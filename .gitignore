@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+coverage/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.*.local
+
+# Editor and operating system files
+.DS_Store
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
