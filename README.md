@@ -30,7 +30,7 @@ The repository is an empty implementation starting point. It currently contains 
 Run client commands through the current workspace package:
 
 ```bash
-pnpm --filter client dev
-pnpm --filter client build
-pnpm --filter client lint
+pnpm --filter @robo-rally/client dev
+pnpm --filter @robo-rally/client build
+pnpm --filter @robo-rally/client lint
 ```
