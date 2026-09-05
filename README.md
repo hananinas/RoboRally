@@ -27,10 +27,11 @@ The repository is an empty implementation starting point. It currently contains 
 └── pnpm-workspace.yaml
 ```
 
-Run client commands through the current workspace package:
+Run commands from the repository root:
 
 ```bash
-pnpm --filter @robo-rally/client dev
-pnpm --filter @robo-rally/client build
-pnpm --filter @robo-rally/client lint
+pnpm dev
+pnpm build
+pnpm lint
+pnpm typecheck
 ```
