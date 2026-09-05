@@ -10,7 +10,7 @@ Building a web-based multiplayer version of the board game `Robo Rally`.
 
 ## Current state
 
-The repository is an empty implementation starting point. It contains a React, TypeScript, and Vite client shell and a minimal TypeScript User Service workspace. Game and user functionality have not been implemented.
+The repository is an empty implementation starting point. It contains a React, TypeScript, and Vite client shell with minimal TypeScript User and Game Service workspaces. Game and user functionality have not been implemented.
 
 ## Requirements
 
@@ -23,6 +23,7 @@ The repository is an empty implementation starting point. It contains a React, T
 .
 ├── apps/
 │   ├── client/
+│   ├── game-service/
 │   └── user-service/
 ├── package.json
 └── pnpm-workspace.yaml

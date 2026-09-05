@@ -54,6 +54,15 @@ importers:
         specifier: ^8.2.2
         version: 8.2.2(@types/node@24.13.3)
 
+  apps/game-service:
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: ~6.0.2
+        version: 6.0.3
+
   apps/user-service:
     devDependencies:
       '@types/node':
