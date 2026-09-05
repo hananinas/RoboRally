@@ -1,81 +1,36 @@
-# RoboRally
+<div align="center">
+  <h1>Robo Rally</h1>
+  <a href="">
+    <img src="https://github.com/user-attachments/assets/e21f2d45-6775-48d8-bf8b-9b1cb99d22e5" alt="Logo" height="80">
+  </a>
+  <h3>For DTU Software Engineering 2</h3>
+</div>
 
-RoboRally is a pnpm monorepo for the project applications and shared packages.
-The repository currently contains a browser-based Battleship game built with
-React, TypeScript, Vite, and Vitest.
+Building a web-based multiplayer version of the board game `Robo Rally`.
 
-## Repository structure
+## Current state
 
-The workspace separates deployable applications from reusable packages:
-
-```text
-.
-├── apps/
-│   └── client/       # React and Vite web application
-├── packages/         # Shared packages added as the project grows
-├── package.json      # Workspace scripts and configuration
-└── pnpm-workspace.yaml
-                       # Workspace package locations
-```
-
-The `.npmrc` configuration uses pnpm's isolated linker and a separate lockfile
-for each workspace. Application dependencies are installed under that
-application's `node_modules` directory. For example, the client dependencies
-are under `apps/client/node_modules`.
+The repository is an empty implementation starting point. It currently contains only a React, TypeScript, and Vite client shell. Game functionality and backend services have not been implemented.
 
 ## Requirements
-
-Install the following tools before you start:
 
 - Node.js 20.19 or newer
 - pnpm 10.9 or newer
 
-## Get started
+## Structure
 
-Run all commands from the repository root:
+```text
+.
+├── apps/
+│   └── client/
+├── package.json
+└── pnpm-workspace.yaml
+```
+
+Run client commands through the current workspace package:
 
 ```bash
-pnpm install
-pnpm dev
+pnpm --filter client dev
+pnpm --filter client build
+pnpm --filter client lint
 ```
-
-Open the URL printed by Vite, normally
-[http://localhost:5173](http://localhost:5173).
-
-## Available commands
-
-Use the root scripts to work with the monorepo:
-
-- `pnpm dev` starts the client development server.
-- `pnpm build` builds every workspace that defines a build script.
-- `pnpm test` runs tests in every workspace that defines a test script.
-- `pnpm typecheck` checks types in every workspace that defines a typecheck
-  script.
-
-To run a command for one workspace, use pnpm's filter option:
-
-```bash
-pnpm --filter @robo-rally/client test
-```
-
-## Add a workspace
-
-Create applications under `apps/` and reusable libraries under `packages/`.
-Each workspace needs a unique `name` in its `package.json`. Run `pnpm install`
-from the repository root after adding it so pnpm installs its dependencies.
-
-## Client configuration
-
-Edit `apps/client/game/config.ts` to change the battlefield size or ship
-configuration:
-
-```typescript
-export const GRID_SIZE = 8;
-export const SHIPS = [7, 4, 3, 2];
-```
-
-## License
-
-The client is based on the MIT-licensed Battleship project by
-[Karel Klima](https://karelklima.com). See
-[`apps/client/LICENSE`](apps/client/LICENSE) for license details.
