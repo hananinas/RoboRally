@@ -1,7 +1,7 @@
 <!-- LTeX: language=en-US -->
 # Decision Summary
 
-The project uses browser-based clients that authenticate through an external Identity Provider. After authentication, clients communicate with the Game Service over Socket.IO. The Game Service handles game logic and persists game data in a local SQLite database.
+The project uses browser-based clients that authenticate through an external Identity Provider. After authentication, clients communicate with the Game Service over Socket.IO for the games core logic. The Game Service handles game logic and persists game data in a local SQLite database.  For certain features that don't need bidirectional, asynchronous communication it might make sense to also support communication via http or another similar protocol. 
 
 ```mermaid
 C4Container
@@ -260,4 +260,5 @@ sequenceDiagram
 
 ```
 
-Using SocketIo doesn't give us contracts by default. But we can use typescript specific schema libraries such as Zod to enforce types.
+Using SocketIo doesn't give us contracts by default. But we can use typescript specific schema libraries such as Zod to enforce types. 
+We should not limit ourselves to this protocol. Some features such as displaying leaderboards might not need bidirectional, asynchronous communication. This should be evaluated on a case by case basis. And we might have to think about enabling communication via multiple protocols.
