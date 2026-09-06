@@ -259,3 +259,5 @@ sequenceDiagram
     end
 
 ```
+
+Using SocketIo doesn't give us contracts by default. But we can use typescript specific schema libraries such as Zod to enforce types.
