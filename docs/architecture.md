@@ -10,7 +10,6 @@ System_Ext(idp, "Identity Provider", "Authenticates users and issues tokens")
 System_Ext(spacer1, "", "", "")
 Container_Ext(client1, "Browser Client 1", "Web Browser", "Game client")
 Container_Ext(client2, "Browser Client 2", "Web Browser", "Game client")
-Container_Ext(client2, "Browser Client 2", "Web Browser", "Game client")
 System_Ext(idp, "Identity Provider", "Authenticates users and issues tokens")
 
 
@@ -29,7 +28,7 @@ Rel(gameService, gameDb, "Reads and writes")
 
 UpdateRelStyle(client1, gameService, $offsetY="-40")
 UpdateRelStyle(client2, gameService, $offsetY="-40")
-UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
+UpdateLayoutConfig($c4ShapeInRow="2", $c4BoundaryInRow="1")
 UpdateElementStyle(spacer1, $bgColor="transparent", $fontColor="transparent", $borderColor="transparent")
 ```
 
@@ -196,7 +195,7 @@ We could use the Socket.IO library which adds a couple of useful features which 
 Through the room feature we can easily model player lobbies and game rooms and broadcast messages to all relevant users.
 A user would be member to up to 3 rooms:
 1. user room: Contains private user messages such as which cards are being played 
-2. game room: Contains all messages all players in a given game should receive (eg. RobotMoved(A)) 
+2. game room: Contains messages all players in a given game should receive (eg. RobotMoved(A)) 
 3. lobby room: used to set up games and contains messages such as PlayerJoined(A))
 
 
