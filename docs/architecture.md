@@ -128,16 +128,20 @@ Game service asks the user service whether a user is authenticated via a message
 **Alternative**:
 No communication between services. 
 
-**Evaluation**: The user servise is dropped. For authentication purposes we don't necessaryly need communication between game service and the identity provider. The client would authenticate via the identity provider and receive a signed token which would then be supplied to the game service. The game service can verify that the token has been signed by the identity provider via the identity providers public key. The only reason why we would need communication between game service and identity provider is if we don't want to statically supply the certificate. I think we can consider key rotation out of scope.
+**Evaluation**: 
+The user service is dropped. For authentication purposes we don't necessarily need communication between game service and the identity provider. The client would authenticate via the identity provider and receive a signed token which would then be supplied to the game service. The game service can verify that the token has been signed by the identity provider via the identity providers public key. The only reason why we would need communication between game service and identity provider is if we don't want to statically supply the certificate. I think we can consider key rotation out of scope.
 
 
 ## Database Choice
 
-**Requirement**: A service needs to be able to reliably persist data
+**Requirement**:
+A service needs to be able to reliably persist data
 
-**Initial Proposal**: SQLight Databases per service
+**Initial Proposal**:
+SQLight Databases per service
 
-**Alternative**: PostgreSQL Databases
+**Alternative**:
+PostgreSQL Databases
 
 **Evaluation**: 
 There are two main shortcomings of an embedded DB such as SQLight. They both relate to scale. If our server would be under a high load, it might become necessary to create multiple instances, potentially running on multiple servers. With Postgres, we could simply point all instances of our services to the Postgres database server. With SQLight we would need to mount the file to our application servers. At this scale, and potentially even before, another weakness of SQLight would come to light. SQLight doesn't support concurrent writes. However, in this projects' context we will never reach a high amount of concurrent writes, nor will writes become complicated and long. SQLight should still be able to handle a couple of thousands writes per second, which is more than enough for our use case. The main advantage is simplicity. We wouldn't have to manage a database server. Given that SQLight meets our performance requirements, I would prioritize this simplicity and focus our time on other areas.
@@ -167,7 +171,7 @@ sequenceDiagram
     participant Client
     participant GameService as Game Service
 
-    Client->>GameService: SubmitProgram()
+    Client->>GameService: SubmitRegisters()
     GameService-->>Client: OK
 
     Client->>GameService: WatchGame()
@@ -185,7 +189,6 @@ From what I have read even with gRPC-Web the web implementation isn't optimal. I
 
 
 **Alternative**
-**Websockets** 
 Websockets support bidirectional communication and is widely supported in modern browsers. 
 
 We could use the Socket.IO library which adds a couple of useful features which we would have to implement ourselves with grpc:
@@ -233,8 +236,8 @@ sequenceDiagram
     S-->>U: Emit private hand
     Note over S,U: Only this user's connections receive it
 
-    C->>S: submitRegisters(cards, expectedVersion)
-    S->>S: Validate player, cards, phase and version
+    C->>S: submitRegisters(cards)
+    S->>S: Validate player, cards
     S-->>U: Emit submissionAccepted
 
     S->>S: Resolve programmed actions
@@ -259,5 +262,8 @@ sequenceDiagram
 
 ```
 
-Using SocketIo doesn't give us contracts by default. But we can use typescript specific schema libraries such as Zod to enforce types. 
+
+**Evaluation**
+GRPC is not supported in the browser. From what I have read even with gRPC-Web the web implementation isn't optimal. It introduces the need for a proxy in between the client and the service which translates http calls into rpc calls. The main advantage would be strict contracts. Contracts would be useful and with SocketIO we wouldn't get this by default. But we can use typescript specific schema libraries such as Zod to enforce types. I am leaning towards SocketIO due to the room feature, which perfectly maps some of the game logic regarding player lobbies and game rooms, and grpcs not being fully supported my browsers.
+
 We should not limit ourselves to this protocol. Some features such as displaying leaderboards might not need bidirectional, asynchronous communication. This should be evaluated on a case by case basis. And we might have to think about enabling communication via multiple protocols.
