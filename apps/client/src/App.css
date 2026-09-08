@@ -1,4 +1,13 @@
 .game {
+  --ui-gap: 1.25rem;
+  --ui-panel-width: clamp(18rem, 23vw, 20.5rem);
+  --ui-panel-radius: 1rem;
+  --ui-hand-card-width: 8rem;
+  --ui-hand-card-height: 11rem;
+  --ui-register-card-width: 3rem;
+  --ui-register-card-height: 4rem;
+  --ui-register-card-radius: 0.6rem;
+
   position: relative;
   isolation: isolate;
   width: 100%;
@@ -18,5 +27,129 @@
 
 .game-overlay {
   z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--ui-panel-width);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: var(--ui-gap);
+  padding: var(--ui-gap);
   pointer-events: none;
+}
+
+.game-hud {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--ui-gap);
+  overflow-y: auto;
+  pointer-events: auto;
+}
+
+.panel {
+  padding: 1.5rem;
+  border-radius: var(--ui-panel-radius);
+  background: #fff;
+  box-shadow: 0 0.5rem 1.5rem #0002;
+}
+
+.player-panel__name,
+.register-panel__heading {
+  margin: 0;
+  color: #333;
+}
+
+.player-panel__name {
+  font-size: 1.75rem;
+}
+
+.register-panel__heading {
+  font-size: 1.2rem;
+}
+
+.registers {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.register {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  color: #555;
+  font-weight: 600;
+}
+
+.register__card {
+  display: grid;
+  width: var(--ui-register-card-width);
+  height: var(--ui-register-card-height);
+  place-items: center;
+  border: 2px dashed #aaa;
+  border-radius: var(--ui-register-card-radius);
+}
+
+.register__card--filled {
+  border-color: transparent;
+}
+
+.register-panel__done {
+  display: block;
+  margin: 1.25rem auto 0;
+  padding: 0.5rem 1.25rem;
+  border: 0;
+  border-radius: 999px;
+  background: #666;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+}
+
+.register-panel__done:disabled {
+  opacity: 0.45;
+}
+
+.programming-hand {
+  grid-column: 1;
+  grid-row: 2;
+  display: grid;
+  grid-auto-columns: var(--ui-hand-card-width);
+  grid-auto-flow: column;
+  gap: 0.75rem;
+  overflow-x: auto;
+  pointer-events: auto;
+}
+
+.program-card {
+  background: #b9b9b9;
+}
+
+.program-card--hand {
+  width: var(--ui-hand-card-width);
+  height: var(--ui-hand-card-height);
+  border: 2px solid #fff;
+  border-radius: 1rem;
+}
+
+.program-card--register {
+  width: var(--ui-register-card-width);
+  height: var(--ui-register-card-height);
+  border-radius: var(--ui-register-card-radius);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

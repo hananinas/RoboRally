@@ -18,14 +18,26 @@ export type ClientGameState = {
 export const REGISTER_COUNT = 5
 
 export function createMockGameState(): ClientGameState {
+  const cardLabels = [
+    'Move 1',
+    'Turn Left',
+    'Move 1',
+    'Turn Left',
+    'Move 1',
+    'Turn Left',
+    'Move 1',
+    'Turn Left',
+    'Move 1',
+  ]
+
   return {
     phase: 'programming',
     player: {
       name: 'Player Name',
     },
-    hand: Array.from({ length: 9 }, (_, index) => ({
+    hand: cardLabels.map((label, index) => ({
       id: `card-${index + 1}`,
-      label: `Programming card ${index + 1}`,
+      label,
     })),
     registers: Array.from({ length: REGISTER_COUNT }, () => null),
     confirmed: false,
