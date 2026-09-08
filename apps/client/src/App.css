@@ -2,10 +2,10 @@
   --ui-gap: 1.25rem;
   --ui-panel-width: clamp(18rem, 23vw, 20.5rem);
   --ui-panel-radius: 1rem;
-  --ui-hand-card-width: 8rem;
-  --ui-hand-card-height: 11rem;
+  --ui-hand-card-width: 6.5rem;
+  --ui-hand-card-height: 9rem;
   --ui-hand-card-radius: 1rem;
-  --ui-register-card-width: 3rem;
+  --ui-register-card-width: 2.75rem;
   --ui-register-card-height: 4rem;
   --ui-register-card-radius: 0.6rem;
 
@@ -44,11 +44,12 @@
   flex-direction: column;
   gap: var(--ui-gap);
   overflow-y: auto;
+  overscroll-behavior: contain;
   pointer-events: auto;
 }
 
 .panel {
-  padding: 1.5rem;
+  padding: 1.25rem;
   border-radius: var(--ui-panel-radius);
   background: #fff;
   box-shadow: 0 0.5rem 1.5rem #0002;
@@ -70,10 +71,12 @@
 
 .registers {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.5rem;
+  grid-template-columns: repeat(5, var(--ui-register-card-width));
+  gap: 0.4rem;
   margin: 0.75rem 0 0;
-  padding: 0;
+  padding: 0 0 0.25rem;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
   list-style: none;
 }
 
@@ -123,6 +126,8 @@
   grid-auto-flow: column;
   gap: 0.75rem;
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
   pointer-events: auto;
 }
 
@@ -142,6 +147,7 @@
   height: var(--ui-hand-card-height);
   border: 2px solid #fff;
   border-radius: var(--ui-hand-card-radius);
+  touch-action: pan-x;
 }
 
 .program-card--register {
@@ -177,4 +183,53 @@
 
 .program-card:disabled {
   cursor: default;
+}
+
+@media (max-width: 48rem) {
+  .game {
+    --ui-gap: 0.75rem;
+    --ui-hand-card-width: 5.5rem;
+    --ui-hand-card-height: 7.5rem;
+    --ui-hand-card-radius: 0.8rem;
+    --ui-register-card-width: 2.5rem;
+    --ui-register-card-height: 3.25rem;
+  }
+
+  .game-overlay {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .game-hud {
+    grid-column: 1;
+    grid-row: 1;
+    max-height: 45dvh;
+  }
+
+  .panel {
+    padding: 1rem;
+  }
+
+  .player-panel__name {
+    font-size: 1.25rem;
+  }
+
+  .register-panel__heading {
+    font-size: 1rem;
+  }
+
+  .register-panel__done {
+    margin-top: 0.75rem;
+  }
+
+  .programming-hand {
+    grid-column: 1;
+    grid-row: 3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dragged-card {
+    transition: none;
+  }
 }
