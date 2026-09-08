@@ -9,23 +9,34 @@ import {
   placeCard,
   registersAreFilled,
   removeCard,
+  type ClientGameState,
   type ProgramCard,
 } from './gameState.ts'
+
+function withPlacedCard(
+  state: ClientGameState,
+  card: ProgramCard,
+  registerIndex: number,
+): ClientGameState {
+  if (state.confirmed) return state
+
+  const registers = placeCard(state.registers, card, registerIndex)
+  return registers === state.registers ? state : { ...state, registers }
+}
 
 function App() {
   const [gameState, setGameState] = useState(createMockGameState)
 
   function selectCard(card: ProgramCard) {
-    setGameState((currentState) => {
-      if (currentState.confirmed) return currentState
+    setGameState((currentState) =>
+      withPlacedCard(currentState, card, currentState.registers.indexOf(null)),
+    )
+  }
 
-      const registerIndex = currentState.registers.indexOf(null)
-      const registers = placeCard(currentState.registers, card, registerIndex)
-
-      return registers === currentState.registers
-        ? currentState
-        : { ...currentState, registers }
-    })
+  function dropCard(card: ProgramCard, registerIndex: number) {
+    setGameState((currentState) =>
+      withPlacedCard(currentState, card, registerIndex),
+    )
   }
 
   function clearRegister(registerIndex: number) {
@@ -71,6 +82,7 @@ function App() {
             registeredCardIds={registeredCardIds}
             confirmed={gameState.confirmed}
             onSelect={selectCard}
+            onDrop={dropCard}
           />
         )}
       </div>

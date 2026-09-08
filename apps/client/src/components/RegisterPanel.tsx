@@ -29,10 +29,11 @@ function RegisterSlot({
   const cardClassName = card
     ? 'register__card register__card--filled'
     : 'register__card'
+  const registerIndex = card || disabled ? undefined : index
 
   return (
     <li className="register">
-      <div className={cardClassName}>
+      <div className={cardClassName} data-register-index={registerIndex}>
         {card && (
           <ProgramCard
             card={card}

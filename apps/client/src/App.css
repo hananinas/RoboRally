@@ -4,6 +4,7 @@
   --ui-panel-radius: 1rem;
   --ui-hand-card-width: 8rem;
   --ui-hand-card-height: 11rem;
+  --ui-hand-card-radius: 1rem;
   --ui-register-card-width: 3rem;
   --ui-register-card-height: 4rem;
   --ui-register-card-radius: 0.6rem;
@@ -133,13 +134,14 @@
   border: 0;
   background: #b9b9b9;
   cursor: pointer;
+  touch-action: none;
 }
 
 .program-card--hand {
   width: var(--ui-hand-card-width);
   height: var(--ui-hand-card-height);
   border: 2px solid #fff;
-  border-radius: 1rem;
+  border-radius: var(--ui-hand-card-radius);
 }
 
 .program-card--register {
@@ -150,6 +152,21 @@
 
 .program-card--selected {
   opacity: 0.25;
+}
+
+.program-card--dragging {
+  opacity: 0;
+}
+
+.dragged-card {
+  position: fixed;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  transition:
+    width 120ms ease,
+    height 120ms ease,
+    border-radius 120ms ease;
+  pointer-events: none;
 }
 
 .program-card:focus-visible,
