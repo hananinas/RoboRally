@@ -1,8 +1,12 @@
+import './App.css'
+import BoardViewport from './components/BoardViewport.tsx'
+
 function App() {
   return (
-    <main>
-      <h1>Robo Rally</h1>
-    </main>
+    <div className="game">
+      <BoardViewport />
+      <div className="game-overlay" />
+    </div>
   )
 }
 

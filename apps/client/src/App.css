@@ -1,0 +1,22 @@
+.game {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.board-viewport,
+.game-overlay {
+  position: absolute;
+  inset: 0;
+}
+
+.board-viewport {
+  background: #d8d8d8;
+}
+
+.game-overlay {
+  z-index: 1;
+  pointer-events: none;
+}
