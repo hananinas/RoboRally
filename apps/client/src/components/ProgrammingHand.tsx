@@ -1,4 +1,4 @@
-import { useState, type PointerEvent } from 'react'
+import { useState, type PointerEvent, type Ref } from 'react'
 import type { ProgramCard as Card } from '../gameState.ts'
 import ProgramCard from './ProgramCard.tsx'
 
@@ -14,6 +14,7 @@ type CardDrag = {
 }
 
 type ProgrammingHandProps = {
+  containerRef: Ref<HTMLElement>
   cards: readonly Card[]
   registeredCardIds: ReadonlySet<string>
   confirmed: boolean
@@ -32,6 +33,7 @@ function registerAtPoint(x: number, y: number): number | null {
 }
 
 function ProgrammingHand({
+  containerRef,
   cards,
   registeredCardIds,
   confirmed,
@@ -104,7 +106,11 @@ function ProgrammingHand({
   }
 
   return (
-    <section className="programming-hand" aria-label="Programming hand">
+    <section
+      ref={containerRef}
+      className="programming-hand"
+      aria-label="Programming hand"
+    >
       {cards.map((card) => {
         const selected = registeredCardIds.has(card.id)
 

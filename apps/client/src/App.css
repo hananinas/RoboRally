@@ -39,13 +39,16 @@
 .game-hud {
   grid-column: 2;
   grid-row: 1 / -1;
-  display: flex;
   min-height: 0;
-  flex-direction: column;
-  gap: var(--ui-gap);
   overflow-y: auto;
   overscroll-behavior: contain;
   pointer-events: auto;
+}
+
+.game-hud__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-gap);
 }
 
 .panel {
@@ -63,6 +66,32 @@
 
 .player-panel__name {
   font-size: 1.75rem;
+}
+
+.player-panel__details {
+  margin-top: 1rem;
+}
+
+.player-panel__detail {
+  padding: 0.75rem 0;
+  border-top: 1px solid #ddd;
+  text-align: center;
+}
+
+.player-panel__detail h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.player-panel__toggle {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.75rem;
+  padding: 0;
+  border: 0;
+  background: #aaa;
+  cursor: pointer;
 }
 
 .register-panel__heading {
@@ -178,6 +207,7 @@
 }
 
 .program-card:focus-visible,
+.player-panel__toggle:focus-visible,
 .register-panel__done:focus-visible {
   outline: 3px solid #333;
   outline-offset: 3px;
@@ -187,7 +217,32 @@
   cursor: default;
 }
 
-@media (max-width: 30rem) {
+.game-overlay--hud-fits .game-hud {
+  overflow: visible;
+}
+
+@media (width > 30rem) {
+  .game-hud {
+    margin: calc(0px - var(--ui-gap));
+    padding: var(--ui-gap);
+    scroll-padding: var(--ui-gap);
+  }
+
+  .game-overlay--hand-below-hud .game-hud {
+    grid-row: 1;
+    align-self: start;
+    max-height: 100%;
+  }
+
+  .game-overlay--hand-below-hud .programming-hand {
+    grid-column: 1 / -1;
+    margin-inline: calc(0px - var(--ui-gap));
+    padding-inline: var(--ui-gap);
+    scroll-padding-inline: var(--ui-gap);
+  }
+}
+
+@media (width <= 30rem) {
   .game {
     --ui-gap: 0.75rem;
     --ui-hand-card-width: 5.5rem;
@@ -227,18 +282,9 @@
   .programming-hand {
     grid-column: 1;
     grid-row: 3;
-  }
-}
-
-@media (min-width: 30.0625rem) and (min-height: 36rem) {
-  .game-hud {
-    grid-row: 1;
-    align-self: start;
-    max-height: 100%;
-  }
-
-  .programming-hand {
-    grid-column: 1 / -1;
+    margin-inline: calc(0px - var(--ui-gap));
+    padding-inline: var(--ui-gap);
+    scroll-padding-inline: var(--ui-gap);
   }
 }
 

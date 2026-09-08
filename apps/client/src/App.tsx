@@ -12,6 +12,7 @@ import {
   type ClientGameState,
   type ProgramCard,
 } from './gameState.ts'
+import useOverlayLayout from './useOverlayLayout.ts'
 
 function withPlacedCard(
   state: ClientGameState,
@@ -26,6 +27,13 @@ function withPlacedCard(
 
 function App() {
   const [gameState, setGameState] = useState(createMockGameState)
+  const {
+    handBelowHud,
+    handRef,
+    hudContentRef,
+    hudFits,
+    overlayRef,
+  } = useOverlayLayout()
 
   function selectCard(card: ProgramCard) {
     setGameState((currentState) =>
@@ -62,22 +70,32 @@ function App() {
   const registeredCardIds = new Set(
     gameState.registers.flatMap((card) => (card ? [card.id] : [])),
   )
+  const overlayClassName = [
+    'game-overlay',
+    handBelowHud && 'game-overlay--hand-below-hud',
+    hudFits && 'game-overlay--hud-fits',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <div className="game">
       <BoardViewport />
-      <div className="game-overlay">
+      <div ref={overlayRef} className={overlayClassName}>
         <aside className="game-hud" aria-label="Game controls">
-          <PlayerPanel player={gameState.player} />
-          <RegisterPanel
-            registers={gameState.registers}
-            confirmed={gameState.confirmed}
-            onRemove={clearRegister}
-            onConfirm={confirmProgram}
-          />
+          <div ref={hudContentRef} className="game-hud__content">
+            <PlayerPanel player={gameState.player} />
+            <RegisterPanel
+              registers={gameState.registers}
+              confirmed={gameState.confirmed}
+              onRemove={clearRegister}
+              onConfirm={confirmProgram}
+            />
+          </div>
         </aside>
         {gameState.phase === 'programming' && (
           <ProgrammingHand
+            containerRef={handRef}
             cards={gameState.hand}
             registeredCardIds={registeredCardIds}
             confirmed={gameState.confirmed}
