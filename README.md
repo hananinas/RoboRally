@@ -35,5 +35,12 @@ Run commands from the repository root:
 pnpm dev
 pnpm build
 pnpm lint
+pnpm test
 pnpm typecheck
+```
+
+Install Chromium once before running the browser tests:
+
+```bash
+pnpm --filter @robo-rally/client exec playwright install chromium
 ```
