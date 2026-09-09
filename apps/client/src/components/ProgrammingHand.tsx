@@ -24,6 +24,7 @@ type ProgrammingHandProps = {
 
 const dragThreshold = 4
 
+// Finds an open register at a point.
 function registerAtPoint(x: number, y: number): number | null {
   const target = document.elementFromPoint(x, y)
   const register = target?.closest<HTMLElement>('[data-register-index]')
@@ -32,6 +33,7 @@ function registerAtPoint(x: number, y: number): number | null {
   return Number.isInteger(registerIndex) ? registerIndex : null
 }
 
+// Renders and manages the draggable hand.
 function ProgrammingHand({
   containerRef,
   cards,
@@ -42,6 +44,7 @@ function ProgrammingHand({
 }: ProgrammingHandProps) {
   const [drag, setDrag] = useState<CardDrag | null>(null)
 
+  // Starts pointer tracking.
   function startDrag(card: Card, event: PointerEvent<HTMLButtonElement>) {
     if (event.button !== 0 || !event.isPrimary) return
 
@@ -58,6 +61,7 @@ function ProgrammingHand({
     })
   }
 
+  // Updates the drag preview.
   function moveDrag(event: PointerEvent<HTMLButtonElement>) {
     setDrag((currentDrag) => {
       if (!currentDrag || currentDrag.pointerId !== event.pointerId) {
@@ -83,6 +87,7 @@ function ProgrammingHand({
     })
   }
 
+  // Places or selects the card.
   function finishDrag(event: PointerEvent<HTMLButtonElement>) {
     if (!drag || drag.pointerId !== event.pointerId) return
 
@@ -101,6 +106,7 @@ function ProgrammingHand({
     setDrag(null)
   }
 
+  // Clears an interrupted drag.
   function cancelDrag(event: PointerEvent<HTMLButtonElement>) {
     if (drag?.pointerId === event.pointerId) setDrag(null)
   }

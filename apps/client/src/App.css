@@ -1,3 +1,4 @@
+/* Page layers */
 .game {
   --ui-gap: 1.25rem;
   --ui-panel-width: clamp(18rem, 23vw, 20.5rem);
@@ -51,6 +52,11 @@
   gap: var(--ui-gap);
 }
 
+.game-overlay--hud-fits .game-hud {
+  overflow: visible;
+}
+
+/* Panels */
 .panel {
   padding: 1.25rem;
   border-radius: var(--ui-panel-radius);
@@ -94,6 +100,7 @@
   cursor: pointer;
 }
 
+/* Registers */
 .register-panel__heading {
   font-size: 1.2rem;
 }
@@ -148,6 +155,7 @@
   opacity: 0.45;
 }
 
+/* Hand and cards */
 .programming-hand {
   grid-column: 1;
   grid-row: 2;
@@ -206,6 +214,7 @@
   pointer-events: none;
 }
 
+/* Interaction states */
 .program-card:focus-visible,
 .player-panel__toggle:focus-visible,
 .register-panel__done:focus-visible {
@@ -217,10 +226,7 @@
   cursor: default;
 }
 
-.game-overlay--hud-fits .game-hud {
-  overflow: visible;
-}
-
+/* Wide layout */
 @media (width > 30rem) {
   .game-hud {
     margin: calc(0px - var(--ui-gap));
@@ -242,6 +248,7 @@
   }
 }
 
+/* Compact layout */
 @media (width <= 30rem) {
   .game {
     --ui-gap: 0.75rem;
@@ -288,6 +295,7 @@
   }
 }
 
+/* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .dragged-card {
     transition: none;

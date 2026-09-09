@@ -17,6 +17,7 @@ export type ClientGameState = {
 
 export const REGISTER_COUNT = 5
 
+// Creates temporary client state.
 export function createMockGameState(): ClientGameState {
   const cardLabels = [
     'Move 1',
@@ -44,6 +45,7 @@ export function createMockGameState(): ClientGameState {
   }
 }
 
+// Places a card when allowed.
 export function placeCard(
   registers: Registers,
   card: ProgramCard,
@@ -63,6 +65,7 @@ export function placeCard(
   )
 }
 
+// Removes a registered card.
 export function removeCard(
   registers: Registers,
   registerIndex: number,
@@ -80,6 +83,7 @@ export function removeCard(
   )
 }
 
+// Checks whether every register is filled.
 export function registersAreFilled(registers: Registers): boolean {
   return registers.every((card) => card !== null)
 }

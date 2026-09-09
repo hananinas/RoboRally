@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 
+// Tracks content-based overlay layout.
 function useOverlayLayout() {
   const overlayRef = useRef<HTMLDivElement>(null)
   const hudContentRef = useRef<HTMLDivElement>(null)
@@ -15,6 +16,7 @@ function useOverlayLayout() {
 
     if (!overlay || !hud || !hudContent || !hand) return
 
+    // Refreshes the layout flags.
     const updateLayout = () => {
       const overlayStyle = getComputedStyle(overlay)
       const contentBottom =

@@ -5,6 +5,7 @@ type PanelProps = {
   className?: string
 }
 
+// Provides the shared panel surface.
 function Panel({ children, className }: PanelProps) {
   const panelClassName = className ? `panel ${className}` : 'panel'
 

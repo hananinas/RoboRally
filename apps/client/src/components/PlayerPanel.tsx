@@ -6,6 +6,7 @@ type PlayerPanelProps = {
   player: ClientGameState['player']
 }
 
+// Shows collapsible player details.
 function PlayerPanel({ player }: PlayerPanelProps) {
   const [expanded, setExpanded] = useState(true)
 

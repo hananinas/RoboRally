@@ -20,6 +20,7 @@ type RegisterSlotProps = {
   onRemove: (registerIndex: number) => void
 }
 
+// Renders one register slot.
 function RegisterSlot({
   card,
   index,
@@ -49,6 +50,7 @@ function RegisterSlot({
   )
 }
 
+// Renders the program registers.
 function RegisterPanel({
   registers,
   confirmed,

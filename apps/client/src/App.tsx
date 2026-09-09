@@ -14,6 +14,7 @@ import {
 } from './gameState.ts'
 import useOverlayLayout from './useOverlayLayout.ts'
 
+// Applies a valid card placement.
 function withPlacedCard(
   state: ClientGameState,
   card: ProgramCard,
@@ -25,6 +26,7 @@ function withPlacedCard(
   return registers === state.registers ? state : { ...state, registers }
 }
 
+// Renders the board and controls.
 function App() {
   const [gameState, setGameState] = useState(createMockGameState)
   const {
@@ -35,18 +37,21 @@ function App() {
     overlayRef,
   } = useOverlayLayout()
 
+  // Fills the next open register.
   function selectCard(card: ProgramCard) {
     setGameState((currentState) =>
       withPlacedCard(currentState, card, currentState.registers.indexOf(null)),
     )
   }
 
+  // Fills the chosen register.
   function dropCard(card: ProgramCard, registerIndex: number) {
     setGameState((currentState) =>
       withPlacedCard(currentState, card, registerIndex),
     )
   }
 
+  // Clears one register.
   function clearRegister(registerIndex: number) {
     setGameState((currentState) => {
       if (currentState.confirmed) return currentState
@@ -59,6 +64,7 @@ function App() {
     })
   }
 
+  // Locks a complete program.
   function confirmProgram() {
     setGameState((currentState) =>
       currentState.confirmed || !registersAreFilled(currentState.registers)

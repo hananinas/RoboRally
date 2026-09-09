@@ -1,4 +1,4 @@
-What it needs:
+o=lWhat it needs:
 - Create Game GRPC service
 	- Board model (containing objects) with empty tiles
 	- Robot model

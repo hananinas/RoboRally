@@ -9,6 +9,7 @@ type ProgramCardProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   label?: string
 }
 
+// Renders a blank program card.
 function ProgramCard({
   card,
   size,
