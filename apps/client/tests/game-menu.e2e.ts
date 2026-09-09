@@ -88,6 +88,51 @@ test('keeps an open popover on screen after resizing', async ({ page }) => {
   }
 })
 
+test('skips the disabled option without trapping keyboard focus', async ({ page }) => {
+  const trigger = page.getByRole('button', { name: 'Game options', exact: true })
+  const options = page.getByRole('region', { name: 'Game options' })
+  const collapse = page.getByRole('button', { name: 'Collapse player details' })
+
+  await page.keyboard.press('Tab')
+  await expect(trigger).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(options).toBeVisible()
+  await page.keyboard.press('Tab')
+  await expect(collapse).toBeFocused()
+  await page.keyboard.press('Shift+Tab')
+  await expect(trigger).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(options).toBeHidden()
+})
+
+test('preserves the program and allows card selection when dismissing the menu', async ({ page }) => {
+  const trigger = page.getByRole('button', { name: 'Game options', exact: true })
+  const options = page.getByRole('region', { name: 'Game options' })
+  const handCards = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
+  const controls = page.getByRole('complementary', { name: 'Game controls' })
+  const registerCards = controls.getByRole('button', { name: /remove from register/ })
+
+  await handCards.nth(0).click()
+  await expect(registerCards).toHaveCount(1)
+  await trigger.click()
+  await expect(options).toBeVisible()
+  await expect(registerCards).toHaveCount(1)
+  await expect(handCards.nth(0)).toBeDisabled()
+
+  await handCards.nth(1).click()
+  await expect(options).toBeHidden()
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  await expect(registerCards).toHaveCount(2)
+  await expect(controls.getByRole('button', { name: 'Move 1, remove from register 1', exact: true })).toBeVisible()
+  await expect(controls.getByRole('button', { name: 'Turn Left, remove from register 2', exact: true })).toBeVisible()
+  await expect(controls.getByRole('button', { name: 'Done', exact: true })).toBeDisabled()
+
+  await trigger.click()
+  await page.keyboard.press('Escape')
+  await expect(options).toBeHidden()
+  await expect(registerCards).toHaveCount(2)
+})
+
 test.describe('touch interaction', () => {
   test.use({ hasTouch: true, viewport: { width: 375, height: 812 } })
 
