@@ -9,6 +9,7 @@
   --ui-register-card-width: 2.75rem;
   --ui-register-card-height: 4rem;
   --ui-register-card-radius: 0.6rem;
+  --ui-menu-trigger-size: 2.75rem;
 
   position: relative;
   isolation: isolate;
@@ -54,6 +55,79 @@
 
 .game-overlay--hud-fits .game-hud {
   overflow: visible;
+}
+
+/* Game options: the popover uses the browser's top layer. */
+.game-menu {
+  position: absolute;
+  z-index: 1;
+  top: var(--ui-gap);
+  left: var(--ui-gap);
+}
+
+.game-menu__trigger {
+  display: grid;
+  width: var(--ui-menu-trigger-size);
+  height: var(--ui-menu-trigger-size);
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 0.75rem;
+  background: #fff;
+  color: #333;
+  box-shadow: 0 0.25rem 0.5rem #0001;
+  cursor: pointer;
+}
+
+.game-menu__trigger:hover,
+.game-menu__trigger[aria-expanded='true'] {
+  background: #eee;
+}
+
+.game-menu__trigger:active {
+  background: #e2e2e2;
+}
+
+.game-menu__popover {
+  position: fixed;
+  inset: calc(var(--ui-gap) + var(--ui-menu-trigger-size) + 0.5rem) auto auto var(--ui-gap);
+  width: min(16rem, calc(100vw - 2 * var(--ui-gap)));
+  max-height: calc(100dvh - 2 * var(--ui-gap) - var(--ui-menu-trigger-size) - 0.5rem);
+  margin: 0;
+  padding: 0.5rem;
+  overflow-y: auto;
+  border: 0;
+  border-radius: var(--ui-panel-radius);
+  background: #fff;
+  color: #333;
+  box-shadow: 0 0.5rem 1.5rem #0002;
+}
+
+.game-menu__heading {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.game-menu__options {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.game-menu__option {
+  width: 100%;
+  min-height: var(--ui-menu-trigger-size);
+  padding: 0.75rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: #f3f3f3;
+  color: #666;
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: default;
 }
 
 /* Panels */
@@ -216,6 +290,7 @@
 
 /* Interaction states */
 .program-card:focus-visible,
+.game-menu__trigger:focus-visible,
 .player-panel__toggle:focus-visible,
 .register-panel__done:focus-visible {
   outline: 3px solid #333;
@@ -260,6 +335,7 @@
   }
 
   .game-overlay {
+    padding-top: calc(2 * var(--ui-gap) + var(--ui-menu-trigger-size));
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
   }
