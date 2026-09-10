@@ -19,108 +19,70 @@
 For v0, the infinite game loop is:
 Programming → Activation → Programming → ...
 
-## Game Setup
+## Start a playable game
 
-### Start a game
-As a player, I want to start with a board and a robot so that I can begin
-programming immediately.
+As a player, I want to start with a board and a robot so that I can begin programming the robot immediately.
 
 - A board is available when the game starts.
 - The board consists of empty tiles.
 - A robot is placed on the board.
 - The robot has a position and a facing direction.
 
-### Keep track of the game state
-As the game service, I want to maintain the current board and robot state so
-that the game can continue from the result of previous actions.
+## Maintain the game state
 
-- The robot's current position is stored.
-- The robot's current facing direction is stored.
-- Changes made while executing cards become the new game state.
+As the game service, I want to keep track of the board and robot state so that each action can continue from the result of the previous action.
 
-## Programming Phase
+- The robot has a current position.
+- The robot has a current facing direction.
+- Changes to the robot become part of the current game state.
 
-### Create a five-card program
-As a player, I want to arrange five cards in order so that I can decide what
-my robot will do during the activation phase.
+## Program the robot
 
-- There are five register positions.
-- Each register contains either Move 1 or Turn Left.
-- The order of the five cards is clear before the program is submitted.
+As a player, I want to arrange and submit five programming cards in a chosen order so that I can decide what my robot will do during the activation phase.
 
-### Receive a program
-As the game service, I want to receive the player's five-card program so that
-I can execute it during the activation phase.
+- Five register positions are available.
+- Each register contains either `Move 1` or `Turn Left`.
+- The order of the five cards is clear before submission.
+- The completed program can be submitted.
 
-- Five cards can be received from the client.
-- The order chosen by the player is preserved.
+## Receive a program
+
+As the game service, I want to receive the player's program so that I can execute the chosen actions during the activation phase.
+
+- A program consists of five cards.
+- The chosen card order is preserved.
 - The received program is used for the next activation phase.
 
-## Activation Phase
+## Execute the programmed actions
 
-### Move the robot forward
-As a player, I want Move 1 to move my robot forward one tile so that the
-robot follows the program I created.
-
-- The robot moves one tile in the direction it is facing.
-- Its facing direction does not change.
-
-### Turn the robot left
-As a player, I want Turn Left to rotate my robot left so that I can change
-the direction of later movement.
-
-- The robot rotates 90 degrees to the left.
-- The robot remains on the same tile.
-
-### Execute my program in order
-As a player, I want my cards to execute in register order so that the outcome
-matches the sequence I programmed.
+As the game service, I want to execute the programmed actions in register order so that the robot follows the program selected by the player.
 
 - Register 1 executes first and register 5 executes last.
-- Each card acts on the result of the previous card.
-- All five registers are executed during the activation phase.
+- `Move 1` moves the robot one tile in the direction it is facing.
+- `Turn Left` rotates the robot 90 degrees to the left.
+- Each register uses the state resulting from the previous register.
 
-### Continue playing
-As a player, I want to create another program after my current program has
-finished so that I can continue controlling the robot.
+## Show the current game state
 
-- After register 5, a new programming phase begins.
-- The robot keeps its current position and facing direction.
-- The programming and activation cycle can continue repeatedly.
-
-## Game State Updates
-
-### Receive changes to the game
-As the game client, I want to receive changes to the game state so that the
-display stays synchronized with the running game.
-
-- Changes are received while a program is being executed.
-- The latest robot position and facing direction are available to the client.
-- The client can update its view when the state changes.
-
-## Client
-
-### See the board and robot
-As a player, I want to see the board and my robot so that I can understand
-the current game state.
+As the game client, I want to present the current board and robot state so that the player can see what is happening in the game.
 
 - The board is displayed as a grid.
 - The robot is displayed on its current tile.
-- The direction the robot is facing is visible.
+- The robot's facing direction is visible.
+- Changes to the game state are reflected in the displayed board.
 
-### Program the robot using the client
-As a player, I want to choose Move 1 and Turn Left cards in the client so
-that I can program the robot without interacting with the game service
-directly.
+## Receive game changes
 
-- Move 1 and Turn Left are available to choose.
-- Five register positions are visible.
-- The completed five-card program can be submitted.
+As the game client, I want to receive changes to the game state so that the displayed game stays up to date while the program executes.
 
-### Watch the program execute
-As a player, I want the board to update while my program executes so that I
-can see the result of each action.
+- Robot movement is reflected in the client.
+- Robot rotation is reflected in the client.
+- Changes appear without manually reloading the page.
 
-- The robot's displayed position changes when it moves.
-- The robot's displayed direction changes when it turns.
-- Updates appear without manually reloading the page.
+## Continue playing
+
+As a player, I want to create another program after the current one has finished so that I can continue controlling the robot.
+
+- After all five registers have executed, another programming phase begins.
+- The robot keeps its resulting position and facing direction.
+- The programming and activation cycle can continue repeatedly.
