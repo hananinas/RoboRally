@@ -79,7 +79,8 @@
         Game --> Board
         Game --> Deck
         Game --> "2..8" Player
-        Board --> Tile
+        Board "1" *-- "1..*" Tile
+
 
         Robot --> Orientation
         Tile <|-- ConveyorBelt
