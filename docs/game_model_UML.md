@@ -58,7 +58,7 @@
         }
 
         class Hand {
-            +Array Cards
+            +Cards[] cards
         }
 
         class Program {
