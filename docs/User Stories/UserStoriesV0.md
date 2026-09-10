@@ -1,5 +1,5 @@
-o=lWhat it needs:
-- Create Game GRPC service
+**What does v0 need:**
+- Create Game Service
 	- Board model (containing objects) with empty tiles
 	- Robot model
 	- Card model (2 implementations $\leftarrow$ and $\uparrow$)
