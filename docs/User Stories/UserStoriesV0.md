@@ -14,7 +14,10 @@
 - Compile rules for v.0
 
 # User stories
-> “As a \[user\], I want \[goal\] so that \[reason\].”
+> “As a \[role\], I want \[goal\] so that \[reason\].”
+
+For v0, the infinite game loop is:
+Programming → Activation → Programming → ...
 
 A full RoboRally round uses three phases:
 - Upgrade
