@@ -109,11 +109,8 @@ components:
       name: cards.dealt
       payload:
         type: object
-        required: [gameId, cards]
+        required: [cards]
         properties:
-          gameId:
-            type: string
-            format: uuid
           cards:
             type: array
             items:
@@ -123,11 +120,8 @@ components:
       name: program.result
       payload:
         type: object
-        required: [gameId, outcome]
+        required: [outcome]
         properties:
-          gameId:
-            type: string
-            format: uuid
           outcome:
             type: string
             enum:
@@ -139,10 +133,8 @@ components:
       description: Reveals readiness, never the submitted cards.
       payload:
         type: object
-        required: [gameId, playerId]
+        required: [playerId]
         properties:
-          gameId:
-            type: string
           playerId:
             type: string
 
@@ -151,14 +143,10 @@ components:
       payload:
         type: object
         required:
-          - gameId
           - robotId
           - instruction
           - position
         properties:
-          gameId:
-            type: string
-            format: uuid
           robotId:
             type: string
             format: uuid
