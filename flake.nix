@@ -8,7 +8,7 @@
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
 
-      cliVersion = "5.0.7";
+      cliVersion = "6.0.2";
 
       asyncapi = pkgs.writeShellScriptBin "asyncapi" ''
         exec ${pkgs.nodejs_24}/bin/npm exec \
