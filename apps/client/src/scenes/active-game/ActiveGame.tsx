@@ -13,6 +13,7 @@ import {
   type ProgramCard,
 } from './gameState.ts'
 import useOverlayLayout from './useOverlayLayout.ts'
+import { DEMO_BOARD } from './board/demoBoard.ts'
 
 // Applies a valid card placement.
 function withPlacedCard(
@@ -86,7 +87,7 @@ function ActiveGame() {
 
   return (
     <div className="game">
-      <BoardViewport />
+      <BoardViewport board={DEMO_BOARD} />
       <div ref={overlayRef} className={overlayClassName}>
         <aside className="game-hud" aria-label="Game controls">
           <div ref={hudContentRef} className="game-hud__content">
