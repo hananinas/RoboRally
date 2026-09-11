@@ -87,7 +87,7 @@
         Tile <|-- EmptyTile
         Tile --> Robot
 
-        Program --> Robot
+        Robot --> Program
 
         Card "0..160" <-- Deck
         Card "0..9" <-- Hand
