@@ -1,5 +1,5 @@
-This UML Class diagram is to be used for internal development purposes.
-Will update with a mode conceptual domain diagram which will be used for presentations highlighting parts of the model.
+This UML Class diagram is to be used for internal development purposes. Such as planning what needs to be implemented and how. \
+Will update with a more conceptual domain diagram which will be used for presentations highlighting parts of the model.
 
 ```mermaid
     classDiagram
