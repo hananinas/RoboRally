@@ -1,47 +1,43 @@
 
 ```mermaid
     classDiagram
-        direction TD
+        direction LR
+
+        class Game {
+        +board: Board
+        +players: Player[]
+        -deck: Card[] unordered
+        -dealCards()
+        +gameLoop()
+        }
 
         class Board {
-        -Tile[][] matrix
+        -tiles: Tile[][]
+        -robots: Robot[]
         +moveRobot(Robot robot)
+        -sortRobots()
+        -execute()
         }
 
         class Tile {
             <<abstract>>
-            -Bool wall_N
-            -Bool wall_E
-            -Bool wall_S
-            -Bool wall_W
-            +Robot robot
-            +performAction()
+            +walls: Orientation[] set
+            +robot: Robot
+            +activate()
         }
 
-        class ConveyorBelt{
-            +performAction()
-        }
-
-        class Game {
-        +Board board
-        +Player[] players
-        +Robot[] robots
-        +setPlayers()
-        +genBoard()
-        +setRobots()
-        +dealCards()
-        +activationPhase()
-        }
+        class Pit
 
         class Player {
-        -Robot robot
-        +setProgram(Robot robot)
+        -robot: Robot
+        -hand: Card[] unordered
+        +assignProgram()
         }
 
         class Robot {
-        -Orientation orientation
-        -int health
-        +Program program
+        -orientation: Orientation
+        +tile: Tile
+        +program: Card[] ordered
         }
 
         class Orientation {
@@ -54,74 +50,58 @@
 
         class Card {
             <<abstract>>
-            +execute()
-        }
-
-        class Hand {
-            +Cards[] cards
-        }
-
-        class Program {
-            +Stack Cards
+            +action()
         }
 
         class Move1
         class TurnLeft
 
-        class Deck {
-            +List Cards
-        }
-
-        class EmptyTile
-        class ConveyorBelt
-
-
-        Game --> Board
-        Game --> Deck
-        Game --> "2..8" Player
-        Board "1" *-- "1..*" Tile
-
+        Game "1" *--> "0..1" Board
+        Game *--> "1..*" Player
+        Board "1" *-- "*" Tile
 
         Robot --> Orientation
-        Tile <|-- ConveyorBelt
-        Tile <|-- EmptyTile
-        Tile --> Robot
+        Tile <|-- Pit
+        Tile --> "*" Orientation
+        Tile "1" -- "0..1" Robot
 
-        Robot --> Program
+        Player "1" --> "1" Robot
 
-        Card "0..160" <-- Deck
-        Card "0..9" <-- Hand
-        Card "0..5" <-- Program
-        
-        Player --> Robot
-        Player --> Hand
+        Game  *--  Card
+        Player  *--  Card
+        Robot  *--  Card
 
-        Move1 --|> Card
-        TurnLeft --|> Card
+        Card <|-- Move1
+        Card <|-- TurnLeft
 ```
 
 # Game
 
-Responsible for game loop of
-- Dealing out cards
-- Executing submitted programs
+Responsible for dictating the game loop
 
 # Board
 
-Has the Tile grid
-
-Responsible for Moving the robot
+Has the Tile grid and Robots
+(Not to be implemented in V0) Sorts robots based on the proximity antenna
+Executes robot programs
+Schedules tile activation
 
 # Tile
 
 Abstract class that gets extended with each obstacle type
 
-Responsible for executing it's function on the robot
+Outlines what it's execution does.
+
+To be called directly when it's the type that activates even when a robot isn't on it, like a laser firing across the map stopping at the first robot or wall.
+
+Only Pit is to be implemented in V0.
 
 # Robot 
 
-Keeps track of it's own health
-To be extended later with the upgrades
+Passes it's program from Player to Board.
+
+Used to find the tiles that activate when robot is on them, like a conveyor belt that moves the robot.
+
 
 # Player 
 
@@ -135,12 +115,52 @@ Abstract class that gets extended with each card
 
 Cards are moves the robots can execute
 
-Deck and Hand are unordered sets of cards while Program is a Stack of cards
+Players have an unordered list/set of Card[] referred to as a hand (only a variable, not a class) 
+Game has an unordered list/set of Card[] referred to as a deck (only a variable, not a class) 
+Robot has an ordered list of Card[] referred to as a program (only a variable, not a class) 
 
 # Orientation
 
 Enum of orientations
 
-Only Robot uses it right now, but later will be useful to have it separate since some
-obstacles are also orientation dependent like conveyor belts
+Robot has simple orientation indicating where it's facing.
+Tile has a set of Orientation[] indicating which sides have walls (useful for collision/path blocking detection).
+Later some Tiles will also use it such as laser or conveyor belt (OrientedTile abstract class will extend tile with an additional orientation variable)
 
+
+# Pseudocode to be used as inspiration for later implementations:
+
+## Board:
+
+```
+
+for register
+    board.getpriolist() -> []robots
+        executeRegisters(robots)               (executes 1 register for each robot, they have new positions after this)
+        for robot:
+            resolveBoardActionPhase 1-4
+        shootBoardLasers()
+        for robot:
+            resolveBoardActionPhase 7-8
+
+```
+
+## Laser obstacle:
+
+
+```
+
+activate()
+    o = this.orientation
+    recurse(this, o)
+        if this.robot                       # 1: is there a robot on my tile?
+            damage(robot)
+            break
+        if o in this.walls                  # 2: Does a wall block me from leaving this tile?
+            break
+        next_tile = board.getTile(o, 1)     # Get neighboiring tile in defined orientation, if edge of board is reached, board should fail this
+        if ((o+2)%4) in next_tile.walls     # 3: Does a wall block me from entering next tile?
+            break
+        recurse(next_tile, o)               # 4: start over in next tile
+
+```
