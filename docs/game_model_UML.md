@@ -81,50 +81,44 @@ Responsible for dictating the game loop
 
 # Board
 
-Has the Tile grid and Robots
-(Not to be implemented in V0) Sorts robots based on the proximity antenna
-Executes robot programs
+Has the Tile grid and Robots \
+(Not to be implemented in V0) Sorts robots based on the proximity antenna \
+Executes robot programs \
 Schedules tile activation
 
 # Tile
 
-Abstract class that gets extended with each obstacle type
-
-Outlines what it's execution does.
-
-To be called directly when it's the type that activates even when a robot isn't on it, like a laser firing across the map stopping at the first robot or wall.
-
+Abstract class that gets extended with each obstacle type  \
+Outlines what it's execution does.  \
+To be called directly when it's the type that activates even when a robot isn't on it, like a laser firing across the map stopping at the first robot or wall.  \
 Only Pit is to be implemented in V0.
 
 # Robot 
 
-Passes it's program from Player to Board.
-
+Passes it's program from Player to Board.  \
 Used to find the tiles that activate when robot is on them, like a conveyor belt that moves the robot.
 
 
 # Player 
 
-Has robot assigned
-
+Has robot assigned  \
 Responsible for assigning a Program to their Robot
 
 # Cards
 
-Abstract class that gets extended with each card
-
+Abstract class that gets extended with each card  \
 Cards are moves the robots can execute
 
-Players have an unordered list/set of Card[] referred to as a hand (only a variable, not a class) 
-Game has an unordered list/set of Card[] referred to as a deck (only a variable, not a class) 
+Players have an unordered list/set of Card[] referred to as a hand (only a variable, not a class)  \
+Game has an unordered list/set of Card[] referred to as a deck (only a variable, not a class)  \
 Robot has an ordered list of Card[] referred to as a program (only a variable, not a class) 
 
 # Orientation
 
-Enum of orientations
-
-Robot has simple orientation indicating where it's facing.
+Enum of orientations  \
+Robot has simple orientation indicating where it's facing.  \
 Tile has a set of Orientation[] indicating which sides have walls (useful for collision/path blocking detection).
+
 Later some Tiles will also use it such as laser or conveyor belt (OrientedTile abstract class will extend tile with an additional orientation variable)
 
 
