@@ -49,6 +49,7 @@ export function createBoardScene(
     stackBaseLayer?: number
   }>>>,
 ): BoardScene {
+  // Pieces stay grouped by global plane to preserve cross-tile paint order
   const planes: BoardScenePiece[][] = Array.from(
     { length: config.aboveGroundLayers + 1 },
     () => [],

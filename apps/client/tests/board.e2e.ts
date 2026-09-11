@@ -113,7 +113,9 @@ test('pans, zooms around the cursor, and resets the camera', async ({ page }) =>
     y: (cursor.y - before.y) / before.zoom,
   }
   await page.mouse.wheel(0, -300)
-  await expect.poll(async () => (await cameraMatrix()).zoom).toBeGreaterThan(1)
+  await expect
+    .poll(async () => (await cameraMatrix()).zoom)
+    .toBeCloseTo(Math.exp(0.3), 5)
 
   const after = await cameraMatrix()
   expect((cursor.x - after.x) / after.zoom).toBeCloseTo(worldBefore.x, 3)
@@ -269,4 +271,42 @@ test.describe('touch board interaction', () => {
       .poll(() => styleNumber(surface, '--board-piece-scale'))
       .toBeCloseTo(1, 5)
   })
+})
+
+test('preserves one board runtime across active game rerenders', async ({ page }) => {
+  const camera = page.locator('.board-canvas')
+  const cameraMatrix = () =>
+    camera.evaluate((element) => {
+      const matrix = new DOMMatrix(getComputedStyle(element).transform)
+      return { x: matrix.e, y: matrix.f, zoom: matrix.a }
+    })
+
+  await page.mouse.move(400, 300)
+  await page.mouse.down()
+  await page.mouse.move(500, 340, { steps: 4 })
+  await page.mouse.up()
+  await expect.poll(cameraMatrix).toEqual({ x: 100, y: 40, zoom: 1 })
+
+  await page
+    .getByRole('region', { name: 'Programming hand' })
+    .getByRole('button')
+    .first()
+    .click()
+
+  await expect(page.locator('.board-plane')).toHaveCount(14)
+  await expect.poll(cameraMatrix).toEqual({ x: 100, y: 40, zoom: 1 })
+})
+
+test('runs board interactions without browser errors', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.reload()
+
+  await page.mouse.move(328, 204)
+  await page.mouse.click(328, 204)
+  await page.mouse.wheel(0, -100)
+  await page.keyboard.press('r')
+  await page.waitForTimeout(100)
+
+  expect(errors).toEqual([])
 })
