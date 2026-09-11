@@ -85,3 +85,56 @@ test('keeps board rendering behind active game controls', async ({ page }) => {
     ),
   ).toHaveCSS('z-index', '1')
 })
+
+test('pans, zooms around the cursor, and resets the camera', async ({ page }) => {
+  const camera = page.locator('.board-canvas')
+  const cameraMatrix = () =>
+    camera.evaluate((element) => {
+      const matrix = new DOMMatrix(getComputedStyle(element).transform)
+      return { x: matrix.e, y: matrix.f, zoom: matrix.a }
+    })
+
+  await page.mouse.move(400, 300)
+  await page.mouse.down()
+  await page.mouse.move(500, 340, { steps: 4 })
+  await page.mouse.up()
+  await expect.poll(cameraMatrix).toEqual({ x: 100, y: 40, zoom: 1 })
+
+  const cursor = { x: 500 - 640, y: 340 - 360 }
+  const before = await cameraMatrix()
+  const worldBefore = {
+    x: (cursor.x - before.x) / before.zoom,
+    y: (cursor.y - before.y) / before.zoom,
+  }
+  await page.mouse.wheel(0, -300)
+  await expect.poll(async () => (await cameraMatrix()).zoom).toBeGreaterThan(1)
+
+  const after = await cameraMatrix()
+  expect((cursor.x - after.x) / after.zoom).toBeCloseTo(worldBefore.x, 3)
+  expect((cursor.y - after.y) / after.zoom).toBeCloseTo(worldBefore.y, 3)
+
+  await page.keyboard.press('r')
+  await expect.poll(cameraMatrix).toEqual({ x: 0, y: 0, zoom: 1 })
+
+  await page.mouse.wheel(0, -100000)
+  await expect.poll(async () => (await cameraMatrix()).zoom).toBe(4)
+  await page.mouse.wheel(0, 100000)
+  await expect.poll(async () => (await cameraMatrix()).zoom).toBe(0.3)
+})
+
+test('recalculates parallax after a portrait resize', async ({ page }) => {
+  const surface = page.locator(
+    '[data-board-component="surface"][data-board-tile="6,5"]',
+  )
+  const pieceX = () =>
+    surface.evaluate((element) =>
+      Number.parseFloat(
+        element.style.getPropertyValue('--board-piece-x'),
+      ),
+    )
+  const before = await pieceX()
+
+  await page.setViewportSize({ width: 600, height: 1000 })
+  await expect.poll(pieceX).not.toBe(before)
+  await expect.poll(pieceX).toBeCloseTo(-4.71744, 4)
+})

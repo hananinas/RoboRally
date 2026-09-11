@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from 'react'
+import { useMemo, useRef, type CSSProperties } from 'react'
 import laser1Url from '../board/assets/laser1.svg'
 import laser2Url from '../board/assets/laser2.svg'
 import laser3Url from '../board/assets/laser3.svg'
@@ -9,6 +9,7 @@ import {
 } from '../board/boardConfig.ts'
 import { createBoardScene, type BoardScenePiece } from '../board/boardScene.ts'
 import type { BoardRenderModel } from '../board/boardModel.ts'
+import useBoardInteraction from '../board/useBoardInteraction.ts'
 import '../board/BoardViewport.css'
 
 type BoardViewportProps = Readonly<{
@@ -73,6 +74,8 @@ function BoardPiece({ piece }: Readonly<{ piece: BoardScenePiece }>) {
 }
 
 function BoardViewport({ board }: BoardViewportProps) {
+  const viewportRef = useRef<HTMLElement>(null)
+  const canvasRef = useRef<HTMLDivElement>(null)
   const scene = useMemo(
     () =>
       createBoardScene(
@@ -83,10 +86,16 @@ function BoardViewport({ board }: BoardViewportProps) {
       ),
     [board],
   )
+  useBoardInteraction({ canvasRef, scene, viewportRef })
 
   return (
-    <main className="board-viewport" aria-label="Game board">
+    <main
+      ref={viewportRef}
+      className="board-viewport"
+      aria-label="Game board"
+    >
       <div
+        ref={canvasRef}
         className="board-canvas"
         data-board-columns={board.columns}
         data-board-rows={board.rows}
@@ -121,6 +130,7 @@ function BoardViewport({ board }: BoardViewportProps) {
                     <div
                       className="board-hole-depth"
                       data-board-height={depth.height}
+                      data-board-tile={`${hole.cell.x},${hole.cell.y}`}
                       key={index}
                       style={{ background: holeColour(depth.blend) }}
                     />
