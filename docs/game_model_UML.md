@@ -23,11 +23,12 @@ Will update with a more conceptual domain diagram which will be used for present
 
         class Tile {
             <<abstract>>
-            +walls: Orientation[] set
+            +walls: Direction[] set
             +robot: Robot
             +activate()
         }
 
+        class EmptyTile
         class Pit
 
         class Player {
@@ -37,17 +38,17 @@ Will update with a more conceptual domain diagram which will be used for present
         }
 
         class Robot {
-        -orientation: Orientation
+        -orientation: Direction
         +tile: Tile
-        +program: Card[] ordered
+        +program: Card[5] ordered
         }
 
-        class Orientation {
+        class Direction {
         <<enumeration>>
-        UP
-        DOWN
-        LEFT
-        RIGHT
+        NORTH
+        EAST
+        SOUTH
+        WEST
         }
 
         class Card {
@@ -58,20 +59,20 @@ Will update with a more conceptual domain diagram which will be used for present
         class Move1
         class TurnLeft
 
-        Game "1" *--> "0..1" Board
+        Game "1" *--> "1" Board
         Game *--> "1..*" Player
-        Board "1" *-- "*" Tile
+        Board "1" *-- "1..*" Tile
 
-        Robot --> Orientation
+        Robot --> Direction
+        Tile <|-- EmptyTile
         Tile <|-- Pit
-        Tile --> "*" Orientation
         Tile "1" -- "0..1" Robot
 
         Player "1" --> "1" Robot
 
-        Game  *--  Card
-        Player  *--  Card
-        Robot  *--  Card
+        Game "1" --> "*" Card : deck
+        Player "1" --> "*" Card : hand
+        Robot "1" --> "5" Card : program
 
         Card <|-- Move1
         Card <|-- TurnLeft
@@ -122,13 +123,13 @@ Cards are moves the robots can execute
 
 Players have an unordered list/set of Card[] referred to as a hand (only a variable, not a class)  \
 Game has an unordered list/set of Card[] referred to as a deck (only a variable, not a class)  \
-Robot has an ordered list of Card[] referred to as a program (only a variable, not a class) 
+Robot has an ordered list of Card[5] referred to as a program (only a variable, not a class)
 
-# Orientation
+# Direction
 
 Enum of orientations  \
 Robot has simple orientation indicating where it's facing.  \
-Tile has a set of Orientation[] indicating which sides have walls (useful for collision/path blocking detection).
+Tile has a set of Direction[] indicating which sides have walls (useful for collision/path blocking detection).
 
 Later some Tiles will also use it such as laser or conveyor belt (OrientedTile abstract class will extend tile with an additional orientation variable)
 
