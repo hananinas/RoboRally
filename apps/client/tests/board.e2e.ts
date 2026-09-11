@@ -1,4 +1,10 @@
 import { expect, test } from '@playwright/test'
+import type { Locator } from '@playwright/test'
+
+function styleNumber(locator: Locator, property: string): Promise<number> {
+  return locator.evaluate((element, name) =>
+    Number.parseFloat(element.style.getPropertyValue(name)), property)
+}
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/')
@@ -137,4 +143,130 @@ test('recalculates parallax after a portrait resize', async ({ page }) => {
   await page.setViewportSize({ width: 600, height: 1000 })
   await expect.poll(pieceX).not.toBe(before)
   await expect.poll(pieceX).toBeCloseTo(-4.71744, 4)
+})
+
+test('animates hover and ripple without moving the ground plane', async ({ page }) => {
+  const surface = page.locator(
+    '[data-board-component="surface"][data-board-tile="6,5"]',
+  )
+  const ground = page.locator(
+    '[data-board-layer="0"] [data-board-tile="6,5"]',
+  )
+  const calmX = await styleNumber(surface, '--board-piece-x')
+  const groundStyle = await ground.getAttribute('style')
+
+  await page.mouse.move(328, 204)
+  await expect
+    .poll(() => styleNumber(surface, '--board-piece-scale'))
+    .toBeCloseTo(1.025, 5)
+  const hoverX = await styleNumber(surface, '--board-piece-x')
+  expect(Math.abs(hoverX)).toBeGreaterThan(Math.abs(calmX))
+
+  await page.mouse.click(328, 204)
+  const rippleSamples: number[] = []
+  for (let index = 0; index < 8; index += 1) {
+    await page.waitForTimeout(16)
+    rippleSamples.push(
+      Math.abs(await styleNumber(surface, '--board-piece-x')),
+    )
+  }
+  expect(
+    rippleSamples.some((position) => position > Math.abs(hoverX) + 1),
+  ).toBe(true)
+  expect(await ground.getAttribute('style')).toBe(groundStyle)
+
+  await page.waitForTimeout(2400)
+  await expect
+    .poll(() => styleNumber(surface, '--board-piece-x'))
+    .toBeCloseTo(hoverX, 4)
+
+  await page.mouse.move(1100, 100)
+  await expect
+    .poll(() => styleNumber(surface, '--board-piece-scale'))
+    .toBeCloseTo(1, 5)
+})
+
+test('lifts laser artwork without stretching its item stack', async ({ page }) => {
+  const selectors = [
+    '[data-board-layer="3"] [data-board-component="laser1"][data-board-tile="6,7"]',
+    '[data-board-layer="4"] [data-board-component="laser1"][data-board-tile="6,7"]',
+    '[data-board-layer="5"] [data-board-component="laser2"][data-board-tile="6,7"]',
+    '[data-board-layer="6"] [data-board-component="laser3"][data-board-tile="6,7"]',
+  ]
+  const pieces = selectors.map((selector) => page.locator(selector))
+  const positions = () =>
+    Promise.all(
+      pieces.map((piece) => styleNumber(piece, '--board-piece-x')),
+    )
+  const before = await positions()
+
+  await page.mouse.move(328, 360)
+  await expect
+    .poll(() => styleNumber(pieces[0], '--board-piece-scale'))
+    .toBeCloseTo(1.025, 5)
+  const after = await positions()
+
+  expect(Math.abs(after[0])).toBeGreaterThan(Math.abs(before[0]))
+  for (let index = 0; index < 3; index += 1) {
+    expect(after[index + 1] - after[index]).toBeCloseTo(
+      before[index + 1] - before[index],
+      5,
+    )
+  }
+})
+
+test('pans without turning the press into a ripple', async ({ page }) => {
+  const surface = page.locator(
+    '[data-board-component="surface"][data-board-tile="6,5"]',
+  )
+
+  await page.mouse.move(328, 204)
+  await page.mouse.down()
+  await page.mouse.move(428, 244, { steps: 4 })
+  await page.mouse.up()
+  await expect
+    .poll(() => styleNumber(surface, '--board-piece-scale'))
+    .toBeCloseTo(1.025, 5)
+  await expect
+    .poll(() => styleNumber(surface, '--board-piece-x'))
+    .toBeCloseTo(-4.3824375, 4)
+})
+
+test('stops scheduling animation frames while idle', async ({ page }) => {
+  await page.mouse.move(328, 204)
+  await page.waitForTimeout(160)
+  await page.mouse.move(1100, 100)
+  await page.waitForTimeout(160)
+
+  await page.evaluate(() => {
+    const original = window.requestAnimationFrame
+    let scheduledFrames = 0
+    window.requestAnimationFrame = (callback) => {
+      scheduledFrames += 1
+      return original(callback)
+    }
+    Object.defineProperty(window, '__scheduledBoardFrames', {
+      get: () => scheduledFrames,
+    })
+  })
+  await page.waitForTimeout(300)
+
+  expect(await page.evaluate(() => Reflect.get(window, '__scheduledBoardFrames'))).toBe(
+    0,
+  )
+})
+
+test.describe('touch board interaction', () => {
+  test.use({ hasTouch: true })
+
+  test('does not leave a hovered tile after a tap', async ({ page }) => {
+    const surface = page.locator(
+      '[data-board-component="surface"][data-board-tile="6,5"]',
+    )
+
+    await page.touchscreen.tap(328, 204)
+    await expect
+      .poll(() => styleNumber(surface, '--board-piece-scale'))
+      .toBeCloseTo(1, 5)
+  })
 })
