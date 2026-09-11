@@ -88,6 +88,9 @@ Has the Tile grid and Robots \
 Executes robot programs \
 Schedules tile activation
 
+Should know implicitly where each Tile is. When tile executes stuff it only tells board which direction it wants to move stuff, board retains authority in actually moving things. \
+Robot location is up for discussion. I had the suggestion of storing robots as a tuple list of [(robot1: Robot, location1: (x: number, y: number)),(robot2: Robot, location2: (x: number, y: number)), ...] but society is not yet ready for solutions of such elegance. Board should have responsibility for keeping track of where everything is so I don't want to have references to location inside the Tile or Robot class.
+
 # Tile
 
 Abstract class that gets extended with each obstacle type  \
