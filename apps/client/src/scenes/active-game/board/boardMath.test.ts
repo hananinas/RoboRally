@@ -250,15 +250,15 @@ describe('board effects', () => {
     expectClose(liftedDepth(-4, -4, 8), -4)
   })
 
-  it('retains the floor, wall stack, and laser recipes', () => {
+  it('retains the floor, pillar, and laser recipes', () => {
     expect(BOARD_RECIPES.empty.slices).toEqual([
       { layer: 0, component: 'ground', shadow: true },
       { layer: 1, component: 'ground' },
       { layer: 2, component: 'ground' },
       { layer: 3, component: 'surface' },
     ])
-    expect(BOARD_RECIPES.wallStack.slices).toHaveLength(14)
-    expect(BOARD_RECIPES.wallStack.slices.filter((slice) => slice.shadow)).toHaveLength(1)
+    expect(BOARD_RECIPES.pillar.slices).toHaveLength(14)
+    expect(BOARD_RECIPES.pillar.slices.filter((slice) => slice.shadow)).toHaveLength(1)
     expect(BOARD_COMPONENTS.wallBlack.width).toBe(0.6)
     expect(BOARD_RECIPES.laser.slices.slice(4).map((slice) => slice.layer)).toEqual([
       3, 4, 5, 6,

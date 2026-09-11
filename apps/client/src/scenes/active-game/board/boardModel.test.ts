@@ -17,14 +17,15 @@ describe('createBoardRenderModel', () => {
       laser: [[2, 1]],
     })
 
-    expect(board.cells).toEqual([
-      { x: 0, y: 0, recipe: 'empty' },
-      { x: 1, y: 0, recipe: 'hole' },
-      { x: 2, y: 0, recipe: 'empty' },
-      { x: 0, y: 1, recipe: 'empty' },
-      { x: 1, y: 1, recipe: 'empty' },
-      { x: 2, y: 1, recipe: 'laser' },
+    expect(board.cells.map(({ x, y, tile }) => ({ x, y, tile }))).toEqual([
+      { x: 0, y: 0, tile: 'empty' },
+      { x: 1, y: 0, tile: 'hole' },
+      { x: 2, y: 0, tile: 'empty' },
+      { x: 0, y: 1, tile: 'empty' },
+      { x: 1, y: 1, tile: 'empty' },
+      { x: 2, y: 1, tile: 'laser' },
     ])
+    expect(board.cells.every((cell) => Object.values(cell.walls).every((wall) => !wall))).toBe(true)
   })
 
   it('rejects invalid dimensions and assignments', () => {
@@ -39,27 +40,66 @@ describe('createBoardRenderModel', () => {
       }),
     ).toThrow(/assigned twice/)
   })
+
+  it('normalizes directional walls on every tile', () => {
+    const board = createBoardRenderModel(2, 1, {
+      walls: [{ x: 1, y: 0, north: true, west: true }],
+    })
+
+    expect(board.cells[0].walls).toEqual({
+      north: false,
+      east: false,
+      south: false,
+      west: false,
+    })
+    expect(board.cells[1].walls).toEqual({
+      north: true,
+      east: false,
+      south: false,
+      west: true,
+    })
+    expect(Object.isFrozen(board.cells[1].walls)).toBe(true)
+    expect(Object.isFrozen(board.cells[1])).toBe(true)
+    expect(Object.isFrozen(board.cells)).toBe(true)
+  })
+
+  it('rejects duplicate and off-board wall assignments', () => {
+    expect(() =>
+      createBoardRenderModel(1, 1, {
+        walls: [
+          { x: 0, y: 0, north: true },
+          { x: 0, y: 0, east: true },
+        ],
+      }),
+    ).toThrow(/assigned twice/)
+    expect(() =>
+      createBoardRenderModel(1, 1, {
+        walls: [{ x: -1, y: 0, north: true }],
+      }),
+    ).toThrow(/outside the board/)
+  })
 })
 
 describe('board rendering definition', () => {
   it('retains the current demo board and visual tuning', () => {
     expect(DEMO_BOARD.cells).toHaveLength(315)
-    expect(DEMO_BOARD.cells.filter((cell) => cell.recipe === 'hole')).toHaveLength(
+    expect(DEMO_BOARD.cells.filter((cell) => cell.tile === 'hole')).toHaveLength(
       6,
     )
     expect(
-      DEMO_BOARD.cells.filter((cell) => cell.recipe === 'wallStack'),
+      DEMO_BOARD.cells.filter((cell) => Object.values(cell.walls).some(Boolean)),
     ).toHaveLength(6)
-    expect(DEMO_BOARD.cells.filter((cell) => cell.recipe === 'laser')).toHaveLength(
+    expect(DEMO_BOARD.cells.filter((cell) => cell.tile === 'laser')).toHaveLength(
       4,
     )
     expect(BOARD_CONFIG.parallax).toBe(0.07)
+    expect(BOARD_CONFIG.edgeWall).toEqual({ width: 12, cornerRadius: 5 })
     expect(BOARD_COMPONENTS.wallBlack.width).toBe(0.6)
     expect(BOARD_COMPONENTS.laser1.width).toBe(0.82)
   })
 
-  it('keeps wall stacks and laser slices on their requested planes', () => {
-    expect(BOARD_RECIPES.wallStack.slices.map((slice) => slice.layer)).toEqual(
+  it('keeps pillars and laser slices on their requested planes', () => {
+    expect(BOARD_RECIPES.pillar.slices.map((slice) => slice.layer)).toEqual(
       Array.from({ length: 14 }, (_, layer) => layer),
     )
     expect(BOARD_RECIPES.laser.stackBaseLayer).toBe(3)

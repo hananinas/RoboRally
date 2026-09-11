@@ -9,13 +9,13 @@ export const DEMO_BOARD = createBoardRenderModel(21, 15, {
     [12, 11],
     [18, 9],
   ],
-  wallStack: [
-    [8, 4],
-    [12, 4],
-    [4, 6],
-    [16, 8],
-    [8, 10],
-    [12, 10],
+  walls: [
+    { x: 8, y: 4, west: true },
+    { x: 12, y: 4, east: true },
+    { x: 4, y: 6, north: true },
+    { x: 16, y: 8, south: true, north: true },
+    { x: 8, y: 10, north: true, east: true },
+    { x: 12, y: 10, north: true, east: true, south: true, west: true },
   ],
   laser: [
     [10, 3],

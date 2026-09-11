@@ -8,7 +8,11 @@ import {
   BOARD_RECIPES,
 } from '../board/boardConfig.ts'
 import { createBoardScene, type BoardScenePiece } from '../board/boardScene.ts'
-import type { BoardRenderModel } from '../board/boardModel.ts'
+import type {
+  BoardRenderModel,
+  BoardTileWalls,
+  BoardWallSide,
+} from '../board/boardModel.ts'
 import useBoardInteraction from '../board/useBoardInteraction.ts'
 import '../board/BoardViewport.css'
 
@@ -34,13 +38,48 @@ function holeColour(blend: number): string {
   return `color-mix(in srgb, var(--board-background) ${100 - percentage}%, var(--board-hole-bottom) ${percentage}%)`
 }
 
+function wallJoins(
+  side: BoardWallSide,
+  walls: BoardTileWalls,
+): readonly [boolean, boolean] {
+  return side === 'north' || side === 'south'
+    ? [walls.west, walls.east]
+    : [walls.north, walls.south]
+}
+
 function pieceStyle(piece: BoardScenePiece): PieceStyle {
-  return {
+  const style: PieceStyle = {
     left: piece.tileCentre.worldX,
     top: piece.tileCentre.worldY,
     width: BOARD_CONFIG.tile * piece.component.width,
     zIndex: piece.slice.order ?? 0,
   }
+
+  if (!piece.slice.wall) return style
+
+  const horizontal =
+    piece.slice.wall === 'north' || piece.slice.wall === 'south'
+  const pitch = BOARD_CONFIG.tile + BOARD_CONFIG.gap
+  const extension = (BOARD_CONFIG.gap + BOARD_CONFIG.edgeWall.width) / 2
+  const [joinsStart, joinsEnd] = wallJoins(
+    piece.slice.wall,
+    piece.cell.walls,
+  )
+  const length =
+    BOARD_CONFIG.tile +
+    (Number(joinsStart) + Number(joinsEnd)) * extension
+  const shift = (Number(joinsEnd) - Number(joinsStart)) * extension / 2
+  const offset = pitch / 2
+  style.width = horizontal ? length : BOARD_CONFIG.edgeWall.width
+  style.height = horizontal ? BOARD_CONFIG.edgeWall.width : length
+  style.borderRadius = BOARD_CONFIG.edgeWall.cornerRadius
+  if (horizontal) style.left = piece.tileCentre.worldX + shift
+  else style.top = piece.tileCentre.worldY + shift
+  if (piece.slice.wall === 'north') style.top = piece.tileCentre.worldY - offset
+  if (piece.slice.wall === 'east') style.left = piece.tileCentre.worldX + offset
+  if (piece.slice.wall === 'south') style.top = piece.tileCentre.worldY + offset
+  if (piece.slice.wall === 'west') style.left = piece.tileCentre.worldX - offset
+  return style
 }
 
 function BoardPiece({ piece }: Readonly<{ piece: BoardScenePiece }>) {
@@ -56,8 +95,9 @@ function BoardPiece({ piece }: Readonly<{ piece: BoardScenePiece }>) {
     'data-board-component': piece.componentName,
     'data-board-height': piece.height,
     'data-board-lift-height': piece.liftHeight,
-    'data-board-recipe': piece.cell.recipe,
+    'data-board-tile-type': piece.cell.tile,
     'data-board-tile': `${piece.cell.x},${piece.cell.y}`,
+    'data-board-wall': piece.slice.wall,
     style: pieceStyle(piece),
   }
 
@@ -115,7 +155,7 @@ function BoardViewport({ board }: BoardViewportProps) {
                 <div
                   className="board-piece board-piece--hole"
                   data-board-height="0"
-                  data-board-recipe="hole"
+                  data-board-tile-type="hole"
                   data-board-tile={`${hole.cell.x},${hole.cell.y}`}
                   key={hole.key}
                   style={{

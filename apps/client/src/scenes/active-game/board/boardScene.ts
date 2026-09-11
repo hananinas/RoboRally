@@ -1,4 +1,5 @@
 import { holeProfile, tileCentre, type TileCentre } from './boardMath.ts'
+import { BOARD_EDGE_WALL_SLICES } from './boardConfig.ts'
 import type {
   BoardCell,
   BoardComponentName,
@@ -6,8 +7,10 @@ import type {
   BoardRenderConfig,
   BoardRenderModel,
   BoardSlice,
+  BoardTileRecipe,
   BoardVisualComponent,
 } from './boardModel.ts'
+import { BOARD_WALL_SIDES, hasAllWalls } from './boardModel.ts'
 
 export type BoardScenePiece = Readonly<{
   cell: BoardCell
@@ -43,11 +46,7 @@ export function createBoardScene(
   board: BoardRenderModel,
   config: BoardRenderConfig,
   components: Readonly<Record<BoardComponentName, BoardVisualComponent>>,
-  recipes: Readonly<Record<BoardRecipeName, Readonly<{
-    hole?: boolean
-    slices: readonly BoardSlice[]
-    stackBaseLayer?: number
-  }>>>,
+  recipes: Readonly<Record<BoardRecipeName, BoardTileRecipe>>,
 ): BoardScene {
   // Pieces stay grouped by global plane to preserve cross-tile paint order
   const planes: BoardScenePiece[][] = Array.from(
@@ -58,7 +57,8 @@ export function createBoardScene(
   const tiles: BoardSceneTile[] = []
 
   for (const cell of board.cells) {
-    const recipe = recipes[cell.recipe]
+    const pillar = hasAllWalls(cell.walls)
+    const recipe = recipes[pillar ? 'pillar' : cell.tile]
     const centre = tileCentre(cell, board, config)
     tiles.push({ cell, hole: recipe.hole ?? false, tileCentre: centre })
 
@@ -69,29 +69,45 @@ export function createBoardScene(
         key: `${cell.x},${cell.y},hole`,
         tileCentre: centre,
       })
-      continue
+    } else {
+      recipe.slices.forEach((slice, sliceIndex) => {
+        addSlice(slice, sliceIndex, recipe.stackBaseLayer)
+      })
     }
 
-    recipe.slices.forEach((slice, sliceIndex) => {
+    if (!pillar) {
+      for (const side of BOARD_WALL_SIDES) {
+        if (!cell.walls[side]) continue
+        BOARD_EDGE_WALL_SLICES.forEach((slice, sliceIndex) => {
+          addSlice({ ...slice, wall: side }, sliceIndex)
+        })
+      }
+    }
+
+    function addSlice(
+      slice: BoardSlice,
+      sliceIndex: number,
+      stackBaseLayer?: number,
+    ) {
       const height = slice.layer / config.parallaxReferenceLayer
       const liftHeight =
-        recipe.stackBaseLayer === undefined
+        stackBaseLayer === undefined
           ? height
           : Math.min(
               height,
-              recipe.stackBaseLayer / config.parallaxReferenceLayer,
+              stackBaseLayer / config.parallaxReferenceLayer,
             )
       planes[slice.layer].push({
         cell,
         component: components[slice.component],
         componentName: slice.component,
         height,
-        key: `${cell.x},${cell.y},${slice.layer},${slice.component},${sliceIndex}`,
+        key: `${cell.x},${cell.y},${slice.layer},${slice.component},${slice.wall ?? 'tile'},${sliceIndex}`,
         liftHeight,
         slice,
         tileCentre: centre,
       })
-    })
+    }
   }
 
   return { holes, planes, tiles }

@@ -15,11 +15,13 @@ test('renders the board through isolated global paint planes', async ({ page }) 
   const planes = board.locator('.board-plane')
 
   await expect(planes).toHaveCount(14)
-  await expect(board.locator('.board-plane > .board-piece')).toHaveCount(1318)
+  await expect(board.locator('.board-plane > .board-piece')).toHaveCount(1324)
   await expect(board.locator('.board-piece--hole')).toHaveCount(6)
   await expect(board.locator('.board-hole-depth')).toHaveCount(48)
-  await expect(board.locator('.board-piece--wall-black')).toHaveCount(36)
-  await expect(board.locator('.board-piece--wall-yellow')).toHaveCount(48)
+  await expect(board.locator('.board-piece--wall-black')).toHaveCount(6)
+  await expect(board.locator('.board-piece--wall-yellow')).toHaveCount(8)
+  await expect(board.locator('.board-piece--wall-edge-black')).toHaveCount(28)
+  await expect(board.locator('.board-piece--wall-edge-yellow')).toHaveCount(28)
 
   expect(
     await planes.evaluateAll((elements) =>
@@ -79,6 +81,128 @@ test('keeps ground shadows below all raised surfaces', async ({ page }) => {
   })
 
   expect(result).toBe(true)
+})
+
+test('renders directional walls between tiles', async ({ page }) => {
+  const westWall = page.locator('[data-board-tile="8,4"][data-board-wall="west"]')
+  const northWall = page.locator('[data-board-tile="4,6"][data-board-wall="north"]')
+  const eastWall = page.locator('[data-board-tile="12,4"][data-board-wall="east"]')
+  const southWall = page.locator('[data-board-tile="16,8"][data-board-wall="south"]')
+  const cornerWalls = page.locator('[data-board-tile="8,10"][data-board-wall]')
+
+  await expect(westWall).toHaveCount(8)
+  await expect(northWall).toHaveCount(8)
+  await expect(eastWall).toHaveCount(8)
+  await expect(southWall).toHaveCount(8)
+  await expect(cornerWalls).toHaveCount(16)
+
+  expect(
+    await westWall.evaluateAll((walls) =>
+      walls.map((wall) => ({
+        component: wall.getAttribute('data-board-component'),
+        layer: Number(wall.parentElement?.getAttribute('data-board-layer')),
+      })),
+    ),
+  ).toEqual([
+    { component: 'wallEdgeBlack', layer: 0 },
+    { component: 'wallEdgeBlack', layer: 1 },
+    { component: 'wallEdgeYellow', layer: 2 },
+    { component: 'wallEdgeYellow', layer: 3 },
+    { component: 'wallEdgeBlack', layer: 4 },
+    { component: 'wallEdgeBlack', layer: 5 },
+    { component: 'wallEdgeYellow', layer: 6 },
+    { component: 'wallEdgeYellow', layer: 7 },
+  ])
+
+  const ground = page.locator(
+    '[data-board-layer="0"] [data-board-tile="8,4"][data-board-component="ground"]',
+  )
+  const westNeighbour = page.locator(
+    '[data-board-layer="0"] [data-board-tile="7,4"][data-board-component="ground"]',
+  )
+  const bottomWall = page.locator(
+    '[data-board-layer="0"] [data-board-tile="8,4"][data-board-wall="west"]',
+  )
+  const [groundBox, neighbourBox, wallBox] = await Promise.all([
+    ground.boundingBox(),
+    westNeighbour.boundingBox(),
+    bottomWall.boundingBox(),
+  ])
+  if (!groundBox || !neighbourBox || !wallBox) {
+    throw new Error('Wall geometry is unavailable')
+  }
+
+  const wallCentreX = wallBox.x + wallBox.width / 2
+  const boundaryX =
+    (groundBox.x +
+      groundBox.width / 2 +
+      neighbourBox.x +
+      neighbourBox.width / 2) /
+    2
+  expect(wallCentreX).toBeCloseTo(boundaryX, 4)
+  expect(wallBox.y + wallBox.height / 2).toBeCloseTo(
+    groundBox.y + groundBox.height / 2,
+    4,
+  )
+  expect(wallBox.width).toBeCloseTo(12, 4)
+  expect(wallBox.height).toBeCloseTo(72, 4)
+  await expect(bottomWall).toHaveCSS('border-radius', '5px')
+
+  const cornerNorth = page.locator(
+    '[data-board-layer="0"] [data-board-tile="8,10"][data-board-wall="north"]',
+  )
+  const cornerEast = page.locator(
+    '[data-board-layer="0"] [data-board-tile="8,10"][data-board-wall="east"]',
+  )
+  const [northBox, eastBox] = await Promise.all([
+    cornerNorth.boundingBox(),
+    cornerEast.boundingBox(),
+  ])
+  if (!northBox || !eastBox) throw new Error('Wall corner is unavailable')
+
+  expect(northBox.width).toBeCloseTo(81, 4)
+  expect(eastBox.height).toBeCloseTo(81, 4)
+  const overlapWidth =
+    Math.min(northBox.x + northBox.width, eastBox.x + eastBox.width) -
+    Math.max(northBox.x, eastBox.x)
+  const overlapHeight =
+    Math.min(northBox.y + northBox.height, eastBox.y + eastBox.height) -
+    Math.max(northBox.y, eastBox.y)
+  expect(overlapWidth).toBeCloseTo(12, 4)
+  expect(overlapHeight).toBeCloseTo(12, 4)
+
+  const surface = page.locator(
+    '[data-board-tile="8,4"][data-board-component="surface"]',
+  )
+  const raisedWall = page.locator(
+    '[data-board-layer="2"] [data-board-tile="8,4"][data-board-wall="west"]',
+  )
+  await page.mouse.move(484, 126)
+  await expect
+    .poll(() => styleNumber(surface, '--board-piece-scale'))
+    .toBeCloseTo(1.025, 5)
+  await expect
+    .poll(() => styleNumber(raisedWall, '--board-piece-scale'))
+    .toBe(1)
+})
+
+test('uses a pillar without a base for tiles walled on every side', async ({ page }) => {
+  const tile = page.locator('[data-board-tile="12,10"]')
+
+  await expect(tile).toHaveCount(14)
+  await expect(
+    page.locator('[data-board-tile="12,10"][data-board-wall]'),
+  ).toHaveCount(0)
+  await expect(
+    page.locator(
+      '[data-board-tile="12,10"][data-board-component="ground"], [data-board-tile="12,10"][data-board-component="surface"]',
+    ),
+  ).toHaveCount(0)
+  await expect(
+    page.locator(
+      '[data-board-tile="12,10"].board-piece--wall-black, [data-board-tile="12,10"].board-piece--wall-yellow',
+    ),
+  ).toHaveCount(14)
 })
 
 test('keeps board rendering behind active game controls', async ({ page }) => {

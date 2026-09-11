@@ -31,6 +31,7 @@ type RuntimePart = Readonly<{
   element: HTMLElement
   height: number
   liftHeight: number
+  scalable: boolean
 }>
 
 type RuntimeTile = {
@@ -80,7 +81,12 @@ export default function useBoardInteraction({
       if (!key) continue
       const height = Number(element.dataset.boardHeight)
       const liftHeight = Number(element.dataset.boardLiftHeight ?? height)
-      const part = { element, height, liftHeight }
+      const part = {
+        element,
+        height,
+        liftHeight,
+        scalable: element.dataset.boardWall === undefined,
+      }
       const parts = partsByTile.get(key)
       if (parts) parts.push(part)
       else partsByTile.set(key, [part])
@@ -125,7 +131,7 @@ export default function useBoardInteraction({
           )
           part.element.style.setProperty(
             '--board-piece-scale',
-            `${part.height > 0 ? effect.scale : 1}`,
+            `${part.scalable ? effect.scale : 1}`,
           )
         }
       }

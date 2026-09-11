@@ -1,10 +1,14 @@
 export type BoardPoint = Readonly<{ x: number; y: number }>
 
-export type BoardRecipeName = 'empty' | 'hole' | 'laser' | 'wallStack'
+export type BoardTileType = 'empty' | 'hole' | 'laser'
+export type BoardRecipeName = BoardTileType | 'pillar'
+export type BoardWallSide = 'north' | 'east' | 'south' | 'west'
+export type BoardTileWalls = Readonly<Record<BoardWallSide, boolean>>
 
 export type BoardCell = BoardPoint &
   Readonly<{
-    recipe: BoardRecipeName
+    tile: BoardTileType
+    walls: BoardTileWalls
   }>
 
 export type BoardRenderModel = Readonly<{
@@ -19,6 +23,8 @@ export type BoardComponentName =
   | 'laser2'
   | 'laser3'
   | 'surface'
+  | 'wallEdgeBlack'
+  | 'wallEdgeYellow'
   | 'wallBlack'
   | 'wallYellow'
 
@@ -27,6 +33,7 @@ export type BoardSlice = Readonly<{
   layer: number
   order?: number
   shadow?: boolean
+  wall?: BoardWallSide
 }>
 
 export type BoardTileRecipe = Readonly<{
@@ -50,6 +57,10 @@ export type BoardRenderConfig = Readonly<{
     wheelSensitivity: number
   }>
   gap: number
+  edgeWall: Readonly<{
+    cornerRadius: number
+    width: number
+  }>
   hole: Readonly<{
     colourOffset: number
     layers: number
@@ -72,9 +83,35 @@ export type BoardRenderConfig = Readonly<{
   tile: number
 }>
 
-type BoardAssignments = Partial<
-  Readonly<Record<BoardRecipeName, readonly (readonly [number, number])[]>>
->
+type BoardWallAssignment = BoardPoint & Partial<BoardTileWalls>
+
+type BoardAssignments = Readonly<{
+  hole?: readonly (readonly [number, number])[]
+  laser?: readonly (readonly [number, number])[]
+  walls?: readonly BoardWallAssignment[]
+}>
+
+export const BOARD_WALL_SIDES: readonly BoardWallSide[] = [
+  'north',
+  'east',
+  'south',
+  'west',
+]
+
+function createTileWalls(walls: Partial<BoardTileWalls> = {}): BoardTileWalls {
+  return Object.freeze({
+    north: walls.north ?? false,
+    east: walls.east ?? false,
+    south: walls.south ?? false,
+    west: walls.west ?? false,
+  })
+}
+
+const EMPTY_WALLS = createTileWalls()
+
+export function hasAllWalls(walls: BoardTileWalls): boolean {
+  return BOARD_WALL_SIDES.every((side) => walls[side])
+}
 
 export function createBoardRenderModel(
   columns: number,
@@ -88,40 +125,55 @@ export function createBoardRenderModel(
     throw new RangeError('Board rows must be a positive integer')
   }
 
-  const recipes = new Map<string, BoardRecipeName>()
-  for (const [recipe, positions] of Object.entries(assignments) as [
-    BoardRecipeName,
-    readonly (readonly [number, number])[],
-  ][]) {
-    for (const [x, y] of positions) {
-      if (
-        !Number.isInteger(x) ||
-        !Number.isInteger(y) ||
-        x < 0 ||
-        x >= columns ||
-        y < 0 ||
-        y >= rows
-      ) {
-        throw new RangeError(`Board cell ${x},${y} is outside the board`)
-      }
+  function positionKey(x: number, y: number): string {
+    if (
+      !Number.isInteger(x) ||
+      !Number.isInteger(y) ||
+      x < 0 ||
+      x >= columns ||
+      y < 0 ||
+      y >= rows
+    ) {
+      throw new RangeError(`Board cell ${x},${y} is outside the board`)
+    }
+    return `${x},${y}`
+  }
 
-      const key = `${x},${y}`
-      if (recipes.has(key)) {
+  const tiles = new Map<string, BoardTileType>()
+  for (const tile of ['hole', 'laser'] as const) {
+    const positions = assignments[tile] ?? []
+    for (const [x, y] of positions) {
+      const key = positionKey(x, y)
+      if (tiles.has(key)) {
         throw new RangeError(`Board cell ${key} is assigned twice`)
       }
-      recipes.set(key, recipe)
+      tiles.set(key, tile)
     }
   }
 
-  const cells = Array.from({ length: rows }, (_, y) =>
-    Array.from({ length: columns }, (_, x) => ({
-      x,
-      y,
-      recipe: recipes.get(`${x},${y}`) ?? 'empty',
-    })),
-  ).flat()
+  const walls = new Map<string, BoardTileWalls>()
+  for (const assignment of assignments.walls ?? []) {
+    const key = positionKey(assignment.x, assignment.y)
+    if (walls.has(key)) {
+      throw new RangeError(`Board walls for cell ${key} are assigned twice`)
+    }
+    walls.set(key, createTileWalls(assignment))
+  }
 
-  return { columns, rows, cells }
+  const cells = Object.freeze(
+    Array.from({ length: rows }, (_, y) =>
+      Array.from({ length: columns }, (_, x) =>
+        Object.freeze({
+          x,
+          y,
+          tile: tiles.get(`${x},${y}`) ?? 'empty',
+          walls: walls.get(`${x},${y}`) ?? EMPTY_WALLS,
+        }),
+      ),
+    ).flat(),
+  )
+
+  return Object.freeze({ columns, rows, cells })
 }
 
 export function validateBoardRendering(
@@ -135,6 +187,13 @@ export function validateBoardRendering(
 
   if (!positive(config.tile) || !nonnegative(config.gap)) {
     throw new RangeError('Board tile must be positive and gap cannot be negative')
+  }
+  if (
+    !positive(config.edgeWall.width) ||
+    config.edgeWall.width > config.tile ||
+    !nonnegative(config.edgeWall.cornerRadius)
+  ) {
+    throw new RangeError('Board edge wall configuration is invalid')
   }
   if (
     !Number.isInteger(config.aboveGroundLayers) ||

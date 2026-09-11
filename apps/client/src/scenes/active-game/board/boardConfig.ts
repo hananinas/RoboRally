@@ -10,6 +10,10 @@ import { validateBoardRendering } from './boardModel.ts'
 export const BOARD_CONFIG: BoardRenderConfig = {
   tile: 72,
   gap: 6,
+  edgeWall: {
+    width: 12,
+    cornerRadius: 5,
+  },
   parallax: 0.07,
   aboveGroundLayers: 13,
   parallaxReferenceLayer: 2,
@@ -45,6 +49,14 @@ export const BOARD_COMPONENTS: Readonly<
   surface: { className: 'board-piece--surface', width: 1 },
   wallBlack: { className: 'board-piece--wall-black', width: 0.6 },
   wallYellow: { className: 'board-piece--wall-yellow', width: 0.6 },
+  wallEdgeBlack: {
+    className: 'board-piece--wall-edge board-piece--wall-edge-black',
+    width: 1,
+  },
+  wallEdgeYellow: {
+    className: 'board-piece--wall-edge board-piece--wall-edge-yellow',
+    width: 1,
+  },
   laser1: {
     asset: 'laser1',
     className: 'board-piece--asset',
@@ -74,7 +86,7 @@ export const BOARD_RECIPES: Readonly<
 > = {
   empty: { slices: EMPTY_SLICES },
   hole: { hole: true, slices: [] },
-  wallStack: {
+  pillar: {
     slices: [
       { layer: 0, component: 'wallBlack', shadow: true },
       { layer: 1, component: 'wallBlack' },
@@ -103,5 +115,16 @@ export const BOARD_RECIPES: Readonly<
     ],
   },
 }
+
+export const BOARD_EDGE_WALL_SLICES = [
+  { layer: 0, component: 'wallEdgeBlack', order: 2 },
+  { layer: 1, component: 'wallEdgeBlack', order: 2 },
+  { layer: 2, component: 'wallEdgeYellow', order: 2 },
+  { layer: 3, component: 'wallEdgeYellow', order: 2 },
+  { layer: 4, component: 'wallEdgeBlack', order: 2 },
+  { layer: 5, component: 'wallEdgeBlack', order: 2 },
+  { layer: 6, component: 'wallEdgeYellow', order: 2 },
+  { layer: 7, component: 'wallEdgeYellow', order: 2 },
+] as const
 
 validateBoardRendering(BOARD_CONFIG, BOARD_COMPONENTS, BOARD_RECIPES)
