@@ -1,6 +1,9 @@
+export type ProgramCardType = 'MOVE_1' | 'TURN_LEFT' | 'TURN_RIGHT'
+
 export type ProgramCard = {
   id: string
   label: string
+  type: ProgramCardType
 }
 
 export type Registers = readonly (ProgramCard | null)[]
@@ -17,33 +20,54 @@ export type ClientGameState = {
 
 export const REGISTER_COUNT = 5
 
+//card types for the robot
+const cardTypes : ProgramCardType[] = [
+  'MOVE_1',
+  'TURN_LEFT',
+  'MOVE_1',
+  'TURN_RIGHT',
+  'MOVE_1',
+  'TURN_LEFT',
+  'MOVE_1',
+  'TURN_RIGHT',
+  'MOVE_1',
+]
+
+function cardLabel(type: ProgramCardType): string {
+
+  switch (type) {
+    case 'MOVE_1':
+      return 'Move 1'
+    case 'TURN_LEFT':
+      return 'Turn Left'
+    case 'TURN_RIGHT':
+      return 'Turn Right'
+    default:
+      return ''
+  }
+}
+
 // Creates temporary client state.
 export function createMockGameState(): ClientGameState {
-  const cardLabels = [
-    'Move 1',
-    'Turn Left',
-    'Move 1',
-    'Turn Left',
-    'Move 1',
-    'Turn Left',
-    'Move 1',
-    'Turn Left',
-    'Move 1',
-  ]
-
+  
   return {
     phase: 'programming',
     player: {
       name: 'Player Name',
     },
-    hand: cardLabels.map((label, index) => ({
+    hand: cardTypes.map((type, index) => ({
       id: `card-${index + 1}`,
-      label,
+      label : cardLabel(type),
+      type,
     })),
     registers: Array.from({ length: REGISTER_COUNT }, () => null),
     confirmed: false,
   }
 }
+
+
+
+
 
 // Places a card when allowed.
 export function placeCard(

@@ -195,6 +195,34 @@
   border-radius: var(--ui-register-card-radius);
 }
 
+/* ----------------code Abid---------------- */
+.program-card__icon {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* Icons for cards in the hand */
+.program-card--hand .program-card__icon {
+  width: 3rem;
+  height: 3rem;
+}
+
+/* Icons for cards inside registers */
+.program-card--register .program-card__icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+/* Card text */
+.program-card__label {
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Smaller text in registers */
+.program-card--register .program-card__label {
+  display: none;
+}
 .program-card--selected {
   opacity: 0.25;
 }
@@ -202,7 +230,82 @@
 .program-card--dragging {
   opacity: 0;
 }
+/* for the robot */
+.robot-sprite {
+  position: absolute;
+  width: 70px;
+  height: 70px;
+}
 
+.robot-sprite__shadow {
+  position: absolute;
+  left: 10px;
+  bottom: 4px;
+  width: 50px;
+  height: 12px;
+  border-radius: 50%;
+  background: #555;
+}
+
+.robot-sprite__body {
+  position: absolute;
+  left: 15px;
+  bottom: 12px;
+  width: 40px;
+  height: 42px;
+  border-radius: 8px;
+  background: #888;
+  border: 3px solid #333;
+}
+
+.robot-sprite__head {
+  position: absolute;
+  left: 3px;
+  top: -22px;
+  width: 28px;
+  height: 24px;
+  border-radius: 6px;
+  background: #aaa;
+  border: 3px solid #333;
+}
+
+.robot-sprite__antenna {
+  position: absolute;
+  left: 11px;
+  top: -13px;
+  width: 3px;
+  height: 12px;
+  background: #333;
+}
+
+.robot-sprite__eye {
+  position: absolute;
+  top: 7px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #222;
+}
+
+.robot-sprite__eye--left {
+  left: 6px;
+}
+
+.robot-sprite__eye--right {
+  right: 6px;
+}
+
+.robot-sprite__chest {
+  position: absolute;
+  left: 11px;
+  top: 14px;
+  width: 14px;
+  height: 10px;
+  border: 2px solid #333;
+  border-radius: 3px;
+}
+
+/* ---------------------------------- */
 .dragged-card {
   position: fixed;
   z-index: 2;
