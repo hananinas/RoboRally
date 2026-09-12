@@ -8,39 +8,43 @@ Will update with a more conceptual domain diagram which will be used for present
         class Game {
         +board: Board
         +players: Player[]
+        -phase: GamePhase
+        -currentRegister: int
+        -activatedRobotIds: RobotId[] set
         -deck: Card[] unordered
         -dealCards()
-        +gameLoop()
+        +submitProgram(PlayerId playerId, Card[5] program)
+        +executeCurrentRegister()
+        -nextRobotByPriority() RobotId
+        -executeCard(RobotId robotId, Card card)
         }
 
         class Board {
         -tiles: Tile[][]
-        -robots: Robot[]
-        +moveRobot(Robot robot)
-        -sortRobots()
-        -execute()
+        -robotPositions: Map
+        +positionOf(RobotId robotId) Position
+        +occupantAt(Position position) RobotId?
+        +moveRobot(RobotId robotId, Direction direction, int steps) MovementResult
         }
 
         class Tile {
             <<abstract>>
             +walls: Direction[] set
-            +robot: Robot
-            +activate()
         }
 
         class EmptyTile
-        class Pit
 
         class Player {
         -robot: Robot
         -hand: Card[] unordered
-        +assignProgram()
         }
 
         class Robot {
-        -orientation: Direction
-        +tile: Tile
+        +id: RobotId
+        -direction: Direction
         +program: Card[5] ordered
+        +setProgram(Card[5] program)
+        +getProgramCard(int registerIndex) Card
         }
 
         class Direction {
@@ -53,7 +57,6 @@ Will update with a more conceptual domain diagram which will be used for present
 
         class Card {
             <<abstract>>
-            +action()
         }
 
         class Move1
@@ -65,8 +68,6 @@ Will update with a more conceptual domain diagram which will be used for present
 
         Robot --> Direction
         Tile <|-- EmptyTile
-        Tile <|-- Pit
-        Tile "1" -- "0..1" Robot
 
         Player "1" --> "1" Robot
 
@@ -80,93 +81,81 @@ Will update with a more conceptual domain diagram which will be used for present
 
 # Game
 
-Responsible for dictating the game loop
+Responsible for dictating the game loop: dealing cards, taking programs, and executing their registers.
+
+Keeps track of the current phase and register. `submitProgram()` checks a player's five cards before assigning them to their Robot. During activation, Game chooses the next robot from those that have not acted yet, using current positions on Board and the priority antenna. It reads that robot's card and applies it: movement goes through Board, while turns change Robot's direction. Priority is worked out again after each robot acts.
+
+Board elements activate after the robot actions in each register. This is a no-op in V0, but leaves room for ordered board effects later. After the fifth register, Game returns to the programming phase.
 
 # Board
 
-Has the Tile grid and Robots \
-(Not to be implemented in V0) Sorts robots based on the proximity antenna \
-Executes robot programs \
-Schedules tile activation
+Has the Tile grid and keeps track of each Robot's position in a map from RobotId to Position. Tile and Robot do not hold references to one another.
 
-Should know implicitly where each Tile is. When tile executes stuff it only tells board which direction it wants to move stuff, board retains authority in actually moving things. 
-
-Robot location is up for debate. I had the suggestion of storing robots as a tuple list of:
-``` 
-[( robot1: Robot, location1: (x: number, y: number)), ( robot2: Robot, location2: (x: number, y: number)), ...] 
-```
-This would make it really easy to sort the robots list based on proximity to the priority antenna, and calculations abt moving the robot, but society is not yet ready for solutions of such elegance. \
-Board should have responsibility for keeping track of where everything is so I don't want to have references to location inside the Tile or Robot class.
+Answers position and occupancy queries, and carries out movement. Board checks walls, board edges, and other robots before moving anything; pushing other robots can be resolved here later. Game reads Board positions and antenna state to work out priority, but Board does not sort robots or execute their programs.
 
 # Tile
 
-Abstract class that gets extended with each obstacle type  \
-Outlines what it's execution does.  \
-To be called directly when it's the type that activates even when a robot isn't on it, like a laser firing across the map stopping at the first robot or wall.  \
-Only Pit is to be implemented in V0.
+Abstract class describing what is on a board space. Walls are properties of any Tile, not a separate tile type. EmptyTile is currently the only tile type shown for V0.
 
-# Robot 
+Tiles do not hold robots or activate themselves. Game can schedule board effects later, with Board handling the spatial checks needed to find what they affect.
 
-Passes it's program from Player to Board.  \
-Used to find the tiles that activate when robot is on them, like a conveyor belt that moves the robot.
+# Robot
 
+Has an ID, its direction, and an ordered program of five cards. Game assigns the program through `setProgram()` and reads the card for each register. Robot does not know its position or which Tile it occupies.
 
-# Player 
+# Player
 
-Has robot assigned  \
-Responsible for assigning a Program to their Robot
+Has an assigned Robot and an unordered hand of cards. A five-card program is submitted through Game rather than assigned directly to Robot.
 
 # Cards
 
-Abstract class that gets extended with each card  \
-Cards are moves the robots can execute
+Abstract class that gets extended with each card type. `Move1` and `TurnLeft` are the V0 examples. Cards describe actions; Game interprets them instead of each card executing itself.
 
-Players have an unordered list/set of Card[] referred to as a hand (only a variable, not a class)  \
-Game has an unordered list/set of Card[] referred to as a deck (only a variable, not a class)  \
-Robot has an ordered list of Card[5] referred to as a program (only a variable, not a class)
+A Player's hand and Game's deck are unordered Card collections. A Robot's program is an ordered list of five Cards. These are properties, not separate classes.
 
 # Direction
 
-Enum of orientations  \
-Robot has simple orientation indicating where it's facing.  \
-Tile has a set of Direction[] indicating which sides have walls (useful for collision/path blocking detection).
+Enum of `NORTH`, `EAST`, `SOUTH`, and `WEST` (cardinal indicating global/non-local directions). `Robot.direction` indicates where it faces (therefore a direction rather than an orientation). `Tile.walls` is a set of Directions indicating which sides have walls. Board checks both sides of a tile boundary when moving a robot or tracing a laser.
 
-Later some Tiles will also use it such as laser or conveyor belt (OrientedTile abstract class will extend tile with an additional orientation variable)
+Later, directional board elements such as lasers or conveyor belts can use Direction too.
 
 
 # Pseudocode to be used as inspiration for later implementations:
 
-## Board:
+## Register execution:
 
 ```
-
-for register
-    board.getpriolist() -> []robots
-        executeRegisters(robots)               (executes 1 register for each robot, they have new positions after this)
-        for robot:
-            resolveBoardActionPhase 1-4
-        shootBoardLasers()
-        for robot:
-            resolveBoardActionPhase 7-8
-
+game.startActivationPhase()                     # currentRegister = 0
+while game.currentRegister < 5:
+    remaining = game.getActiveRobotIds()
+    while remaining is not empty:
+        robotId = game.getNextRobot(remaining)    # Uses current Board positions and antenna
+        card = robot(robotId).getProgramCard(game.currentRegister)
+        game.executeCard(robotId, card)           # Movement via Board, turning via Robot
+        remaining.remove(robotId)                 # Priority is checked again for the next robot
+    game.activateBoardElements()                  # No-op in V0; ordered effects later
+    game.finishRegister()                         # Advance to the next register
+game.finishRound()                                # Return to programming phase
 ```
 
 ## Laser obstacle:
 
-
 ```
+game.activateBoardElements():                     # Later; no-op in V0
+    for each (position, laser) on board:
+        hit = board.firstRobotHit(position, laser.direction)
+        if hit exists:
+            game.damageRobot(hit)
 
-activate()
-    o = this.orientation
-    recurse(this, o)
-        if this.robot                       # 1: is there a robot on my tile?
-            damage(robot)
-            break
-        if o in this.walls                  # 2: Does a wall block me from leaving this tile?
-            break
-        next_tile = board.getTile(o, 1)     # Get neighboiring tile in defined orientation, if edge of board is reached, board should fail this
-        if ((o+2)%4) in next_tile.walls     # 3: Does a wall block me from entering next tile?
-            break
-        recurse(next_tile, o)               # 4: start over in next tile
-
+board.firstRobotHit(position, direction):
+    while board.isInBounds(position):
+        if robotId = board.occupantAt(position):
+            return robotId
+        next = board.getNeighbour(position, direction)
+        if not board.isInBounds(next):
+            return none
+        if board.hasWallBetween(position, direction):  # Wall on either side blocks the laser
+            return none
+        position = next
+    return none
 ```
