@@ -17,7 +17,7 @@ describe('createBoardScene', () => {
 
   it('groups every solid slice into a global paint plane', () => {
     expect(scene.planes).toHaveLength(14)
-    expect(scene.planes.flat()).toHaveLength(1318)
+    expect(scene.planes.flat()).toHaveLength(1323)
     expect(scene.planes[0]).toHaveLength(316)
     expect(scene.planes[13]).toHaveLength(1)
   })
@@ -71,6 +71,23 @@ describe('createBoardScene', () => {
 
     expect(laserPieces.map((piece) => piece.liftHeight)).toEqual([
       0, 0.5, 1, 1.5, 1.5, 1.5, 1.5, 1.5,
+    ])
+  })
+
+  it('renders the debug tank as five stacked sprite layers', () => {
+    const tankPieces = scene.planes
+      .flat()
+      .filter((piece) => piece.cell.x === 10 && piece.cell.y === 7)
+
+    expect(tankPieces.slice(4).map((piece) => piece.componentName)).toEqual([
+      'testTank1',
+      'testTank2',
+      'testTank3',
+      'testTank4',
+      'testTank5',
+    ])
+    expect(tankPieces.slice(4).map((piece) => piece.slice.layer)).toEqual([
+      3, 4, 5, 6, 7,
     ])
   })
 })

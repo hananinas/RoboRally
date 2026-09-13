@@ -1,6 +1,6 @@
 export type BoardPoint = Readonly<{ x: number; y: number }>
 
-export type BoardTileType = 'empty' | 'hole' | 'laser'
+export type BoardTileType = 'empty' | 'hole' | 'laser' | 'testTank'
 export type BoardRecipeName = BoardTileType | 'pillar'
 export type BoardWallSide = 'north' | 'east' | 'south' | 'west'
 export type BoardTileWalls = Readonly<Record<BoardWallSide, boolean>>
@@ -22,6 +22,11 @@ export type BoardComponentName =
   | 'laser1'
   | 'laser2'
   | 'laser3'
+  | 'testTank1'
+  | 'testTank2'
+  | 'testTank3'
+  | 'testTank4'
+  | 'testTank5'
   | 'surface'
   | 'wallEdgeBlack'
   | 'wallEdgeYellow'
@@ -93,6 +98,7 @@ type BoardWallAssignment = BoardPoint & Partial<BoardTileWalls>
 type BoardAssignments = Readonly<{
   hole?: readonly (readonly [number, number])[]
   laser?: readonly (readonly [number, number])[]
+  testTank?: readonly (readonly [number, number])[]
   walls?: readonly BoardWallAssignment[]
 }>
 
@@ -145,7 +151,7 @@ export function createBoardRenderModel(
   }
 
   const tiles = new Map<string, BoardTileType>()
-  for (const tile of ['hole', 'laser'] as const) {
+  for (const tile of ['hole', 'laser', 'testTank'] as const) {
     const positions = assignments[tile] ?? []
     for (const [x, y] of positions) {
       const key = positionKey(x, y)

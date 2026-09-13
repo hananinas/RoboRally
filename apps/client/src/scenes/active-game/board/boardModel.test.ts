@@ -92,6 +92,9 @@ describe('board rendering definition', () => {
     expect(DEMO_BOARD.cells.filter((cell) => cell.tile === 'laser')).toHaveLength(
       4,
     )
+    expect(
+      DEMO_BOARD.cells.filter((cell) => cell.tile === 'testTank'),
+    ).toHaveLength(1)
     expect(BOARD_CONFIG.parallax).toBe(0.07)
     expect(BOARD_CONFIG.edgeWall).toEqual({ width: 12, cornerRadius: 5 })
     expect(BOARD_COMPONENTS.wallBlack.width).toBe(0.6)
@@ -112,6 +115,13 @@ describe('board rendering definition', () => {
       { layer: 4, component: 'laser1' },
       { layer: 5, component: 'laser2' },
       { layer: 6, component: 'laser3' },
+    ])
+    expect(BOARD_RECIPES.testTank.slices.slice(4)).toEqual([
+      { layer: 3, component: 'testTank1', order: 1 },
+      { layer: 4, component: 'testTank2' },
+      { layer: 5, component: 'testTank3' },
+      { layer: 6, component: 'testTank4' },
+      { layer: 7, component: 'testTank5' },
     ])
   })
 
