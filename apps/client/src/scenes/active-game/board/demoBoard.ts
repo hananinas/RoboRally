@@ -23,5 +23,9 @@ export const DEMO_BOARD = createBoardRenderModel(21, 15, {
     [14, 7],
     [10, 11],
   ],
-  testTank: [[10, 7]],
+  testTank: [
+    { x: 9, y: 7, colour: '#4D8DEB' },
+    { x: 10, y: 7, colour: '#E55F5F' },
+    { x: 11, y: 7, colour: '#4CAF70' },
+  ],
 })
