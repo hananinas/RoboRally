@@ -1,6 +1,8 @@
 export { Board } from './Board.js'
 export type { MovementResult } from './Board.js'
 export { Card, Move1, TurnLeft } from './Card.js'
+export { Game } from './Game.js'
+export type { GamePhase } from './Game.js'
 export { Player } from './Player.js'
 export { Robot } from './Robot.js'
 export { Tile, EmptyTile } from './Tile.js'
