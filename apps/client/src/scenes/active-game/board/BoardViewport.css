@@ -46,10 +46,12 @@
   --board-piece-x: 0px;
   --board-piece-y: 0px;
   --board-piece-scale: 1;
+  --board-piece-angle: 0deg;
 
   position: absolute;
   transform: translate(-50%, -50%)
     translate(var(--board-piece-x), var(--board-piece-y))
+    rotate(var(--board-piece-angle))
     scale(var(--board-piece-scale));
   transform-origin: center;
 }

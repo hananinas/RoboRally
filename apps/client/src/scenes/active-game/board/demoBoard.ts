@@ -24,8 +24,8 @@ export const DEMO_BOARD = createBoardRenderModel(21, 15, {
     [10, 11],
   ],
   testTank: [
-    { x: 9, y: 7, colour: '#4D8DEB' },
+    { x: 9, y: 7, colour: '#4D8DEB', angle: -90 },
     { x: 10, y: 7, colour: '#E55F5F' },
-    { x: 11, y: 7, colour: '#4CAF70' },
+    { x: 11, y: 7, colour: '#4CAF70', angle: 180 },
   ],
 })

@@ -7,6 +7,7 @@ export type BoardTileWalls = Readonly<Record<BoardWallSide, boolean>>
 
 export type BoardCell = BoardPoint &
   Readonly<{
+    angle?: number
     colour?: string
     tile: BoardTileType
     walls: BoardTileWalls
@@ -95,7 +96,11 @@ export type BoardRenderConfig = Readonly<{
 }>
 
 type BoardWallAssignment = BoardPoint & Partial<BoardTileWalls>
-type BoardTankAssignment = BoardPoint & Readonly<{ colour: string }>
+type BoardTankAssignment = BoardPoint &
+  Readonly<{
+    angle?: number
+    colour: string
+  }>
 
 type BoardAssignments = Readonly<{
   hole?: readonly (readonly [number, number])[]
@@ -165,6 +170,7 @@ export function createBoardRenderModel(
   }
 
   const tankColours = new Map<string, string>()
+  const tankAngles = new Map<string, number>()
   for (const tank of assignments.testTank ?? []) {
     const key = positionKey(tank.x, tank.y)
     if (tiles.has(key)) {
@@ -172,6 +178,7 @@ export function createBoardRenderModel(
     }
     tiles.set(key, 'testTank')
     tankColours.set(key, tank.colour)
+    if (tank.angle !== undefined) tankAngles.set(key, tank.angle)
   }
 
   const walls = new Map<string, BoardTileWalls>()
@@ -188,9 +195,11 @@ export function createBoardRenderModel(
       Array.from({ length: columns }, (_, x) => {
         const key = `${x},${y}`
         const colour = tankColours.get(key)
+        const angle = tankAngles.get(key)
         return Object.freeze({
           x,
           y,
+          ...(angle === undefined ? {} : { angle }),
           ...(colour === undefined ? {} : { colour }),
           tile: tiles.get(key) ?? 'empty',
           walls: walls.get(key) ?? EMPTY_WALLS,

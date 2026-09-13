@@ -22,6 +22,7 @@ type BoardViewportProps = Readonly<{
 type PieceStyle = CSSProperties &
   Readonly<{
     '--board-piece-scale'?: number
+    '--board-piece-angle'?: string
     '--board-piece-x'?: string
     '--board-piece-y'?: string
     '--tank-colour'?: string
@@ -43,6 +44,9 @@ function wallJoins(
 
 function pieceStyle(piece: BoardScenePiece): PieceStyle {
   const style: PieceStyle = {
+    ...(piece.cell.angle === undefined
+      ? {}
+      : { '--board-piece-angle': `${piece.cell.angle}deg` }),
     ...(piece.cell.colour
       ? { '--tank-colour': piece.cell.colour }
       : {}),
