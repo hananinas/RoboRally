@@ -7,6 +7,7 @@ export type BoardTileWalls = Readonly<Record<BoardWallSide, boolean>>
 
 export type BoardCell = BoardPoint &
   Readonly<{
+    colour?: string
     tile: BoardTileType
     walls: BoardTileWalls
   }>
@@ -94,11 +95,12 @@ export type BoardRenderConfig = Readonly<{
 }>
 
 type BoardWallAssignment = BoardPoint & Partial<BoardTileWalls>
+type BoardTankAssignment = BoardPoint & Readonly<{ colour: string }>
 
 type BoardAssignments = Readonly<{
   hole?: readonly (readonly [number, number])[]
   laser?: readonly (readonly [number, number])[]
-  testTank?: readonly (readonly [number, number])[]
+  testTank?: readonly BoardTankAssignment[]
   walls?: readonly BoardWallAssignment[]
 }>
 
@@ -151,7 +153,7 @@ export function createBoardRenderModel(
   }
 
   const tiles = new Map<string, BoardTileType>()
-  for (const tile of ['hole', 'laser', 'testTank'] as const) {
+  for (const tile of ['hole', 'laser'] as const) {
     const positions = assignments[tile] ?? []
     for (const [x, y] of positions) {
       const key = positionKey(x, y)
@@ -160,6 +162,16 @@ export function createBoardRenderModel(
       }
       tiles.set(key, tile)
     }
+  }
+
+  const tankColours = new Map<string, string>()
+  for (const tank of assignments.testTank ?? []) {
+    const key = positionKey(tank.x, tank.y)
+    if (tiles.has(key)) {
+      throw new RangeError(`Board cell ${key} is assigned twice`)
+    }
+    tiles.set(key, 'testTank')
+    tankColours.set(key, tank.colour)
   }
 
   const walls = new Map<string, BoardTileWalls>()
@@ -173,14 +185,17 @@ export function createBoardRenderModel(
 
   const cells = Object.freeze(
     Array.from({ length: rows }, (_, y) =>
-      Array.from({ length: columns }, (_, x) =>
-        Object.freeze({
+      Array.from({ length: columns }, (_, x) => {
+        const key = `${x},${y}`
+        const colour = tankColours.get(key)
+        return Object.freeze({
           x,
           y,
-          tile: tiles.get(`${x},${y}`) ?? 'empty',
-          walls: walls.get(`${x},${y}`) ?? EMPTY_WALLS,
-        }),
-      ),
+          ...(colour === undefined ? {} : { colour }),
+          tile: tiles.get(key) ?? 'empty',
+          walls: walls.get(key) ?? EMPTY_WALLS,
+        })
+      }),
     ).flat(),
   )
 

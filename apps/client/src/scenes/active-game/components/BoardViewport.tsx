@@ -24,6 +24,7 @@ type PieceStyle = CSSProperties &
     '--board-piece-scale'?: number
     '--board-piece-x'?: string
     '--board-piece-y'?: string
+    '--tank-colour'?: string
   }>
 
 function holeColour(blend: number): string {
@@ -42,6 +43,9 @@ function wallJoins(
 
 function pieceStyle(piece: BoardScenePiece): PieceStyle {
   const style: PieceStyle = {
+    ...(piece.cell.colour
+      ? { '--tank-colour': piece.cell.colour }
+      : {}),
     left: piece.tileCentre.worldX,
     top: piece.tileCentre.worldY,
     width: BOARD_CONFIG.tile * piece.component.width,

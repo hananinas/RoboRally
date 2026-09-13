@@ -94,7 +94,12 @@ describe('board rendering definition', () => {
     )
     expect(
       DEMO_BOARD.cells.filter((cell) => cell.tile === 'testTank'),
-    ).toHaveLength(1)
+    ).toHaveLength(3)
+    expect(
+      DEMO_BOARD.cells
+        .filter((cell) => cell.tile === 'testTank')
+        .map((cell) => cell.colour),
+    ).toEqual(['#4D8DEB', '#E55F5F', '#4CAF70'])
     expect(BOARD_CONFIG.parallax).toBe(0.07)
     expect(BOARD_CONFIG.edgeWall).toEqual({ width: 12, cornerRadius: 5 })
     expect(BOARD_COMPONENTS.wallBlack.width).toBe(0.6)

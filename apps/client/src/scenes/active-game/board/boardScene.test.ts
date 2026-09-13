@@ -17,7 +17,7 @@ describe('createBoardScene', () => {
 
   it('groups every solid slice into a global paint plane', () => {
     expect(scene.planes).toHaveLength(14)
-    expect(scene.planes.flat()).toHaveLength(1323)
+    expect(scene.planes.flat()).toHaveLength(1333)
     expect(scene.planes[0]).toHaveLength(316)
     expect(scene.planes[13]).toHaveLength(1)
   })
