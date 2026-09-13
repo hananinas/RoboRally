@@ -25,6 +25,10 @@ export class Robot {
     this.programmedCards = [...program]
   }
 
+  clearProgram(): void {
+    this.programmedCards = []
+  }
+
   getProgramCard(registerIndex: number): Card {
     if (!Number.isInteger(registerIndex) || registerIndex < 0 || registerIndex >= 5) {
       throw new RangeError('Register index must be between 0 and 4')
