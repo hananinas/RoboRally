@@ -33,3 +33,16 @@ export function opposite(direction: Direction): Direction {
       return Direction.EAST
   }
 }
+
+export function turnLeft(direction: Direction): Direction {
+  switch (direction) {
+    case Direction.NORTH:
+      return Direction.WEST
+    case Direction.EAST:
+      return Direction.NORTH
+    case Direction.SOUTH:
+      return Direction.EAST
+    case Direction.WEST:
+      return Direction.SOUTH
+  }
+}
