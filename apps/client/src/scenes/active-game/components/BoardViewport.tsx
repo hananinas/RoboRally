@@ -1,5 +1,6 @@
 import { useMemo, useRef, type CSSProperties } from 'react'
-import spriteLibrary from '../board/assets/lib.rbrsprite?raw'
+import laserSprites from '../board/assets/lasers.hbls?raw'
+import tankSprites from '../board/assets/tanks.hbls?raw'
 import {
   BOARD_COMPONENTS,
   BOARD_CONFIG,
@@ -143,7 +144,7 @@ function BoardViewport({ board }: BoardViewportProps) {
       >
         <div
           aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: spriteLibrary }}
+          dangerouslySetInnerHTML={{ __html: `${laserSprites}${tankSprites}` }}
         />
         {scene.planes.map((pieces, layer) => (
           <div

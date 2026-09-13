@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <!-- testTank1 -->
+  <symbol id="testTank1" viewBox="0 0 57 87">
+    <rect x="5.59012" y="26.6229" width="14.189" height="53.7059" rx="3" fill="#313131"/>
+    <rect x="37.2209" y="26.6229" width="14.189" height="53.7059" rx="3" fill="#313131"/>
+  </symbol>
+
+  <!-- testTank2 -->
+  <symbol id="testTank2" viewBox="0 0 57 87">
+    <rect x="5.5901" y="23.7816" width="14.189" height="60.6468" rx="3" fill="#313131"/>
+    <rect x="5.5901" y="32.7562" width="8.52141" height="42.6976" rx="3" fill="#C6C6C6"/>
+    <rect x="37.2209" y="23.7816" width="14.189" height="60.6468" rx="3" fill="#313131"/>
+    <rect x="42.0212" y="32.7562" width="9.38871" height="42.6976" rx="3" fill="#C6C6C6"/>
+    <rect x="19.7791" y="34.6861" width="17.4417" height="44.4018" fill="#E55F5F"/>
+  </symbol>
+
+  <!-- testTank3 -->
+  <symbol id="testTank3" viewBox="0 0 57 87">
+    <rect x="5.59012" y="26.6229" width="14.189" height="53.7059" rx="3" fill="#313131"/>
+    <rect x="37.2209" y="26.6229" width="14.189" height="53.7059" rx="3" fill="#313131"/>
+    <rect x="13.6881" y="34" width="29.4293" height="45.3228" rx="3" fill="#E55F5F"/>
+  </symbol>
+
+  <!-- testTank4 -->
+  <symbol id="testTank4" viewBox="0 0 57 87">
+    <path d="M13.7854 44C13.7854 40.6863 16.4717 38 19.7854 38H37.2147C40.5284 38 43.2146 40.6863 43.2146 44V72.5097C43.2146 74.7188 41.4238 76.5097 39.2146 76.5097H17.7854C15.5762 76.5097 13.7854 74.7188 13.7854 72.5097L13.7854 44Z" fill="#E55F5F"/>
+    <rect x="24.2557" y="6" width="8.48855" height="42.7107" rx="3" fill="#E55F5F"/>
+  </symbol>
+
+  <!-- testTank5 -->
+  <symbol id="testTank5" viewBox="0 0 57 87">
+    <path d="M13.7854 52C13.7854 48.6863 16.4717 46 19.7854 46H37.2147C40.5284 46 43.2146 48.6863 43.2146 52V69.3949C43.2146 72.7086 40.5284 75.3949 37.2146 75.3949H19.7854C16.4717 75.3949 13.7854 72.7086 13.7854 69.3949V52Z" fill="#E55F5F"/>
+  </symbol>
+</svg>
