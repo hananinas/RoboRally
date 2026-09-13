@@ -58,17 +58,17 @@ export const BOARD_COMPONENTS: Readonly<
     width: 1,
   },
   laser1: {
-    asset: 'laser1',
+    asset: { symbol: 'laser1', viewBox: '0 0 72 72' },
     className: 'board-piece--asset',
     width: 0.82,
   },
   laser2: {
-    asset: 'laser2',
+    asset: { symbol: 'laser2', viewBox: '0 0 72 87' },
     className: 'board-piece--asset',
     width: 0.82,
   },
   laser3: {
-    asset: 'laser3',
+    asset: { symbol: 'laser3', viewBox: '0 0 72 72' },
     className: 'board-piece--asset',
     width: 0.82,
   },

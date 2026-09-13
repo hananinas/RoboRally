@@ -37,20 +37,22 @@ test('renders the board through isolated global paint planes', async ({ page }) 
   ).toBe(true)
 })
 
-test('loads laser artwork at its intrinsic aspect ratio', async ({ page }) => {
+test('renders sprite artwork at its configured aspect ratio', async ({ page }) => {
   const assets = page.locator('.board-piece--asset')
   await expect(assets).toHaveCount(16)
 
   expect(
-    await assets.evaluateAll((images) =>
-      images.every((element) => {
-        const image = element as HTMLImageElement
-        const bounds = image.getBoundingClientRect()
+    await assets.evaluateAll((elements) =>
+      elements.every((element) => {
+        if (!(element instanceof SVGSVGElement)) return false
+        const bounds = element.getBoundingClientRect()
+        const viewBox = element.viewBox.baseVal
+        const symbol = element.querySelector('use')?.getAttribute('href')
         return (
-          image.complete &&
-          image.naturalWidth === 72 &&
+          symbol?.startsWith('#laser') &&
+          viewBox.width === 72 &&
           Math.abs(bounds.width - 59.04) < 0.02 &&
-          Math.abs(bounds.height / bounds.width - image.naturalHeight / 72) <
+          Math.abs(bounds.height / bounds.width - viewBox.height / viewBox.width) <
             0.001
         )
       }),

@@ -96,6 +96,10 @@ describe('board rendering definition', () => {
     expect(BOARD_CONFIG.edgeWall).toEqual({ width: 12, cornerRadius: 5 })
     expect(BOARD_COMPONENTS.wallBlack.width).toBe(0.6)
     expect(BOARD_COMPONENTS.laser1.width).toBe(0.82)
+    expect(BOARD_COMPONENTS.laser1.asset).toEqual({
+      symbol: 'laser1',
+      viewBox: '0 0 72 72',
+    })
   })
 
   it('keeps pillars and laser slices on their requested planes', () => {

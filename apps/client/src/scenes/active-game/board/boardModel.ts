@@ -42,8 +42,13 @@ export type BoardTileRecipe = Readonly<{
   stackBaseLayer?: number
 }>
 
+export type BoardSpriteAsset = Readonly<{
+  symbol: string
+  viewBox: string
+}>
+
 export type BoardVisualComponent = Readonly<{
-  asset?: 'laser1' | 'laser2' | 'laser3'
+  asset?: BoardSpriteAsset
   className: string
   width: number
 }>
