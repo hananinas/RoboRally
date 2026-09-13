@@ -1,0 +1,6 @@
+export { Board } from './Board.js'
+export type { MovementResult } from './Board.js'
+export { Tile, EmptyTile } from './Tile.js'
+export { Direction } from './spatial.js'
+export type { Position } from './spatial.js'
+export type { RobotId } from './ids.js'
