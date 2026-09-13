@@ -15,7 +15,7 @@ test('renders the board through isolated global paint planes', async ({ page }) 
   const planes = board.locator('.board-plane')
 
   await expect(planes).toHaveCount(14)
-  await expect(board.locator('.board-plane > .board-piece')).toHaveCount(1324)
+  await expect(board.locator('.board-plane > .board-piece')).toHaveCount(1339)
   await expect(board.locator('.board-piece--hole')).toHaveCount(6)
   await expect(board.locator('.board-hole-depth')).toHaveCount(48)
   await expect(board.locator('.board-piece--wall-black')).toHaveCount(6)
@@ -39,20 +39,27 @@ test('renders the board through isolated global paint planes', async ({ page }) 
 
 test('renders sprite artwork at its configured aspect ratio', async ({ page }) => {
   const assets = page.locator('.board-piece--asset')
-  await expect(assets).toHaveCount(16)
+  await expect(assets).toHaveCount(31)
 
   expect(
     await assets.evaluateAll((elements) =>
       elements.every((element) => {
         if (!(element instanceof SVGSVGElement)) return false
-        const bounds = element.getBoundingClientRect()
+        const style = getComputedStyle(element)
+        const renderedWidth = Number.parseFloat(style.width)
+        const renderedHeight = Number.parseFloat(style.height)
         const viewBox = element.viewBox.baseVal
         const symbol = element.querySelector('use')?.getAttribute('href')
+        const expectedWidth = symbol?.startsWith('#laser')
+          ? { rendered: 59.04, viewBox: 72 }
+          : symbol?.startsWith('#testTank')
+            ? { rendered: 46.8, viewBox: 57 }
+            : undefined
         return (
-          symbol?.startsWith('#laser') &&
-          viewBox.width === 72 &&
-          Math.abs(bounds.width - 59.04) < 0.02 &&
-          Math.abs(bounds.height / bounds.width - viewBox.height / viewBox.width) <
+          expectedWidth !== undefined &&
+          viewBox.width === expectedWidth.viewBox &&
+          Math.abs(renderedWidth - expectedWidth.rendered) < 0.02 &&
+          Math.abs(renderedHeight / renderedWidth - viewBox.height / viewBox.width) <
             0.001
         )
       }),
