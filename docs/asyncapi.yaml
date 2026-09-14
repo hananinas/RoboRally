@@ -20,6 +20,8 @@ channels:
     messages:
       submitProgram:
         $ref: '#/components/messages/SubmitProgram'
+      getPublicGameState:
+        $ref: '#/components/messages/GetPublicGameState'
 
   programReplies:
     address: null
@@ -29,6 +31,15 @@ channels:
     messages:
       programResult:
         $ref: '#/components/messages/ProgramResult'
+
+  publicGameStateReplies:
+    address: null
+    description: | 
+      Logical reply channel, not a Socket.IO room. 
+      Delivered through the acknowledgement callback of game.getPublicGameState
+    messages:
+      publicGameStateResult:
+        $ref: '#/components/messages/PublicGameStateResult'
 
   player:
     address: 'game:{gameId}:player:{playerId}'
@@ -82,6 +93,20 @@ operations:
     action: send
     channel:
       $ref: '#/channels/public'
+  
+  handleGetGameState:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/getPublicGameState'
+    reply:
+      channel:
+        $ref: '#/channels/publicGameStateReplies'
+      messages:
+        - $ref: '#/channels/publicGameStateReplies/messages/publicGameStateResult'
+      x-socketio:
+        acknowledgement: true
 
 components:
   messages:
@@ -153,7 +178,22 @@ components:
           instruction:
             $ref: '#/components/schemas/Instruction'
           position:
-            $ref: '#/components/schemas/RobotPosition'
+            $ref: '#/components/schemas/Position'
+
+    GetPublicGameState:
+      name: game.getPublicGameState
+      payload:
+        type: object
+        required: [gameId]
+        properties:
+          gameId:
+            type: string
+
+    PublicGameStateResult:
+      name: game.publicGameStateResult
+      description: Public game snapshot returned through an acknowledgement.
+      payload:
+        $ref: '#/components/schemas/PublicGameState'
 
   schemas:
     Instruction:
@@ -170,17 +210,77 @@ components:
           description: Unique card instance ID
         instruction:
           $ref: '#/components/schemas/Instruction'
+      
+    Orientation:
+      type: string
+      enum: [NORTH, EAST, SOUTH, WEST]
 
-    RobotPosition:
+    Position:
       type: object
-      description: |
-        Authoritative state after the instruction.
       required: [x, y, orientation]
       properties:
         x:
           type: integer
+          minimum: 0
         y:
           type: integer
+          minimum: 0
         orientation:
+            $ref: '#/components/schemas/Orientation' 
+    
+    Robot:
+      type: object
+      required: [robotId, playerId, Position]
+      properties:
+        robotId:
+              type: string
+        playerId:
           type: string
-          enum: [NORTH, EAST, SOUTH, WEST]
+        Position:
+          $ref: '#/components/schemas/Position' 
+
+    PublicGameState:
+      type: object
+      required: [gameId, board, robots, phase]
+      properties:
+        gameId:
+          type: string
+        board:
+          $ref: '#/components/schemas/Board'
+        robots:
+          type: array
+          items:
+            $ref: '#/components/schemas/Robot'
+        phase:
+          type: string
+          enum: [WAITING, PROGRAMMING, EXECUTING]
+
+    Board:
+      type: object
+      required: [width, height, tiles]
+      properties:
+        width:
+          type: integer
+          minimum: 1
+        height:
+          type: integer
+          minimum: 1
+        tiles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tile'
+
+    Tile:
+      type: object
+      required: [position, type]
+      properties:
+        position:
+          $ref: '#/components/schemas/Position'
+        type:
+          type: string
+          enum: [EMPTY]
+        walls:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Orientation'
