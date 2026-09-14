@@ -12,34 +12,10 @@ Building a web-based multiplayer version of the board game `Robo Rally`.
 
 The repository is an empty implementation starting point. It contains a React, TypeScript, and Vite client shell with minimal TypeScript User and Game Service workspaces. Game and user functionality have not been implemented.
 
-## Development
+## Requirements
 
-### NixOS
-Note: Currently the flake only installs documentation dependencies. 
-
-#### Requirements
-
-You must have the following tools available system-wide prior to installation:
-
-    - [direnv](https://direnv.net) version >= 2.28.0
-
-#### Setup
-1. Enable direnv.
-
-   - Copy `.envrc-example` as `.envrc`.
-   - Enable direnv:
-     `$ direnv allow`
-     The development shell defined in flake.nix is automatically activated upon entering the directory.
-
-
-### Other OS/Distributions
-
-#### Requirements
-
-You must have the following tools available system-wide prior to installation:
-
-    - Node.js 20.19 or newer
-    - pnpm 10.9 or newer
+- Node.js 20.19 or newer
+- pnpm 10.9 or newer
 
 ## Structure
 

@@ -11,8 +11,6 @@ test-results/
 # Environment files
 .env
 .env.*.local
-.envrc
-.direnv/
 
 # Editor and operating system files
 .DS_Store
