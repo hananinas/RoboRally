@@ -158,7 +158,7 @@ components:
   schemas:
     Instruction:
       type: string
-      enum: [MOVE_1, TURN_90]
+      enum: [MOVE_1, TURN_LEFT]
 
     Card:
       type: object
