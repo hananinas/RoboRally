@@ -36,15 +36,16 @@ sequenceDiagram
         break Invalid program
             Server-->>Client: Acknowledgement: INVALID_PROGRAM
         end
-            Note over Server: Store program
-            Server-->>Client: Acknowledgement: ACCEPTED
-            Server->>Public: program.submitted {playerId}
+          
+        Note over Server: Store program
+        Server-->>Client: Acknowledgement: ACCEPTED
+        Server->>Public: program.submitted {playerId}
 
-            loop Registers 1 through 5
-                Note over Server: Execute instruction
-                Server->>Public: robot.actionResolved
-                Public-->>Client: robot.actionResolved
-            end
+        loop Registers 1 through 5
+            Note over Server: Execute instruction
+            Server->>Public: robot.actionResolved
+            Public-->>Client: robot.actionResolved
+        end
     end
 
 ```
