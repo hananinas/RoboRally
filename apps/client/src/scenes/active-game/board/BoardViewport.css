@@ -1,5 +1,12 @@
+@property --board-piece-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
 .board-viewport {
   --board-tile: 72px;
+  --board-gap: 6px;
   --board-radius: 10px;
   --board-ground: #252a31;
   --board-surface: #606a76;
@@ -13,6 +20,9 @@
   --board-wall-black-end: #1c2124;
   --board-wall-yellow-start: #e2cc04;
   --board-wall-yellow-end: #b4a301;
+  --tank-move-duration: 600ms;
+  --tank-turn-duration: 300ms;
+  --tank-motion-easing: cubic-bezier(0.4, 0, 0.2, 1);
 
   overflow: hidden;
   background: var(--board-background);
@@ -54,6 +64,19 @@
     rotate(var(--board-piece-angle))
     scale(var(--board-piece-scale));
   transform-origin: center;
+}
+
+.board-piece--test-tank {
+  transition:
+    left var(--tank-move-duration) var(--tank-motion-easing),
+    top var(--tank-move-duration) var(--tank-motion-easing),
+    --board-piece-angle var(--tank-turn-duration) var(--tank-motion-easing);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-piece--test-tank {
+    transition-duration: 0s;
+  }
 }
 
 .board-piece--ground,

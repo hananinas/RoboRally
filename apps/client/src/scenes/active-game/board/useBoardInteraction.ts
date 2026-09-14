@@ -14,9 +14,11 @@ import {
   type ScreenPoint,
 } from './boardMath.ts'
 import type { BoardScene } from './boardScene.ts'
+import type { DisplayRobot } from './robotPlayback.ts'
 
 type BoardInteractionOptions = Readonly<{
   canvasRef: RefObject<HTMLDivElement | null>
+  robots: readonly DisplayRobot[]
   scene: BoardScene
   viewportRef: RefObject<HTMLElement | null>
 }>
@@ -28,6 +30,10 @@ type MutableCamera = {
 }
 
 type RuntimePart = Readonly<{
+  boardPosition?: {
+    worldX: number
+    worldY: number
+  }
   element: HTMLElement
   height: number
   liftHeight: number
@@ -39,7 +45,7 @@ type RuntimeTile = {
   hole: boolean
   hover: number
   hoverTarget: number
-  parts: readonly RuntimePart[]
+  parts: RuntimePart[]
   tileCentre: BoardScene['tiles'][number]['tileCentre']
 }
 
@@ -53,6 +59,7 @@ type DragState = {
 
 export default function useBoardInteraction({
   canvasRef,
+  robots,
   scene,
   viewportRef,
 }: BoardInteractionOptions): void {
@@ -82,6 +89,14 @@ export default function useBoardInteraction({
       const height = Number(element.dataset.boardHeight)
       const liftHeight = Number(element.dataset.boardLiftHeight ?? height)
       const part = {
+        ...(element.classList.contains('board-piece--test-tank')
+          ? {
+              boardPosition: {
+                worldX: Number.parseFloat(element.style.left),
+                worldY: Number.parseFloat(element.style.top),
+              },
+            }
+          : {}),
         element,
         height,
         liftHeight,
@@ -108,18 +123,22 @@ export default function useBoardInteraction({
     let pointer: ScreenPoint | null = null
     let frameId = 0
     let previousFrame: number | null = null
-
     function render(now: number) {
       canvas.style.transform = `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`
 
       for (const tile of runtimeTiles) {
-        const offset = parallaxOffset(tile.tileCentre, camera, viewport, BOARD_CONFIG)
         const wave = tile.hole
           ? 0
           : rippleHeight(tile.cell, ripples, now, BOARD_CONFIG.ripple)
         const effect = surfaceEffect(tile.hover, wave, BOARD_CONFIG)
         for (const part of tile.parts) {
           if (part.height === 0) continue
+          const offset = parallaxOffset(
+            part.boardPosition ?? tile.tileCentre,
+            camera,
+            viewport,
+            BOARD_CONFIG,
+          )
           const depth = liftedDepth(part.height, part.liftHeight, effect.height)
           part.element.style.setProperty(
             '--board-piece-x',
@@ -406,5 +425,5 @@ export default function useBoardInteraction({
       window.removeEventListener('blur', onBlur)
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [canvasRef, scene, viewportRef])
+  }, [canvasRef, robots, scene, viewportRef])
 }

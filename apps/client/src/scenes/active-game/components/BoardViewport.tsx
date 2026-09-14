@@ -6,6 +6,12 @@ import {
   BOARD_CONFIG,
   BOARD_RECIPES,
 } from '../board/boardConfig.ts'
+import { tileCentre } from '../board/boardMath.ts'
+import {
+  ROBOT_MOVE_DURATION_MS,
+  ROBOT_TURN_DURATION_MS,
+  type DisplayRobot,
+} from '../board/robotPlayback.ts'
 import { createBoardScene, type BoardScenePiece } from '../board/boardScene.ts'
 import type {
   BoardRenderModel,
@@ -17,6 +23,7 @@ import '../board/BoardViewport.css'
 
 type BoardViewportProps = Readonly<{
   board: BoardRenderModel
+  robots: readonly DisplayRobot[]
 }>
 
 type PieceStyle = CSSProperties &
@@ -26,6 +33,8 @@ type PieceStyle = CSSProperties &
     '--board-piece-x'?: string
     '--board-piece-y'?: string
     '--tank-colour'?: string
+    '--tank-move-duration'?: string
+    '--tank-turn-duration'?: string
   }>
 
 function holeColour(blend: number): string {
@@ -44,12 +53,6 @@ function wallJoins(
 
 function pieceStyle(piece: BoardScenePiece): PieceStyle {
   const style: PieceStyle = {
-    ...(piece.cell.angle === undefined
-      ? {}
-      : { '--board-piece-angle': `${piece.cell.angle}deg` }),
-    ...(piece.cell.colour
-      ? { '--tank-colour': piece.cell.colour }
-      : {}),
     left: piece.tileCentre.worldX,
     top: piece.tileCentre.worldY,
     width: BOARD_CONFIG.tile * piece.component.width,
@@ -123,7 +126,60 @@ function BoardPiece({ piece }: Readonly<{ piece: BoardScenePiece }>) {
   )
 }
 
-function BoardViewport({ board }: BoardViewportProps) {
+const ROBOT_COMPONENTS = [
+  'testTank1',
+  'testTank2',
+  'testTank3',
+  'testTank4',
+  'testTank5',
+] as const
+
+function RobotPiece({
+  board,
+  componentName,
+  layer,
+  robot,
+}: Readonly<{
+  board: BoardRenderModel
+  componentName: (typeof ROBOT_COMPONENTS)[number]
+  layer: number
+  robot: DisplayRobot
+}>) {
+  const component = BOARD_COMPONENTS[componentName]
+  if (!component.asset) throw new Error(`Missing robot sprite ${componentName}`)
+  const centre = tileCentre(robot.position, board, BOARD_CONFIG)
+  const height = layer / BOARD_CONFIG.parallaxReferenceLayer
+  const style: PieceStyle = {
+    left: centre.worldX,
+    top: centre.worldY,
+    width: BOARD_CONFIG.tile * component.width,
+    zIndex: layer === 3 ? 1 : 0,
+    '--board-piece-angle': `${robot.angle}deg`,
+    '--tank-colour': robot.colour,
+  }
+
+  return (
+    <svg
+      aria-hidden="true"
+      className={`board-piece ${component.className} board-piece--test-tank`}
+      data-board-component={componentName}
+      data-board-height={height}
+      data-board-lift-height={Math.min(
+        height,
+        3 / BOARD_CONFIG.parallaxReferenceLayer,
+      )}
+      data-board-tile={`${robot.position.x},${robot.position.y}`}
+      data-robot-id={robot.robotId}
+      preserveAspectRatio="xMidYMid meet"
+      style={style}
+      viewBox={component.asset.viewBox}
+    >
+      <use href={`#${component.asset.symbol}`} />
+    </svg>
+  )
+}
+
+function BoardViewport({ board, robots }: BoardViewportProps) {
   const viewportRef = useRef<HTMLElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const scene = useMemo(
@@ -136,13 +192,17 @@ function BoardViewport({ board }: BoardViewportProps) {
       ),
     [board],
   )
-  useBoardInteraction({ canvasRef, scene, viewportRef })
+  useBoardInteraction({ canvasRef, robots, scene, viewportRef })
 
   return (
     <main
       ref={viewportRef}
       className="board-viewport"
       aria-label="Game board"
+      style={{
+        '--tank-move-duration': `${ROBOT_MOVE_DURATION_MS}ms`,
+        '--tank-turn-duration': `${ROBOT_TURN_DURATION_MS}ms`,
+      } as PieceStyle}
     >
       <div
         ref={canvasRef}
@@ -154,45 +214,57 @@ function BoardViewport({ board }: BoardViewportProps) {
           aria-hidden="true"
           dangerouslySetInnerHTML={{ __html: `${laserSprites}${tankSprites}` }}
         />
-        {scene.planes.map((pieces, layer) => (
-          <div
-            className="board-plane"
-            data-board-layer={layer}
-            key={layer}
-            style={{ zIndex: layer }}
-          >
-            {pieces.map((piece) => (
-              <BoardPiece key={piece.key} piece={piece} />
-            ))}
-            {layer === 0 &&
-              scene.holes.map((hole) => (
-                <div
-                  className="board-piece board-piece--hole"
-                  data-board-height="0"
-                  data-board-tile-type="hole"
-                  data-board-tile={`${hole.cell.x},${hole.cell.y}`}
-                  key={hole.key}
-                  style={{
-                    background: holeColour(BOARD_CONFIG.hole.colourOffset),
-                    left: hole.tileCentre.worldX,
-                    top: hole.tileCentre.worldY,
-                    width: BOARD_CONFIG.tile,
-                    zIndex: 1,
-                  }}
-                >
-                  {hole.depths.map((depth, index) => (
-                    <div
-                      className="board-hole-depth"
-                      data-board-height={depth.height}
-                      data-board-tile={`${hole.cell.x},${hole.cell.y}`}
-                      key={index}
-                      style={{ background: holeColour(depth.blend) }}
-                    />
-                  ))}
-                </div>
+        {scene.planes.map((pieces, layer) => {
+          const robotComponent = ROBOT_COMPONENTS[layer - 3]
+          return (
+            <div
+              className="board-plane"
+              data-board-layer={layer}
+              key={layer}
+              style={{ zIndex: layer }}
+            >
+              {pieces.map((piece) => (
+                <BoardPiece key={piece.key} piece={piece} />
               ))}
-          </div>
-        ))}
+              {robotComponent && robots.map((robot) => (
+                <RobotPiece
+                  board={board}
+                  componentName={robotComponent}
+                  key={`${robot.robotId}:${robotComponent}`}
+                  layer={layer}
+                  robot={robot}
+                />
+              ))}
+              {layer === 0 &&
+                scene.holes.map((hole) => (
+                  <div
+                    className="board-piece board-piece--hole"
+                    data-board-height="0"
+                    data-board-tile-type="hole"
+                    data-board-tile={`${hole.cell.x},${hole.cell.y}`}
+                    key={hole.key}
+                    style={{
+                      background: holeColour(BOARD_CONFIG.hole.colourOffset),
+                      left: hole.tileCentre.worldX,
+                      top: hole.tileCentre.worldY,
+                      width: BOARD_CONFIG.tile,
+                      zIndex: 1,
+                    }}
+                  >
+                    {hole.depths.map((depth, index) => (
+                      <div
+                        className="board-hole-depth"
+                        data-board-height={depth.height}
+                        data-board-tile={`${hole.cell.x},${hole.cell.y}`}
+                        key={index}
+                        style={{ background: holeColour(depth.blend) }}
+                      />
+                    ))}
+                  </div>
+                ))}
+            </div>
+          )
+        })}
       </div>
     </main>
   )

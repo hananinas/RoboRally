@@ -1,4 +1,5 @@
 import { createBoardRenderModel } from './boardModel.ts'
+import type { Robot } from './robotPlayback.ts'
 
 export const DEMO_BOARD = createBoardRenderModel(21, 15, {
   hole: [
@@ -23,9 +24,19 @@ export const DEMO_BOARD = createBoardRenderModel(21, 15, {
     [14, 7],
     [10, 11],
   ],
-  testTank: [
-    { x: 9, y: 7, colour: '#4D8DEB', angle: -90 },
-    { x: 10, y: 7, colour: '#E55F5F' },
-    { x: 11, y: 7, colour: '#4CAF70', angle: 180 },
-  ],
 })
+
+export const DEMO_ROBOTS: readonly Robot[] = [
+  {
+    robotId: 'blue', colour: '#4D8DEB',
+    position: { x: 9, y: 7, orientation: 'WEST' },
+  },
+  {
+    robotId: 'red', colour: '#E55F5F',
+    position: { x: 10, y: 7, orientation: 'NORTH' },
+  },
+  {
+    robotId: 'green', colour: '#4CAF70',
+    position: { x: 11, y: 7, orientation: 'SOUTH' },
+  },
+]

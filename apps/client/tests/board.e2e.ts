@@ -6,6 +6,11 @@ function styleNumber(locator: Locator, property: string): Promise<number> {
     Number.parseFloat(element.style.getPropertyValue(name)), property)
 }
 
+function computedStyleNumber(locator: Locator, property: string): Promise<number> {
+  return locator.evaluate((element, name) =>
+    Number.parseFloat(getComputedStyle(element).getPropertyValue(name)), property)
+}
+
 test.beforeEach(async ({ page }) => {
   await page.goto('/')
 })
@@ -65,6 +70,61 @@ test('renders sprite artwork at its configured aspect ratio', async ({ page }) =
       }),
     ),
   ).toBe(true)
+})
+
+test('plays rapid server results one robot at a time without replacing its sprite', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
+  await page.reload()
+  await page.clock.pauseAt(new Date('2026-01-01T00:01:00Z'))
+
+  const red = page.locator('[data-robot-id="red"]')
+  const blue = page.locator('[data-robot-id="blue"]')
+  await expect(red).toHaveCount(5)
+  const original = await red.first().elementHandle()
+  if (!original) throw new Error('Robot sprite is unavailable')
+
+  const steps = [
+    { robotId: 'red', instruction: 'MOVE_1', position: { x: 10, y: 6, orientation: 'NORTH' } },
+    { robotId: 'red', instruction: 'MOVE_1', position: { x: 10, y: 5, orientation: 'NORTH' } },
+    { robotId: 'red', instruction: 'TURN_LEFT', position: { x: 10, y: 5, orientation: 'WEST' } },
+    { robotId: 'red', instruction: 'MOVE_1', position: { x: 9, y: 5, orientation: 'WEST' } },
+    { robotId: 'red', instruction: 'TURN_LEFT', position: { x: 9, y: 5, orientation: 'SOUTH' } },
+  ] as const
+  await page.evaluate((actions) => {
+    for (const action of actions) {
+      window.dispatchEvent(new CustomEvent('debug:robot-action-resolved', { detail: action }))
+    }
+  }, steps)
+
+  for (const [index, step] of steps.entries()) {
+    await expect(red.first()).toHaveAttribute('data-board-tile', `${step.position.x},${step.position.y}`)
+    expect(await red.first().evaluate((element, first) => element === first, original)).toBe(true)
+    await expect(blue.first()).toHaveAttribute('data-board-tile', '9,7')
+    if (index === 0) {
+      await page.clock.runFor(300)
+      const midway = await computedStyleNumber(red.first(), 'top')
+      expect(midway).toBeLessThan(0)
+      expect(midway).toBeGreaterThan(-78)
+      await page.clock.runFor(300)
+    } else {
+      await page.clock.runFor(step.instruction === 'TURN_LEFT' ? 300 : 600)
+    }
+  }
+  await expect.poll(() => computedStyleNumber(red.first(), '--board-piece-angle'))
+    .toBeCloseTo(-180, 1)
+})
+
+test('arrow keys do not move robots or block HUD scrolling', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 })
+  const hud = page.locator('.game-hud')
+  const red = page.locator('[data-robot-id="red"]').first()
+  await page.getByRole('button', { name: 'Collapse player details' }).focus()
+  const initialScroll = await hud.evaluate((element) => element.scrollTop)
+
+  await page.keyboard.press('ArrowDown')
+  await expect.poll(() => hud.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(initialScroll)
+  await expect(red).toHaveAttribute('data-board-tile', '10,7')
 })
 
 test('keeps ground shadows below all raised surfaces', async ({ page }) => {
