@@ -33,9 +33,9 @@ sequenceDiagram
         Note over Client: Player chooses five cards
         Client->>Server: program.submit {gameId, cardIds}
 
-        alt Invalid program
+        break Invalid program
             Server-->>Client: Acknowledgement: INVALID_PROGRAM
-        else Valid program
+        end
             Note over Server: Store program
             Server-->>Client: Acknowledgement: ACCEPTED
             Server->>Public: program.submitted {playerId}
@@ -45,7 +45,6 @@ sequenceDiagram
                 Server->>Public: robot.actionResolved
                 Public-->>Client: robot.actionResolved
             end
-        end
     end
 
 ```
