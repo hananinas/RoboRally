@@ -72,202 +72,59 @@ test('renders sprite artwork at its configured aspect ratio', async ({ page }) =
   ).toBe(true)
 })
 
-test('moves the debug tanks forward repeatedly with an eased CSS transition', async ({ page }) => {
-  const tanks = [
-    { tile: '9,7', expected: { x: -78, y: 0 } },
-    { tile: '10,7', expected: { x: 0, y: -78 } },
-    { tile: '11,7', expected: { x: 0, y: 78 } },
+test('plays rapid server results one robot at a time without replacing its sprite', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
+  await page.reload()
+  await page.clock.pauseAt(new Date('2026-01-01T00:01:00Z'))
+
+  const red = page.locator('[data-robot-id="red"]')
+  const blue = page.locator('[data-robot-id="blue"]')
+  await expect(red).toHaveCount(5)
+  const original = await red.first().elementHandle()
+  if (!original) throw new Error('Robot sprite is unavailable')
+
+  const steps = [
+    { robotId: 'red', instruction: 'MOVE_1', position: { x: 10, y: 6, orientation: 'NORTH' } },
+    { robotId: 'red', instruction: 'MOVE_1', position: { x: 10, y: 5, orientation: 'NORTH' } },
+    { robotId: 'red', instruction: 'TURN_LEFT', position: { x: 10, y: 5, orientation: 'WEST' } },
+    { robotId: 'red', instruction: 'MOVE_1', position: { x: 9, y: 5, orientation: 'WEST' } },
+    { robotId: 'red', instruction: 'TURN_LEFT', position: { x: 9, y: 5, orientation: 'SOUTH' } },
   ] as const
-  const selectors = tanks.map(({ tile }) =>
-    page.locator(`[data-board-debug-tank="${tile}"]`),
-  )
+  await page.evaluate((actions) => {
+    for (const action of actions) {
+      window.dispatchEvent(new CustomEvent('debug:robot-action-resolved', { detail: action }))
+    }
+  }, steps)
 
-  for (const tank of selectors) await expect(tank).toHaveCount(5)
-
-  await page.locator('.board-viewport').evaluate((element) => {
-    const viewport = element as HTMLElement
-    viewport.style.setProperty('--tank-move-duration', '1000ms')
-  })
-  const before = await Promise.all(
-    selectors.map((tank) =>
-      Promise.all(
-        Array.from({ length: 5 }, async (_, layer) => ({
-          left: await computedStyleNumber(tank.nth(layer), 'left'),
-          top: await computedStyleNumber(tank.nth(layer), 'top'),
-        })),
-      ),
-    ),
-  )
-  const initialParallax = await Promise.all(
-    Array.from({ length: 5 }, (_, layer) =>
-      styleNumber(selectors[0].nth(layer), '--board-piece-x'),
-    ),
-  )
-
-  await page.keyboard.press('ArrowUp')
-  await page.waitForTimeout(400)
-  const midway = await computedStyleNumber(
-    selectors[0].first(),
-    'left',
-  )
-  expect(midway).toBeLessThan(-83)
-  expect(midway).toBeGreaterThan(-151)
-
-  await expect
-    .poll(() => computedStyleNumber(selectors[0].first(), 'left'))
-    .toBeCloseTo(-156, 1)
-
-  for (const [tankIndex, tank] of selectors.entries()) {
-    const after = await Promise.all(
-      Array.from({ length: 5 }, async (_, layer) => ({
-        left: await computedStyleNumber(tank.nth(layer), 'left'),
-        top: await computedStyleNumber(tank.nth(layer), 'top'),
-      })),
-    )
-    const initial = before[tankIndex]
-    for (const [layer, position] of after.entries()) {
-      expect(position.left - initial[layer].left).toBeCloseTo(
-        tanks[tankIndex].expected.x,
-        1,
-      )
-      expect(position.top - initial[layer].top).toBeCloseTo(
-        tanks[tankIndex].expected.y,
-        1,
-      )
+  for (const [index, step] of steps.entries()) {
+    await expect(red.first()).toHaveAttribute('data-board-tile', `${step.position.x},${step.position.y}`)
+    expect(await red.first().evaluate((element, first) => element === first, original)).toBe(true)
+    await expect(blue.first()).toHaveAttribute('data-board-tile', '9,7')
+    if (index === 0) {
+      await page.clock.runFor(300)
+      const midway = await computedStyleNumber(red.first(), 'top')
+      expect(midway).toBeLessThan(0)
+      expect(midway).toBeGreaterThan(-78)
+      await page.clock.runFor(300)
+    } else {
+      await page.clock.runFor(step.instruction === 'TURN_LEFT' ? 300 : 600)
     }
   }
-
-  await page.keyboard.press('ArrowUp')
-  await expect
-    .poll(() => computedStyleNumber(selectors[0].first(), 'left'))
-    .toBeCloseTo(-234, 1)
-
-  for (const [tankIndex, tank] of selectors.entries()) {
-    const afterSecondMove = await Promise.all(
-      Array.from({ length: 5 }, async (_, layer) => ({
-        left: await computedStyleNumber(tank.nth(layer), 'left'),
-        top: await computedStyleNumber(tank.nth(layer), 'top'),
-      })),
-    )
-    for (const [layer, position] of afterSecondMove.entries()) {
-      expect(position.left - before[tankIndex][layer].left).toBeCloseTo(
-        tanks[tankIndex].expected.x * 2,
-        1,
-      )
-      expect(position.top - before[tankIndex][layer].top).toBeCloseTo(
-        tanks[tankIndex].expected.y * 2,
-        1,
-      )
-    }
-  }
-
-  await expect
-    .poll(() => styleNumber(selectors[0].last(), '--board-piece-x'))
-    .toBeLessThan(initialParallax[4])
-  await expect(selectors[0].first()).toHaveAttribute('data-board-tile', '7,7')
-  await expect(selectors[1].first()).toHaveAttribute('data-board-tile', '10,5')
-  await expect(selectors[2].first()).toHaveAttribute('data-board-tile', '11,9')
-
-  const destinationSurface = page.locator(
-    '[data-board-component="surface"][data-board-tile="10,5"]',
-  )
-  const redTankTopLayer = selectors[1].last()
-  const tankYBeforeRipple = await styleNumber(
-    redTankTopLayer,
-    '--board-piece-y',
-  )
-  const surfaceYBeforeRipple = await styleNumber(
-    destinationSurface,
-    '--board-piece-y',
-  )
-  const destinationBox = await destinationSurface.boundingBox()
-  if (!destinationBox) throw new Error('Destination tile is unavailable')
-
-  await page.mouse.click(
-    destinationBox.x + destinationBox.width / 2,
-    destinationBox.y + destinationBox.height / 2,
-  )
-  await expect
-    .poll(() => styleNumber(destinationSurface, '--board-piece-y'))
-    .not.toBeCloseTo(surfaceYBeforeRipple, 2)
-  await expect
-    .poll(() => styleNumber(redTankTopLayer, '--board-piece-y'))
-    .not.toBeCloseTo(tankYBeforeRipple, 2)
-})
-
-test('turns every debug tank left with a CSS transition', async ({ page }) => {
-  const tanks = ['9,7', '10,7', '11,7'].map((tile) =>
-    page.locator(`[data-board-debug-tank="${tile}"]`),
-  )
-  const initialAngles = [-90, 0, 180]
-
-  await page.locator('.board-viewport').evaluate((element) => {
-    (element as HTMLElement).style.setProperty('--tank-turn-duration', '1000ms')
-  })
-  await page.keyboard.press('ArrowLeft')
-  await page.waitForTimeout(400)
-  const midway = await computedStyleNumber(tanks[1].first(), '--board-piece-angle')
-  expect(midway).toBeLessThan(-5)
-  expect(midway).toBeGreaterThan(-85)
-
-  for (const [tankIndex, tank] of tanks.entries()) {
-    await expect
-      .poll(() => computedStyleNumber(tank.first(), '--board-piece-angle'))
-      .toBeCloseTo(initialAngles[tankIndex] - 90, 1)
-    const layerAngles = await Promise.all(
-      Array.from({ length: 5 }, (_, layer) =>
-        computedStyleNumber(tank.nth(layer), '--board-piece-angle'),
-      ),
-    )
-    for (const angle of layerAngles) {
-      expect(angle).toBeCloseTo(initialAngles[tankIndex] - 90, 1)
-    }
-  }
-
-  await page.keyboard.press('ArrowLeft')
-  await expect
-    .poll(() => computedStyleNumber(tanks[1].first(), '--board-piece-angle'))
+  await expect.poll(() => computedStyleNumber(red.first(), '--board-piece-angle'))
     .toBeCloseTo(-180, 1)
-
-  await expect
-    .poll(() =>
-      tanks[1].first().evaluate((element) =>
-        element.getAnimations().some((animation) => animation.playState === 'running'),
-      ),
-    )
-    .toBe(false)
-  await page.locator('.board-viewport').evaluate((element) => {
-    (element as HTMLElement).style.setProperty('--tank-move-duration', '1ms')
-  })
-  await page.keyboard.press('ArrowUp')
-  await expect(tanks[1].first()).toHaveAttribute('data-board-tile', '10,8')
-  await expect
-    .poll(() => computedStyleNumber(tanks[1].first(), 'top'))
-    .toBeCloseTo(78, 1)
 })
 
-test('accepts tank commands while CSS transitions are active', async ({ page }) => {
-  const redTank = page.locator('[data-board-debug-tank="10,7"]')
-  await page.locator('.board-viewport').evaluate((element) => {
-    const viewport = element as HTMLElement
-    viewport.style.setProperty('--tank-move-duration', '1000ms')
-    viewport.style.setProperty('--tank-turn-duration', '1000ms')
-  })
+test('arrow keys do not move robots or block HUD scrolling', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 })
+  const hud = page.locator('.game-hud')
+  const red = page.locator('[data-robot-id="red"]').first()
+  await page.getByRole('button', { name: 'Collapse player details' }).focus()
+  const initialScroll = await hud.evaluate((element) => element.scrollTop)
 
-  await page.keyboard.press('ArrowUp')
-  await page.keyboard.press('ArrowLeft')
-  await page.keyboard.press('ArrowUp')
-
-  await expect(redTank.first()).toHaveAttribute('data-board-tile', '9,6')
-  await expect
-    .poll(() => computedStyleNumber(redTank.first(), 'left'))
-    .toBeCloseTo(-78, 1)
-  await expect
-    .poll(() => computedStyleNumber(redTank.first(), 'top'))
-    .toBeCloseTo(-78, 1)
-  await expect
-    .poll(() => computedStyleNumber(redTank.first(), '--board-piece-angle'))
-    .toBeCloseTo(-90, 1)
+  await page.keyboard.press('ArrowDown')
+  await expect.poll(() => hud.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(initialScroll)
+  await expect(red).toHaveAttribute('data-board-tile', '10,7')
 })
 
 test('keeps ground shadows below all raised surfaces', async ({ page }) => {

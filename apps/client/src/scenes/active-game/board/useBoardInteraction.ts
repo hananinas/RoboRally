@@ -8,16 +8,17 @@ import {
   parallaxOffset,
   rippleHeight,
   surfaceEffect,
-  tileCentre,
   zoomAround,
   type Camera,
   type Ripple,
   type ScreenPoint,
 } from './boardMath.ts'
 import type { BoardScene } from './boardScene.ts'
+import type { DisplayRobot } from './robotPlayback.ts'
 
 type BoardInteractionOptions = Readonly<{
   canvasRef: RefObject<HTMLDivElement | null>
+  robots: readonly DisplayRobot[]
   scene: BoardScene
   viewportRef: RefObject<HTMLElement | null>
 }>
@@ -56,16 +57,9 @@ type DragState = {
   tile: RuntimeTile | null
 }
 
-type RuntimeTank = {
-  angle: number
-  direction: number
-  parts: RuntimePart[]
-  x: number
-  y: number
-}
-
 export default function useBoardInteraction({
   canvasRef,
+  robots,
   scene,
   viewportRef,
 }: BoardInteractionOptions): void {
@@ -129,38 +123,6 @@ export default function useBoardInteraction({
     let pointer: ScreenPoint | null = null
     let frameId = 0
     let previousFrame: number | null = null
-    const tankParts = runtimeTiles.flatMap((tile) =>
-      tile.parts.filter((part) => part.boardPosition !== undefined),
-    )
-    const tankLocations = new Map<RuntimePart, RuntimeTile>()
-    const tanksById = new Map<string, RuntimeTank>()
-    for (const tile of runtimeTiles) {
-      for (const part of tile.parts) {
-        if (!part.boardPosition) continue
-        tankLocations.set(part, tile)
-        const id = part.element.dataset.boardDebugTank
-        if (!id) continue
-        const tank = tanksById.get(id)
-        if (tank) {
-          tank.parts.push(part)
-        } else {
-          const angle = Number.parseFloat(
-            getComputedStyle(part.element).getPropertyValue(
-              '--board-piece-angle',
-            ),
-          )
-          tanksById.set(id, {
-            angle,
-            direction: ((Math.round(angle / 90) % 4) + 4) % 4,
-            parts: [part],
-            x: tile.cell.x,
-            y: tile.cell.y,
-          })
-        }
-      }
-    }
-    const tanks = Array.from(tanksById.values())
-
     function render(now: number) {
       canvas.style.transform = `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`
 
@@ -397,6 +359,7 @@ export default function useBoardInteraction({
 
     function onKeyDown(event: KeyboardEvent) {
       if (
+        event.key.toLowerCase() !== 'r' ||
         event.ctrlKey ||
         event.metaKey ||
         event.altKey
@@ -409,73 +372,6 @@ export default function useBoardInteraction({
       ) {
         return
       }
-
-      // this is for testing tank movement, remove for later development
-      if (
-        event.key === 'ArrowUp' ||
-        event.key === 'ArrowDown' ||
-        event.key === 'ArrowLeft' ||
-        event.key === 'ArrowRight'
-      ) {
-        event.preventDefault()
-        if (event.repeat || tankParts.length === 0) return
-
-        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-          const quarterTurn = event.key === 'ArrowLeft' ? -1 : 1
-          for (const tank of tanks) {
-            tank.angle += quarterTurn * 90
-            tank.direction = (tank.direction + quarterTurn + 4) % 4
-            for (const part of tank.parts) {
-              part.element.style.setProperty(
-                '--board-piece-angle',
-                `${tank.angle}deg`,
-              )
-            }
-          }
-          return
-        }
-
-        const forward = event.key === 'ArrowUp' ? 1 : -1
-        const directions = [
-          { x: 0, y: -1 },
-          { x: 1, y: 0 },
-          { x: 0, y: 1 },
-          { x: -1, y: 0 },
-        ] as const
-        const columns = Number(canvas.dataset.boardColumns)
-        const rows = Number(canvas.dataset.boardRows)
-
-        for (const tank of tanks) {
-          const direction = directions[tank.direction]
-          const x = tank.x + direction.x * forward
-          const y = tank.y + direction.y * forward
-          if (x < 0 || x >= columns || y < 0 || y >= rows) continue
-
-          const destination = runtimeTiles[y * columns + x]
-          const centre = tileCentre({ x, y }, { columns, rows }, BOARD_CONFIG)
-          tank.x = x
-          tank.y = y
-
-          for (const part of tank.parts) {
-            const current = tankLocations.get(part)
-            const position = part.boardPosition
-            if (!current || !position) continue
-            const currentIndex = current.parts.indexOf(part)
-            if (currentIndex !== -1) current.parts.splice(currentIndex, 1)
-            destination.parts.push(part)
-            tankLocations.set(part, destination)
-            position.worldX = centre.worldX
-            position.worldY = centre.worldY
-            part.element.style.left = `${centre.worldX}px`
-            part.element.style.top = `${centre.worldY}px`
-            part.element.dataset.boardTile = `${x},${y}`
-          }
-        }
-        requestFrame()
-        return
-      }
-
-      if (event.key.toLowerCase() !== 'r') return
 
       finishDrag(null, true)
       Object.assign(camera, {
@@ -529,5 +425,5 @@ export default function useBoardInteraction({
       window.removeEventListener('blur', onBlur)
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [canvasRef, scene, viewportRef])
+  }, [canvasRef, robots, scene, viewportRef])
 }

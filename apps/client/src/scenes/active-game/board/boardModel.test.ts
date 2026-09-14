@@ -4,7 +4,7 @@ import {
   BOARD_CONFIG,
   BOARD_RECIPES,
 } from './boardConfig.ts'
-import { DEMO_BOARD } from './demoBoard.ts'
+import { DEMO_BOARD, DEMO_ROBOTS } from './demoBoard.ts'
 import {
   createBoardRenderModel,
   validateBoardRendering,
@@ -92,19 +92,11 @@ describe('board rendering definition', () => {
     expect(DEMO_BOARD.cells.filter((cell) => cell.tile === 'laser')).toHaveLength(
       4,
     )
-    expect(
-      DEMO_BOARD.cells.filter((cell) => cell.tile === 'testTank'),
-    ).toHaveLength(3)
-    expect(
-      DEMO_BOARD.cells
-        .filter((cell) => cell.tile === 'testTank')
-        .map((cell) => cell.colour),
-    ).toEqual(['#4D8DEB', '#E55F5F', '#4CAF70'])
-    expect(
-      DEMO_BOARD.cells
-        .filter((cell) => cell.tile === 'testTank')
-        .map((cell) => cell.angle),
-    ).toEqual([-90, undefined, 180])
+    expect(DEMO_ROBOTS.map((robot) => robot.position)).toEqual([
+      { x: 9, y: 7, orientation: 'WEST' },
+      { x: 10, y: 7, orientation: 'NORTH' },
+      { x: 11, y: 7, orientation: 'SOUTH' },
+    ])
     expect(BOARD_CONFIG.parallax).toBe(0.07)
     expect(BOARD_CONFIG.edgeWall).toEqual({ width: 12, cornerRadius: 5 })
     expect(BOARD_COMPONENTS.wallBlack.width).toBe(0.6)
@@ -125,13 +117,6 @@ describe('board rendering definition', () => {
       { layer: 4, component: 'laser1' },
       { layer: 5, component: 'laser2' },
       { layer: 6, component: 'laser3' },
-    ])
-    expect(BOARD_RECIPES.testTank.slices.slice(4)).toEqual([
-      { layer: 3, component: 'testTank1', order: 1 },
-      { layer: 4, component: 'testTank2' },
-      { layer: 5, component: 'testTank3' },
-      { layer: 6, component: 'testTank4' },
-      { layer: 7, component: 'testTank5' },
     ])
   })
 

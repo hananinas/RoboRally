@@ -139,17 +139,6 @@ export const BOARD_RECIPES: Readonly<
       { layer: 6, component: 'laser3' },
     ],
   },
-  testTank: {
-    stackBaseLayer: 3,
-    slices: [
-      ...EMPTY_SLICES,
-      { layer: 3, component: 'testTank1', order: 1 },
-      { layer: 4, component: 'testTank2' },
-      { layer: 5, component: 'testTank3' },
-      { layer: 6, component: 'testTank4' },
-      { layer: 7, component: 'testTank5' },
-    ],
-  },
 }
 
 export const BOARD_EDGE_WALL_SLICES = [
