@@ -58,19 +58,44 @@ export const BOARD_COMPONENTS: Readonly<
     width: 1,
   },
   laser1: {
-    asset: 'laser1',
+    asset: { symbol: 'laser1', viewBox: '0 0 72 72' },
     className: 'board-piece--asset',
     width: 0.82,
   },
   laser2: {
-    asset: 'laser2',
+    asset: { symbol: 'laser2', viewBox: '0 0 72 87' },
     className: 'board-piece--asset',
     width: 0.82,
   },
   laser3: {
-    asset: 'laser3',
+    asset: { symbol: 'laser3', viewBox: '0 0 72 72' },
     className: 'board-piece--asset',
     width: 0.82,
+  },
+  testTank1: {
+    asset: { symbol: 'testTank1', viewBox: '0 0 57 87' },
+    className: 'board-piece--asset',
+    width: 0.65,
+  },
+  testTank2: {
+    asset: { symbol: 'testTank2', viewBox: '0 0 57 87' },
+    className: 'board-piece--asset',
+    width: 0.65,
+  },
+  testTank3: {
+    asset: { symbol: 'testTank3', viewBox: '0 0 57 87' },
+    className: 'board-piece--asset',
+    width: 0.65,
+  },
+  testTank4: {
+    asset: { symbol: 'testTank4', viewBox: '0 0 57 87' },
+    className: 'board-piece--asset',
+    width: 0.65,
+  },
+  testTank5: {
+    asset: { symbol: 'testTank5', viewBox: '0 0 57 87' },
+    className: 'board-piece--asset',
+    width: 0.65,
   },
 }
 
@@ -112,6 +137,17 @@ export const BOARD_RECIPES: Readonly<
       { layer: 4, component: 'laser1' },
       { layer: 5, component: 'laser2' },
       { layer: 6, component: 'laser3' },
+    ],
+  },
+  testTank: {
+    stackBaseLayer: 3,
+    slices: [
+      ...EMPTY_SLICES,
+      { layer: 3, component: 'testTank1', order: 1 },
+      { layer: 4, component: 'testTank2' },
+      { layer: 5, component: 'testTank3' },
+      { layer: 6, component: 'testTank4' },
+      { layer: 7, component: 'testTank5' },
     ],
   },
 }

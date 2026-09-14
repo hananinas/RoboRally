@@ -1,7 +1,6 @@
 import { useMemo, useRef, type CSSProperties } from 'react'
-import laser1Url from '../board/assets/laser1.svg'
-import laser2Url from '../board/assets/laser2.svg'
-import laser3Url from '../board/assets/laser3.svg'
+import laserSprites from '../board/assets/lasers.hbls?raw'
+import tankSprites from '../board/assets/tanks.hbls?raw'
 import {
   BOARD_COMPONENTS,
   BOARD_CONFIG,
@@ -23,15 +22,11 @@ type BoardViewportProps = Readonly<{
 type PieceStyle = CSSProperties &
   Readonly<{
     '--board-piece-scale'?: number
+    '--board-piece-angle'?: string
     '--board-piece-x'?: string
     '--board-piece-y'?: string
+    '--tank-colour'?: string
   }>
-
-const ASSET_URLS = {
-  laser1: laser1Url,
-  laser2: laser2Url,
-  laser3: laser3Url,
-} as const
 
 function holeColour(blend: number): string {
   const percentage = Math.min(1, Math.max(0, blend)) * 100
@@ -49,6 +44,12 @@ function wallJoins(
 
 function pieceStyle(piece: BoardScenePiece): PieceStyle {
   const style: PieceStyle = {
+    ...(piece.cell.angle === undefined
+      ? {}
+      : { '--board-piece-angle': `${piece.cell.angle}deg` }),
+    ...(piece.cell.colour
+      ? { '--tank-colour': piece.cell.colour }
+      : {}),
     left: piece.tileCentre.worldX,
     top: piece.tileCentre.worldY,
     width: BOARD_CONFIG.tile * piece.component.width,
@@ -101,15 +102,24 @@ function BoardPiece({ piece }: Readonly<{ piece: BoardScenePiece }>) {
     style: pieceStyle(piece),
   }
 
-  return piece.component.asset ? (
-    <img
+  if (piece.component.asset) {
+    const { symbol, viewBox } = piece.component.asset
+    return (
+      <svg
+        {...sharedProps}
+        aria-hidden="true"
+        preserveAspectRatio="xMidYMid meet"
+        viewBox={viewBox}
+      >
+        <use href={`#${symbol}`} />
+      </svg>
+    )
+  }
+
+  return (
+    <div
       {...sharedProps}
-      alt=""
-      draggable={false}
-      src={ASSET_URLS[piece.component.asset]}
     />
-  ) : (
-    <div {...sharedProps} />
   )
 }
 
@@ -140,6 +150,10 @@ function BoardViewport({ board }: BoardViewportProps) {
         data-board-columns={board.columns}
         data-board-rows={board.rows}
       >
+        <div
+          aria-hidden="true"
+          dangerouslySetInnerHTML={{ __html: `${laserSprites}${tankSprites}` }}
+        />
         {scene.planes.map((pieces, layer) => (
           <div
             className="board-plane"

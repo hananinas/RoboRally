@@ -43,10 +43,16 @@
 }
 
 .board-piece {
+  --board-piece-x: 0px;
+  --board-piece-y: 0px;
+  --board-piece-scale: 1;
+  --board-piece-angle: 0deg;
+
   position: absolute;
   transform: translate(-50%, -50%)
-    translate(var(--board-piece-x, 0), var(--board-piece-y, 0))
-    scale(var(--board-piece-scale, 1));
+    translate(var(--board-piece-x), var(--board-piece-y))
+    rotate(var(--board-piece-angle))
+    scale(var(--board-piece-scale));
   transform-origin: center;
 }
 
@@ -112,6 +118,7 @@
   display: block;
   height: auto;
   max-width: none;
+  overflow: visible;
 }
 
 .board-piece--hole {
@@ -125,7 +132,7 @@
   border-radius: inherit;
   filter: blur(var(--board-hole-blur));
   transform: translate(
-    var(--board-piece-x, 0),
-    var(--board-piece-y, 0)
+    var(--board-piece-x),
+    var(--board-piece-y)
   );
 }
