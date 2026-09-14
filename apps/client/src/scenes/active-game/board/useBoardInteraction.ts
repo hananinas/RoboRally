@@ -28,6 +28,10 @@ type MutableCamera = {
 }
 
 type RuntimePart = Readonly<{
+  boardPosition?: {
+    worldX: number
+    worldY: number
+  }
   element: HTMLElement
   height: number
   liftHeight: number
@@ -82,6 +86,14 @@ export default function useBoardInteraction({
       const height = Number(element.dataset.boardHeight)
       const liftHeight = Number(element.dataset.boardLiftHeight ?? height)
       const part = {
+        ...(element.classList.contains('board-piece--test-tank')
+          ? {
+              boardPosition: {
+                worldX: Number.parseFloat(element.style.left),
+                worldY: Number.parseFloat(element.style.top),
+              },
+            }
+          : {}),
         element,
         height,
         liftHeight,
@@ -108,18 +120,26 @@ export default function useBoardInteraction({
     let pointer: ScreenPoint | null = null
     let frameId = 0
     let previousFrame: number | null = null
+    const tankParts = runtimeTiles.flatMap((tile) =>
+      tile.parts.filter((part) => part.boardPosition !== undefined),
+    )
 
     function render(now: number) {
       canvas.style.transform = `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`
 
       for (const tile of runtimeTiles) {
-        const offset = parallaxOffset(tile.tileCentre, camera, viewport, BOARD_CONFIG)
         const wave = tile.hole
           ? 0
           : rippleHeight(tile.cell, ripples, now, BOARD_CONFIG.ripple)
         const effect = surfaceEffect(tile.hover, wave, BOARD_CONFIG)
         for (const part of tile.parts) {
           if (part.height === 0) continue
+          const offset = parallaxOffset(
+            part.boardPosition ?? tile.tileCentre,
+            camera,
+            viewport,
+            BOARD_CONFIG,
+          )
           const depth = liftedDepth(part.height, part.liftHeight, effect.height)
           part.element.style.setProperty(
             '--board-piece-x',
@@ -340,7 +360,6 @@ export default function useBoardInteraction({
 
     function onKeyDown(event: KeyboardEvent) {
       if (
-        event.key.toLowerCase() !== 'r' ||
         event.ctrlKey ||
         event.metaKey ||
         event.altKey
@@ -353,6 +372,32 @@ export default function useBoardInteraction({
       ) {
         return
       }
+
+      // this is for testing tank movement, remove for later development
+      if (event.code === 'Space') {
+        event.preventDefault()
+        if (event.repeat || tankParts.length === 0) return
+
+        for (const part of tankParts) {
+          const directionX = Number.parseFloat(
+            part.element.style.getPropertyValue('--tank-direction-x'),
+          )
+          const directionY = Number.parseFloat(
+            part.element.style.getPropertyValue('--tank-direction-y'),
+          )
+          const position = part.boardPosition
+          if (!position) continue
+          const distance = BOARD_CONFIG.tile + BOARD_CONFIG.gap
+          position.worldX += directionX * distance
+          position.worldY += directionY * distance
+          part.element.style.left = `${position.worldX}px`
+          part.element.style.top = `${position.worldY}px`
+        }
+        requestFrame()
+        return
+      }
+
+      if (event.key.toLowerCase() !== 'r') return
 
       finishDrag(null, true)
       Object.assign(camera, {

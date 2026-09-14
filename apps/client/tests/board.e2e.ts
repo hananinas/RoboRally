@@ -6,6 +6,11 @@ function styleNumber(locator: Locator, property: string): Promise<number> {
     Number.parseFloat(element.style.getPropertyValue(name)), property)
 }
 
+function computedStyleNumber(locator: Locator, property: string): Promise<number> {
+  return locator.evaluate((element, name) =>
+    Number.parseFloat(getComputedStyle(element).getPropertyValue(name)), property)
+}
+
 test.beforeEach(async ({ page }) => {
   await page.goto('/')
 })
@@ -65,6 +70,100 @@ test('renders sprite artwork at its configured aspect ratio', async ({ page }) =
       }),
     ),
   ).toBe(true)
+})
+
+test('moves the debug tanks forward repeatedly with a linear CSS transition', async ({ page }) => {
+  const tanks = [
+    { tile: '9,7', expected: { x: -78, y: 0 } },
+    { tile: '10,7', expected: { x: 0, y: -78 } },
+    { tile: '11,7', expected: { x: 0, y: 78 } },
+  ] as const
+  const selectors = tanks.map(({ tile }) =>
+    page.locator(`[data-board-tile="${tile}"].board-piece--test-tank`),
+  )
+
+  for (const tank of selectors) await expect(tank).toHaveCount(5)
+
+  await page.locator('.board-viewport').evaluate((element) => {
+    const viewport = element as HTMLElement
+    viewport.style.setProperty('--tank-move-duration', '1000ms')
+  })
+  const before = await Promise.all(
+    selectors.map((tank) =>
+      Promise.all(
+        Array.from({ length: 5 }, async (_, layer) => ({
+          left: await computedStyleNumber(tank.nth(layer), 'left'),
+          top: await computedStyleNumber(tank.nth(layer), 'top'),
+        })),
+      ),
+    ),
+  )
+  const initialParallax = await Promise.all(
+    Array.from({ length: 5 }, (_, layer) =>
+      styleNumber(selectors[0].nth(layer), '--board-piece-x'),
+    ),
+  )
+
+  await page.keyboard.press('Space')
+  await page.waitForTimeout(400)
+  const midway = await computedStyleNumber(
+    selectors[0].first(),
+    'left',
+  )
+  expect(midway).toBeLessThan(-83)
+  expect(midway).toBeGreaterThan(-151)
+
+  await expect
+    .poll(() => computedStyleNumber(selectors[0].first(), 'left'))
+    .toBeCloseTo(-156, 1)
+
+  for (const [tankIndex, tank] of selectors.entries()) {
+    const after = await Promise.all(
+      Array.from({ length: 5 }, async (_, layer) => ({
+        left: await computedStyleNumber(tank.nth(layer), 'left'),
+        top: await computedStyleNumber(tank.nth(layer), 'top'),
+      })),
+    )
+    const initial = before[tankIndex]
+    for (const [layer, position] of after.entries()) {
+      expect(position.left - initial[layer].left).toBeCloseTo(
+        tanks[tankIndex].expected.x,
+        1,
+      )
+      expect(position.top - initial[layer].top).toBeCloseTo(
+        tanks[tankIndex].expected.y,
+        1,
+      )
+    }
+  }
+
+  await page.keyboard.press('Space')
+  await expect
+    .poll(() => computedStyleNumber(selectors[0].first(), 'left'))
+    .toBeCloseTo(-234, 1)
+
+  for (const [tankIndex, tank] of selectors.entries()) {
+    const afterSecondMove = await Promise.all(
+      Array.from({ length: 5 }, async (_, layer) => ({
+        left: await computedStyleNumber(tank.nth(layer), 'left'),
+        top: await computedStyleNumber(tank.nth(layer), 'top'),
+      })),
+    )
+    for (const [layer, position] of afterSecondMove.entries()) {
+      expect(position.left - before[tankIndex][layer].left).toBeCloseTo(
+        tanks[tankIndex].expected.x * 2,
+        1,
+      )
+      expect(position.top - before[tankIndex][layer].top).toBeCloseTo(
+        tanks[tankIndex].expected.y * 2,
+        1,
+      )
+    }
+  }
+
+  await expect
+    .poll(() => styleNumber(selectors[0].last(), '--board-piece-x'))
+    .toBeLessThan(initialParallax[4])
 })
 
 test('keeps ground shadows below all raised surfaces', async ({ page }) => {

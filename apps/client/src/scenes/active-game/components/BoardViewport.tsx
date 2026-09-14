@@ -25,8 +25,19 @@ type PieceStyle = CSSProperties &
     '--board-piece-angle'?: string
     '--board-piece-x'?: string
     '--board-piece-y'?: string
+    '--tank-direction-x'?: number
+    '--tank-direction-y'?: number
     '--tank-colour'?: string
   }>
+
+function tankDirection(angle = 0): Readonly<{ x: number; y: number }> {
+  const radians = angle * Math.PI / 180
+  const normalise = (value: number) => Math.abs(value) < 1e-10 ? 0 : value
+  return {
+    x: normalise(Math.sin(radians)),
+    y: normalise(-Math.cos(radians)),
+  }
+}
 
 function holeColour(blend: number): string {
   const percentage = Math.min(1, Math.max(0, blend)) * 100
@@ -43,12 +54,22 @@ function wallJoins(
 }
 
 function pieceStyle(piece: BoardScenePiece): PieceStyle {
+  const tankDirectionVector =
+    piece.cell.tile === 'testTank'
+      ? tankDirection(piece.cell.angle)
+      : undefined
   const style: PieceStyle = {
     ...(piece.cell.angle === undefined
       ? {}
       : { '--board-piece-angle': `${piece.cell.angle}deg` }),
     ...(piece.cell.colour
       ? { '--tank-colour': piece.cell.colour }
+      : {}),
+    ...(tankDirectionVector
+      ? {
+          '--tank-direction-x': tankDirectionVector.x,
+          '--tank-direction-y': tankDirectionVector.y,
+        }
       : {}),
     left: piece.tileCentre.worldX,
     top: piece.tileCentre.worldY,
@@ -87,6 +108,7 @@ function BoardPiece({ piece }: Readonly<{ piece: BoardScenePiece }>) {
   const className = [
     'board-piece',
     piece.component.className,
+    piece.componentName.startsWith('testTank') && 'board-piece--test-tank',
     piece.slice.shadow && 'board-piece--shadow',
   ]
     .filter(Boolean)
