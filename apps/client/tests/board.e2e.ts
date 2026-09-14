@@ -79,7 +79,7 @@ test('moves the debug tanks forward repeatedly with a linear CSS transition', as
     { tile: '11,7', expected: { x: 0, y: 78 } },
   ] as const
   const selectors = tanks.map(({ tile }) =>
-    page.locator(`[data-board-tile="${tile}"].board-piece--test-tank`),
+    page.locator(`[data-board-debug-tank="${tile}"]`),
   )
 
   for (const tank of selectors) await expect(tank).toHaveCount(5)
@@ -164,6 +164,35 @@ test('moves the debug tanks forward repeatedly with a linear CSS transition', as
   await expect
     .poll(() => styleNumber(selectors[0].last(), '--board-piece-x'))
     .toBeLessThan(initialParallax[4])
+  await expect(selectors[0].first()).toHaveAttribute('data-board-tile', '7,7')
+  await expect(selectors[1].first()).toHaveAttribute('data-board-tile', '10,5')
+  await expect(selectors[2].first()).toHaveAttribute('data-board-tile', '11,9')
+
+  const destinationSurface = page.locator(
+    '[data-board-component="surface"][data-board-tile="10,5"]',
+  )
+  const redTankTopLayer = selectors[1].last()
+  const tankYBeforeRipple = await styleNumber(
+    redTankTopLayer,
+    '--board-piece-y',
+  )
+  const surfaceYBeforeRipple = await styleNumber(
+    destinationSurface,
+    '--board-piece-y',
+  )
+  const destinationBox = await destinationSurface.boundingBox()
+  if (!destinationBox) throw new Error('Destination tile is unavailable')
+
+  await page.mouse.click(
+    destinationBox.x + destinationBox.width / 2,
+    destinationBox.y + destinationBox.height / 2,
+  )
+  await expect
+    .poll(() => styleNumber(destinationSurface, '--board-piece-y'))
+    .not.toBeCloseTo(surfaceYBeforeRipple, 2)
+  await expect
+    .poll(() => styleNumber(redTankTopLayer, '--board-piece-y'))
+    .not.toBeCloseTo(tankYBeforeRipple, 2)
 })
 
 test('keeps ground shadows below all raised surfaces', async ({ page }) => {

@@ -120,6 +120,9 @@ function BoardPiece({ piece }: Readonly<{ piece: BoardScenePiece }>) {
     'data-board-lift-height': piece.liftHeight,
     'data-board-tile-type': piece.cell.tile,
     'data-board-tile': `${piece.cell.x},${piece.cell.y}`,
+    'data-board-debug-tank': piece.componentName.startsWith('testTank')
+      ? `${piece.cell.x},${piece.cell.y}`
+      : undefined,
     'data-board-wall': piece.slice.wall,
     style: pieceStyle(piece),
   }

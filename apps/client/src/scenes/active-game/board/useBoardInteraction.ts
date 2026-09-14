@@ -43,7 +43,7 @@ type RuntimeTile = {
   hole: boolean
   hover: number
   hoverTarget: number
-  parts: readonly RuntimePart[]
+  parts: RuntimePart[]
   tileCentre: BoardScene['tiles'][number]['tileCentre']
 }
 
@@ -123,6 +123,12 @@ export default function useBoardInteraction({
     const tankParts = runtimeTiles.flatMap((tile) =>
       tile.parts.filter((part) => part.boardPosition !== undefined),
     )
+    const tankLocations = new Map<RuntimePart, RuntimeTile>()
+    for (const tile of runtimeTiles) {
+      for (const part of tile.parts) {
+        if (part.boardPosition) tankLocations.set(part, tile)
+      }
+    }
 
     function render(now: number) {
       canvas.style.transform = `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`
@@ -388,10 +394,32 @@ export default function useBoardInteraction({
           const position = part.boardPosition
           if (!position) continue
           const distance = BOARD_CONFIG.tile + BOARD_CONFIG.gap
-          position.worldX += directionX * distance
-          position.worldY += directionY * distance
+          const worldX = position.worldX + directionX * distance
+          const worldY = position.worldY + directionY * distance
+          const columns = Number(canvas.dataset.boardColumns)
+          const rows = Number(canvas.dataset.boardRows)
+          const x = Math.round(
+            worldX / distance + (columns - 1) / 2,
+          )
+          const y = Math.round(
+            worldY / distance + (rows - 1) / 2,
+          )
+          const destination =
+            x >= 0 && x < columns && y >= 0 && y < rows
+              ? runtimeTiles[y * columns + x]
+              : undefined
+          const current = tankLocations.get(part)
+          if (!destination || !current) continue
+
+          const currentIndex = current.parts.indexOf(part)
+          if (currentIndex !== -1) current.parts.splice(currentIndex, 1)
+          destination.parts.push(part)
+          tankLocations.set(part, destination)
+          position.worldX = worldX
+          position.worldY = worldY
           part.element.style.left = `${position.worldX}px`
           part.element.style.top = `${position.worldY}px`
+          part.element.dataset.boardTile = `${x},${y}`
         }
         requestFrame()
         return
