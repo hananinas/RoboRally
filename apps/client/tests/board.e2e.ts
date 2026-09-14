@@ -281,6 +281,11 @@ test('recalculates parallax after a portrait resize', async ({ page }) => {
 })
 
 test('animates hover and ripple without moving the ground plane', async ({ page }) => {
+  // Reload with a controlled clock so slow CI reads cannot miss the ripple peak.
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
+  await page.reload()
+  await page.clock.pauseAt(new Date('2026-01-01T00:01:00Z'))
+
   const surface = page.locator(
     '[data-board-component="surface"][data-board-tile="6,5"]',
   )
@@ -291,6 +296,7 @@ test('animates hover and ripple without moving the ground plane', async ({ page 
   const groundStyle = await ground.getAttribute('style')
 
   await page.mouse.move(328, 204)
+  await page.clock.runFor(160)
   await expect
     .poll(() => styleNumber(surface, '--board-piece-scale'))
     .toBeCloseTo(1.025, 5)
@@ -300,7 +306,7 @@ test('animates hover and ripple without moving the ground plane', async ({ page 
   await page.mouse.click(328, 204)
   const rippleSamples: number[] = []
   for (let index = 0; index < 8; index += 1) {
-    await page.waitForTimeout(16)
+    await page.clock.runFor(16)
     rippleSamples.push(
       Math.abs(await styleNumber(surface, '--board-piece-x')),
     )
@@ -310,12 +316,13 @@ test('animates hover and ripple without moving the ground plane', async ({ page 
   ).toBe(true)
   expect(await ground.getAttribute('style')).toBe(groundStyle)
 
-  await page.waitForTimeout(2400)
+  await page.clock.runFor(2400)
   await expect
     .poll(() => styleNumber(surface, '--board-piece-x'))
     .toBeCloseTo(hoverX, 4)
 
   await page.mouse.move(1100, 100)
+  await page.clock.runFor(160)
   await expect
     .poll(() => styleNumber(surface, '--board-piece-scale'))
     .toBeCloseTo(1, 5)

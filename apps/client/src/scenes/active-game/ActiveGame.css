@@ -9,6 +9,7 @@
   --ui-register-card-width: 2.75rem;
   --ui-register-card-height: 4rem;
   --ui-register-card-radius: 0.6rem;
+  --ui-menu-trigger-size: 2.75rem;
 
   position: relative;
   isolation: isolate;
@@ -52,12 +53,92 @@
   overflow: visible;
 }
 
+/* Game options: the popover uses the browser's top layer. */
+.game-menu {
+  flex: none;
+}
+
+.game-menu__trigger {
+  anchor-name: --game-menu-trigger;
+  display: grid;
+  width: var(--ui-menu-trigger-size);
+  height: var(--ui-menu-trigger-size);
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 0.75rem;
+  background: transparent;
+  color: #333;
+  cursor: pointer;
+}
+
+.game-menu__trigger:hover,
+.game-menu__trigger[aria-expanded='true'] {
+  background: #eee;
+}
+
+.game-menu__trigger:active {
+  background: #e2e2e2;
+}
+
+.game-menu__popover {
+  position: fixed;
+  position-anchor: --game-menu-trigger;
+  inset: auto;
+  top: anchor(bottom);
+  right: anchor(right);
+  width: min(16rem, calc(100vw - 2 * var(--ui-gap)));
+  max-height: calc(100dvh - anchor(bottom) - 2 * var(--ui-gap));
+  margin: 0.5rem 0 0;
+  padding: 0.5rem;
+  overflow-y: auto;
+  border: 0;
+  border-radius: var(--ui-panel-radius);
+  background: #fff;
+  color: #333;
+  box-shadow: 0 0.5rem 1.5rem #0002;
+}
+
+.game-menu__heading {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.game-menu__options {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.game-menu__option {
+  width: 100%;
+  min-height: var(--ui-menu-trigger-size);
+  padding: 0.75rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: #f3f3f3;
+  color: #666;
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: default;
+}
+
 /* Panels */
 .panel {
   padding: 1.25rem;
   border-radius: var(--ui-panel-radius);
   background: #fff;
   box-shadow: 0 0.5rem 1.5rem #0002;
+}
+
+.player-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
 .player-panel__name,
@@ -67,6 +148,8 @@
 }
 
 .player-panel__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: 1.75rem;
 }
 
@@ -212,6 +295,7 @@
 
 /* Interaction states */
 .program-card:focus-visible,
+.game-menu__trigger:focus-visible,
 .player-panel__toggle:focus-visible,
 .register-panel__done:focus-visible {
   outline: 3px solid #333;
