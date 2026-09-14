@@ -52,24 +52,39 @@ test('dismisses on an outside click without blocking game controls', async ({ pa
   await expect(options).toBeVisible()
 })
 
-test('keeps the trigger clear of the HUD and the popover inside a small viewport', async ({ page }) => {
-  await page.setViewportSize({ width: 320, height: 568 })
-  const trigger = page.getByRole('button', { name: 'Game options', exact: true })
-  const options = page.getByRole('region', { name: 'Game options' })
-  const hud = page.getByRole('complementary', { name: 'Game controls' })
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 1280, height: 720 },
+  { width: 320, height: 568 },
+  { width: 568, height: 320 },
+]) {
+  test(`anchors game options to the player header at ${viewport.width}x${viewport.height}`, async ({ page }) => {
+    await page.setViewportSize(viewport)
+    const trigger = page.getByRole('button', { name: 'Game options', exact: true })
+    const options = page.getByRole('region', { name: 'Game options' })
+    const panel = page.locator('.player-panel')
+    const heading = panel.getByRole('heading', { level: 1 })
 
-  await expect(trigger).toBeInViewport()
-  const triggerBox = await trigger.boundingBox()
-  const hudBox = await hud.boundingBox()
-  if (!triggerBox || !hudBox) throw new Error('Control positions are unavailable')
-  expect(triggerBox.width).toBeGreaterThanOrEqual(44)
-  expect(triggerBox.height).toBeGreaterThanOrEqual(44)
-  expect(triggerBox.y + triggerBox.height).toBeLessThan(hudBox.y)
+    await expect(panel.getByRole('button', { name: 'Game options', exact: true })).toBeVisible()
+    const triggerBox = await trigger.boundingBox()
+    const panelBox = await panel.boundingBox()
+    const headingBox = await heading.boundingBox()
+    if (!triggerBox || !panelBox || !headingBox) throw new Error('Control positions are unavailable')
+    expect(triggerBox.width).toBeGreaterThanOrEqual(44)
+    expect(triggerBox.height).toBeGreaterThanOrEqual(44)
+    expect(triggerBox.x).toBeGreaterThanOrEqual(headingBox.x + headingBox.width)
+    expect(triggerBox.x + triggerBox.width).toBeLessThanOrEqual(panelBox.x + panelBox.width)
+    expect(triggerBox.y).toBeGreaterThanOrEqual(panelBox.y)
+    expect(Math.abs(triggerBox.y + triggerBox.height / 2 - headingBox.y - headingBox.height / 2)).toBeLessThan(1)
 
-  await trigger.click()
-  await expect(options).toBeInViewport({ ratio: 1 })
-  await expect(options.getByRole('button')).toBeVisible()
-})
+    await trigger.click()
+    await expect(options).toBeInViewport({ ratio: 1 })
+    const optionsBox = await options.boundingBox()
+    if (!optionsBox) throw new Error('Popover position is unavailable')
+    expect(Math.abs(optionsBox.x + optionsBox.width - triggerBox.x - triggerBox.width)).toBeLessThan(1)
+    expect(optionsBox.y).toBeGreaterThanOrEqual(triggerBox.y + triggerBox.height)
+  })
+}
 
 test('keeps an open popover on screen after resizing', async ({ page }) => {
   const trigger = page.getByRole('button', { name: 'Game options', exact: true })

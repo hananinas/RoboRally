@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import './ActiveGame.css'
 import BoardViewport from './components/BoardViewport.tsx'
-import GameMenu from './components/GameMenu.tsx'
 import PlayerPanel from './components/PlayerPanel.tsx'
 import ProgrammingHand from './components/ProgrammingHand.tsx'
 import RegisterPanel from './components/RegisterPanel.tsx'
@@ -89,7 +88,6 @@ function ActiveGame() {
   return (
     <div className="game">
       <BoardViewport board={DEMO_BOARD} />
-      <GameMenu />
       <div ref={overlayRef} className={overlayClassName}>
         <aside className="game-hud" aria-label="Game controls">
           <div ref={hudContentRef} className="game-hud__content">
