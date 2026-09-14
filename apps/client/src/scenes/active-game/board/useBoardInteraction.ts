@@ -8,6 +8,7 @@ import {
   parallaxOffset,
   rippleHeight,
   surfaceEffect,
+  tileCentre,
   zoomAround,
   type Camera,
   type Ripple,
@@ -53,6 +54,14 @@ type DragState = {
   moved: boolean
   start: ScreenPoint
   tile: RuntimeTile | null
+}
+
+type RuntimeTank = {
+  angle: number
+  direction: number
+  parts: RuntimePart[]
+  x: number
+  y: number
 }
 
 export default function useBoardInteraction({
@@ -124,11 +133,33 @@ export default function useBoardInteraction({
       tile.parts.filter((part) => part.boardPosition !== undefined),
     )
     const tankLocations = new Map<RuntimePart, RuntimeTile>()
+    const tanksById = new Map<string, RuntimeTank>()
     for (const tile of runtimeTiles) {
       for (const part of tile.parts) {
-        if (part.boardPosition) tankLocations.set(part, tile)
+        if (!part.boardPosition) continue
+        tankLocations.set(part, tile)
+        const id = part.element.dataset.boardDebugTank
+        if (!id) continue
+        const tank = tanksById.get(id)
+        if (tank) {
+          tank.parts.push(part)
+        } else {
+          const angle = Number.parseFloat(
+            getComputedStyle(part.element).getPropertyValue(
+              '--board-piece-angle',
+            ),
+          )
+          tanksById.set(id, {
+            angle,
+            direction: ((Math.round(angle / 90) % 4) + 4) % 4,
+            parts: [part],
+            x: tile.cell.x,
+            y: tile.cell.y,
+          })
+        }
       }
     }
+    const tanks = Array.from(tanksById.values())
 
     function render(now: number) {
       canvas.style.transform = `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`
@@ -380,46 +411,65 @@ export default function useBoardInteraction({
       }
 
       // this is for testing tank movement, remove for later development
-      if (event.code === 'Space') {
+      if (
+        event.key === 'ArrowUp' ||
+        event.key === 'ArrowDown' ||
+        event.key === 'ArrowLeft' ||
+        event.key === 'ArrowRight'
+      ) {
         event.preventDefault()
         if (event.repeat || tankParts.length === 0) return
 
-        for (const part of tankParts) {
-          const directionX = Number.parseFloat(
-            part.element.style.getPropertyValue('--tank-direction-x'),
-          )
-          const directionY = Number.parseFloat(
-            part.element.style.getPropertyValue('--tank-direction-y'),
-          )
-          const position = part.boardPosition
-          if (!position) continue
-          const distance = BOARD_CONFIG.tile + BOARD_CONFIG.gap
-          const worldX = position.worldX + directionX * distance
-          const worldY = position.worldY + directionY * distance
-          const columns = Number(canvas.dataset.boardColumns)
-          const rows = Number(canvas.dataset.boardRows)
-          const x = Math.round(
-            worldX / distance + (columns - 1) / 2,
-          )
-          const y = Math.round(
-            worldY / distance + (rows - 1) / 2,
-          )
-          const destination =
-            x >= 0 && x < columns && y >= 0 && y < rows
-              ? runtimeTiles[y * columns + x]
-              : undefined
-          const current = tankLocations.get(part)
-          if (!destination || !current) continue
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+          const quarterTurn = event.key === 'ArrowLeft' ? -1 : 1
+          for (const tank of tanks) {
+            tank.angle += quarterTurn * 90
+            tank.direction = (tank.direction + quarterTurn + 4) % 4
+            for (const part of tank.parts) {
+              part.element.style.setProperty(
+                '--board-piece-angle',
+                `${tank.angle}deg`,
+              )
+            }
+          }
+          return
+        }
 
-          const currentIndex = current.parts.indexOf(part)
-          if (currentIndex !== -1) current.parts.splice(currentIndex, 1)
-          destination.parts.push(part)
-          tankLocations.set(part, destination)
-          position.worldX = worldX
-          position.worldY = worldY
-          part.element.style.left = `${position.worldX}px`
-          part.element.style.top = `${position.worldY}px`
-          part.element.dataset.boardTile = `${x},${y}`
+        const forward = event.key === 'ArrowUp' ? 1 : -1
+        const directions = [
+          { x: 0, y: -1 },
+          { x: 1, y: 0 },
+          { x: 0, y: 1 },
+          { x: -1, y: 0 },
+        ] as const
+        const columns = Number(canvas.dataset.boardColumns)
+        const rows = Number(canvas.dataset.boardRows)
+
+        for (const tank of tanks) {
+          const direction = directions[tank.direction]
+          const x = tank.x + direction.x * forward
+          const y = tank.y + direction.y * forward
+          if (x < 0 || x >= columns || y < 0 || y >= rows) continue
+
+          const destination = runtimeTiles[y * columns + x]
+          const centre = tileCentre({ x, y }, { columns, rows }, BOARD_CONFIG)
+          tank.x = x
+          tank.y = y
+
+          for (const part of tank.parts) {
+            const current = tankLocations.get(part)
+            const position = part.boardPosition
+            if (!current || !position) continue
+            const currentIndex = current.parts.indexOf(part)
+            if (currentIndex !== -1) current.parts.splice(currentIndex, 1)
+            destination.parts.push(part)
+            tankLocations.set(part, destination)
+            position.worldX = centre.worldX
+            position.worldY = centre.worldY
+            part.element.style.left = `${centre.worldX}px`
+            part.element.style.top = `${centre.worldY}px`
+            part.element.dataset.boardTile = `${x},${y}`
+          }
         }
         requestFrame()
         return

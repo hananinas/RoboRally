@@ -72,7 +72,7 @@ test('renders sprite artwork at its configured aspect ratio', async ({ page }) =
   ).toBe(true)
 })
 
-test('moves the debug tanks forward repeatedly with a linear CSS transition', async ({ page }) => {
+test('moves the debug tanks forward repeatedly with an eased CSS transition', async ({ page }) => {
   const tanks = [
     { tile: '9,7', expected: { x: -78, y: 0 } },
     { tile: '10,7', expected: { x: 0, y: -78 } },
@@ -104,7 +104,7 @@ test('moves the debug tanks forward repeatedly with a linear CSS transition', as
     ),
   )
 
-  await page.keyboard.press('Space')
+  await page.keyboard.press('ArrowUp')
   await page.waitForTimeout(400)
   const midway = await computedStyleNumber(
     selectors[0].first(),
@@ -137,7 +137,7 @@ test('moves the debug tanks forward repeatedly with a linear CSS transition', as
     }
   }
 
-  await page.keyboard.press('Space')
+  await page.keyboard.press('ArrowUp')
   await expect
     .poll(() => computedStyleNumber(selectors[0].first(), 'left'))
     .toBeCloseTo(-234, 1)
@@ -193,6 +193,81 @@ test('moves the debug tanks forward repeatedly with a linear CSS transition', as
   await expect
     .poll(() => styleNumber(redTankTopLayer, '--board-piece-y'))
     .not.toBeCloseTo(tankYBeforeRipple, 2)
+})
+
+test('turns every debug tank left with a CSS transition', async ({ page }) => {
+  const tanks = ['9,7', '10,7', '11,7'].map((tile) =>
+    page.locator(`[data-board-debug-tank="${tile}"]`),
+  )
+  const initialAngles = [-90, 0, 180]
+
+  await page.locator('.board-viewport').evaluate((element) => {
+    (element as HTMLElement).style.setProperty('--tank-turn-duration', '1000ms')
+  })
+  await page.keyboard.press('ArrowLeft')
+  await page.waitForTimeout(400)
+  const midway = await computedStyleNumber(tanks[1].first(), '--board-piece-angle')
+  expect(midway).toBeLessThan(-5)
+  expect(midway).toBeGreaterThan(-85)
+
+  for (const [tankIndex, tank] of tanks.entries()) {
+    await expect
+      .poll(() => computedStyleNumber(tank.first(), '--board-piece-angle'))
+      .toBeCloseTo(initialAngles[tankIndex] - 90, 1)
+    const layerAngles = await Promise.all(
+      Array.from({ length: 5 }, (_, layer) =>
+        computedStyleNumber(tank.nth(layer), '--board-piece-angle'),
+      ),
+    )
+    for (const angle of layerAngles) {
+      expect(angle).toBeCloseTo(initialAngles[tankIndex] - 90, 1)
+    }
+  }
+
+  await page.keyboard.press('ArrowLeft')
+  await expect
+    .poll(() => computedStyleNumber(tanks[1].first(), '--board-piece-angle'))
+    .toBeCloseTo(-180, 1)
+
+  await expect
+    .poll(() =>
+      tanks[1].first().evaluate((element) =>
+        element.getAnimations().some((animation) => animation.playState === 'running'),
+      ),
+    )
+    .toBe(false)
+  await page.locator('.board-viewport').evaluate((element) => {
+    (element as HTMLElement).style.setProperty('--tank-move-duration', '1ms')
+  })
+  await page.keyboard.press('ArrowUp')
+  await expect(tanks[1].first()).toHaveAttribute('data-board-tile', '10,8')
+  await expect
+    .poll(() => computedStyleNumber(tanks[1].first(), 'top'))
+    .toBeCloseTo(78, 1)
+})
+
+test('accepts tank commands while CSS transitions are active', async ({ page }) => {
+  const redTank = page.locator('[data-board-debug-tank="10,7"]')
+  await page.locator('.board-viewport').evaluate((element) => {
+    const viewport = element as HTMLElement
+    viewport.style.setProperty('--tank-move-duration', '1000ms')
+    viewport.style.setProperty('--tank-turn-duration', '1000ms')
+  })
+
+  await page.keyboard.press('ArrowUp')
+  await page.keyboard.press('ArrowLeft')
+  await page.keyboard.press('ArrowUp')
+
+  await expect(redTank.first()).toHaveAttribute('data-board-tile', '9,6')
+  await expect
+    .poll(() => computedStyleNumber(redTank.first(), 'left'))
+    .toBeCloseTo(-78, 1)
+  await expect
+    .poll(() => computedStyleNumber(redTank.first(), 'top'))
+    .toBeCloseTo(-78, 1)
+  await expect
+    .poll(() => computedStyleNumber(redTank.first(), '--board-piece-angle'))
+    .toBeCloseTo(-90, 1)
 })
 
 test('keeps ground shadows below all raised surfaces', async ({ page }) => {

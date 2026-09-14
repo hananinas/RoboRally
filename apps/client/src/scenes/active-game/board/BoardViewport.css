@@ -1,3 +1,9 @@
+@property --board-piece-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
 .board-viewport {
   --board-tile: 72px;
   --board-gap: 6px;
@@ -15,6 +21,8 @@
   --board-wall-yellow-start: #e2cc04;
   --board-wall-yellow-end: #b4a301;
   --tank-move-duration: 600ms;
+  --tank-turn-duration: 300ms;
+  --tank-motion-easing: cubic-bezier(0.4, 0, 0.2, 1);
 
   overflow: hidden;
   background: var(--board-background);
@@ -59,11 +67,10 @@
 }
 
 .board-piece--test-tank {
-  --tank-direction-x: 0;
-  --tank-direction-y: -1;
   transition:
-    left var(--tank-move-duration) linear,
-    top var(--tank-move-duration) linear;
+    left var(--tank-move-duration) var(--tank-motion-easing),
+    top var(--tank-move-duration) var(--tank-motion-easing),
+    --board-piece-angle var(--tank-turn-duration) var(--tank-motion-easing);
 }
 
 @media (prefers-reduced-motion: reduce) {
