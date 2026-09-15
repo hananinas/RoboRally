@@ -40,13 +40,6 @@ export type PublicGameState = Readonly<{
   phase: GamePhase
 }>
 
-export type ProgramCardIds = readonly [string, string, string, string, string]
-
-export type SubmitProgram = Readonly<{
-  gameId: string
-  cardIds: ProgramCardIds
-}>
-
 export type CardsDealt = Readonly<{
   cards: readonly Card[]
 }>

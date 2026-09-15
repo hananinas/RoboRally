@@ -5,8 +5,8 @@ import type {
   ProgramSubmitted,
   PublicGameStateResult,
   RobotActionResolved,
-  SubmitProgram,
 } from './payloads.js'
+import type { SubmitProgram } from './submitProgram.js'
 
 export type ProgramResultAcknowledgement = (result: ProgramResult) => void
 

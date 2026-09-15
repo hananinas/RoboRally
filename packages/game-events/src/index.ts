@@ -13,7 +13,6 @@ export type {
   Instruction,
   Orientation,
   Position,
-  ProgramCardIds,
   ProgramResult,
   ProgramResultOutcome,
   ProgramSubmitted,
@@ -21,6 +20,7 @@ export type {
   PublicGameStateResult,
   Robot,
   RobotActionResolved,
-  SubmitProgram,
   Tile,
 } from './payloads.js'
+export { parseSubmitProgram, submitProgramSchema } from './submitProgram.js'
+export type { ProgramCardIds, SubmitProgram } from './submitProgram.js'
