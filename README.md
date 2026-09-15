@@ -20,6 +20,13 @@ The development shell provides the tools required by the project, including Node
 
 ### Nix
 #### Requirements
+
+The following tools must be installed system-wide:
+
+- [Nix](https://nixos.org/download/)
+- [direnv](https://direnv.net/) version 2.28.0 or newer
+
+#### Setup
 1. Copy the example direnv configuration:
 
    ```sh
