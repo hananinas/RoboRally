@@ -118,8 +118,7 @@ components:
         required: [gameId, cardIds]
         properties:
           gameId:
-            type: string
-            format: uuid
+            $ref: '#/components/schemas/GameId'
           cardIds:
             type: array
             description: Card instance IDs in register order.
@@ -127,8 +126,7 @@ components:
             maxItems: 5
             uniqueItems: true
             items:
-              type: string
-              format: uuid
+              $ref: '#/components/schemas/CardId'
 
     CardsDealt:
       name: cards.dealt
@@ -161,7 +159,7 @@ components:
         required: [playerId]
         properties:
           playerId:
-            type: string
+            $ref: '#/components/schemas/PlayerId'
 
     RobotActionResolved:
       name: robot.actionResolved
@@ -173,8 +171,7 @@ components:
           - position
         properties:
           robotId:
-            type: string
-            format: uuid
+            $ref: '#/components/schemas/RobotId'
           instruction:
             $ref: '#/components/schemas/Instruction'
           position:
@@ -187,7 +184,7 @@ components:
         required: [gameId]
         properties:
           gameId:
-            type: string
+            $ref: '#/components/schemas/GameId'
 
     PublicGameStateResult:
       name: game.publicGameStateResult
@@ -196,6 +193,22 @@ components:
         $ref: '#/components/schemas/PublicGameState'
 
   schemas:
+    GameId:
+      type: string
+      format: uuid
+
+    PlayerId:
+      type: string
+      format: uuid
+
+    RobotId:
+      type: string
+      format: uuid
+
+    CardId:
+      type: string
+      format: uuid
+
     Instruction:
       type: string
       enum: [MOVE_1, TURN_LEFT]
@@ -205,8 +218,7 @@ components:
       required: [id, instruction]
       properties:
         id:
-          type: string
-          format: uuid
+          $ref: '#/components/schemas/CardId'
           description: Unique card instance ID
         instruction:
           $ref: '#/components/schemas/Instruction'
@@ -217,6 +229,7 @@ components:
 
     Coordinate:
       type: object
+      description: A board location without a facing direction.
       required: [x, y]
       properties:
         x:
@@ -227,31 +240,31 @@ components:
           minimum: 0
 
     Position:
-      allOf:
-        - $ref: '#/components/schemas/Coordinate'
-        - type: object
-          required: [orientation]
-          properties:
-            orientation:
-              $ref: '#/components/schemas/Orientation'
+      type: object
+      required: [coordinate, orientation]
+      properties:
+        coordinate:
+          $ref: '#/components/schemas/Coordinate'
+        orientation:
+          $ref: '#/components/schemas/Orientation'
     
     Robot:
       type: object
       required: [robotId, playerId, position]
       properties:
         robotId:
-              type: string
+          $ref: '#/components/schemas/RobotId'
         playerId:
-          type: string
+          $ref: '#/components/schemas/PlayerId'
         position:
-          $ref: '#/components/schemas/Position' 
+          $ref: '#/components/schemas/Position'
 
     PublicGameState:
       type: object
       required: [gameId, board, robots, phase]
       properties:
         gameId:
-          type: string
+          $ref: '#/components/schemas/GameId'
         board:
           $ref: '#/components/schemas/Board'
         robots:

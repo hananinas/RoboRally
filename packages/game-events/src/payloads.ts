@@ -1,7 +1,12 @@
+export type GameId = string
+export type PlayerId = string
+export type RobotId = string
+export type CardId = string
+
 export type Instruction = 'MOVE_1' | 'TURN_LEFT'
 
 export type Card = Readonly<{
-  id: string
+  id: CardId
   instruction: Instruction
 }>
 
@@ -12,13 +17,14 @@ export type Coordinate = Readonly<{
   y: number
 }>
 
-export type Position = Coordinate & Readonly<{
+export type Position = Readonly<{
+  coordinate: Coordinate
   orientation: Orientation
 }>
 
 export type Robot = Readonly<{
-  robotId: string
-  playerId: string
+  robotId: RobotId
+  playerId: PlayerId
   position: Position
 }>
 
@@ -37,7 +43,7 @@ export type Board = Readonly<{
 export type GamePhase = 'WAITING' | 'PROGRAMMING' | 'EXECUTING'
 
 export type PublicGameState = Readonly<{
-  gameId: string
+  gameId: GameId
   board: Board
   robots: readonly Robot[]
   phase: GamePhase
@@ -54,17 +60,17 @@ export type ProgramResult = Readonly<{
 }>
 
 export type ProgramSubmitted = Readonly<{
-  playerId: string
+  playerId: PlayerId
 }>
 
 export type RobotActionResolved = Readonly<{
-  robotId: string
+  robotId: RobotId
   instruction: Instruction
   position: Position
 }>
 
 export type GetPublicGameState = Readonly<{
-  gameId: string
+  gameId: GameId
 }>
 
 export type PublicGameStateResult = PublicGameState
