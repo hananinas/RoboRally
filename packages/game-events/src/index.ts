@@ -1,4 +1,10 @@
 export type {
+  ClientToServerEvents,
+  ProgramResultAcknowledgement,
+  PublicGameStateAcknowledgement,
+  ServerToClientEvents,
+} from './events.js'
+export type {
   Board,
   Card,
   CardsDealt,
