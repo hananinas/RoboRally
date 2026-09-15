@@ -1,8 +1,15 @@
+import { useState } from 'react'
 import ActiveGame from './scenes/active-game/ActiveGame.tsx'
+import Lobby from './scenes/lobby/Lobby.tsx'
 
-// Hosts the current application scene. (Simply an active game for now - no setup etc.)
 function App() {
-  return <ActiveGame />
+  const [gameStarted, setGameStarted] = useState(false)
+
+  return gameStarted ? (
+    <ActiveGame />
+  ) : (
+    <Lobby onStartGame={() => setGameStarted(true)} />
+  )
 }
 
 export default App
