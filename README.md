@@ -34,7 +34,7 @@ You must have the following tools available system-wide prior to installation:
      To enter individual development shells run:
      - `nix develop .#client` for client development
      - `nix develop .#game-service` for backend developemnt
-     - `nix develop .#casyncapi` for asyncapi documentation tooling
+     - `nix develop .#asyncapi` for asyncapi documentation tooling
 
 
 ### Other OS/Distributions
