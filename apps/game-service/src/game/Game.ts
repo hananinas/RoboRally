@@ -7,7 +7,7 @@ import type { Direction, Position } from './spatial.js'
 
 export type GamePhase = 'programming' | 'activation'
 
-type RobotActionResult = Readonly<{
+export type RobotActionResult = Readonly<{
   robotId: RobotId
   cardId: CardId
   position: Position
