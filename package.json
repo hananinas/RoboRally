@@ -5,8 +5,7 @@
   "packageManager": "pnpm@10.9.0",
   "scripts": {
     "install-dev": "pnpm -r --workspace-concurrency=1 run install-dev",
-    "dev": "pnpn --parallel run dev",
-    "start": "pnpm --parallel run start",
+    "dev": "pnpm --parallel run dev",
     "build": "pnpm --recursive --if-present build",
     "lint": "pnpm --recursive --if-present lint",
     "test": "pnpm --recursive --if-present test",

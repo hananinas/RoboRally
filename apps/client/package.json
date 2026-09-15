@@ -6,7 +6,6 @@
   "scripts": {
     "install-dev": "pnpm --filter @robo-rally/client... install --frozen-lockfile --prod=false",
     "dev": "vite",
-    "start": "vite preview",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "pnpm test:unit && pnpm test:browser",
