@@ -1,0 +1,161 @@
+@property --board-piece-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.board-viewport {
+  --board-tile: 72px;
+  --board-gap: 6px;
+  --board-radius: 10px;
+  --board-ground: #252a31;
+  --board-surface: #606a76;
+  --board-background: #3f4651;
+  --board-hole-bottom: #12161a;
+  --board-ground-shadow: 0 0 5px #0007;
+  --board-surface-shading: inset 0 0 8px #0002, inset 0 0 2px #0006;
+  --board-hole-shadow: 0 0 2px #0004;
+  --board-hole-blur: 3px;
+  --board-wall-black-start: #272e32;
+  --board-wall-black-end: #1c2124;
+  --board-wall-yellow-start: #e2cc04;
+  --board-wall-yellow-end: #b4a301;
+  --tank-move-duration: 600ms;
+  --tank-turn-duration: 300ms;
+  --tank-motion-easing: cubic-bezier(0.4, 0, 0.2, 1);
+
+  overflow: hidden;
+  background: var(--board-background);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.board-viewport--dragging {
+  cursor: grabbing;
+}
+
+.board-canvas {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  isolation: isolate;
+  transform: translate(0, 0) scale(1);
+  transform-origin: 0 0;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.board-plane {
+  position: absolute;
+  inset: 0;
+  isolation: isolate;
+}
+
+.board-piece {
+  --board-piece-x: 0px;
+  --board-piece-y: 0px;
+  --board-piece-scale: 1;
+  --board-piece-angle: 0deg;
+
+  position: absolute;
+  transform: translate(-50%, -50%)
+    translate(var(--board-piece-x), var(--board-piece-y))
+    rotate(var(--board-piece-angle))
+    scale(var(--board-piece-scale));
+  transform-origin: center;
+}
+
+.board-piece--test-tank {
+  transition:
+    left var(--tank-move-duration) var(--tank-motion-easing),
+    top var(--tank-move-duration) var(--tank-motion-easing),
+    --board-piece-angle var(--tank-turn-duration) var(--tank-motion-easing);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-piece--test-tank {
+    transition-duration: 0s;
+  }
+}
+
+.board-piece--ground,
+.board-piece--surface,
+.board-piece--hole {
+  aspect-ratio: 1;
+  border-radius: var(--board-radius);
+}
+
+.board-piece--ground {
+  background: var(--board-ground);
+}
+
+.board-piece--surface {
+  background: var(--board-surface);
+  box-shadow: var(--board-surface-shading);
+}
+
+.board-piece--wall-black,
+.board-piece--wall-yellow {
+  aspect-ratio: 1;
+  border-radius: 50%;
+}
+
+.board-piece--wall-edge-black {
+  background: linear-gradient(
+    45deg,
+    var(--board-wall-black-start),
+    var(--board-wall-black-end)
+  );
+}
+
+.board-piece--wall-edge-yellow {
+  background: linear-gradient(
+    45deg,
+    var(--board-wall-yellow-start),
+    var(--board-wall-yellow-end)
+  );
+}
+
+.board-piece--wall-black {
+  background: linear-gradient(
+    45deg,
+    var(--board-wall-black-start),
+    var(--board-wall-black-end)
+  );
+}
+
+.board-piece--wall-yellow {
+  background: linear-gradient(
+    45deg,
+    var(--board-wall-yellow-start),
+    var(--board-wall-yellow-end)
+  );
+}
+
+.board-piece--shadow {
+  box-shadow: var(--board-ground-shadow);
+}
+
+.board-piece--asset {
+  display: block;
+  height: auto;
+  max-width: none;
+  overflow: visible;
+}
+
+.board-piece--hole {
+  overflow: hidden;
+  box-shadow: var(--board-hole-shadow);
+}
+
+.board-hole-depth {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  filter: blur(var(--board-hole-blur));
+  transform: translate(
+    var(--board-piece-x),
+    var(--board-piece-y)
+  );
+}

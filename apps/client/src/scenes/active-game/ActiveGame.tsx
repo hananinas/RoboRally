@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './ActiveGame.css'
 import BoardViewport from './components/BoardViewport.tsx'
 import PlayerPanel from './components/PlayerPanel.tsx'
@@ -13,6 +13,11 @@ import {
   type ProgramCard,
 } from './gameState.ts'
 import useOverlayLayout from './useOverlayLayout.ts'
+import { DEMO_BOARD, DEMO_ROBOTS } from './board/demoBoard.ts'
+import {
+  useRobotPlayback,
+  type ResolvedRobotAction,
+} from './board/robotPlayback.ts'
 
 // Applies a valid card placement.
 function withPlacedCard(
@@ -29,6 +34,17 @@ function withPlacedCard(
 // Renders the active game scene.
 function ActiveGame() {
   const [gameState, setGameState] = useState(createMockGameState)
+  const { robots, enqueue } = useRobotPlayback(DEMO_ROBOTS)
+
+  // #41 will feed the same queue from Socket.IO; this hook is only for the demo tests.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const onResolved = (event: Event) => {
+      enqueue((event as CustomEvent<ResolvedRobotAction>).detail)
+    }
+    window.addEventListener('debug:robot-action-resolved', onResolved)
+    return () => window.removeEventListener('debug:robot-action-resolved', onResolved)
+  }, [enqueue])
   const {
     handBelowHud,
     handRef,
@@ -86,7 +102,7 @@ function ActiveGame() {
 
   return (
     <div className="game">
-      <BoardViewport />
+      <BoardViewport board={DEMO_BOARD} robots={robots} />
       <div ref={overlayRef} className={overlayClassName}>
         <aside className="game-hud" aria-label="Game controls">
           <div ref={hudContentRef} className="game-hud__content">
