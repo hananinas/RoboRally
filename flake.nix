@@ -2,13 +2,42 @@
   description = "Robo Rally workspace and AsyncAPI development environment";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  inputs.nixvim.url = "github:nix-community/nixvim";
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, nixvim }:
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
       nodejs = pkgs.nodejs_24;
-      
+
+      editorConfig = nixvim.lib.evalNixvim {
+        inherit system;
+        modules = [
+          ({ config, ... }: {
+            plugins.treesitter = {
+              enable = true;
+              highlight.enable = true;
+              grammarPackages = with config.plugins.treesitter.package.builtGrammars; [
+                typescript
+                tsx
+                javascript
+                json
+                html
+                css
+                nix
+                yaml
+              ];
+            };
+          })
+        ];
+      };
+
+      # Keep project editor data separate from the global nixCats installation.
+      editor = pkgs.writeShellScriptBin "nvim" ''
+        export NVIM_APPNAME=robo-rally-nvim
+        exec ${editorConfig.config.build.package}/bin/nvim "$@"
+      '';
+
       pnpm = pkgs.writeShellScriptBin "pnpm" ''
         exec ${nodejs}/bin/npm exec --yes --package=pnpm@10.9.0 -- pnpm "$@"
       '';
@@ -33,7 +62,7 @@
       docs = pkgs.writeShellScriptBin "asyncapi-docs" ''
         if [ "$#" -lt 1 ]; then
           echo "Usage: asyncapi-docs <asyncapi.yaml> [output-dir]" >&2
-            exit 1
+          exit 1
         fi
 
         spec="$1"
@@ -63,7 +92,7 @@
         withAsyncapi ? false
       }:
         pkgs.mkShell ({
-          packages = [ nodejs pnpm ]
+          packages = [ nodejs pnpm editor ]
             ++ pkgs.lib.optionals withAsyncapi asyncapiPackages;
 
           shellHook = ''
@@ -82,7 +111,7 @@
           withGameService = true;
           withAsyncapi = true;
         };
-        
+
         client = mkProjectShell {
           setupCommand = "pnpm --filter @robo-rally/client run install-dev";
           withClient = true;
@@ -94,7 +123,7 @@
         };
 
         asyncapi = pkgs.mkShell {
-          packages = [ nodejs ] ++ asyncapiPackages;
+          packages = [ nodejs editor ] ++ asyncapiPackages;
         };
       };
     };
