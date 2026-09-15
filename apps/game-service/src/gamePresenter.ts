@@ -76,7 +76,7 @@ export function presentPublicGameState(
       robotId: player.robot.id,
       playerId: player.id,
       position: {
-        ...game.board.positionOf(player.robot.id),
+        coordinate: game.board.positionOf(player.robot.id),
         orientation: orientations[player.robot.direction],
       },
     })),
@@ -104,7 +104,7 @@ export function presentRobotActionResolved(
     robotId: action.robotId,
     instruction: instructionFor(card),
     position: {
-      ...action.position,
+      coordinate: action.position,
       orientation: orientations[action.direction],
     },
   }

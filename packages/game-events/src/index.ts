@@ -7,12 +7,15 @@ export type {
 export type {
   Board,
   Card,
+  CardId,
   CardsDealt,
   Coordinate,
+  GameId,
   GamePhase,
   GetPublicGameState,
   Instruction,
   Orientation,
+  PlayerId,
   Position,
   ProgramResult,
   ProgramResultOutcome,
@@ -20,6 +23,7 @@ export type {
   PublicGameState,
   PublicGameStateResult,
   Robot,
+  RobotId,
   RobotActionResolved,
   Tile,
 } from './payloads.js'

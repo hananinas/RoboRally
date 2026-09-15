@@ -35,7 +35,10 @@ describe('game presenter', () => {
         {
           robotId: player.robot.id,
           playerId: player.id,
-          position: { x: 10, y: 7, orientation: 'NORTH' },
+          position: {
+            coordinate: { x: 10, y: 7 },
+            orientation: 'NORTH',
+          },
         },
       ],
     })
@@ -123,7 +126,10 @@ describe('game presenter', () => {
     expect(resolved).toEqual({
       robotId: player.robot.id,
       instruction,
-      position: { x: 4, y: 5, orientation: 'SOUTH' },
+      position: {
+        coordinate: { x: 4, y: 5 },
+        orientation: 'SOUTH',
+      },
     })
   })
 
