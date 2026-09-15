@@ -36,6 +36,7 @@
               enable = true;
               servers.ts_ls.enable = true;
             };
+            plugins.blink-cmp.enable = true;
           })
         ];
       };
