@@ -8,6 +8,7 @@ export type {
   Board,
   Card,
   CardsDealt,
+  Coordinate,
   GamePhase,
   GetPublicGameState,
   Instruction,

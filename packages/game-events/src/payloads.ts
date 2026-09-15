@@ -7,9 +7,12 @@ export type Card = Readonly<{
 
 export type Orientation = 'NORTH' | 'EAST' | 'SOUTH' | 'WEST'
 
-export type Position = Readonly<{
+export type Coordinate = Readonly<{
   x: number
   y: number
+}>
+
+export type Position = Coordinate & Readonly<{
   orientation: Orientation
 }>
 
@@ -20,7 +23,7 @@ export type Robot = Readonly<{
 }>
 
 export type Tile = Readonly<{
-  position: Position
+  position: Coordinate
   type: 'EMPTY'
   walls?: readonly Orientation[]
 }>
