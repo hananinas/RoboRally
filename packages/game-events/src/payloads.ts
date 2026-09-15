@@ -73,4 +73,11 @@ export type GetPublicGameState = Readonly<{
   gameId: GameId
 }>
 
-export type PublicGameStateResult = PublicGameState
+export type PublicGameStateResult =
+  | Readonly<{
+      outcome: 'FOUND'
+      state: PublicGameState
+    }>
+  | Readonly<{
+      outcome: 'GAME_NOT_FOUND'
+    }>
