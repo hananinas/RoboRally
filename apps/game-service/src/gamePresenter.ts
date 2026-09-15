@@ -1,0 +1,111 @@
+import type {
+  Card as CardPayload,
+  CardsDealt,
+  GamePhase as GamePhasePayload,
+  Instruction,
+  Orientation,
+  PublicGameState,
+  RobotActionResolved,
+  Tile as TilePayload,
+} from '@robo-rally/game-events'
+import {
+  Direction,
+  EmptyTile,
+  Move1,
+  TurnLeft,
+  type Card,
+  type Game,
+  type GameId,
+  type GamePhase,
+  type Player,
+  type RobotActionResult,
+} from './game/index.js'
+
+const orientations: Record<Direction, Orientation> = {
+  [Direction.NORTH]: 'NORTH',
+  [Direction.EAST]: 'EAST',
+  [Direction.SOUTH]: 'SOUTH',
+  [Direction.WEST]: 'WEST',
+}
+
+const phases: Record<GamePhase, GamePhasePayload> = {
+  programming: 'PROGRAMMING',
+  activation: 'EXECUTING',
+}
+
+function instructionFor(card: Card): Instruction {
+  if (card instanceof Move1) return 'MOVE_1'
+  if (card instanceof TurnLeft) return 'TURN_LEFT'
+  throw new Error(`Unsupported card ${card.id}`)
+}
+
+function presentCard(card: Card): CardPayload {
+  return { id: card.id, instruction: instructionFor(card) }
+}
+
+function presentTile(game: Game, x: number, y: number): TilePayload {
+  const tile = game.board.getTile({ x, y })
+  if (!(tile instanceof EmptyTile)) {
+    throw new Error(`Unsupported tile at ${x},${y}`)
+  }
+
+  const walls = [...tile.walls].map((direction) => orientations[direction])
+  return {
+    position: { x, y },
+    type: 'EMPTY',
+    ...(walls.length === 0 ? {} : { walls }),
+  }
+}
+
+export function presentPublicGameState(
+  gameId: GameId,
+  game: Game,
+): PublicGameState {
+  const tiles = Array.from({ length: game.board.height }, (_, y) =>
+    Array.from({ length: game.board.width }, (_, x) => presentTile(game, x, y)),
+  ).flat()
+
+  return {
+    gameId,
+    board: {
+      width: game.board.width,
+      height: game.board.height,
+      tiles,
+    },
+    robots: game.players.map((player) => ({
+      robotId: player.robot.id,
+      playerId: player.id,
+      position: {
+        ...game.board.positionOf(player.robot.id),
+        orientation: orientations[player.robot.direction],
+      },
+    })),
+    phase: phases[game.phase],
+  }
+}
+
+export function presentCardsDealt(player: Player): CardsDealt {
+  return { cards: player.hand.map(presentCard) }
+}
+
+export function presentRobotActionResolved(
+  game: Game,
+  action: RobotActionResult,
+): RobotActionResolved {
+  const player = game.players.find(
+    (candidate) => candidate.robot.id === action.robotId,
+  )
+  const card = player?.hand.find((candidate) => candidate.id === action.cardId)
+  if (!card) {
+    throw new Error(`Card ${action.cardId} is not available to robot ${action.robotId}`)
+  }
+
+  return {
+    robotId: action.robotId,
+    instruction: instructionFor(card),
+    position: {
+      ...action.position,
+      orientation: orientations[action.direction],
+    },
+  }
+}
