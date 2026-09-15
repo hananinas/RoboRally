@@ -56,8 +56,14 @@ export function createGameSocketServer(
     socket.join([publicRoom(gameId), playerRoom(gameId, player.id)])
 
     socket.on('game.getPublicGameState', (payload, acknowledge) => {
-      if (payload.gameId !== gameId) return
-      acknowledge(presentPublicGameState(gameId, game))
+      if (payload.gameId !== gameId) {
+        acknowledge({ outcome: 'GAME_NOT_FOUND' })
+        return
+      }
+      acknowledge({
+        outcome: 'FOUND',
+        state: presentPublicGameState(gameId, game),
+      })
     })
 
     socket.on('program.submit', (payload, acknowledge) => {

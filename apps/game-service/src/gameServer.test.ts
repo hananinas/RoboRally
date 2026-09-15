@@ -107,9 +107,24 @@ describe('game Socket.IO connection', () => {
       { gameId: singlePlayerGame.gameId },
     )
 
-    expect(state).toEqual(
-      presentPublicGameState(singlePlayerGame.gameId, singlePlayerGame.game),
+    expect(state).toEqual({
+      outcome: 'FOUND',
+      state: presentPublicGameState(
+        singlePlayerGame.gameId,
+        singlePlayerGame.game,
+      ),
+    })
+  })
+
+  it('acknowledges an unknown game without leaving the client waiting', async () => {
+    await connect()
+
+    const result = await client.timeout(1_000).emitWithAck(
+      'game.getPublicGameState',
+      { gameId: '00000000-0000-4000-8000-000000000999' },
     )
+
+    expect(result).toEqual({ outcome: 'GAME_NOT_FOUND' })
   })
 
   it('accepts an ordered program, executes five registers, and starts the next round', async () => {
@@ -157,8 +172,14 @@ describe('game Socket.IO connection', () => {
       'game.getPublicGameState',
       { gameId: singlePlayerGame.gameId },
     )
-    expect(nextState.phase).toBe('PROGRAMMING')
-    expect(nextState.robots[0].position).toEqual(resolvedActions.at(-1)?.position)
+    expect(nextState.outcome).toBe('FOUND')
+    if (nextState.outcome !== 'FOUND') {
+      throw new Error('Game state was not found')
+    }
+    expect(nextState.state.phase).toBe('PROGRAMMING')
+    expect(nextState.state.robots[0].position).toEqual(
+      resolvedActions.at(-1)?.position,
+    )
   })
 
   it('rejects malformed, unknown, and unavailable programs atomically', async () => {
