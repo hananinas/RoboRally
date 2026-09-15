@@ -1,0 +1,8 @@
+version: "0.5"
+
+processes:
+  client:
+    command: "pnpm --filter @robo-rally/client run dev"
+
+  game-service:
+    command: "pnpm --filter @robo-rally/game-service run dev"
