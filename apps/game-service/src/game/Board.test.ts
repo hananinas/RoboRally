@@ -157,4 +157,28 @@ describe('Board robot ownership', () => {
     expect(() => board.moveRobot('unknown', Direction.NORTH, 1)).toThrow()
     expect(board.positionOf('alpha')).toEqual({ x: 1, y: 1 })
   })
+
+  it('moves multiple steps successfully without blocking', () => {
+    const board = new Board(grid(4, 1))
+    board.placeRobot('alpha', { x: 0, y: 0 })
+
+    expect(board.moveRobot('alpha', Direction.EAST, 3)).toEqual({
+      position: { x: 3, y: 0 },
+      stepsMoved: 3,
+      blocked: false,
+    })
+    expect(board.positionOf('alpha')).toEqual({ x: 3, y: 0 })
+  })
+
+  it('stops at board edge during multi-step move', () => {
+    const board = new Board(grid(3, 1))
+    board.placeRobot('alpha', { x: 0, y: 0 })
+
+    expect(board.moveRobot('alpha', Direction.EAST, 5)).toEqual({
+      position: { x: 2, y: 0 },
+      stepsMoved: 2,
+      blocked: true,
+    })
+    expect(board.positionOf('alpha')).toEqual({ x: 2, y: 0 })
+  })
 })
