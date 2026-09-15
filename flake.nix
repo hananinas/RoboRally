@@ -98,11 +98,13 @@
         setupCommand,
         withClient ? false,
         withGameService ? false,
-        withAsyncapi ? false
+        withAsyncapi ? false,
+        withEditor ? false
       }:
         pkgs.mkShell ({
-          packages = [ nodejs pnpm editor ]
-            ++ pkgs.lib.optionals withAsyncapi asyncapiPackages;
+          packages = [ nodejs pnpm ]
+            ++ pkgs.lib.optionals withAsyncapi asyncapiPackages
+            ++ pkgs.lib.optionals withEditor [ editor ];
 
           shellHook = ''
             ${setupCommand} || return $?
@@ -132,7 +134,15 @@
         };
 
         asyncapi = pkgs.mkShell {
-          packages = [ nodejs editor ] ++ asyncapiPackages;
+          packages = [ nodejs ] ++ asyncapiPackages;
+        };
+
+        with-editor = mkProjectShell {
+          setupCommand = "pnpm run install-dev";
+          withClient = true;
+          withGameService = true;
+          withAsyncapi = true;
+          withEditor = true;
         };
       };
     };
