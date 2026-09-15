@@ -230,13 +230,13 @@ components:
     
     Robot:
       type: object
-      required: [robotId, playerId, Position]
+      required: [robotId, playerId, position]
       properties:
         robotId:
               type: string
         playerId:
           type: string
-        Position:
+        position:
           $ref: '#/components/schemas/Position' 
 
     PublicGameState:
