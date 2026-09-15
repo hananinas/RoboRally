@@ -215,9 +215,9 @@ components:
       type: string
       enum: [NORTH, EAST, SOUTH, WEST]
 
-    Position:
+    Coordinate:
       type: object
-      required: [x, y, orientation]
+      required: [x, y]
       properties:
         x:
           type: integer
@@ -225,8 +225,15 @@ components:
         y:
           type: integer
           minimum: 0
-        orientation:
-            $ref: '#/components/schemas/Orientation' 
+
+    Position:
+      allOf:
+        - $ref: '#/components/schemas/Coordinate'
+        - type: object
+          required: [orientation]
+          properties:
+            orientation:
+              $ref: '#/components/schemas/Orientation'
     
     Robot:
       type: object
@@ -275,7 +282,7 @@ components:
       required: [position, type]
       properties:
         position:
-          $ref: '#/components/schemas/Position'
+          $ref: '#/components/schemas/Coordinate'
         type:
           type: string
           enum: [EMPTY]
