@@ -5,4 +5,5 @@ export {
   TurnLeft,
   type CardAction,
   type CardId,
+  type CardExecutionContext,
 } from './Card.js'
