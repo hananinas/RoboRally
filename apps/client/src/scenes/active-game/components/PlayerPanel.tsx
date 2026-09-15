@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { ClientGameState } from '../gameState.ts'
+import GameMenu from './GameMenu.tsx'
 import Panel from './Panel.tsx'
 
 type PlayerPanelProps = {
@@ -12,7 +13,10 @@ function PlayerPanel({ player }: PlayerPanelProps) {
 
   return (
     <Panel className="player-panel">
-      <h1 className="player-panel__name">{player.name}</h1>
+      <header className="player-panel__header">
+        <h1 className="player-panel__name">{player.name}</h1>
+        <GameMenu />
+      </header>
       {expanded && (
         <div className="player-panel__details">
           {['Checkpoints', 'Health', 'Energy', 'Upgrades'].map((section) => (

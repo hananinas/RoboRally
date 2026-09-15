@@ -4,7 +4,7 @@ import {
   BOARD_CONFIG,
   BOARD_RECIPES,
 } from './boardConfig.ts'
-import { DEMO_BOARD } from './demoBoard.ts'
+import { DEMO_BOARD, DEMO_ROBOTS } from './demoBoard.ts'
 import {
   createBoardRenderModel,
   validateBoardRendering,
@@ -92,10 +92,19 @@ describe('board rendering definition', () => {
     expect(DEMO_BOARD.cells.filter((cell) => cell.tile === 'laser')).toHaveLength(
       4,
     )
+    expect(DEMO_ROBOTS.map((robot) => robot.position)).toEqual([
+      { x: 9, y: 7, orientation: 'WEST' },
+      { x: 10, y: 7, orientation: 'NORTH' },
+      { x: 11, y: 7, orientation: 'SOUTH' },
+    ])
     expect(BOARD_CONFIG.parallax).toBe(0.07)
     expect(BOARD_CONFIG.edgeWall).toEqual({ width: 12, cornerRadius: 5 })
     expect(BOARD_COMPONENTS.wallBlack.width).toBe(0.6)
     expect(BOARD_COMPONENTS.laser1.width).toBe(0.82)
+    expect(BOARD_COMPONENTS.laser1.asset).toEqual({
+      symbol: 'laser1',
+      viewBox: '0 0 72 72',
+    })
   })
 
   it('keeps pillars and laser slices on their requested planes', () => {

@@ -22,6 +22,11 @@ export type BoardComponentName =
   | 'laser1'
   | 'laser2'
   | 'laser3'
+  | 'testTank1'
+  | 'testTank2'
+  | 'testTank3'
+  | 'testTank4'
+  | 'testTank5'
   | 'surface'
   | 'wallEdgeBlack'
   | 'wallEdgeYellow'
@@ -42,8 +47,13 @@ export type BoardTileRecipe = Readonly<{
   stackBaseLayer?: number
 }>
 
+export type BoardSpriteAsset = Readonly<{
+  symbol: string
+  viewBox: string
+}>
+
 export type BoardVisualComponent = Readonly<{
-  asset?: 'laser1' | 'laser2' | 'laser3'
+  asset?: BoardSpriteAsset
   className: string
   width: number
 }>
@@ -84,7 +94,6 @@ export type BoardRenderConfig = Readonly<{
 }>
 
 type BoardWallAssignment = BoardPoint & Partial<BoardTileWalls>
-
 type BoardAssignments = Readonly<{
   hole?: readonly (readonly [number, number])[]
   laser?: readonly (readonly [number, number])[]

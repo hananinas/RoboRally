@@ -58,19 +58,44 @@ export const BOARD_COMPONENTS: Readonly<
     width: 1,
   },
   laser1: {
-    asset: 'laser1',
+    asset: { symbol: 'laser1', viewBox: '0 0 72 72' },
     className: 'board-piece--asset',
     width: 0.82,
   },
   laser2: {
-    asset: 'laser2',
+    asset: { symbol: 'laser2', viewBox: '0 0 72 87' },
     className: 'board-piece--asset',
     width: 0.82,
   },
   laser3: {
-    asset: 'laser3',
+    asset: { symbol: 'laser3', viewBox: '0 0 72 72' },
     className: 'board-piece--asset',
     width: 0.82,
+  },
+  testTank1: {
+    asset: { symbol: 'testTank1', viewBox: '0 0 57 87' },
+    className: 'board-piece--asset',
+    width: 0.65,
+  },
+  testTank2: {
+    asset: { symbol: 'testTank2', viewBox: '0 0 57 87' },
+    className: 'board-piece--asset',
+    width: 0.65,
+  },
+  testTank3: {
+    asset: { symbol: 'testTank3', viewBox: '0 0 57 87' },
+    className: 'board-piece--asset',
+    width: 0.65,
+  },
+  testTank4: {
+    asset: { symbol: 'testTank4', viewBox: '0 0 57 87' },
+    className: 'board-piece--asset',
+    width: 0.65,
+  },
+  testTank5: {
+    asset: { symbol: 'testTank5', viewBox: '0 0 57 87' },
+    className: 'board-piece--asset',
+    width: 0.65,
   },
 }
 
