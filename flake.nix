@@ -14,6 +14,10 @@
         inherit system;
         modules = [
           ({ config, ... }: {
+           clipboard = {
+             register = "unnamedplus";
+             providers.wl-copy.enable = true;
+           };
             plugins.treesitter = {
               enable = true;
               highlight.enable = true;
@@ -27,6 +31,10 @@
                 nix
                 yaml
               ];
+            };
+            plugins.lsp = {
+              enable = true;
+              servers.ts_ls.enable = true;
             };
           })
         ];
