@@ -29,7 +29,12 @@ You must have the following tools available system-wide prior to installation:
    - Copy `.envrc-example` as `.envrc`.
    - Enable direnv:
      `$ direnv allow`
-     The development shell defined in flake.nix is automatically activated upon entering the directory.
+     The development shell defined in `flake.nix` is automatically activated upon entering the directory. By default, it installs dependencies of the client, game-service and asyncapi documentation tooling. 
+
+     To enter individual development shells run:
+     - `nix develop .#client` for client development
+     - `nix develop .#game-service` for backend developemnt
+     - `nix develop .#casyncapi` for asyncapi documentation tooling
 
 
 ### Other OS/Distributions

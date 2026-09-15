@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "install-dev": "pnpm --filter @robo-rally/client... install --frozen-lockfile --prod=false",
+    "run": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "pnpm test:unit && pnpm test:browser",

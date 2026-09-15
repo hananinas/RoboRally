@@ -1,5 +1,5 @@
 {
-  description = "AsyncAPI documentation development environment";
+  description = "Robo Rally workspace and AsyncAPI development environment";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
@@ -7,11 +7,16 @@
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
+      nodejs = pkgs.nodejs_24;
+      
+      pnpm = pkgs.writeShellScriptBin "pnpm" ''
+        exec ${nodejs}/bin/npm exec --yes --package=pnpm@10.9.0 -- pnpm "$@"
+      '';
 
       cliVersion = "6.0.2";
 
       asyncapi = pkgs.writeShellScriptBin "asyncapi" ''
-        exec ${pkgs.nodejs_24}/bin/npm exec \
+        exec ${nodejs}/bin/npm exec \
           --yes \
           --package=@asyncapi/cli@${cliVersion} \
           -- asyncapi "$@"
@@ -41,25 +46,56 @@
           --output "$output" \
           --force-write
       '';
-    in {
-      devShells.${system}.default = pkgs.mkShell {
-        packages = [
-          pkgs.nodejs_24
-          asyncapi
-          studio
-          preview
-          docs
-        ];
 
-        shellHook = ''
-          echo "AsyncAPI development environment"
-          echo ""
-          echo "  asyncapi-studio asyncapi.yaml   Edit in browser"
-          echo "  asyncapi-preview asyncapi.yaml  Read-only preview"
-          echo "  asyncapi validate asyncapi.yaml Validate"
-          echo "  asyncapi-docs asyncapi.yaml     Generate static HTML"
-          echo ""
-        '';
+      asyncapiPackages = [ asyncapi studio preview docs ];
+
+      asyncapiHelp = ''
+        echo "  asyncapi-studio asyncapi.yaml   Edit in browser"
+        echo "  asyncapi-preview asyncapi.yaml  Read-only preview"
+        echo "  asyncapi validate asyncapi.yaml Validate"
+        echo "  asyncapi-docs asyncapi.yaml     Generate static HTML"
+      '';
+
+      mkProjectShell = {
+        setupCommand,
+        withClient ? false,
+        withGameService ? false,
+        withAsyncapi ? false
+      }:
+        pkgs.mkShell ({
+          packages = [ nodejs pnpm ]
+            ++ pkgs.lib.optionals withAsyncapi asyncapiPackages;
+
+          shellHook = ''
+            ${setupCommand} || return $?
+          '';
+        } // pkgs.lib.optionalAttrs withClient {
+          PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
+          PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
+        });
+    in {
+      devShells.${system} = {
+        default = mkProjectShell {
+          setupCommand = "pnpm run install-dev";
+          withClient = true;
+          withGameService = true;
+          withAsyncapi = true;
+        };
+        
+        client = mkProjectShell {
+          setupCommand = "pnpm --filter @robo-rally/client run install-dev";
+          withClient = true;
+        };
+
+        game-service = mkProjectShell {
+          setupCommand = "pnpm --filter @robo-rally/game-service run install-dev";
+          withGameService = true;
+        };
+
+        asyncapi = pkgs.mkShell {
+          packages = [ nodejs ] ++ asyncapiPackages;
+        };
       };
     };
 }
