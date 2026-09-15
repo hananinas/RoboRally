@@ -1,5 +1,11 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import type { Coordinate, Position, Tile } from '../src/index.js'
+import type {
+  Coordinate,
+  Position,
+  PublicGameState,
+  PublicGameStateResult,
+  Tile,
+} from '../src/index.js'
 
 describe('game event payload types', () => {
   it('keeps tile coordinates separate from oriented robot positions', () => {
@@ -13,5 +19,21 @@ describe('game event payload types', () => {
     expectTypeOf<Coordinate>().not.toMatchTypeOf<Position>()
     expect(position).toEqual({ coordinate: { x: 2, y: 3 }, orientation: 'NORTH' })
     expect(tile.position).toEqual({ x: 2, y: 3 })
+  })
+
+  it('distinguishes a public game state from an unknown game', () => {
+    const state = {
+      gameId: 'game',
+      board: { width: 1, height: 1, tiles: [] },
+      robots: [],
+      phase: 'PROGRAMMING',
+    } satisfies PublicGameState
+    const found = { outcome: 'FOUND', state } satisfies PublicGameStateResult
+    const notFound = {
+      outcome: 'GAME_NOT_FOUND',
+    } satisfies PublicGameStateResult
+
+    expect(found.state).toBe(state)
+    expect(notFound.outcome).toBe('GAME_NOT_FOUND')
   })
 })

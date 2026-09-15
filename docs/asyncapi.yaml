@@ -188,9 +188,11 @@ components:
 
     PublicGameStateResult:
       name: game.publicGameStateResult
-      description: Public game snapshot returned through an acknowledgement.
+      description: Result returned through the game.getPublicGameState acknowledgement.
       payload:
-        $ref: '#/components/schemas/PublicGameState'
+        oneOf:
+          - $ref: '#/components/schemas/PublicGameStateFound'
+          - $ref: '#/components/schemas/PublicGameStateNotFound'
 
   schemas:
     GameId:
@@ -274,6 +276,26 @@ components:
         phase:
           type: string
           enum: [WAITING, PROGRAMMING, EXECUTING]
+
+    PublicGameStateFound:
+      type: object
+      additionalProperties: false
+      required: [outcome, state]
+      properties:
+        outcome:
+          type: string
+          enum: [FOUND]
+        state:
+          $ref: '#/components/schemas/PublicGameState'
+
+    PublicGameStateNotFound:
+      type: object
+      additionalProperties: false
+      required: [outcome]
+      properties:
+        outcome:
+          type: string
+          enum: [GAME_NOT_FOUND]
 
     Board:
       type: object
