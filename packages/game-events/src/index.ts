@@ -27,5 +27,9 @@ export type {
   RobotActionResolved,
   Tile,
 } from './payloads.js'
+export {
+  getPublicGameStateSchema,
+  parseGetPublicGameState,
+} from './getPublicGameState.js'
 export { parseSubmitProgram, submitProgramSchema } from './submitProgram.js'
 export type { ProgramCardIds, SubmitProgram } from './submitProgram.js'
