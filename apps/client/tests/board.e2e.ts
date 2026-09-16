@@ -84,11 +84,11 @@ test('plays rapid server results one robot at a time without replacing its sprit
   if (!original) throw new Error('Robot sprite is unavailable')
 
   const steps = [
-    { robotId: 'red', instruction: 'MOVE_1', position: { x: 10, y: 6, orientation: 'NORTH' } },
-    { robotId: 'red', instruction: 'MOVE_1', position: { x: 10, y: 5, orientation: 'NORTH' } },
-    { robotId: 'red', instruction: 'TURN_LEFT', position: { x: 10, y: 5, orientation: 'WEST' } },
-    { robotId: 'red', instruction: 'MOVE_1', position: { x: 9, y: 5, orientation: 'WEST' } },
-    { robotId: 'red', instruction: 'TURN_LEFT', position: { x: 9, y: 5, orientation: 'SOUTH' } },
+    { robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 6 }, orientation: 'NORTH' } },
+    { robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 5 }, orientation: 'NORTH' } },
+    { robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 10, y: 5 }, orientation: 'WEST' } },
+    { robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 9, y: 5 }, orientation: 'WEST' } },
+    { robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 9, y: 5 }, orientation: 'SOUTH' } },
   ] as const
   await page.evaluate((actions) => {
     for (const action of actions) {
@@ -97,7 +97,10 @@ test('plays rapid server results one robot at a time without replacing its sprit
   }, steps)
 
   for (const [index, step] of steps.entries()) {
-    await expect(red.first()).toHaveAttribute('data-board-tile', `${step.position.x},${step.position.y}`)
+    await expect(red.first()).toHaveAttribute(
+      'data-board-tile',
+      `${step.position.coordinate.x},${step.position.coordinate.y}`,
+    )
     expect(await red.first().evaluate((element, first) => element === first, original)).toBe(true)
     await expect(blue.first()).toHaveAttribute('data-board-tile', '9,7')
     if (index === 0) {
