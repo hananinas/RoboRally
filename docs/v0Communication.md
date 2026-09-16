@@ -25,7 +25,7 @@ sequenceDiagram
 
     Client->>Server: game.getPublicGameState {gameId}
     alt Game exists
-        Server-->>Client: Acknowledgement: FOUND with PublicGameState
+        Server-->>Client: Acknowledgement: GAME_FOUND with PublicGameState
     else Unknown gameId
         Server-->>Client: Acknowledgement: GAME_NOT_FOUND
     end

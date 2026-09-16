@@ -7,15 +7,18 @@
     "install-dev": "pnpm --filter @robo-rally/game-service... install --frozen-lockfile --prod=false",
     "dev": "tsx watch --clear-screen=false src/index.ts",
     "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@robo-rally/game-events": "workspace:*"
+    "@robo-rally/game-events": "workspace:*",
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
     "@types/node": "^26.4.1",
     "tsx": "^4.23.13",
+    "socket.io-client": "^4.8.3",
     "typescript": "~7.0.2",
     "vitest": "^4.1.11"
   }

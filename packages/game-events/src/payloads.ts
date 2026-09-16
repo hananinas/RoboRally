@@ -75,7 +75,7 @@ export type GetPublicGameState = Readonly<{
 
 export type PublicGameStateResult =
   | Readonly<{
-      outcome: 'FOUND'
+      outcome: 'GAME_FOUND'
       state: PublicGameState
     }>
   | Readonly<{
