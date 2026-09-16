@@ -1,6 +1,5 @@
 import './ActiveGame.css'
 import BoardViewport from './components/BoardViewport.tsx'
-import Panel from './components/Panel.tsx'
 import PlayerPanel from './components/PlayerPanel.tsx'
 import ProgrammingHand from './components/ProgrammingHand.tsx'
 import RegisterPanel from './components/RegisterPanel.tsx'
@@ -40,14 +39,12 @@ function ActiveGame() {
         <aside className="game-hud" aria-label="Game controls">
           <div ref={hudContentRef} className="game-hud__content">
             <PlayerPanel player={{ name: 'Player 1' }} />
-            <Panel className="game-status">
-              <p role="status">{status}</p>
-              {state.error && <p role="alert">{state.error}</p>}
-            </Panel>
             <RegisterPanel
               registers={state.registers}
               disabled={disabled}
               submission={state.submission}
+              status={status}
+              error={state.error}
               onRemove={(registerIndex) => dispatch({ type: 'remove', registerIndex })}
               onConfirm={submit}
             />

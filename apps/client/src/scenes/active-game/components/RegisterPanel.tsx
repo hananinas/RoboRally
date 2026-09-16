@@ -11,6 +11,8 @@ type RegisterPanelProps = {
   registers: Registers
   disabled: boolean
   submission: ClientGameState['submission']
+  status: string
+  error: string | null
   onRemove: (registerIndex: number) => void
   onConfirm: () => void
 }
@@ -57,12 +59,18 @@ function RegisterPanel({
   registers,
   disabled,
   submission,
+  status,
+  error,
   onRemove,
   onConfirm,
 }: RegisterPanelProps) {
   return (
     <Panel className="register-panel">
       <h2 className="register-panel__heading">Registers</h2>
+      <div className="game-status">
+        <p role="status">{status}</p>
+        {error && <p role="alert">{error}</p>}
+      </div>
       <ol className="registers">
         {registers.map((card, index) => (
           <RegisterSlot
