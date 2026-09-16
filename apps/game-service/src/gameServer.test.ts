@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net'
 import type {
   ClientToServerEvents,
   ProgramResult,
+  PublicGameStateResult,
   RobotActionResolved,
   ServerToClientEvents,
 } from '@robo-rally/game-events'
@@ -67,6 +68,21 @@ describe('game Socket.IO connection', () => {
     )
   }
 
+  function getPublicGameState(
+    payload: unknown,
+  ): Promise<PublicGameStateResult> {
+    const untypedClient = client as unknown as {
+      emit: (
+        event: 'game.getPublicGameState',
+        request: unknown,
+        acknowledge: (result: PublicGameStateResult) => void,
+      ) => void
+    }
+    return new Promise((resolve) =>
+      untypedClient.emit('game.getPublicGameState', payload, resolve),
+    )
+  }
+
   function collectResolvedActions(): Promise<readonly RobotActionResolved[]> {
     return new Promise((resolve) => {
       const actions: RobotActionResolved[] = []
@@ -125,6 +141,38 @@ describe('game Socket.IO connection', () => {
     )
 
     expect(result).toEqual({ outcome: 'GAME_NOT_FOUND' })
+  })
+
+  it('rejects malformed state requests without terminating the service', async () => {
+    await connect()
+
+    await expect(getPublicGameState(null)).resolves.toEqual({
+      outcome: 'GAME_NOT_FOUND',
+    })
+    await expect(
+      getPublicGameState({ gameId: singlePlayerGame.gameId, extra: true }),
+    ).resolves.toEqual({ outcome: 'GAME_NOT_FOUND' })
+  })
+
+  it('ignores commands without acknowledgement callbacks', async () => {
+    await connect()
+    const cardIds = singlePlayerGame.player.hand
+      .slice(0, 5)
+      .map((card) => card.id)
+    const untypedClient = client as unknown as {
+      emit: (event: string, payload: unknown) => void
+    }
+
+    untypedClient.emit('game.getPublicGameState', null)
+    untypedClient.emit('program.submit', {
+      gameId: singlePlayerGame.gameId,
+      cardIds,
+    })
+
+    const state = await getPublicGameState({ gameId: singlePlayerGame.gameId })
+    expect(state.outcome).toBe('FOUND')
+    expect(singlePlayerGame.game.phase).toBe('programming')
+    expect(singlePlayerGame.player.robot.program).toEqual([])
   })
 
   it('accepts an ordered program, executes five registers, and starts the next round', async () => {

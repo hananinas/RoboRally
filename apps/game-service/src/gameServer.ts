@@ -1,5 +1,6 @@
 import type { Server as HttpServer } from 'node:http'
 import {
+  parseGetPublicGameState,
   parseSubmitProgram,
   type ClientToServerEvents,
   type ProgramCardIds,
@@ -56,17 +57,27 @@ export function createGameSocketServer(
     socket.join([publicRoom(gameId), playerRoom(gameId, player.id)])
 
     socket.on('game.getPublicGameState', (payload, acknowledge) => {
-      if (payload.gameId !== gameId) {
-        acknowledge({ outcome: 'GAME_NOT_FOUND' })
-        return
+      if (typeof acknowledge !== 'function') return
+
+      try {
+        const request = parseGetPublicGameState(payload)
+        if (request.gameId === gameId) {
+          acknowledge({
+            outcome: 'FOUND',
+            state: presentPublicGameState(gameId, game),
+          })
+          return
+        }
+      } catch {
+        // Invalid requests receive the same non-disclosing result as unknown games.
       }
-      acknowledge({
-        outcome: 'FOUND',
-        state: presentPublicGameState(gameId, game),
-      })
+
+      acknowledge({ outcome: 'GAME_NOT_FOUND' })
     })
 
     socket.on('program.submit', (payload, acknowledge) => {
+      if (typeof acknowledge !== 'function') return
+
       try {
         const submission = parseSubmitProgram(payload)
         const program = resolveProgram(player, submission.cardIds)
