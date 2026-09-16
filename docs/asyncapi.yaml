@@ -285,7 +285,7 @@ components:
       properties:
         outcome:
           type: string
-          enum: [FOUND]
+          enum: [GAME_FOUND]
         state:
           $ref: '#/components/schemas/PublicGameState'
 
