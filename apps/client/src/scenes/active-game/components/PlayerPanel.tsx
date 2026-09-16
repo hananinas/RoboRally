@@ -1,10 +1,9 @@
 import { useState } from 'react'
-import type { ClientGameState } from '../gameState.ts'
 import GameMenu from './GameMenu.tsx'
 import Panel from './Panel.tsx'
 
 type PlayerPanelProps = {
-  player: ClientGameState['player']
+  player: { name: string }
 }
 
 // Shows collapsible player details.

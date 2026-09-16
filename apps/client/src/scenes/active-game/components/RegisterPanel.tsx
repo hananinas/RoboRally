@@ -1,5 +1,6 @@
 import {
   registersAreFilled,
+  type ClientGameState,
   type ProgramCard as Card,
   type Registers,
 } from '../gameState.ts'
@@ -8,7 +9,8 @@ import ProgramCard from './ProgramCard.tsx'
 
 type RegisterPanelProps = {
   registers: Registers
-  confirmed: boolean
+  disabled: boolean
+  submission: ClientGameState['submission']
   onRemove: (registerIndex: number) => void
   onConfirm: () => void
 }
@@ -53,7 +55,8 @@ function RegisterSlot({
 // Renders the program registers.
 function RegisterPanel({
   registers,
-  confirmed,
+  disabled,
+  submission,
   onRemove,
   onConfirm,
 }: RegisterPanelProps) {
@@ -66,7 +69,7 @@ function RegisterPanel({
             key={index}
             card={card}
             index={index}
-            disabled={confirmed}
+            disabled={disabled}
             onRemove={onRemove}
           />
         ))}
@@ -74,10 +77,12 @@ function RegisterPanel({
       <button
         className="register-panel__done"
         type="button"
-        disabled={!registersAreFilled(registers) || confirmed}
+        disabled={!registersAreFilled(registers) || disabled}
         onClick={onConfirm}
       >
-        {confirmed ? 'Confirmed' : 'Done'}
+        {submission === 'pending' ? 'Submitting…'
+          : submission === 'accepted' ? 'Confirmed'
+            : submission === 'uncertain' ? 'Awaiting server' : 'Done'}
       </button>
     </Panel>
   )

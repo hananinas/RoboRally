@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 
 // Tracks content-based overlay layout.
-function useOverlayLayout() {
+function useOverlayLayout(handVersion = 0) {
   const overlayRef = useRef<HTMLDivElement>(null)
   const hudContentRef = useRef<HTMLDivElement>(null)
   const handRef = useRef<HTMLElement>(null)
@@ -37,7 +37,7 @@ function useOverlayLayout() {
     observer.observe(hand)
 
     return () => observer.disconnect()
-  }, [])
+  }, [handVersion])
 
   return { handBelowHud, handRef, hudContentRef, hudFits, overlayRef }
 }

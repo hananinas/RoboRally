@@ -17,7 +17,7 @@ type ProgrammingHandProps = {
   containerRef: Ref<HTMLElement>
   cards: readonly Card[]
   registeredCardIds: ReadonlySet<string>
-  confirmed: boolean
+  disabled: boolean
   onSelect: (card: Card) => void
   onDrop: (card: Card, registerIndex: number) => void
 }
@@ -38,7 +38,7 @@ function ProgrammingHand({
   containerRef,
   cards,
   registeredCardIds,
-  confirmed,
+  disabled,
   onSelect,
   onDrop,
 }: ProgrammingHandProps) {
@@ -126,7 +126,7 @@ function ProgrammingHand({
             card={card}
             size="hand"
             selected={selected}
-            disabled={selected || confirmed}
+            disabled={selected || disabled}
             dragging={drag?.card.id === card.id && drag.moved}
             onClick={(event) => {
               if (event.detail === 0) onSelect(card)
