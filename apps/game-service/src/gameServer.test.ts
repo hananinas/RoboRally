@@ -124,7 +124,7 @@ describe('game Socket.IO connection', () => {
     )
 
     expect(state).toEqual({
-      outcome: 'FOUND',
+      outcome: 'GAME_FOUND',
       state: presentPublicGameState(
         singlePlayerGame.gameId,
         singlePlayerGame.game,
@@ -170,7 +170,7 @@ describe('game Socket.IO connection', () => {
     })
 
     const state = await getPublicGameState({ gameId: singlePlayerGame.gameId })
-    expect(state.outcome).toBe('FOUND')
+    expect(state.outcome).toBe('GAME_FOUND')
     expect(singlePlayerGame.game.phase).toBe('programming')
     expect(singlePlayerGame.player.robot.program).toEqual([])
   })
@@ -220,8 +220,8 @@ describe('game Socket.IO connection', () => {
       'game.getPublicGameState',
       { gameId: singlePlayerGame.gameId },
     )
-    expect(nextState.outcome).toBe('FOUND')
-    if (nextState.outcome !== 'FOUND') {
+    expect(nextState.outcome).toBe('GAME_FOUND')
+    if (nextState.outcome !== 'GAME_FOUND') {
       throw new Error('Game state was not found')
     }
     expect(nextState.state.phase).toBe('PROGRAMMING')

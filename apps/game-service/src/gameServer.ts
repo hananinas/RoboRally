@@ -63,7 +63,7 @@ export function createGameSocketServer(
         const request = parseGetPublicGameState(payload)
         if (request.gameId === gameId) {
           acknowledge({
-            outcome: 'FOUND',
+            outcome: 'GAME_FOUND',
             state: presentPublicGameState(gameId, game),
           })
           return
