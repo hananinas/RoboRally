@@ -24,7 +24,11 @@ sequenceDiagram
     participant Public as game:{gameId}:public
 
     Client->>Server: game.getPublicGameState {gameId}
-    Server-->>Client: Acknowledgement: PublicGameStateResult
+    alt Game exists
+        Server-->>Client: Acknowledgement: FOUND with PublicGameState
+    else Unknown gameId
+        Server-->>Client: Acknowledgement: GAME_NOT_FOUND
+    end
 
     loop Rounds repeat forever
         Server->>Private: cards.dealt {cards}
@@ -33,21 +37,20 @@ sequenceDiagram
         Note over Client: Player chooses five cards
         Client->>Server: program.submit {gameId, cardIds}
 
-        alt Invalid program
+        break Invalid program
             Server-->>Client: Acknowledgement: INVALID_PROGRAM
-        else Valid program
-            Note over Server: Store program
-            Server-->>Client: Acknowledgement: ACCEPTED
-            Server->>Public: program.submitted {playerId}
+        end
+          
+        Note over Server: Store program
+        Server-->>Client: Acknowledgement: ACCEPTED
+        Server->>Public: program.submitted {playerId}
 
-            loop Registers 1 through 5
-                Note over Server: Execute instruction
-                Server->>Public: robot.actionResolved
-                Public-->>Client: robot.actionResolved
-            end
+        loop Registers 1 through 5
+            Note over Server: Execute instruction
+            Server->>Public: robot.actionResolved
+            Public-->>Client: robot.actionResolved
         end
     end
 
 ```
-
 

@@ -7,11 +7,11 @@ import {
 } from './robotPlayback.ts'
 
 const steps: readonly ResolvedRobotAction[] = [
-  { robotId: 'red', instruction: 'MOVE_1', position: { x: 10, y: 6, orientation: 'NORTH' } },
-  { robotId: 'red', instruction: 'MOVE_1', position: { x: 10, y: 5, orientation: 'NORTH' } },
-  { robotId: 'red', instruction: 'TURN_LEFT', position: { x: 10, y: 5, orientation: 'WEST' } },
-  { robotId: 'red', instruction: 'MOVE_1', position: { x: 9, y: 5, orientation: 'WEST' } },
-  { robotId: 'red', instruction: 'TURN_LEFT', position: { x: 9, y: 5, orientation: 'SOUTH' } },
+  { robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 6 }, orientation: 'NORTH' } },
+  { robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 5 }, orientation: 'NORTH' } },
+  { robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 10, y: 5 }, orientation: 'WEST' } },
+  { robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 9, y: 5 }, orientation: 'WEST' } },
+  { robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 9, y: 5 }, orientation: 'SOUTH' } },
 ]
 
 describe('robot playback', () => {
@@ -39,11 +39,11 @@ describe('robot playback', () => {
     let state = createRobotPlaybackState(DEMO_ROBOTS)
     state = robotPlaybackReducer(state, {
       type: 'enqueue',
-      action: { robotId: 'red', instruction: 'MOVE_1', position: { x: 2, y: 3, orientation: 'NORTH' } },
+      action: { robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 2, y: 3 }, orientation: 'NORTH' } },
     })
     state = robotPlaybackReducer(state, { type: 'enqueue', action: steps[1] })
     expect(state.robots.find((robot) => robot.robotId === 'red')?.position)
-      .toEqual({ x: 2, y: 3, orientation: 'NORTH' })
+      .toEqual({ coordinate: { x: 2, y: 3 }, orientation: 'NORTH' })
 
     state = robotPlaybackReducer(state, { type: 'reset', robots: DEMO_ROBOTS })
     expect(state).toEqual(createRobotPlaybackState(DEMO_ROBOTS))

@@ -147,7 +147,7 @@ function RobotPiece({
 }>) {
   const component = BOARD_COMPONENTS[componentName]
   if (!component.asset) throw new Error(`Missing robot sprite ${componentName}`)
-  const centre = tileCentre(robot.position, board, BOARD_CONFIG)
+  const centre = tileCentre(robot.position.coordinate, board, BOARD_CONFIG)
   const height = layer / BOARD_CONFIG.parallaxReferenceLayer
   const style: PieceStyle = {
     left: centre.worldX,
@@ -168,7 +168,7 @@ function RobotPiece({
         height,
         3 / BOARD_CONFIG.parallaxReferenceLayer,
       )}
-      data-board-tile={`${robot.position.x},${robot.position.y}`}
+      data-board-tile={`${robot.position.coordinate.x},${robot.position.coordinate.y}`}
       data-robot-id={robot.robotId}
       preserveAspectRatio="xMidYMid meet"
       style={style}
