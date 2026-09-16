@@ -1,0 +1,85 @@
+import { useEffect, useState } from 'react'
+import { createRoot } from 'react-dom/client'
+import '../src/index.css'
+import '../src/scenes/active-game/ActiveGame.css'
+import BoardViewport from '../src/scenes/active-game/components/BoardViewport.tsx'
+import PlayerPanel from '../src/scenes/active-game/components/PlayerPanel.tsx'
+import ProgrammingHand from '../src/scenes/active-game/components/ProgrammingHand.tsx'
+import RegisterPanel from '../src/scenes/active-game/components/RegisterPanel.tsx'
+import { DEMO_BOARD, DEMO_ROBOTS } from '../src/scenes/active-game/board/demoBoard.ts'
+import {
+  useRobotPlayback,
+  type ResolvedRobotAction,
+} from '../src/scenes/active-game/board/robotPlayback.ts'
+import {
+  placeCard,
+  removeCard,
+  type ProgramCard,
+  type Registers,
+} from '../src/scenes/active-game/gameState.ts'
+import useOverlayLayout from '../src/scenes/active-game/useOverlayLayout.ts'
+
+export type BoardHarnessApi = {
+  enqueue: (actions: readonly ResolvedRobotAction[]) => void
+}
+
+declare global {
+  interface Window {
+    boardFixture: BoardHarnessApi
+  }
+}
+
+const hand: readonly ProgramCard[] = Array.from({ length: 9 }, (_, index) => ({
+  id: `board-fixture-card-${index}`,
+  label: index % 2 === 0 ? 'Move 1' : 'Turn Left',
+}))
+
+export default function BoardHarness() {
+  const { robots, enqueue } = useRobotPlayback(DEMO_ROBOTS)
+  const [registers, setRegisters] = useState<Registers>(() => Array(5).fill(null))
+  const [confirmed, setConfirmed] = useState(false)
+  const { handBelowHud, handRef, hudContentRef, hudFits, overlayRef } = useOverlayLayout()
+
+  useEffect(() => {
+    window.boardFixture = { enqueue: (actions) => actions.forEach(enqueue) }
+  }, [enqueue])
+
+  const registeredCardIds = new Set(registers.flatMap((card) => card ? [card.id] : []))
+  const overlayClassName = [
+    'game-overlay',
+    handBelowHud && 'game-overlay--hand-below-hud',
+    hudFits && 'game-overlay--hud-fits',
+  ].filter(Boolean).join(' ')
+
+  return (
+    <div className="game">
+      <BoardViewport board={DEMO_BOARD} robots={robots} />
+      <div ref={overlayRef} className={overlayClassName}>
+        <aside className="game-hud" aria-label="Game controls">
+          <div ref={hudContentRef} className="game-hud__content">
+            <PlayerPanel player={{ name: 'Board fixture player' }} />
+            <RegisterPanel
+              registers={registers}
+              disabled={confirmed}
+              submission={confirmed ? 'accepted' : 'idle'}
+              status="Programming"
+              error={null}
+              onRemove={(index) => setRegisters((current) => removeCard(current, index))}
+              onConfirm={() => setConfirmed(true)}
+            />
+          </div>
+        </aside>
+        <ProgrammingHand
+          containerRef={handRef}
+          cards={hand}
+          registeredCardIds={registeredCardIds}
+          disabled={confirmed}
+          onSelect={(card) => setRegisters((current) => placeCard(current, card, current.indexOf(null)))}
+          onDrop={(card, index) => setRegisters((current) => placeCard(current, card, index))}
+        />
+      </div>
+    </div>
+  )
+}
+
+createRoot(document.getElementById('root')!).render(<BoardHarness />)

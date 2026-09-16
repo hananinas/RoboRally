@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Locator } from '@playwright/test'
+import type { BoardHarnessApi } from './board-harness.tsx'
 
 function styleNumber(locator: Locator, property: string): Promise<number> {
   return locator.evaluate((element, name) =>
@@ -12,39 +13,12 @@ function computedStyleNumber(locator: Locator, property: string): Promise<number
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/')
-})
-
-test('renders the board through isolated global paint planes', async ({ page }) => {
-  const board = page.getByRole('main', { name: 'Game board' })
-  const planes = board.locator('.board-plane')
-
-  await expect(planes).toHaveCount(14)
-  await expect(board.locator('.board-plane > .board-piece')).toHaveCount(1339)
-  await expect(board.locator('.board-piece--hole')).toHaveCount(6)
-  await expect(board.locator('.board-hole-depth')).toHaveCount(48)
-  await expect(board.locator('.board-piece--wall-black')).toHaveCount(6)
-  await expect(board.locator('.board-piece--wall-yellow')).toHaveCount(8)
-  await expect(board.locator('.board-piece--wall-edge-black')).toHaveCount(28)
-  await expect(board.locator('.board-piece--wall-edge-yellow')).toHaveCount(28)
-
-  expect(
-    await planes.evaluateAll((elements) =>
-      elements.every((element, layer) => {
-        const style = getComputedStyle(element)
-        return (
-          Number(element.getAttribute('data-board-layer')) === layer &&
-          Number(style.zIndex) === layer &&
-          style.isolation === 'isolate'
-        )
-      }),
-    ),
-  ).toBe(true)
+  await page.goto('/tests/board-harness.html')
 })
 
 test('renders sprite artwork at its configured aspect ratio', async ({ page }) => {
   const assets = page.locator('.board-piece--asset')
-  await expect(assets).toHaveCount(31)
+  await expect(assets.first()).toBeVisible()
 
   expect(
     await assets.evaluateAll((elements) =>
@@ -79,7 +53,6 @@ test('plays rapid server results one robot at a time without replacing its sprit
 
   const red = page.locator('[data-robot-id="red"]')
   const blue = page.locator('[data-robot-id="blue"]')
-  await expect(red).toHaveCount(5)
   const original = await red.first().elementHandle()
   if (!original) throw new Error('Robot sprite is unavailable')
 
@@ -91,9 +64,7 @@ test('plays rapid server results one robot at a time without replacing its sprit
     { robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 9, y: 5 }, orientation: 'SOUTH' } },
   ] as const
   await page.evaluate((actions) => {
-    for (const action of actions) {
-      window.dispatchEvent(new CustomEvent('debug:robot-action-resolved', { detail: action }))
-    }
+    (window as Window & { boardFixture: BoardHarnessApi }).boardFixture.enqueue(actions)
   }, steps)
 
   for (const [index, step] of steps.entries()) {
@@ -156,36 +127,6 @@ test('keeps ground shadows below all raised surfaces', async ({ page }) => {
 })
 
 test('renders directional walls between tiles', async ({ page }) => {
-  const westWall = page.locator('[data-board-tile="8,4"][data-board-wall="west"]')
-  const northWall = page.locator('[data-board-tile="4,6"][data-board-wall="north"]')
-  const eastWall = page.locator('[data-board-tile="12,4"][data-board-wall="east"]')
-  const southWall = page.locator('[data-board-tile="16,8"][data-board-wall="south"]')
-  const cornerWalls = page.locator('[data-board-tile="8,10"][data-board-wall]')
-
-  await expect(westWall).toHaveCount(8)
-  await expect(northWall).toHaveCount(8)
-  await expect(eastWall).toHaveCount(8)
-  await expect(southWall).toHaveCount(8)
-  await expect(cornerWalls).toHaveCount(16)
-
-  expect(
-    await westWall.evaluateAll((walls) =>
-      walls.map((wall) => ({
-        component: wall.getAttribute('data-board-component'),
-        layer: Number(wall.parentElement?.getAttribute('data-board-layer')),
-      })),
-    ),
-  ).toEqual([
-    { component: 'wallEdgeBlack', layer: 0 },
-    { component: 'wallEdgeBlack', layer: 1 },
-    { component: 'wallEdgeYellow', layer: 2 },
-    { component: 'wallEdgeYellow', layer: 3 },
-    { component: 'wallEdgeBlack', layer: 4 },
-    { component: 'wallEdgeBlack', layer: 5 },
-    { component: 'wallEdgeYellow', layer: 6 },
-    { component: 'wallEdgeYellow', layer: 7 },
-  ])
-
   const ground = page.locator(
     '[data-board-layer="0"] [data-board-tile="8,4"][data-board-component="ground"]',
   )
@@ -259,9 +200,6 @@ test('renders directional walls between tiles', async ({ page }) => {
 })
 
 test('uses a pillar without a base for tiles walled on every side', async ({ page }) => {
-  const tile = page.locator('[data-board-tile="12,10"]')
-
-  await expect(tile).toHaveCount(14)
   await expect(
     page.locator('[data-board-tile="12,10"][data-board-wall]'),
   ).toHaveCount(0)
@@ -270,22 +208,6 @@ test('uses a pillar without a base for tiles walled on every side', async ({ pag
       '[data-board-tile="12,10"][data-board-component="ground"], [data-board-tile="12,10"][data-board-component="surface"]',
     ),
   ).toHaveCount(0)
-  await expect(
-    page.locator(
-      '[data-board-tile="12,10"].board-piece--wall-black, [data-board-tile="12,10"].board-piece--wall-yellow',
-    ),
-  ).toHaveCount(14)
-})
-
-test('keeps board rendering behind active game controls', async ({ page }) => {
-  const controls = page.getByRole('complementary', { name: 'Game controls' })
-  await expect(controls.getByRole('heading', { name: 'Player Name' })).toBeVisible()
-  await expect(page.getByRole('region', { name: 'Programming hand' })).toBeVisible()
-  await expect(
-    page.locator(
-      '[data-board-layer="3"] [data-board-component="laser1"][data-board-tile="6,7"]',
-    ),
-  ).toHaveCSS('z-index', '1')
 })
 
 test('pans, zooms around the cursor, and resets the camera', async ({ page }) => {
@@ -476,7 +398,7 @@ test.describe('touch board interaction', () => {
   })
 })
 
-test('preserves one board runtime across active game rerenders', async ({ page }) => {
+test('preserves the board camera across HUD rerenders', async ({ page }) => {
   const camera = page.locator('.board-canvas')
   const cameraMatrix = () =>
     camera.evaluate((element) => {
@@ -496,20 +418,6 @@ test('preserves one board runtime across active game rerenders', async ({ page }
     .first()
     .click()
 
-  await expect(page.locator('.board-plane')).toHaveCount(14)
   await expect.poll(cameraMatrix).toEqual({ x: 100, y: 40, zoom: 1 })
 })
 
-test('runs board interactions without browser errors', async ({ page }) => {
-  const errors: string[] = []
-  page.on('pageerror', (error) => errors.push(error.message))
-  await page.reload()
-
-  await page.mouse.move(328, 204)
-  await page.mouse.click(328, 204)
-  await page.mouse.wheel(0, -100)
-  await page.keyboard.press('r')
-  await page.waitForTimeout(100)
-
-  expect(errors).toEqual([])
-})

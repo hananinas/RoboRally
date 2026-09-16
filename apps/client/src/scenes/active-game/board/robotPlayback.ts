@@ -18,6 +18,11 @@ export type DisplayRobot = Robot & Readonly<{ angle: number }>
 export const ROBOT_MOVE_DURATION_MS = 600
 export const ROBOT_TURN_DURATION_MS = 300
 
+export function robotActionDuration(action: ResolvedRobotAction, reducedMotion: boolean): number {
+  return reducedMotion ? 200
+    : action.instruction === 'TURN_LEFT' ? ROBOT_TURN_DURATION_MS : ROBOT_MOVE_DURATION_MS
+}
+
 export type RobotPlaybackState = Readonly<{
   robots: readonly DisplayRobot[]
   pending: readonly ResolvedRobotAction[]
@@ -94,11 +99,7 @@ export function useRobotPlayback(initialRobots: readonly Robot[]) {
   useEffect(() => {
     if (!state.active) return
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const duration = reducedMotion
-      ? 200
-      : state.active.instruction === 'TURN_LEFT'
-        ? ROBOT_TURN_DURATION_MS
-        : ROBOT_MOVE_DURATION_MS
+    const duration = robotActionDuration(state.active, reducedMotion)
     const timer = window.setTimeout(() => dispatch({ type: 'complete' }), duration)
     return () => window.clearTimeout(timer)
   }, [state.active])

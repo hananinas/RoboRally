@@ -1,128 +1,66 @@
-import { useEffect, useState } from 'react'
 import './ActiveGame.css'
 import BoardViewport from './components/BoardViewport.tsx'
 import PlayerPanel from './components/PlayerPanel.tsx'
 import ProgrammingHand from './components/ProgrammingHand.tsx'
 import RegisterPanel from './components/RegisterPanel.tsx'
-import {
-  createMockGameState,
-  placeCard,
-  registersAreFilled,
-  removeCard,
-  type ClientGameState,
-  type ProgramCard,
-} from './gameState.ts'
+import { canProgram } from './gameState.ts'
+import useGameConnection from './useGameConnection.ts'
 import useOverlayLayout from './useOverlayLayout.ts'
-import { DEMO_BOARD, DEMO_ROBOTS } from './board/demoBoard.ts'
-import {
-  useRobotPlayback,
-  type ResolvedRobotAction,
-} from './board/robotPlayback.ts'
 
-// Applies a valid card placement.
-function withPlacedCard(
-  state: ClientGameState,
-  card: ProgramCard,
-  registerIndex: number,
-): ClientGameState {
-  if (state.confirmed) return state
-
-  const registers = placeCard(state.registers, card, registerIndex)
-  return registers === state.registers ? state : { ...state, registers }
-}
-
-// Renders the active game scene.
 function ActiveGame() {
-  const [gameState, setGameState] = useState(createMockGameState)
-  const { robots, enqueue } = useRobotPlayback(DEMO_ROBOTS)
-
-  // #41 will feed the same queue from Socket.IO; this hook is only for the demo tests.
-  useEffect(() => {
-    if (!import.meta.env.DEV) return
-    const onResolved = (event: Event) => {
-      enqueue((event as CustomEvent<ResolvedRobotAction>).detail)
-    }
-    window.addEventListener('debug:robot-action-resolved', onResolved)
-    return () => window.removeEventListener('debug:robot-action-resolved', onResolved)
-  }, [enqueue])
+  const { state, dispatch, submit } = useGameConnection()
   const {
     handBelowHud,
     handRef,
     hudContentRef,
     hudFits,
     overlayRef,
-  } = useOverlayLayout()
-
-  // Fills the next open register.
-  function selectCard(card: ProgramCard) {
-    setGameState((currentState) =>
-      withPlacedCard(currentState, card, currentState.registers.indexOf(null)),
-    )
-  }
-
-  // Fills the chosen register.
-  function dropCard(card: ProgramCard, registerIndex: number) {
-    setGameState((currentState) =>
-      withPlacedCard(currentState, card, registerIndex),
-    )
-  }
-
-  // Clears one register.
-  function clearRegister(registerIndex: number) {
-    setGameState((currentState) => {
-      if (currentState.confirmed) return currentState
-
-      const registers = removeCard(currentState.registers, registerIndex)
-
-      return registers === currentState.registers
-        ? currentState
-        : { ...currentState, registers }
-    })
-  }
-
-  // Locks a complete program.
-  function confirmProgram() {
-    setGameState((currentState) =>
-      currentState.confirmed || !registersAreFilled(currentState.registers)
-        ? currentState
-        : { ...currentState, confirmed: true },
-    )
-  }
-
+  } = useOverlayLayout(state.handVersion)
+  const disabled = !canProgram(state)
+  const phase = state.playback.active ? 'EXECUTING' : state.publicState?.phase
+  const phaseLabel = phase === 'PROGRAMMING' ? 'Programming'
+    : phase === 'EXECUTING' ? 'Executing' : 'Waiting'
+  const status = !state.connected ? 'Not connected'
+    : !state.publicState ? 'Loading game…'
+      : !state.hasHand && phase === 'PROGRAMMING' ? 'Waiting for cards…' : phaseLabel
   const registeredCardIds = new Set(
-    gameState.registers.flatMap((card) => (card ? [card.id] : [])),
+    state.registers.flatMap((card) => (card ? [card.id] : [])),
   )
   const overlayClassName = [
     'game-overlay',
     handBelowHud && 'game-overlay--hand-below-hud',
     hudFits && 'game-overlay--hud-fits',
-  ]
-    .filter(Boolean)
-    .join(' ')
+  ].filter(Boolean).join(' ')
 
   return (
     <div className="game">
-      <BoardViewport board={DEMO_BOARD} robots={robots} />
+      {state.board && <BoardViewport board={state.board} robots={state.playback.robots} />}
       <div ref={overlayRef} className={overlayClassName}>
         <aside className="game-hud" aria-label="Game controls">
           <div ref={hudContentRef} className="game-hud__content">
-            <PlayerPanel player={gameState.player} />
+            <PlayerPanel player={{ name: 'Player 1' }} />
             <RegisterPanel
-              registers={gameState.registers}
-              confirmed={gameState.confirmed}
-              onRemove={clearRegister}
-              onConfirm={confirmProgram}
+              registers={state.registers}
+              disabled={disabled}
+              submission={state.submission}
+              status={status}
+              error={state.error}
+              onRemove={(registerIndex) => dispatch({ type: 'remove', registerIndex })}
+              onConfirm={submit}
             />
           </div>
         </aside>
-        {gameState.phase === 'programming' && (
+        {state.hasHand && (
           <ProgrammingHand
+            key={state.handVersion}
             containerRef={handRef}
-            cards={gameState.hand}
+            cards={state.hand}
             registeredCardIds={registeredCardIds}
-            confirmed={gameState.confirmed}
-            onSelect={selectCard}
-            onDrop={dropCard}
+            disabled={disabled}
+            onSelect={(card) => dispatch({
+              type: 'place', cardId: card.id, registerIndex: state.registers.indexOf(null),
+            })}
+            onDrop={(card, registerIndex) => dispatch({ type: 'place', cardId: card.id, registerIndex })}
           />
         )}
       </div>
