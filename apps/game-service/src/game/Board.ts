@@ -1,4 +1,4 @@
-import { type Direction, type Position } from './spatial.js'
+import { type Direction, type Position, neighbour, opposite } from './spatial.js'
 import type { RobotId } from './ids.js'
 import type { Tile } from './Tile.js'
 
@@ -71,9 +71,50 @@ export class Board {
     return undefined
   }
 
+  private updateRobotPosition(robotId: RobotId, position: Position): void {
+    this.robotPositions.set(robotId, { ...position })
+  }
+
   moveRobot(robotId: RobotId, direction: Direction, steps: number): MovementResult {
-    // TODO: Move up to `steps` tiles in `direction`.
-    // Check bounds, both wall edges, and occupancy; then update position and result.
-    return { position: this.positionOf(robotId), stepsMoved: 0, blocked: true }
+    // Validate input parameters
+    if (!Number.isInteger(steps) || steps <= 0) {
+      throw new RangeError('Steps must be a positive integer')
+    }
+
+    // Verify robot is on the board
+    let currentPosition = this.positionOf(robotId)
+    let nextPosition: Position = currentPosition
+    let stepsMoved = 0
+    
+    for (let step = 0; step < steps; step++) {
+      currentPosition = nextPosition
+      nextPosition = neighbour(nextPosition, direction)
+
+      if (this.getTile(currentPosition)?.hasWall(direction)) {
+        // robot is blocked by a wall in the current tile
+        return { position: currentPosition, stepsMoved: step, blocked: true }
+      }
+
+      if (this.getTile(nextPosition)?.hasWall(opposite(direction))) {
+        // robot blocked by a wall in the next tile
+        return { position: currentPosition, stepsMoved: step, blocked: true }
+      }
+
+      if (!this.contains(nextPosition)) {
+        // robot hits board edge
+        return { position: currentPosition, stepsMoved: step, blocked: true }
+      }
+      
+      if (this.occupantAt(nextPosition) !== undefined) {
+        // robot is blocked by another robot
+        return { position: currentPosition, stepsMoved: step, blocked: true }
+      }
+
+      // move the robot to the next position as it is free
+      this.updateRobotPosition(robotId, nextPosition)
+      stepsMoved = step + 1
+    }
+
+    return { position: this.positionOf(robotId), stepsMoved: stepsMoved, blocked: false }
   }
 }

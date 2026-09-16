@@ -37,18 +37,18 @@ sequenceDiagram
         Note over Client: Player chooses five cards
         Client->>Server: program.submit {gameId, cardIds}
 
-        alt Invalid program
+        break Invalid program
             Server-->>Client: Acknowledgement: INVALID_PROGRAM
-        else Valid program
-            Note over Server: Store program
-            Server-->>Client: Acknowledgement: ACCEPTED
-            Server->>Public: program.submitted {playerId}
+        end
+          
+        Note over Server: Store program
+        Server-->>Client: Acknowledgement: ACCEPTED
+        Server->>Public: program.submitted {playerId}
 
-            loop Registers 1 through 5
-                Note over Server: Execute instruction
-                Server->>Public: robot.actionResolved
-                Public-->>Client: robot.actionResolved
-            end
+        loop Registers 1 through 5
+            Note over Server: Execute instruction
+            Server->>Public: robot.actionResolved
+            Public-->>Client: robot.actionResolved
         end
     end
 

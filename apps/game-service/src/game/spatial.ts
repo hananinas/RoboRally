@@ -2,10 +2,10 @@
 export type Position = Readonly<{ x: number; y: number }>
 
 export enum Direction {
-  NORTH = 'NORTH',
-  EAST = 'EAST',
-  SOUTH = 'SOUTH',
-  WEST = 'WEST',
+  NORTH = 0,
+  WEST = 1,
+  SOUTH = 2,
+  EAST = 3,
 }
 
 export function neighbour(position: Position, direction: Direction): Position {
@@ -22,27 +22,13 @@ export function neighbour(position: Position, direction: Direction): Position {
 }
 
 export function opposite(direction: Direction): Direction {
-  switch (direction) {
-    case Direction.NORTH:
-      return Direction.SOUTH
-    case Direction.EAST:
-      return Direction.WEST
-    case Direction.SOUTH:
-      return Direction.NORTH
-    case Direction.WEST:
-      return Direction.EAST
-  }
+  return rotateDirection(direction, 2)
 }
 
 export function turnLeft(direction: Direction): Direction {
-  switch (direction) {
-    case Direction.NORTH:
-      return Direction.WEST
-    case Direction.EAST:
-      return Direction.NORTH
-    case Direction.SOUTH:
-      return Direction.EAST
-    case Direction.WEST:
-      return Direction.SOUTH
-  }
+  return rotateDirection(direction, 1)
+}
+
+export function rotateDirection(direction: Direction, qTurns: number): Direction {
+  return ((direction + qTurns) % 4) as Direction
 }
