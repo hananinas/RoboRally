@@ -181,6 +181,7 @@ components:
       name: game.getPublicGameState
       payload:
         type: object
+        additionalProperties: false
         required: [gameId]
         properties:
           gameId:
