@@ -24,7 +24,11 @@ sequenceDiagram
     participant Public as game:{gameId}:public
 
     Client->>Server: game.getPublicGameState {gameId}
-    Server-->>Client: Acknowledgement: PublicGameStateResult
+    alt Game exists
+        Server-->>Client: Acknowledgement: FOUND with PublicGameState
+    else Unknown gameId
+        Server-->>Client: Acknowledgement: GAME_NOT_FOUND
+    end
 
     loop Rounds repeat forever
         Server->>Private: cards.dealt {cards}
@@ -49,5 +53,4 @@ sequenceDiagram
     end
 
 ```
-
 
