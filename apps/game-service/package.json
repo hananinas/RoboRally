@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "install-dev": "pnpm --filter @robo-rally/game-service... install --frozen-lockfile --prod=false",
-    "dev": "tsx watch --clear-screen=false src/index.ts",
+    "dev": "tsx watch --clear-screen=false src/main.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "test": "vitest run",
