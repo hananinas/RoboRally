@@ -1,0 +1,25 @@
+name: Nix build
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nix-build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nix-build:
+    name: Build game service with Nix
+    runs-on: [se2-c]
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build game service
+        run: nix build .#game-service --print-build-logs
