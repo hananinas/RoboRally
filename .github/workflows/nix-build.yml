@@ -14,7 +14,7 @@ concurrency:
 jobs:
   nix-build:
     name: Build game service with Nix
-    runs-on: [se2-c]
+    runs-on: [self-hosted]
     timeout-minutes: 15
 
     steps:
