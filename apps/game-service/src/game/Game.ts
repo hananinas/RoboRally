@@ -1,6 +1,6 @@
 import type { Board } from './Board.js'
 import { Move1, TurnLeft, type Card } from './Card.js'
-import type { CardId, PlayerId, RobotId } from './ids.js'
+import type { PlayerId, RobotId } from './ids.js'
 import type { Player } from './Player.js'
 import type { Robot } from './Robot.js'
 import type { Direction, Position } from './spatial.js'
@@ -9,7 +9,7 @@ export type GamePhase = 'programming' | 'activation'
 
 export type RobotActionResult = Readonly<{
   robotId: RobotId
-  cardId: CardId
+  card: Card
   position: Position
   direction: Direction
 }>
@@ -95,7 +95,7 @@ export class Game {
       this.activatedRobotIds.add(robotId)
       actions.push({
         robotId,
-        cardId: card.id,
+        card,
         position: this.board.positionOf(robotId),
         direction: robot.direction,
       })
