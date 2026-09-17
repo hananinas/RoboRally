@@ -15,9 +15,18 @@ import type {
 } from '../board/boardModel.ts'
 import useBoardInteraction from '../board/useBoardInteraction.ts'
 import '../board/BoardViewport.css'
+import RobotSprite from './RobotSprite.tsx'
+import { tileCentre } from '../board/boardMath.ts'
+
+type RobotState = Readonly<{
+  x:number
+  y: number 
+  direction: 'NORTH' | 'EAST' | 'SOUTH' | 'WEST'
+}>
 
 type BoardViewportProps = Readonly<{
   board: BoardRenderModel
+  robot: RobotState
 }>
 
 type PieceStyle = CSSProperties &
@@ -113,9 +122,17 @@ function BoardPiece({ piece }: Readonly<{ piece: BoardScenePiece }>) {
   )
 }
 
-function BoardViewport({ board }: BoardViewportProps) {
+function BoardViewport({ board, robot }: BoardViewportProps) {
   const viewportRef = useRef<HTMLElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
+  const robotPosition = tileCentre(
+    {
+      x: robot.x,
+      y: robot.y
+    },
+    board,
+    BOARD_CONFIG
+  )
   const scene = useMemo(
     () =>
       createBoardScene(
@@ -179,6 +196,9 @@ function BoardViewport({ board }: BoardViewportProps) {
               ))}
           </div>
         ))}
+        {/* <RobotSprite x ={robotPosition.worldX} 
+        y ={robotPosition.worldY}
+        direction={robot.direction}/> */}
       </div>
     </main>
   )

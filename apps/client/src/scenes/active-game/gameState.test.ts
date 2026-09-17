@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import {describe, expect, it } from 'vitest'
 import {
+  createProgrammingDeck,
+  type ProgramCardType,
   createMockGameState,
   placeCard,
   REGISTER_COUNT,
@@ -92,4 +94,34 @@ describe('registersAreFilled', () => {
       ]),
     ).toBe(false)
   })
+})
+
+it('creates a 20-card programming deck', () => {
+  const deck = createProgrammingDeck()
+
+  expect(deck).toHaveLength(20)
+})
+
+it('creates the expected programming card distribution', () => {
+  const deck = createProgrammingDeck()
+
+  const counts = deck.reduce(
+    (result, card) => {
+      result[card.type] = (result[card.type] ?? 0) + 1
+      return result
+    },
+    {} as Record<ProgramCardType, number>,
+  )
+
+  expect(counts.MOVE_1).toBe(5)
+  expect(counts.MOVE_2).toBe(3)
+  expect(counts.MOVE_3).toBe(1)
+
+  expect(counts.TURN_LEFT).toBe(3)
+  expect(counts.TURN_RIGHT).toBe(3)
+  expect(counts.U_TURN).toBe(1)
+
+  expect(counts.BACK_UP).toBe(1)
+  expect(counts.POWER_UP).toBe(1)
+  expect(counts.AGAIN).toBe(2)
 })

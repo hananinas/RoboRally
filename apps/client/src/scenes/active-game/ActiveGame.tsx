@@ -4,6 +4,7 @@ import BoardViewport from './components/BoardViewport.tsx'
 import PlayerPanel from './components/PlayerPanel.tsx'
 import ProgrammingHand from './components/ProgrammingHand.tsx'
 import RegisterPanel from './components/RegisterPanel.tsx'
+import RobotSprite from './components/RobotSprite.tsx'
 import {
   createMockGameState,
   placeCard,
@@ -14,6 +15,8 @@ import {
 } from './gameState.ts'
 import useOverlayLayout from './useOverlayLayout.ts'
 import { DEMO_BOARD } from './board/demoBoard.ts'
+import { BOARD_CONFIG } from './board/boardConfig.ts'
+import { tileCentre } from './board/boardMath.ts'
 
 // Applies a valid card placement.
 function withPlacedCard(
@@ -30,6 +33,11 @@ function withPlacedCard(
 // Renders the active game scene.
 function ActiveGame() {
   const [gameState, setGameState] = useState(createMockGameState)
+  const [robot, setRobot] = useState({
+    x:10,
+    y:7,
+    direction:'NORTH' as const,
+  })
   const {
     handBelowHud,
     handRef,
@@ -73,6 +81,15 @@ function ActiveGame() {
         : { ...currentState, confirmed: true },
     )
   }
+  
+  const robotPosition = tileCentre(
+    {
+      x: robot.x,
+      y: robot.y,
+    },
+    DEMO_BOARD,
+    BOARD_CONFIG,
+  )
 
   const registeredCardIds = new Set(
     gameState.registers.flatMap((card) => (card ? [card.id] : [])),
@@ -87,7 +104,7 @@ function ActiveGame() {
 
   return (
     <div className="game">
-      <BoardViewport board={DEMO_BOARD} />
+      <BoardViewport board={DEMO_BOARD} robot={robot} />
       <div ref={overlayRef} className={overlayClassName}>
         <aside className="game-hud" aria-label="Game controls">
           <div ref={hudContentRef} className="game-hud__content">
