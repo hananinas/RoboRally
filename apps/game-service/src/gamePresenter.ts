@@ -89,20 +89,11 @@ export function presentCardsDealt(player: Player): CardsDealt {
 }
 
 export function presentRobotActionResolved(
-  game: Game,
   action: RobotActionResult,
 ): RobotActionResolved {
-  const player = game.players.find(
-    (candidate) => candidate.robot.id === action.robotId,
-  )
-  const card = player?.hand.find((candidate) => candidate.id === action.cardId)
-  if (!card) {
-    throw new Error(`Card ${action.cardId} is not available to robot ${action.robotId}`)
-  }
-
   return {
     robotId: action.robotId,
-    instruction: instructionFor(card),
+    instruction: instructionFor(action.card),
     position: {
       coordinate: action.position,
       orientation: orientations[action.direction],
