@@ -91,7 +91,7 @@ export function createGameSocketServer(
       }
 
       acknowledge({ outcome: 'ACCEPTED' })
-      io.to(publicRoom(gameId)).emit('program.submitted', {
+      socket.to(publicRoom(gameId)).emit('program.submitted', {
         playerId: player.id,
       })
 
