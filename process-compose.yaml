@@ -1,8 +1,17 @@
 version: "0.5"
 
 processes:
+  build-game-events:
+    command: "pnpm --filter @robo-rally/game-events run build"
+
   client:
     command: "pnpm --filter @robo-rally/client run dev"
+    depends_on:
+      build-game-events:
+        condition: process_completed_successfully
 
   game-service:
     command: "pnpm --filter @robo-rally/game-service run dev"
+    depends_on:
+      build-game-events:
+        condition: process_completed_successfully
