@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "files": ["dist"],
   "scripts": {
     "install-dev": "pnpm --filter @robo-rally/game-service... install --frozen-lockfile --prod=false",
     "dev": "tsx watch --clear-screen=false src/main.ts",

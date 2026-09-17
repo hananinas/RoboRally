@@ -19,5 +19,14 @@
           pkgs = import nixpkgs { inherit system; };
           inherit nixvim system;
         });
+      packages = forAllSystems (system:
+        let
+          pkgs = import nixpkgs { inherit system; };
+        in {
+          game-service = import ./nix/packages/game-service.nix {
+            inherit pkgs;
+          };
+        }
+      );
     };
 }
