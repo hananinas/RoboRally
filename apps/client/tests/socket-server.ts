@@ -160,7 +160,7 @@ io.on('connection', (socket) => {
       acknowledge({ outcome: 'GAME_NOT_FOUND' })
       return
     }
-    acknowledge({ outcome: 'FOUND', state: fixture.state })
+    acknowledge({ outcome: 'GAME_FOUND', state: fixture.state })
     if (!dealt) {
       dealt = true
       socket.emit('cards.dealt', { cards: fixture.cards })

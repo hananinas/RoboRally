@@ -20,13 +20,9 @@
           inherit nixvim system;
         });
       packages = forAllSystems (system:
-        let
-          pkgs = import nixpkgs { inherit system; };
-        in {
-          game-service = import ./nix/packages/game-service.nix {
-            inherit pkgs;
-          };
-        }
-      );
+        import ./nix/packages {
+        pkgs = import nixpkgs { inherit system; };
+        gameId = "00000000-0000-4000-8000-000000000001";
+      });
     };
 }
