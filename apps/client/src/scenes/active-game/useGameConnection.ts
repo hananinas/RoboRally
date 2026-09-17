@@ -33,7 +33,7 @@ export default function useGameConnection() {
       return
     }
 
-    const socket: GameSocket = io(import.meta.env.VITE_GAME_SERVICE_URL || undefined, {
+    const socket: GameSocket = io({
       autoConnect: false,
       // Rejoining/replay needs a protocol of its own (#13). Never silently
       // reconnect and resend a program whose acknowledgement may have been lost.
@@ -64,7 +64,7 @@ export default function useGameConnection() {
       requestState()
     })
     socket.on('connect_error', () => {
-      dispatch({ type: 'error', message: 'Could not connect to the Game Service. Check the service URL and reload.' })
+      dispatch({ type: 'error', message: 'Could not connect to the Game Service.' })
     })
     socket.on('disconnect', () => {
       snapshotRequest += 1

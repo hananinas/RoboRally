@@ -7,7 +7,7 @@ export default defineConfig({
     open: true,
     proxy: {
       '/socket.io': {
-        target: 'http://127.0.0.1:3001',
+        target: process.env.GAME_SERVICE_URL || 'http://127.0.0.1:3001',
         ws: true,
       },
     },
