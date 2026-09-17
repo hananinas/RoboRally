@@ -100,7 +100,7 @@ export function createGameSocketServer(
         for (const action of result.actions) {
           io.to(publicRoom(gameId)).emit(
             'robot.actionResolved',
-            presentRobotActionResolved(game, action),
+            presentRobotActionResolved(action),
           )
         }
       }

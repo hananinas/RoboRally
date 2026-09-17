@@ -34,7 +34,7 @@ describe('Game activation loop', () => {
         phase: registerIndex === 4 ? 'programming' : 'activation',
         actions: [{
           robotId: robot.id,
-          cardId: deck[registerIndex].id,
+          card: deck[registerIndex],
           position: { x: 1, y: 1 },
           direction: directions[registerIndex],
         }],
@@ -67,9 +67,9 @@ describe('Game activation loop', () => {
     const result = game.executeCurrentRegister()
 
     expect(move).toHaveBeenCalledExactlyOnceWith('robot-1', Direction.NORTH, 1)
-    expect(result.actions[0].cardId).toBe('move-1')
+    expect(result.actions[0].card).toBe(deck[1])
     expect(result.actions[0].direction).toBe(Direction.NORTH)
-    expect(game.executeCurrentRegister().actions[0].cardId).toBe('left-2')
+    expect(game.executeCurrentRegister().actions[0].card).toBe(deck[2])
   })
 
   it('reports the position reached by Move1', () => {

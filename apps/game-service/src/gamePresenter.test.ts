@@ -112,15 +112,15 @@ describe('game presenter', () => {
     { cardIndex: 0, instruction: 'MOVE_1' },
     { cardIndex: 1, instruction: 'TURN_LEFT' },
   ] as const)('presents a resolved $instruction action', ({ cardIndex, instruction }) => {
-    const { game, player } = createSinglePlayerGame()
+    const { player } = createSinglePlayerGame()
     const action = {
       robotId: player.robot.id,
-      cardId: player.hand[cardIndex].id,
+      card: player.hand[cardIndex],
       position: { x: 4, y: 5 },
       direction: Direction.SOUTH,
     }
 
-    const resolved = presentRobotActionResolved(game, action)
+    const resolved = presentRobotActionResolved(action)
 
     expectTypeOf(resolved).toEqualTypeOf<RobotActionResolved>()
     expect(resolved).toEqual({
@@ -131,18 +131,5 @@ describe('game presenter', () => {
         orientation: 'SOUTH',
       },
     })
-  })
-
-  it('rejects actions that do not belong to the game', () => {
-    const { game, player } = createSinglePlayerGame()
-
-    expect(() =>
-      presentRobotActionResolved(game, {
-        robotId: player.robot.id,
-        cardId: 'missing',
-        position: { x: 0, y: 0 },
-        direction: Direction.NORTH,
-      }),
-    ).toThrow('Card missing is not available')
   })
 })
