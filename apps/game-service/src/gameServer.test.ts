@@ -26,6 +26,8 @@ describe('game Socket.IO connection', () => {
   let httpServer: HttpServer
   let io: GameSocketServer
   let client: ClientSocket<ServerToClientEvents, ClientToServerEvents>
+  let clients: ClientSocket<ServerToClientEvents, ClientToServerEvents>[]
+  let serviceUrl: string
   let singlePlayerGame: SinglePlayerGame
 
   beforeEach(async () => {
@@ -34,24 +36,37 @@ describe('game Socket.IO connection', () => {
     io = createGameSocketServer(httpServer, singlePlayerGame)
     await new Promise<void>((resolve) => httpServer.listen(0, '127.0.0.1', resolve))
     const { port } = httpServer.address() as AddressInfo
-    client = createSocketClient(`http://127.0.0.1:${port}`, {
+    serviceUrl = `http://127.0.0.1:${port}`
+    clients = []
+    client = createClient()
+  })
+
+  function createClient(): ClientSocket<
+    ServerToClientEvents,
+    ClientToServerEvents
+  > {
+    const socket = createSocketClient(serviceUrl, {
       autoConnect: false,
       transports: ['websocket'],
     })
-  })
+    clients.push(socket)
+    return socket
+  }
 
   afterEach(async () => {
-    client.disconnect()
+    for (const socket of clients) socket.disconnect()
     await new Promise<void>((resolve, reject) =>
       io.close((error) => (error ? reject(error) : resolve())),
     )
   })
 
-  function connect(): Promise<void> {
+  function connect(
+    socket: ClientSocket<ServerToClientEvents, ClientToServerEvents> = client,
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
-      client.once('connect', resolve)
-      client.once('connect_error', reject)
-      client.connect()
+      socket.once('connect', resolve)
+      socket.once('connect_error', reject)
+      socket.connect()
     })
   }
 
@@ -182,11 +197,16 @@ describe('game Socket.IO connection', () => {
     await connect()
     await initialHand
 
-    const selectedCards = singlePlayerGame.player.hand.slice(0, 5)
-    const submitToGame = vi.spyOn(singlePlayerGame.game, 'submitProgram')
+    const observer = createClient()
     const submitted = new Promise<
       Parameters<ServerToClientEvents['program.submitted']>[0]
-    >((resolve) => client.once('program.submitted', resolve))
+    >((resolve) => observer.once('program.submitted', resolve))
+    const submittedToPlayer = vi.fn()
+    client.on('program.submitted', submittedToPlayer)
+    await connect(observer)
+
+    const selectedCards = singlePlayerGame.player.hand.slice(0, 5)
+    const submitToGame = vi.spyOn(singlePlayerGame.game, 'submitProgram')
     const actions = collectResolvedActions()
     const nextHand = new Promise<
       Parameters<ServerToClientEvents['cards.dealt']>[0]
@@ -203,6 +223,7 @@ describe('game Socket.IO connection', () => {
       selectedCards,
     )
     expect(await submitted).toEqual({ playerId: singlePlayerGame.player.id })
+    expect(submittedToPlayer).not.toHaveBeenCalled()
     const resolvedActions = await actions
     expect(resolvedActions.map((action) => action.instruction)).toEqual([
       'MOVE_1',
