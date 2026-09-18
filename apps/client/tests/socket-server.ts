@@ -153,18 +153,13 @@ io.on('connection', (socket) => {
     return
   }
   fixture.sockets.add(socket)
-  let dealt = false
 
   socket.on('game.getPublicGameState', ({ gameId }, acknowledge) => {
     if (gameId !== GAME_ID) {
       acknowledge({ outcome: 'GAME_NOT_FOUND' })
       return
     }
-    acknowledge({ outcome: 'FOUND', state: fixture.state })
-    if (!dealt) {
-      dealt = true
-      socket.emit('cards.dealt', { cards: fixture.cards })
-    }
+    acknowledge({ outcome: 'GAME_FOUND', state: fixture.state })
   })
 
   socket.on('program.submit', (payload, acknowledge) => {
@@ -186,6 +181,8 @@ io.on('connection', (socket) => {
     fixture.sockets.delete(socket)
     fixture.pending = fixture.pending.filter((pending) => pending.socket !== socket)
   })
+
+  socket.emit('cards.dealt', { cards: fixture.cards })
 })
 
 httpServer.listen(4174, '127.0.0.1')
