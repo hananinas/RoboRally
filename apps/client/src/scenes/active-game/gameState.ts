@@ -27,7 +27,6 @@ export type ClientGameState = {
   playback: RobotPlaybackState
   hand: readonly ProgramCard[]
   registers: Registers
-  hasHand: boolean
   handVersion: number
   submission: 'idle' | 'pending' | 'accepted' | 'uncertain'
   error: string | null
@@ -67,7 +66,6 @@ export function createClientGameState(): ClientGameState {
     playback: createRobotPlaybackState([]),
     hand: [],
     registers: emptyRegisters(),
-    hasHand: false,
     handVersion: 0,
     submission: 'idle',
     error: null,
@@ -77,7 +75,7 @@ export function createClientGameState(): ClientGameState {
 export function canProgram(state: ClientGameState): boolean {
   return state.connected &&
     state.publicState?.phase === 'PROGRAMMING' &&
-    state.hasHand && 
+    state.handVersion > 0 &&
     !state.playback.active && 
     state.submission === 'idle'
 }
@@ -136,7 +134,6 @@ export function gameStateReducer(
         ...state,
         hand: event.cards.map((card) => ({ id: card.id, label: cardLabels[card.instruction] })),
         publicState: state.publicState ? { ...state.publicState, phase: 'PROGRAMMING' } : null,
-        hasHand: true,
         handVersion: state.handVersion + 1,
         registers: emptyRegisters(),
         submission: 'idle',

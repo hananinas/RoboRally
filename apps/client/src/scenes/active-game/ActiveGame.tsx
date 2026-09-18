@@ -17,12 +17,13 @@ function ActiveGame() {
     overlayRef,
   } = useOverlayLayout(state.handVersion)
   const disabled = !canProgram(state)
+  const hasHand = state.handVersion > 0
   const phase = state.playback.active ? 'EXECUTING' : state.publicState?.phase
   const phaseLabel = phase === 'PROGRAMMING' ? 'Programming'
     : phase === 'EXECUTING' ? 'Executing' : 'Waiting'
   const status = !state.connected ? 'Not connected'
     : !state.publicState ? 'Loading game…'
-      : !state.hasHand && phase === 'PROGRAMMING' ? 'Waiting for cards…' : phaseLabel
+      : !hasHand && phase === 'PROGRAMMING' ? 'Waiting for cards…' : phaseLabel
   const registeredCardIds = new Set(
     state.registers.flatMap((card) => (card ? [card.id] : [])),
   )
@@ -50,7 +51,7 @@ function ActiveGame() {
             />
           </div>
         </aside>
-        {state.hasHand && (
+        {hasHand && (
           <ProgrammingHand
             key={state.handVersion}
             containerRef={handRef}
