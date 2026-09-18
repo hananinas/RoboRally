@@ -24,6 +24,20 @@ async function pauseClock(page: Page) {
   await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
 }
 
+test('waits for the initial snapshot when the hand arrives first', async ({ page, game }) => {
+  await game.control({ type: 'state-requests', deferred: true })
+  await openGame(page)
+  await expect.poll(async () => (await game.snapshot()).pendingStateRequests).toBe(1)
+  const cards = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
+  await expect(cards.first()).toBeDisabled()
+  await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
+
+  await game.control({ type: 'respond-state' })
+  await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
+  await expect(page.locator(`[data-robot-id="${ROBOT_ID}"]`).first()).toHaveAttribute('data-board-tile', '5,5')
+  await expect(cards.first()).toBeEnabled()
+})
+
 test('renders the programming interface', async ({ page }) => {
   await openGame(page)
 

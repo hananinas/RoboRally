@@ -183,7 +183,6 @@ io.on('connection', (socket) => {
       fixture.pendingState.push({ socket, acknowledge })
     } else {
       acknowledge({ outcome: 'GAME_FOUND', state: fixture.state })
-      socket.emit('cards.dealt', { cards: fixture.cards })
     }
   })
 
@@ -208,6 +207,7 @@ io.on('connection', (socket) => {
     fixture.pendingState = fixture.pendingState.filter((pending) => pending.socket !== socket)
   })
 
+  socket.emit('cards.dealt', { cards: fixture.cards })
 })
 
 httpServer.listen(4174, '127.0.0.1')
