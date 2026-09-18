@@ -61,7 +61,7 @@ function ActiveGame() {
             onSelect={(card) => dispatch({
               type: 'place', cardId: card.id, registerIndex: state.registers.indexOf(null),
             })}
-            onDrop={(card, registerIndex) => dispatch({ type: 'place', cardId: card.id, registerIndex })}
+            onPlaceCard={(card, registerIndex) => dispatch({ type: 'place', cardId: card.id, registerIndex })}
           />
         )}
       </div>

@@ -1,6 +1,7 @@
 import { useState, type PointerEvent, type Ref } from 'react'
 import type { ProgramCard as Card } from '../gameState.ts'
 import ProgramCard from './ProgramCard.tsx'
+import useGameKeybinds from './useGameKeybinds.ts'
 
 type CardDrag = {
   card: Card
@@ -19,7 +20,7 @@ type ProgrammingHandProps = {
   registeredCardIds: ReadonlySet<string>
   disabled: boolean
   onSelect: (card: Card) => void
-  onDrop: (card: Card, registerIndex: number) => void
+  onPlaceCard: (card: Card, registerIndex: number) => void
 }
 
 const dragThreshold = 4
@@ -40,9 +41,10 @@ function ProgrammingHand({
   registeredCardIds,
   disabled,
   onSelect,
-  onDrop,
+  onPlaceCard,
 }: ProgrammingHandProps) {
   const [drag, setDrag] = useState<CardDrag | null>(null)
+  const highlightedIndex = useGameKeybinds(cards, disabled, onPlaceCard)
 
   // Starts pointer tracking.
   function startDrag(card: Card, event: PointerEvent<HTMLButtonElement>) {
@@ -98,7 +100,7 @@ function ProgrammingHand({
 
     if (moved) {
       const registerIndex = registerAtPoint(event.clientX, event.clientY)
-      if (registerIndex !== null) onDrop(drag.card, registerIndex)
+      if (registerIndex !== null) onPlaceCard(drag.card, registerIndex)
     } else {
       onSelect(drag.card)
     }
@@ -117,7 +119,7 @@ function ProgrammingHand({
       className="programming-hand"
       aria-label="Programming hand"
     >
-      {cards.map((card) => {
+      {cards.map((card, index) => {
         const selected = registeredCardIds.has(card.id)
 
         return (
@@ -136,6 +138,10 @@ function ProgrammingHand({
             onPointerUp={finishDrag}
             onPointerCancel={cancelDrag}
             onLostPointerCapture={cancelDrag}
+            style={{
+              outline: index === highlightedIndex ? '3px solid orange' : undefined,
+              outlineOffset: '3px',
+            }}
           />
         )
       })}
