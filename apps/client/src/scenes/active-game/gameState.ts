@@ -28,6 +28,7 @@ export type ClientGameState = {
   hand: readonly ProgramCard[]
   registers: Registers
   hasHand: boolean
+  handStateReady: boolean
   handVersion: number
   submission: 'idle' | 'pending' | 'accepted' | 'uncertain'
   error: string | null
@@ -68,6 +69,7 @@ export function createClientGameState(): ClientGameState {
     hand: [],
     registers: emptyRegisters(),
     hasHand: false,
+    handStateReady: false,
     handVersion: 0,
     submission: 'idle',
     error: null,
@@ -76,7 +78,7 @@ export function createClientGameState(): ClientGameState {
 
 export function canProgram(state: ClientGameState): boolean {
   return state.connected && state.publicState?.phase === 'PROGRAMMING' &&
-    state.hasHand && !state.playback.active && state.submission === 'idle'
+    state.hasHand && state.handStateReady && !state.playback.active && state.submission === 'idle'
 }
 
 export function createSubmission(state: ClientGameState): SubmitProgram | null {
@@ -109,6 +111,7 @@ export function gameStateReducer(
       return {
         ...state,
         publicState: snapshot,
+        handStateReady: state.hasHand && snapshot.phase === 'PROGRAMMING',
         // A round-end snapshot must not skip the actions still being displayed.
         playback: state.publicState ? state.playback : createRobotPlaybackState(
           snapshot.robots.map((robot) => ({ ...robot, colour: '#c74f4f' })),
@@ -133,6 +136,7 @@ export function gameStateReducer(
         ...state,
         hand: event.cards.map((card) => ({ id: card.id, label: cardLabels[card.instruction] })),
         hasHand: true,
+        handStateReady: false,
         handVersion: state.handVersion + 1,
         registers: emptyRegisters(),
         submission: 'idle',
