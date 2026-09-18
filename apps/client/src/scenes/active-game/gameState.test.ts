@@ -9,8 +9,8 @@ import {
   type Registers,
 } from './gameState.ts'
 
-const firstCard: ProgramCard = { id: 'first', label: 'Move' }
-const secondCard: ProgramCard = { id: 'second', label: 'Turn' }
+const firstCard: ProgramCard = { id: 'first', instruction: 'MOVE_1' }
+const secondCard: ProgramCard = { id: 'second', instruction: 'TURN_LEFT' }
 const emptyRegisters: Registers = Object.freeze(
   Array.from({ length: REGISTER_COUNT }, () => null),
 )

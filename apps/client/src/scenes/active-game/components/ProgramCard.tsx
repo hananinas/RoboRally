@@ -1,33 +1,81 @@
 import type { ButtonHTMLAttributes } from 'react'
-import type { ProgramCard as Card } from '../gameState.ts'
+import type {
+  Card,
+  Instruction,
+} from '@robo-rally/game-events'
 
-type ProgramCardProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  card: Card
-  size: 'hand' | 'register'
-  selected?: boolean
-  dragging?: boolean
-  label?: string
+import arrowLeft from './svg/arrow-left.svg'
+import arrowUp1 from './svg/arrow-up-1.svg'
+
+type ProgramCardProps =
+  ButtonHTMLAttributes<HTMLButtonElement> & {
+    card: Card
+    size: 'hand' | 'register'
+    selected?: boolean
+    dragging?: boolean
+    label?: string
+  }
+
+function instructionLabel(instruction: Instruction): string {
+  switch (instruction) {
+    case 'MOVE_1':
+      return 'Move 1'
+    case 'TURN_LEFT':
+      return 'Turn Left'
+  }
 }
 
-// Renders a blank program card.
+function CardIcon({ instruction }: { instruction: Instruction }) {
+  const icons: Record<Instruction, string> = {
+    MOVE_1: arrowUp1,
+    TURN_LEFT: arrowLeft,
+  }
+
+  return (
+    <img
+      src={icons[instruction]}
+      alt=""
+      aria-hidden="true"
+      className="program-card__icon"
+      draggable={false}
+    />
+  )
+}
+
+// Renders a programming card.
 function ProgramCard({
   card,
   size,
   selected = false,
   dragging = false,
-  label = card.label,
+  label = instructionLabel(card.instruction),
   ...buttonProps
 }: ProgramCardProps) {
-  const selectedClassName = selected ? ' program-card--selected' : ''
-  const draggingClassName = dragging ? ' program-card--dragging' : ''
+  const selectedClassName = selected
+    ? ' program-card--selected'
+    : ''
+
+  const draggingClassName = dragging
+    ? ' program-card--dragging'
+    : ''
 
   return (
     <button
       {...buttonProps}
-      className={`program-card program-card--${size}${selectedClassName}${draggingClassName}`}
       type="button"
       aria-label={label}
-    />
+      className={
+        `program-card program-card--${size}` +
+        selectedClassName +
+        draggingClassName
+      }
+    >
+      <CardIcon instruction={card.instruction} />
+
+      <span className="program-card__label">
+        {label}
+      </span>
+    </button>
   )
 }
 

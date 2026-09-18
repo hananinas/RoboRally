@@ -1,7 +1,6 @@
-export type ProgramCard = {
-  id: string
-  label: string
-}
+import type { Card } from '@robo-rally/game-events'
+
+export type ProgramCard = Card
 
 export type Registers = readonly (ProgramCard | null)[]
 
@@ -17,28 +16,28 @@ export type ClientGameState = {
 
 export const REGISTER_COUNT = 5
 
-// Creates temporary client state.
+// Creates temporary client state for the programming-card UI.
 export function createMockGameState(): ClientGameState {
-  const cardLabels = [
-    'Move 1',
-    'Turn Left',
-    'Move 1',
-    'Turn Left',
-    'Move 1',
-    'Turn Left',
-    'Move 1',
-    'Turn Left',
-    'Move 1',
-  ]
+  const instructions = [
+    'MOVE_1',
+    'TURN_LEFT',
+    'MOVE_1',
+    'TURN_LEFT',
+    'MOVE_1',
+    'TURN_LEFT',
+    'MOVE_1',
+    'TURN_LEFT',
+    'MOVE_1',
+  ] as const
 
   return {
     phase: 'programming',
     player: {
       name: 'Player Name',
     },
-    hand: cardLabels.map((label, index) => ({
+    hand: instructions.map((instruction, index) => ({
       id: `card-${index + 1}`,
-      label,
+      instruction,
     })),
     registers: Array.from({ length: REGISTER_COUNT }, () => null),
     confirmed: false,
