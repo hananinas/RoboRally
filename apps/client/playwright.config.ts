@@ -22,7 +22,7 @@ export default defineConfig({
       command: 'pnpm dev --host 127.0.0.1 --port 4173 --strictPort',
       env: {
         VITE_GAME_ID: GAME_ID,
-        VITE_GAME_SERVICE_URL: GAME_SERVICE_URL,
+        GAME_SERVICE_URL,
       },
       reuseExistingServer: false,
       url: baseURL,

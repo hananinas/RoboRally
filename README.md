@@ -14,34 +14,76 @@ The client and Game Service implement the v0 single-player loop using shared
 Socket.IO game events. Browser tests use an isolated contract fixture rather
 than starting the production service.
 
-## Development
+## Development Setup
 
-### NixOS
-Note: Currently the flake only installs documentation dependencies. 
+The recommended development environment uses Nix together with direnv. You do not need to run NixOS. The Nix package manager can also be installed on other Linux distributions and macOS.
 
+The development shell provides the tools required by the project, including Node.js, pnpm, Process Compose, and project-specific development tooling.
+
+### Nix
 #### Requirements
 
-You must have the following tools available system-wide prior to installation:
+The following tools must be installed system-wide:
 
-    - [direnv](https://direnv.net) version >= 2.28.0
+- [Nix](https://nixos.org/download/)
+- [direnv](https://direnv.net/) version 2.28.0 or newer
 
 #### Setup
-1. Enable direnv.
+1. Copy the example direnv configuration:
 
-   - Copy `.envrc-example` as `.envrc`.
-   - Enable direnv:
-     `$ direnv allow`
-     The development shell defined in flake.nix is automatically activated upon entering the directory.
+   ```sh
+   cp .envrc-example .envrc
+   ```
 
+2. Allow direnv for the repository:
 
-### Other OS/Distributions
+   ```sh
+   direnv allow
+   ```
 
-#### Requirements
+   The development shell defined in `flake.nix` will now be activated automatically whenever you enter the repository.
 
-You must have the following tools available system-wide prior to installation:
+3. Start the local development processes:
 
-    - Node.js 20.19 or newer
-    - pnpm 10.9 or newer
+   ```sh
+   process-compose
+   ```
+
+The default development shell contains the tooling required for client, game-service, and AsyncAPI documentation development.
+
+Individual development shells are also available:
+
+- `nix develop .#client` — client development
+- `nix develop .#game-service` — game-service development
+- `nix develop .#asyncapi` — AsyncAPI documentation tooling
+- `nix develop .#with-editor` — full development environment including the optional project Nixvim configuration
+
+### Without Nix
+
+Using Nix is the recommended and supported development setup. It ensures that all developers use compatible versions of the project tooling.
+
+If you prefer not to use Nix, you must install the required tools yourself.
+
+At minimum, you will need:
+
+- Node.js 24 or a compatible version
+- pnpm 10.9 or newer
+- [Process Compose](https://f1bonacc1.github.io/process-compose/)
+- AsyncAPI tooling for writing and generating API documentation
+
+Then install the project dependencies:
+
+```sh
+pnpm install
+```
+
+and start the development processes with:
+
+```sh
+process-compose
+```
+
+The non-Nix setup is best-effort and may require additional platform-specific tooling.
 
 ## Structure
 
@@ -65,41 +107,3 @@ pnpm test
 pnpm typecheck
 ```
 
-### Connect the client to a Game Service
-
-Copy `apps/client/.env.example` to `apps/client/.env.local`. Set `VITE_GAME_ID`
-to the service's game UUID and `VITE_GAME_SERVICE_URL` to its HTTP origin.
-Leave the URL empty only when Socket.IO is served through the client's origin.
-Restart `pnpm dev` after changing these values. A separate service origin must
-allow the client's origin through Socket.IO CORS.
-
-The client requests state once on connection. Each new deal clears the registers
-and starts programming, with controls locked until all resolved actions finish
-playing. A rejected program keeps its selection for editing and retry. A missing
-acknowledgement or disconnected socket never triggers an automatic resend.
-Reconnection and replay remain outside v0.
-
-Run focused client and server unit tests with:
-
-```bash
-pnpm --filter @robo-rally/client test:unit
-pnpm --filter @robo-rally/game-service test
-```
-
-Both commands use Vitest. Client browser tests start their own Socket.IO fixture
-and Vite server on ports 4174 and 4173; no running Game Service is required.
-
-Install Chromium once before running the browser tests:
-
-```bash
-pnpm --filter @robo-rally/client exec playwright install chromium
-```
-
-Build and run the local Game Service on `127.0.0.1:3001`:
-
-```bash
-pnpm --filter @robo-rally/game-service build
-pnpm --filter @robo-rally/game-service start
-```
-
-Set `PORT` to use a different local port.
