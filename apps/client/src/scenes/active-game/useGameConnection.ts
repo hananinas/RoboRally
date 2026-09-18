@@ -1,7 +1,7 @@
 import type { ClientToServerEvents, ServerToClientEvents } from '@robo-rally/game-events'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { io, type Socket } from 'socket.io-client'
-import { robotActionDuration } from './board/robotPlayback.ts'
+import { useRobotPlaybackTimer } from './board/robotPlayback.ts'
 import {
   createClientGameState,
   createSubmission,
@@ -76,15 +76,7 @@ export default function useGameConnection() {
     }
   }, [dispatch])
 
-  useEffect(() => {
-    if (!state.playback.active) return
-    const duration = robotActionDuration(
-      state.playback.active,
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-    )
-    const timer = window.setTimeout(() => dispatch({ type: 'complete' }), duration)
-    return () => window.clearTimeout(timer)
-  }, [dispatch, state.playback.active])
+  useRobotPlaybackTimer(state.playback.active, dispatch)
 
   const submit = useCallback(() => {
     const socket = socketRef.current

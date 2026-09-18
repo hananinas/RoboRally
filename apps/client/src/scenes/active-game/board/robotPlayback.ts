@@ -89,32 +89,33 @@ export function robotPlaybackReducer(
   return state.active ? queued : startNext(queued)
 }
 
+export function useRobotPlaybackTimer(
+  active: ResolvedRobotAction | null,
+  dispatch: (event: { type: 'complete' }) => void,
+) {
+  useEffect(() => {
+    if (!active) return
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const duration = robotActionDuration(active, reducedMotion)
+    const timer = window.setTimeout(() => dispatch({ type: 'complete' }), duration)
+    return () => window.clearTimeout(timer)
+  }, [active, dispatch])
+}
+
 export function useRobotPlayback(initialRobots: readonly Robot[]) {
   const [state, dispatch] = useReducer(
     robotPlaybackReducer,
     initialRobots,
     createRobotPlaybackState,
   )
-
-  useEffect(() => {
-    if (!state.active) return
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const duration = robotActionDuration(state.active, reducedMotion)
-    const timer = window.setTimeout(() => dispatch({ type: 'complete' }), duration)
-    return () => window.clearTimeout(timer)
-  }, [state.active])
+  useRobotPlaybackTimer(state.active, dispatch)
 
   const enqueue = useCallback((action: ResolvedRobotAction) => {
     dispatch({ type: 'enqueue', action })
   }, [])
-  const reset = useCallback((robots: readonly Robot[]) => {
-    dispatch({ type: 'reset', robots })
-  }, [])
 
   return {
     robots: state.robots,
-    isPlaying: state.active !== null,
     enqueue,
-    reset,
   }
 }
