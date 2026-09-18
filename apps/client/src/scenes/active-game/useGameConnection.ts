@@ -103,7 +103,8 @@ export default function useGameConnection() {
     const handVersion = current.current.handVersion
     dispatch({ type: 'submit' })
     socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit('program.submit', payload, (error, result) => {
-      if (socketRef.current !== socket) return
+      // Disconnect also fails pending acknowledgements; preserve its reload guidance.
+      if (socketRef.current !== socket || !socket.connected) return
       dispatch(error
         ? { type: 'submission-unknown', handVersion }
         : { type: 'result', result, handVersion })
