@@ -96,3 +96,12 @@ Install Chromium once before running the browser tests:
 ```bash
 pnpm --filter @robo-rally/client exec playwright install chromium
 ```
+
+Build and run the local Game Service on `127.0.0.1:3001`:
+
+```bash
+pnpm --filter @robo-rally/game-service build
+pnpm --filter @robo-rally/game-service start
+```
+
+Set `PORT` to use a different local port.
