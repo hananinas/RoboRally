@@ -1,6 +1,9 @@
 import type {
   Card,
+  GameId,
+  GamePhase,
   Instruction,
+  PlayerId,
   ProgramResult,
   PublicGameState,
   RobotActionResolved,
@@ -22,12 +25,13 @@ export type Registers = readonly (ProgramCard | null)[]
 
 export type ClientGameState = {
   connected: boolean
-  publicState: PublicGameState | null
+  gameId: GameId | null
+  phase: GamePhase | null
+  playerIds: readonly PlayerId[]
   board: BoardRenderModel | null
   playback: RobotPlaybackState
   hand: readonly ProgramCard[]
   registers: Registers
-  hasHand: boolean
   handVersion: number
   submission: 'idle' | 'pending' | 'accepted' | 'uncertain'
   error: string | null
@@ -37,7 +41,7 @@ export type GameStateEvent =
   | { type: 'connected' }
   | { type: 'disconnected' }
   | { type: 'error'; message: string }
-  | { type: 'state'; state: PublicGameState }
+  | { type: 'initial-state'; state: PublicGameState }
   | { type: 'dealt'; cards: readonly Card[] }
   | { type: 'submitted'; playerId: string }
   | { type: 'action'; action: RobotActionResolved }
@@ -62,12 +66,13 @@ function emptyRegisters(): Registers {
 export function createClientGameState(): ClientGameState {
   return {
     connected: false,
-    publicState: null,
+    gameId: null,
+    phase: null,
+    playerIds: [],
     board: null,
     playback: createRobotPlaybackState([]),
     hand: [],
     registers: emptyRegisters(),
-    hasHand: false,
     handVersion: 0,
     submission: 'idle',
     error: null,
@@ -75,16 +80,19 @@ export function createClientGameState(): ClientGameState {
 }
 
 export function canProgram(state: ClientGameState): boolean {
-  return state.connected && state.publicState?.phase === 'PROGRAMMING' &&
-    state.hasHand && !state.playback.active && state.submission === 'idle'
+  return state.connected &&
+    state.phase === 'PROGRAMMING' &&
+    state.handVersion > 0 &&
+    !state.playback.active && 
+    state.submission === 'idle'
 }
 
 export function createSubmission(state: ClientGameState): SubmitProgram | null {
-  if (!canProgram(state) || !state.publicState) return null
+  if (!canProgram(state) || state.gameId === null) return null
   const [first, second, third, fourth, fifth] = state.registers
   if (!first || !second || !third || !fourth || !fifth) return null
   return {
-    gameId: state.publicState.gameId,
+    gameId: state.gameId,
     cardIds: [first.id, second.id, third.id, fourth.id, fifth.id],
   }
 }
@@ -104,16 +112,17 @@ export function gameStateReducer(
       }
     case 'error':
       return { ...state, error: event.message }
-    case 'state': {
+    case 'initial-state': {
       const snapshot = event.state
       return {
         ...state,
-        publicState: snapshot,
-        // A round-end snapshot must not skip the actions still being displayed.
-        playback: state.publicState ? state.playback : createRobotPlaybackState(
+        gameId: snapshot.gameId,
+        phase: snapshot.phase,
+        playerIds: snapshot.robots.map((robot) => robot.playerId),
+        playback: createRobotPlaybackState(
           snapshot.robots.map((robot) => ({ ...robot, colour: '#c74f4f' })),
         ),
-        board: state.board ?? createBoardRenderModel(
+        board: createBoardRenderModel(
           snapshot.board.width,
           snapshot.board.height,
           {
@@ -132,18 +141,18 @@ export function gameStateReducer(
       return {
         ...state,
         hand: event.cards.map((card) => ({ id: card.id, label: cardLabels[card.instruction] })),
-        hasHand: true,
+        phase: state.gameId === null ? null : 'PROGRAMMING',
         handVersion: state.handVersion + 1,
         registers: emptyRegisters(),
         submission: 'idle',
         error: null,
       }
     case 'submitted':
-      if (!state.publicState?.robots.some((robot) => robot.playerId === event.playerId)) return state
+      if (!state.playerIds.includes(event.playerId)) return state
       return {
         ...state,
         submission: 'accepted',
-        publicState: { ...state.publicState, phase: 'EXECUTING' },
+        phase: 'EXECUTING',
         error: null,
       }
     case 'action':
@@ -167,8 +176,7 @@ export function gameStateReducer(
     case 'submit':
       return createSubmission(state) ? { ...state, submission: 'pending', error: null } : state
     case 'result':
-      if (event.handVersion !== state.handVersion ||
-        (state.submission !== 'pending' && state.submission !== 'uncertain')) return state
+      if (event.handVersion !== state.handVersion || state.submission !== 'pending') return state
       return event.result.outcome === 'ACCEPTED'
         ? { ...state, submission: 'accepted', error: null }
         : { ...state, submission: 'idle', error: 'Program rejected. Adjust your selection and try again.' }

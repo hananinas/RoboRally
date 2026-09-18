@@ -74,7 +74,7 @@ const actions: readonly RobotActionResolved[] = [
 
 function programmingState(): ClientGameState {
   let state = gameStateReducer(createClientGameState(), { type: 'connected' })
-  state = gameStateReducer(state, { type: 'state', state: publicState })
+  state = gameStateReducer(state, { type: 'initial-state', state: publicState })
   return gameStateReducer(state, { type: 'dealt', cards })
 }
 
@@ -130,41 +130,34 @@ describe('removeCard', () => {
 })
 
 describe('client game state', () => {
-  it('keeps an early hand unavailable until a programming snapshot arrives', () => {
+  it('keeps an early hand locked and initializes robots from the first snapshot', () => {
     let state = gameStateReducer(createClientGameState(), { type: 'connected' })
     state = gameStateReducer(state, { type: 'dealt', cards })
-
+    expect(state.gameId).toBeNull()
+    expect(state.phase).toBeNull()
     expect(canProgram(state)).toBe(false)
     state = gameStateReducer(state, { type: 'place', cardId: cards[0].id, registerIndex: 0 })
     expect(state.registers).toEqual(emptyRegisters)
     expect(createSubmission(state)).toBeNull()
 
-    state = gameStateReducer(state, {
-      type: 'state',
-      state: { ...publicState, phase: 'WAITING' },
-    })
-    expect(canProgram(state)).toBe(false)
-
-    state = gameStateReducer(state, { type: 'state', state: publicState })
+    state = gameStateReducer(state, { type: 'initial-state', state: publicState })
+    expect(state.board).not.toBeNull()
+    expect(state.playback.robots).toMatchObject(publicState.robots)
     expect(canProgram(state)).toBe(true)
-    state = selectProgram(state)
-    expect(createSubmission(state)).toEqual({
-      gameId: publicState.gameId,
-      cardIds: selectedCardIds,
-    })
   })
 
   it('requires a dealt hand and disables editing when execution starts', () => {
     let state = gameStateReducer(createClientGameState(), { type: 'connected' })
-    state = gameStateReducer(state, { type: 'state', state: publicState })
+    state = gameStateReducer(state, { type: 'initial-state', state: publicState })
     expect(canProgram(state)).toBe(false)
 
     state = gameStateReducer(state, { type: 'dealt', cards })
     state = selectProgram(state)
     const registers = state.registers
+    expect(gameStateReducer(state, { type: 'submitted', playerId: 'unknown-player' })).toBe(state)
     state = gameStateReducer(state, {
-      type: 'state',
-      state: { ...publicState, phase: 'EXECUTING' },
+      type: 'submitted',
+      playerId: publicState.robots[0].playerId,
     })
 
     expect(canProgram(state)).toBe(false)
@@ -314,16 +307,6 @@ describe('client game state', () => {
       state = gameStateReducer(state, { type: 'action', action })
     }
 
-    state = gameStateReducer(state, {
-      type: 'state',
-      state: {
-        ...publicState,
-        robots: [
-          { ...publicState.robots[0], position: actions[4].position },
-          publicState.robots[1],
-        ],
-      },
-    })
     state = gameStateReducer(state, { type: 'dealt', cards })
     expect(state.registers).toEqual(emptyRegisters)
 
@@ -346,7 +329,6 @@ describe('client game state', () => {
       gameId: publicState.gameId,
       cardIds: selectedCardIds,
     })
-    state = gameStateReducer(state, { type: 'state', state: publicState })
     expect(state.playback.robots.find((robot) => robot.robotId === robotId)?.position)
       .toEqual(actions[4].position)
   })

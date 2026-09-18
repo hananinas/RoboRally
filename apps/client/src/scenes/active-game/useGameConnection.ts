@@ -1,7 +1,7 @@
 import type { ClientToServerEvents, ServerToClientEvents } from '@robo-rally/game-events'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { io, type Socket } from 'socket.io-client'
-import { robotActionDuration } from './board/robotPlayback.ts'
+import { useRobotPlaybackTimer } from './board/robotPlayback.ts'
 import {
   createClientGameState,
   createSubmission,
@@ -18,8 +18,7 @@ export default function useGameConnection() {
   const current = useRef(state)
   const socketRef = useRef<GameSocket | null>(null)
 
-  // Update the event-time state synchronously: React can batch several packets
-  // or clicks into one render, but submission and playback cannot drop any.
+  // Keep event-time state current so submission checks see updates before React renders.
   const dispatch = useCallback((event: GameStateEvent) => {
     const next = gameStateReducer(current.current, event)
     current.current = next
@@ -40,61 +39,43 @@ export default function useGameConnection() {
       reconnection: false,
     })
     socketRef.current = socket
-    let alive = true
-    let snapshotRequest = 0
 
-    function requestState() {
-      const request = ++snapshotRequest
+    socket.on('connect', () => {
+      dispatch({ type: 'connected' })
       socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit(
         'game.getPublicGameState', { gameId }, (error, result) => {
-          if (!alive || request !== snapshotRequest) return
+          if (socketRef.current !== socket || !socket.connected) return
           if (error) {
             dispatch({ type: 'error', message: 'Could not load game state. Reload to try again.' })
           } else if (result.outcome === 'GAME_NOT_FOUND') {
             dispatch({ type: 'error', message: 'Game not found. Check VITE_GAME_ID and restart the client.' })
           } else {
-            dispatch({ type: 'state', state: result.state })
+            dispatch({ type: 'initial-state', state: result.state })
           }
         },
       )
-    }
-
-    socket.on('connect', () => {
-      dispatch({ type: 'connected' })
-      requestState()
     })
     socket.on('connect_error', () => {
       dispatch({ type: 'error', message: 'Could not connect to the Game Service.' })
     })
     socket.on('disconnect', () => {
-      snapshotRequest += 1
       dispatch({ type: 'disconnected' })
     })
     socket.on('cards.dealt', ({ cards }) => {
       dispatch({ type: 'dealt', cards })
-      requestState()
     })
     socket.on('program.submitted', ({ playerId }) => dispatch({ type: 'submitted', playerId }))
     socket.on('robot.actionResolved', (action) => dispatch({ type: 'action', action }))
     socket.connect()
 
     return () => {
-      alive = false
       socketRef.current = null
       socket.removeAllListeners()
       socket.disconnect()
     }
   }, [dispatch])
 
-  useEffect(() => {
-    if (!state.playback.active) return
-    const duration = robotActionDuration(
-      state.playback.active,
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-    )
-    const timer = window.setTimeout(() => dispatch({ type: 'complete' }), duration)
-    return () => window.clearTimeout(timer)
-  }, [dispatch, state.playback.active])
+  useRobotPlaybackTimer(state.playback.active, dispatch)
 
   const submit = useCallback(() => {
     const socket = socketRef.current
@@ -103,7 +84,8 @@ export default function useGameConnection() {
     const handVersion = current.current.handVersion
     dispatch({ type: 'submit' })
     socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit('program.submit', payload, (error, result) => {
-      if (socketRef.current !== socket) return
+      // Disconnect also fails pending acknowledgements; preserve its reload guidance.
+      if (socketRef.current !== socket || !socket.connected) return
       dispatch(error
         ? { type: 'submission-unknown', handVersion }
         : { type: 'result', result, handVersion })

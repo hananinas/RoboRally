@@ -6,6 +6,7 @@ import type {
   ProgramResultAcknowledgement,
   ProgramResultOutcome,
   PublicGameState,
+  PublicGameStateAcknowledgement,
   ServerToClientEvents,
   SubmitProgram,
 } from '@robo-rally/game-events'
@@ -27,6 +28,9 @@ type Fixture = {
   sockets: Set<GameSocket>
   outcome: ProgramResultOutcome
   deferred: boolean
+  stateRequests: number
+  deferState: boolean
+  pendingState: { socket: GameSocket; acknowledge: PublicGameStateAcknowledgement }[]
   pending: { socket: GameSocket; acknowledge: ProgramResultAcknowledgement }[]
 }
 
@@ -45,6 +49,8 @@ function snapshot(fixture: Fixture): FixtureSnapshot {
     cards: fixture.cards,
     state: fixture.state,
     submissions: fixture.submissions,
+    stateRequests: fixture.stateRequests,
+    pendingStateRequests: fixture.pendingState.length,
   }
 }
 
@@ -57,12 +63,26 @@ function acknowledgeProgram(
   acknowledge({ outcome })
   if (outcome === 'ACCEPTED') {
     fixture.state = { ...fixture.state, phase: 'EXECUTING' }
-    socket.emit('program.submitted', { playerId: PLAYER_ID })
+    // Production broadcasts acceptance to the other sockets, excluding the sender.
+    for (const observer of fixture.sockets) {
+      if (observer !== socket) observer.emit('program.submitted', { playerId: PLAYER_ID })
+    }
   }
 }
 
 function controlFixture(fixture: Fixture, control: FixtureControl) {
   switch (control.type) {
+    case 'disconnect':
+      for (const socket of fixture.sockets) socket.disconnect(true)
+      break
+    case 'state-requests':
+      fixture.deferState = control.deferred
+      break
+    case 'respond-state':
+      for (const pending of fixture.pendingState.splice(0)) {
+        pending.acknowledge({ outcome: 'GAME_FOUND', state: fixture.state })
+      }
+      break
     case 'submission':
       fixture.outcome = control.outcome
       fixture.deferred = control.deferred
@@ -79,7 +99,7 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
           ? { ...robot, position: action.position }
           : robot)
       }
-      fixture.state = { ...fixture.state, phase: control.phase ?? 'PROGRAMMING', robots }
+      fixture.state = { ...fixture.state, phase: 'PROGRAMMING', robots }
       fixture.cards = dealCards()
       for (const socket of fixture.sockets) {
         for (const action of control.actions) socket.emit('robot.actionResolved', action)
@@ -111,6 +131,9 @@ const httpServer = createServer(async (request, response) => {
       outcome: 'ACCEPTED',
       deferred: false,
       pending: [],
+      stateRequests: 0,
+      deferState: false,
+      pendingState: [],
     }
     fixtures.set(fixture.id, fixture)
     send(201, snapshot(fixture))
@@ -153,17 +176,17 @@ io.on('connection', (socket) => {
     return
   }
   fixture.sockets.add(socket)
-  let dealt = false
 
   socket.on('game.getPublicGameState', ({ gameId }, acknowledge) => {
+    fixture.stateRequests += 1
     if (gameId !== GAME_ID) {
       acknowledge({ outcome: 'GAME_NOT_FOUND' })
       return
     }
-    acknowledge({ outcome: 'GAME_FOUND', state: fixture.state })
-    if (!dealt) {
-      dealt = true
-      socket.emit('cards.dealt', { cards: fixture.cards })
+    if (fixture.deferState) {
+      fixture.pendingState.push({ socket, acknowledge })
+    } else {
+      acknowledge({ outcome: 'GAME_FOUND', state: fixture.state })
     }
   })
 
@@ -185,7 +208,10 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     fixture.sockets.delete(socket)
     fixture.pending = fixture.pending.filter((pending) => pending.socket !== socket)
+    fixture.pendingState = fixture.pendingState.filter((pending) => pending.socket !== socket)
   })
+
+  socket.emit('cards.dealt', { cards: fixture.cards })
 })
 
 httpServer.listen(4174, '127.0.0.1')
