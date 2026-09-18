@@ -135,7 +135,7 @@ export function gameStateReducer(
       return {
         ...state,
         hand: event.cards.map((card) => ({ id: card.id, label: cardLabels[card.instruction] })),
-        publicState: { ...state.publicState, phase: 'PROGRAMMING' },
+        publicState: state.publicState ? { ...state.publicState, phase: 'PROGRAMMING' } : null,
         hasHand: true,
         handVersion: state.handVersion + 1,
         registers: emptyRegisters(),

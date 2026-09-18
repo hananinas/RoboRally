@@ -138,6 +138,21 @@ describe('removeCard', () => {
 })
 
 describe('client game state', () => {
+  it('keeps an early hand locked and initializes robots from the first snapshot', () => {
+    let state = gameStateReducer(createClientGameState(), { type: 'connected' })
+    state = gameStateReducer(state, { type: 'dealt', cards })
+    expect(state.publicState).toBeNull()
+    expect(canProgram(state)).toBe(false)
+    state = gameStateReducer(state, { type: 'place', cardId: cards[0].id, registerIndex: 0 })
+    expect(state.registers).toEqual(emptyRegisters)
+    expect(createSubmission(state)).toBeNull()
+
+    state = gameStateReducer(state, { type: 'state', state: publicState })
+    expect(state.board).not.toBeNull()
+    expect(state.playback.robots).toMatchObject(publicState.robots)
+    expect(canProgram(state)).toBe(true)
+  })
+
   it('requires a dealt hand and disables editing when execution starts', () => {
     let state = gameStateReducer(createClientGameState(), { type: 'connected' })
     state = gameStateReducer(state, { type: 'state', state: publicState })
