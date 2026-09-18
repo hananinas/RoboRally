@@ -93,9 +93,9 @@ describe('board rendering definition', () => {
       4,
     )
     expect(DEMO_ROBOTS.map((robot) => robot.position)).toEqual([
-      { x: 9, y: 7, orientation: 'WEST' },
-      { x: 10, y: 7, orientation: 'NORTH' },
-      { x: 11, y: 7, orientation: 'SOUTH' },
+      { coordinate: { x: 9, y: 7 }, orientation: 'WEST' },
+      { coordinate: { x: 10, y: 7 }, orientation: 'NORTH' },
+      { coordinate: { x: 11, y: 7 }, orientation: 'SOUTH' },
     ])
     expect(BOARD_CONFIG.parallax).toBe(0.07)
     expect(BOARD_CONFIG.edgeWall).toEqual({ width: 12, cornerRadius: 5 })

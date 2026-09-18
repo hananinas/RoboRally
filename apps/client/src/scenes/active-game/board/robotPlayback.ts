@@ -1,17 +1,18 @@
+import type {
+  Orientation,
+  Position,
+  RobotActionResolved,
+} from '@robo-rally/game-events'
 import { useCallback, useEffect, useReducer } from 'react'
 
-export type Orientation = 'NORTH' | 'EAST' | 'SOUTH' | 'WEST'
-export type RobotPosition = Readonly<{ x: number; y: number; orientation: Orientation }>
+export type { Orientation }
+export type RobotPosition = Position
 export type Robot = Readonly<{
   robotId: string
   colour: string
   position: RobotPosition
 }>
-export type ResolvedRobotAction = Readonly<{
-  robotId: string
-  instruction: 'MOVE_1' | 'TURN_LEFT'
-  position: RobotPosition
-}>
+export type ResolvedRobotAction = RobotActionResolved
 export type DisplayRobot = Robot & Readonly<{ angle: number }>
 
 export const ROBOT_MOVE_DURATION_MS = 600

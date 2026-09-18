@@ -4,11 +4,19 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@robo-rally/game-events": "workspace:*",
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
     "@types/node": "^26.4.1",
-    "typescript": "~7.0.2"
+    "socket.io-client": "^4.8.3",
+    "typescript": "~7.0.2",
+    "vitest": "^4.1.11"
   }
 }

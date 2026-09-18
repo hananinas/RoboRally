@@ -159,3 +159,41 @@ board.firstRobotHit(position, direction):
         position = next
     return none
 ```
+
+## Robot priority (TypeScript reference implementation):
+
+The antenna is passed explicitly because the current Board model does not store it yet. Its `angle` is in radians from east; with board coordinates increasing south, positive angles rotate clockwise. Call this again after each robot acts, using only robots that have not activated in the current register. Exact ties keep the first ID in `remaining`.
+
+```ts
+type RobotId = string
+type Position = Readonly<{ x: number; y: number }>
+type Antenna = Readonly<Position & { angle: number }>
+type BoardPositions = { positionOf(robotId: RobotId): Position }
+
+function nextRobotByPriority(
+  remaining: readonly RobotId[],
+  board: BoardPositions,
+  antenna: Antenna,
+): RobotId {
+  if (remaining.length === 0) {
+    throw new RangeError('No robots remain to activate')
+  }
+
+  const fullTurn = 2 * Math.PI
+  const score = (id: RobotId): readonly [number, number] => {
+    const position = board.positionOf(id)
+    const distance = Math.abs(position.x - antenna.x) + Math.abs(position.y - antenna.y)
+    const angle = Math.atan2(position.y - antenna.y, position.x - antenna.x)
+    const offset = ((angle - antenna.angle) % fullTurn + fullTurn) % fullTurn
+    return [distance, offset]
+  }
+
+  return remaining.reduce((best, id) => {
+    const [distance, offset] = score(id)
+    const [bestDistance, bestOffset] = score(best)
+    return distance < bestDistance || (distance === bestDistance && offset < bestOffset)
+      ? id
+      : best
+  })
+}
+```
