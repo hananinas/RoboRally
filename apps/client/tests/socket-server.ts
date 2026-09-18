@@ -28,6 +28,7 @@ type Fixture = {
   sockets: Set<GameSocket>
   outcome: ProgramResultOutcome
   deferred: boolean
+  stateRequests: number
   deferState: boolean
   pendingState: { socket: GameSocket; acknowledge: PublicGameStateAcknowledgement }[]
   pending: { socket: GameSocket; acknowledge: ProgramResultAcknowledgement }[]
@@ -48,6 +49,7 @@ function snapshot(fixture: Fixture): FixtureSnapshot {
     cards: fixture.cards,
     state: fixture.state,
     submissions: fixture.submissions,
+    stateRequests: fixture.stateRequests,
     pendingStateRequests: fixture.pendingState.length,
   }
 }
@@ -97,7 +99,7 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
           ? { ...robot, position: action.position }
           : robot)
       }
-      fixture.state = { ...fixture.state, phase: control.phase ?? 'PROGRAMMING', robots }
+      fixture.state = { ...fixture.state, phase: 'PROGRAMMING', robots }
       fixture.cards = dealCards()
       for (const socket of fixture.sockets) {
         for (const action of control.actions) socket.emit('robot.actionResolved', action)
@@ -129,6 +131,7 @@ const httpServer = createServer(async (request, response) => {
       outcome: 'ACCEPTED',
       deferred: false,
       pending: [],
+      stateRequests: 0,
       deferState: false,
       pendingState: [],
     }
@@ -175,6 +178,7 @@ io.on('connection', (socket) => {
   fixture.sockets.add(socket)
 
   socket.on('game.getPublicGameState', ({ gameId }, acknowledge) => {
+    fixture.stateRequests += 1
     if (gameId !== GAME_ID) {
       acknowledge({ outcome: 'GAME_NOT_FOUND' })
       return

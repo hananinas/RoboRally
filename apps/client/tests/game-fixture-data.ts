@@ -1,6 +1,5 @@
 import type {
   Card,
-  GamePhase,
   ProgramResultOutcome,
   PublicGameState,
   RobotActionResolved,
@@ -46,12 +45,13 @@ export type FixtureControl =
   | { type: 'disconnect' }
   | { type: 'state-requests'; deferred: boolean }
   | { type: 'respond-state' }
-  | { type: 'round'; actions: readonly RobotActionResolved[]; phase?: GamePhase }
+  | { type: 'round'; actions: readonly RobotActionResolved[] }
 
 export type FixtureSnapshot = {
   id: string
   cards: readonly Card[]
   state: PublicGameState
   submissions: readonly SubmitProgram[]
+  stateRequests: number
   pendingStateRequests: number
 }
