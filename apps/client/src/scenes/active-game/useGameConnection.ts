@@ -72,7 +72,6 @@ export default function useGameConnection() {
     })
     socket.on('cards.dealt', ({ cards }) => {
       dispatch({ type: 'dealt', cards })
-      requestState()
     })
     socket.on('program.submitted', ({ playerId }) => dispatch({ type: 'submitted', playerId }))
     socket.on('robot.actionResolved', (action) => dispatch({ type: 'action', action }))
