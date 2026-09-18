@@ -10,7 +10,9 @@ Building a web-based multiplayer version of the board game `Robo Rally`.
 
 ## Current state
 
-The repository is an empty implementation starting point. It contains a React, TypeScript, and Vite client shell with minimal TypeScript User and Game Service workspaces. Game and user functionality have not been implemented.
+The client and Game Service implement the v0 single-player loop using shared
+Socket.IO game events. Browser tests use an isolated contract fixture rather
+than starting the production service.
 
 ## Development
 
@@ -62,6 +64,30 @@ pnpm lint
 pnpm test
 pnpm typecheck
 ```
+
+### Connect the client to a Game Service
+
+Copy `apps/client/.env.example` to `apps/client/.env.local`. Set `VITE_GAME_ID`
+to the service's game UUID and `VITE_GAME_SERVICE_URL` to its HTTP origin.
+Leave the URL empty only when Socket.IO is served through the client's origin.
+Restart `pnpm dev` after changing these values. A separate service origin must
+allow the client's origin through Socket.IO CORS.
+
+The client requests state once on connection. Each new deal clears the registers
+and starts programming, with controls locked until all resolved actions finish
+playing. A rejected program keeps its selection for editing and retry. A missing
+acknowledgement or disconnected socket never triggers an automatic resend.
+Reconnection and replay remain outside v0.
+
+Run focused client and server unit tests with:
+
+```bash
+pnpm --filter @robo-rally/client test:unit
+pnpm --filter @robo-rally/game-service test
+```
+
+Both commands use Vitest. Client browser tests start their own Socket.IO fixture
+and Vite server on ports 4174 and 4173; no running Game Service is required.
 
 Install Chromium once before running the browser tests:
 

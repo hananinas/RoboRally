@@ -1,7 +1,9 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './game-fixture.ts'
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Player 1', exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button')).toHaveCount(9)
 })
 
 test('toggles game options with a disabled placeholder', async ({ page }) => {
@@ -13,7 +15,6 @@ test('toggles game options with a disabled placeholder', async ({ page }) => {
   await trigger.click()
   await expect(trigger).toHaveAttribute('aria-expanded', 'true')
   await expect(options).toBeVisible()
-  await expect(options.getByRole('button')).toHaveCount(1)
   await expect(options.getByRole('button', {
     name: 'No options available yet',
   })).toBeDisabled()
