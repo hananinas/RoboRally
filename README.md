@@ -73,11 +73,11 @@ Leave the URL empty only when Socket.IO is served through the client's origin.
 Restart `pnpm dev` after changing these values. A separate service origin must
 allow the client's origin through Socket.IO CORS.
 
-The client requests state on connection and after each dealt hand. It preserves
-all five resolved actions even if the next hand arrives before playback ends.
-A rejected program keeps its selection for editing and retry. A missing
+The client requests state once on connection. Each new deal clears the registers
+and starts programming, with controls locked until all resolved actions finish
+playing. A rejected program keeps its selection for editing and retry. A missing
 acknowledgement or disconnected socket never triggers an automatic resend.
-Reconnection and replay are outside the current contract.
+Reconnection and replay remain outside v0.
 
 Run focused client and server unit tests with:
 

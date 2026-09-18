@@ -18,8 +18,7 @@ export default function useGameConnection() {
   const current = useRef(state)
   const socketRef = useRef<GameSocket | null>(null)
 
-  // Update the event-time state synchronously: React can batch several packets
-  // or clicks into one render, but submission and playback cannot drop any.
+  // Keep event-time state current so submission checks see updates before React renders.
   const dispatch = useCallback((event: GameStateEvent) => {
     const next = gameStateReducer(current.current, event)
     current.current = next
