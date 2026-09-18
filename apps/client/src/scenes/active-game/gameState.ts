@@ -36,7 +36,7 @@ export type GameStateEvent =
   | { type: 'connected' }
   | { type: 'disconnected' }
   | { type: 'error'; message: string }
-  | { type: 'state'; state: PublicGameState }
+  | { type: 'initial-state'; state: PublicGameState }
   | { type: 'dealt'; cards: readonly Card[] }
   | { type: 'submitted'; playerId: string }
   | { type: 'action'; action: RobotActionResolved }
@@ -105,16 +105,15 @@ export function gameStateReducer(
       }
     case 'error':
       return { ...state, error: event.message }
-    case 'state': {
+    case 'initial-state': {
       const snapshot = event.state
       return {
         ...state,
         publicState: snapshot,
-        // A round-end snapshot must not skip the actions still being displayed.
-        playback: state.publicState ? state.playback : createRobotPlaybackState(
+        playback: createRobotPlaybackState(
           snapshot.robots.map((robot) => ({ ...robot, colour: '#c74f4f' })),
         ),
-        board: state.board ?? createBoardRenderModel(
+        board: createBoardRenderModel(
           snapshot.board.width,
           snapshot.board.height,
           {

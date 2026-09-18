@@ -51,7 +51,7 @@ export default function useGameConnection() {
           } else if (result.outcome === 'GAME_NOT_FOUND') {
             dispatch({ type: 'error', message: 'Game not found. Check VITE_GAME_ID and restart the client.' })
           } else {
-            dispatch({ type: 'state', state: result.state })
+            dispatch({ type: 'initial-state', state: result.state })
           }
         },
       )
