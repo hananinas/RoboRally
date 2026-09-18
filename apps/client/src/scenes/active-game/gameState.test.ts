@@ -74,8 +74,8 @@ const actions: readonly RobotActionResolved[] = [
 
 function programmingState(): ClientGameState {
   let state = gameStateReducer(createClientGameState(), { type: 'connected' })
-  state = gameStateReducer(state, { type: 'state', state: publicState })
-  return gameStateReducer(state, { type: 'dealt', cards })
+  state = gameStateReducer(state, { type: 'dealt', cards })
+  return gameStateReducer(state, { type: 'state', state: publicState })
 }
 
 function selectProgram(state = programmingState()): ClientGameState {
@@ -160,6 +160,7 @@ describe('client game state', () => {
     expect(canProgram(state)).toBe(false)
 
     state = gameStateReducer(state, { type: 'dealt', cards })
+    state = gameStateReducer(state, { type: 'state', state: publicState })
     state = selectProgram(state)
     const registers = state.registers
     state = gameStateReducer(state, {
@@ -268,6 +269,7 @@ describe('client game state', () => {
     const previousVersion = state.handVersion
     state = gameStateReducer(state, { type: 'submit' })
     state = gameStateReducer(state, { type: 'dealt', cards })
+    state = gameStateReducer(state, { type: 'state', state: publicState })
 
     expect(state.registers).toEqual(emptyRegisters)
     expect(canProgram(state)).toBe(true)
@@ -314,6 +316,7 @@ describe('client game state', () => {
       state = gameStateReducer(state, { type: 'action', action })
     }
 
+    state = gameStateReducer(state, { type: 'dealt', cards })
     state = gameStateReducer(state, {
       type: 'state',
       state: {
@@ -324,7 +327,6 @@ describe('client game state', () => {
         ],
       },
     })
-    state = gameStateReducer(state, { type: 'dealt', cards })
     expect(state.registers).toEqual(emptyRegisters)
 
     const displayedAngles = [0, -90, -90, -180, -180]
@@ -349,6 +351,33 @@ describe('client game state', () => {
     state = gameStateReducer(state, { type: 'state', state: publicState })
     expect(state.playback.robots.find((robot) => robot.robotId === robotId)?.position)
       .toEqual(actions[4].position)
+  })
+
+  it('requires a fresh programming snapshot for each new hand', () => {
+    let state = selectProgram()
+    state = gameStateReducer(state, { type: 'dealt', cards })
+    expect(state.registers).toEqual(emptyRegisters)
+    expect(canProgram(state)).toBe(false)
+
+    state = gameStateReducer(state, { type: 'place', cardId: cards[0].id, registerIndex: 0 })
+    expect(state.registers).toEqual(emptyRegisters)
+    state = gameStateReducer(state, {
+      type: 'state', state: { ...publicState, phase: 'WAITING' },
+    })
+    expect(canProgram(state)).toBe(false)
+    state = gameStateReducer(state, { type: 'dealt', cards })
+    state = gameStateReducer(state, { type: 'state', state: publicState })
+    expect(createSubmission(selectProgram(state))).not.toBeNull()
+  })
+
+  it('does not reuse the previous programming phase after a refresh failure', () => {
+    let state = selectProgram()
+    state = gameStateReducer(state, { type: 'dealt', cards })
+    state = gameStateReducer(state, {
+      type: 'error', message: 'Could not load game state. Reload to try again.',
+    })
+    expect(canProgram(state)).toBe(false)
+    expect(createSubmission(selectProgram(state))).toBeNull()
   })
 
   it('preserves selection but locks editing and submission on connection loss', () => {

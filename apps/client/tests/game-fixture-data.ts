@@ -43,6 +43,9 @@ export const ROUND_ACTIONS: readonly RobotActionResolved[] = [
 export type FixtureControl =
   | { type: 'submission'; outcome: ProgramResultOutcome; deferred: boolean }
   | { type: 'acknowledge'; outcome: ProgramResultOutcome }
+  | { type: 'disconnect' }
+  | { type: 'state-requests'; deferred: boolean }
+  | { type: 'respond-state' }
   | { type: 'round'; actions: readonly RobotActionResolved[]; phase?: GamePhase }
 
 export type FixtureSnapshot = {
@@ -50,4 +53,5 @@ export type FixtureSnapshot = {
   cards: readonly Card[]
   state: PublicGameState
   submissions: readonly SubmitProgram[]
+  pendingStateRequests: number
 }

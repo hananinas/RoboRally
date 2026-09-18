@@ -397,7 +397,86 @@ test('does not resend a program after its acknowledgement times out', async ({ p
     cardIds: game.initial.cards.slice(0, 5).map((card) => card.id),
   }])
 
-  // Server events can still complete the round after the acknowledgement is lost.
+  // Socket.IO discards acknowledgements that arrive after their timeout. The
+  // real server does not echo program.submitted to the submitting socket.
   await game.control({ type: 'acknowledge', outcome: 'ACCEPTED' })
-  await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()
+  const nextRound = await game.control({ type: 'round', actions: ROUND_ACTIONS })
+  const hand = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
+  const robot = page.locator(`[data-robot-id="${ROBOT_ID}"]`).first()
+  await expect(registered).toHaveCount(0)
+  for (const action of ROUND_ACTIONS) {
+    await expect(robot).toHaveAttribute('data-board-tile',
+      `${action.position.coordinate.x},${action.position.coordinate.y}`)
+    await expect(hand.first()).toBeDisabled()
+    await page.clock.runFor(action.instruction === 'TURN_LEFT' ? 300 : 600)
+  }
+  await expect(hand.first()).toBeEnabled()
+  await expect(page.getByText('Programming', { exact: true })).toBeVisible()
+  expect((await game.snapshot()).submissions).toHaveLength(1)
+
+  await game.control({ type: 'submission', outcome: 'ACCEPTED', deferred: false })
+  await fillProgram(page)
+  await page.getByRole('button', { name: 'Done', exact: true }).click()
+  await expect.poll(async () => (await game.snapshot()).submissions).toEqual([
+    { gameId: GAME_ID, cardIds: game.initial.cards.slice(0, 5).map((card) => card.id) },
+    { gameId: GAME_ID, cardIds: nextRound.cards.slice(0, 5).map((card) => card.id) },
+  ])
+})
+
+
+test('retains reload guidance and the selected program when disconnected during submission', async ({ page, game }) => {
+  await game.control({ type: 'submission', outcome: 'ACCEPTED', deferred: true })
+  await openGame(page)
+  await fillProgram(page)
+  const registered = page.getByRole('button', { name: /remove from register/ })
+  const selection = await registered.allTextContents()
+  await page.getByRole('button', { name: 'Done', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Submitting…', exact: true })).toBeDisabled()
+
+  await game.control({ type: 'disconnect' })
+  await expect(page.getByRole('status')).toHaveText('Not connected')
+  await expect(registered).toHaveCount(5)
+  expect(await registered.allTextContents()).toEqual(selection)
+  await expect(registered.first()).toBeDisabled()
+  expect((await game.snapshot()).submissions).toHaveLength(1)
+  await expect(page.getByRole('alert')).toContainText('Reload')
+})
+
+test('keeps a new hand locked until its refreshed phase is known', async ({ page, game }) => {
+  await openGame(page)
+  await fillProgram(page)
+  await game.control({ type: 'state-requests', deferred: true })
+  await game.control({ type: 'round', actions: [], phase: 'WAITING' })
+  await expect.poll(async () => (await game.snapshot()).pendingStateRequests).toBe(1)
+  await expect(page.getByRole('button', { name: /remove from register/ })).toHaveCount(0)
+  const cards = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
+  await expect(cards.first()).toBeDisabled()
+
+  await game.control({ type: 'respond-state' })
+  await expect(page.getByRole('status')).toHaveText('Waiting')
+  await expect(cards.first()).toBeDisabled()
+
+  await game.control({ type: 'round', actions: [], phase: 'PROGRAMMING' })
+  await expect.poll(async () => (await game.snapshot()).pendingStateRequests).toBe(1)
+  await expect(cards.first()).toBeDisabled()
+  await game.control({ type: 'respond-state' })
+  await expect(cards.first()).toBeEnabled()
+})
+
+test('keeps a new hand locked if its state refresh times out', async ({ page, game }) => {
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
+  await openGame(page)
+  const cards = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
+  await expect(cards.first()).toBeEnabled()
+  await pauseClock(page)
+  await fillProgram(page)
+  await game.control({ type: 'state-requests', deferred: true })
+  await game.control({ type: 'round', actions: [] })
+  await expect.poll(async () => (await game.snapshot()).pendingStateRequests).toBe(1)
+  await expect(page.getByRole('button', { name: /remove from register/ })).toHaveCount(0)
+  await page.clock.runFor(5000)
+  await expect(page.getByRole('alert')).toContainText('Could not load game state')
+  expect((await game.snapshot()).submissions).toHaveLength(0)
+  await expect(cards.first()).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeDisabled()
 })
