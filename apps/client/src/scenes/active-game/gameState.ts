@@ -168,8 +168,7 @@ export function gameStateReducer(
     case 'submit':
       return createSubmission(state) ? { ...state, submission: 'pending', error: null } : state
     case 'result':
-      if (event.handVersion !== state.handVersion ||
-        (state.submission !== 'pending' && state.submission !== 'uncertain')) return state
+      if (event.handVersion !== state.handVersion || state.submission !== 'pending') return state
       return event.result.outcome === 'ACCEPTED'
         ? { ...state, submission: 'accepted', error: null }
         : { ...state, submission: 'idle', error: 'Program rejected. Adjust your selection and try again.' }
