@@ -38,6 +38,18 @@ test('waits for the initial snapshot when the hand arrives first', async ({ page
   await expect(cards.first()).toBeEnabled()
 })
 
+test('retains reload guidance when disconnected during initial loading', async ({ page, game }) => {
+  await game.control({ type: 'state-requests', deferred: true })
+  await openGame(page)
+  await expect.poll(async () => (await game.snapshot()).pendingStateRequests).toBe(1)
+
+  await game.control({ type: 'disconnect' })
+  await expect(page.getByRole('status')).toHaveText('Not connected')
+  await expect(page.getByRole('alert')).toContainText('Connection lost. Reload')
+  await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button').first()).toBeDisabled()
+  await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
+})
+
 test('renders the programming interface', async ({ page }) => {
   await openGame(page)
 

@@ -40,14 +40,12 @@ export default function useGameConnection() {
       reconnection: false,
     })
     socketRef.current = socket
-    let alive = true
-    let snapshotRequest = 0
 
-    function requestState() {
-      const request = ++snapshotRequest
+    socket.on('connect', () => {
+      dispatch({ type: 'connected' })
       socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit(
         'game.getPublicGameState', { gameId }, (error, result) => {
-          if (!alive || request !== snapshotRequest) return
+          if (socketRef.current !== socket || !socket.connected) return
           if (error) {
             dispatch({ type: 'error', message: 'Could not load game state. Reload to try again.' })
           } else if (result.outcome === 'GAME_NOT_FOUND') {
@@ -57,17 +55,11 @@ export default function useGameConnection() {
           }
         },
       )
-    }
-
-    socket.on('connect', () => {
-      dispatch({ type: 'connected' })
-      requestState()
     })
     socket.on('connect_error', () => {
       dispatch({ type: 'error', message: 'Could not connect to the Game Service. Check the service URL and reload.' })
     })
     socket.on('disconnect', () => {
-      snapshotRequest += 1
       dispatch({ type: 'disconnected' })
     })
     socket.on('cards.dealt', ({ cards }) => {
@@ -78,7 +70,6 @@ export default function useGameConnection() {
     socket.connect()
 
     return () => {
-      alive = false
       socketRef.current = null
       socket.removeAllListeners()
       socket.disconnect()
