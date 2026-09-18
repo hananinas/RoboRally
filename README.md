@@ -10,11 +10,9 @@ Building a web-based multiplayer version of the board game `Robo Rally`.
 
 ## Current state
 
-The client renders a board and robot from shared Socket.IO game events, submits
-five-card programs, and plays resolved actions in order. The Game Service has a
-tested in-memory game model. Its runnable Socket.IO server is tracked in
-[#40](https://github.com/hananinas/RoboRally/issues/40); until that lands, browser
-tests use an isolated contract fixture rather than a production service.
+The client and Game Service implement the v0 single-player loop using shared
+Socket.IO game events. Browser tests use an isolated contract fixture rather
+than starting the production service.
 
 ## Development
 

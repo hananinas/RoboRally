@@ -64,7 +64,7 @@ The connection flow uses the existing acknowledgement contract, not a new
 state-push event:
 
 1. On connection, the client requests `game.getPublicGameState`.
-2. The service acknowledges with `FOUND` and the board, robots, and phase, or
+2. The service acknowledges with `GAME_FOUND` and the board, robots, and phase, or
    `GAME_NOT_FOUND`. It sends the player's nine cards through `cards.dealt`.
 3. The client submits five distinct card IDs in register order through
    `program.submit`. `INVALID_PROGRAM` preserves the selection for retry.
