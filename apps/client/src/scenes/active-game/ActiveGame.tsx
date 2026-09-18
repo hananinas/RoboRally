@@ -18,11 +18,11 @@ function ActiveGame() {
   } = useOverlayLayout(state.handVersion)
   const disabled = !canProgram(state)
   const hasHand = state.handVersion > 0
-  const phase = state.playback.active ? 'EXECUTING' : state.publicState?.phase
+  const phase = state.playback.active ? 'EXECUTING' : state.phase
   const phaseLabel = phase === 'PROGRAMMING' ? 'Programming'
     : phase === 'EXECUTING' ? 'Executing' : 'Waiting'
   const status = !state.connected ? 'Not connected'
-    : !state.publicState ? 'Loading game…'
+    : state.gameId === null ? 'Loading game…'
       : !hasHand && phase === 'PROGRAMMING' ? 'Waiting for cards…' : phaseLabel
   const registeredCardIds = new Set(
     state.registers.flatMap((card) => (card ? [card.id] : [])),

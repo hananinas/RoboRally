@@ -133,7 +133,8 @@ describe('client game state', () => {
   it('keeps an early hand locked and initializes robots from the first snapshot', () => {
     let state = gameStateReducer(createClientGameState(), { type: 'connected' })
     state = gameStateReducer(state, { type: 'dealt', cards })
-    expect(state.publicState).toBeNull()
+    expect(state.gameId).toBeNull()
+    expect(state.phase).toBeNull()
     expect(canProgram(state)).toBe(false)
     state = gameStateReducer(state, { type: 'place', cardId: cards[0].id, registerIndex: 0 })
     expect(state.registers).toEqual(emptyRegisters)
@@ -153,6 +154,7 @@ describe('client game state', () => {
     state = gameStateReducer(state, { type: 'dealt', cards })
     state = selectProgram(state)
     const registers = state.registers
+    expect(gameStateReducer(state, { type: 'submitted', playerId: 'unknown-player' })).toBe(state)
     state = gameStateReducer(state, {
       type: 'submitted',
       playerId: publicState.robots[0].playerId,

@@ -1,6 +1,9 @@
 import type {
   Card,
+  GameId,
+  GamePhase,
   Instruction,
+  PlayerId,
   ProgramResult,
   PublicGameState,
   RobotActionResolved,
@@ -22,7 +25,9 @@ export type Registers = readonly (ProgramCard | null)[]
 
 export type ClientGameState = {
   connected: boolean
-  publicState: PublicGameState | null
+  gameId: GameId | null
+  phase: GamePhase | null
+  playerIds: readonly PlayerId[]
   board: BoardRenderModel | null
   playback: RobotPlaybackState
   hand: readonly ProgramCard[]
@@ -61,7 +66,9 @@ function emptyRegisters(): Registers {
 export function createClientGameState(): ClientGameState {
   return {
     connected: false,
-    publicState: null,
+    gameId: null,
+    phase: null,
+    playerIds: [],
     board: null,
     playback: createRobotPlaybackState([]),
     hand: [],
@@ -74,18 +81,18 @@ export function createClientGameState(): ClientGameState {
 
 export function canProgram(state: ClientGameState): boolean {
   return state.connected &&
-    state.publicState?.phase === 'PROGRAMMING' &&
+    state.phase === 'PROGRAMMING' &&
     state.handVersion > 0 &&
     !state.playback.active && 
     state.submission === 'idle'
 }
 
 export function createSubmission(state: ClientGameState): SubmitProgram | null {
-  if (!canProgram(state) || !state.publicState) return null
+  if (!canProgram(state) || state.gameId === null) return null
   const [first, second, third, fourth, fifth] = state.registers
   if (!first || !second || !third || !fourth || !fifth) return null
   return {
-    gameId: state.publicState.gameId,
+    gameId: state.gameId,
     cardIds: [first.id, second.id, third.id, fourth.id, fifth.id],
   }
 }
@@ -109,7 +116,9 @@ export function gameStateReducer(
       const snapshot = event.state
       return {
         ...state,
-        publicState: snapshot,
+        gameId: snapshot.gameId,
+        phase: snapshot.phase,
+        playerIds: snapshot.robots.map((robot) => robot.playerId),
         playback: createRobotPlaybackState(
           snapshot.robots.map((robot) => ({ ...robot, colour: '#c74f4f' })),
         ),
@@ -132,18 +141,18 @@ export function gameStateReducer(
       return {
         ...state,
         hand: event.cards.map((card) => ({ id: card.id, label: cardLabels[card.instruction] })),
-        publicState: state.publicState ? { ...state.publicState, phase: 'PROGRAMMING' } : null,
+        phase: state.gameId === null ? null : 'PROGRAMMING',
         handVersion: state.handVersion + 1,
         registers: emptyRegisters(),
         submission: 'idle',
         error: null,
       }
     case 'submitted':
-      if (!state.publicState?.robots.some((robot) => robot.playerId === event.playerId)) return state
+      if (!state.playerIds.includes(event.playerId)) return state
       return {
         ...state,
         submission: 'accepted',
-        publicState: { ...state.publicState, phase: 'EXECUTING' },
+        phase: 'EXECUTING',
         error: null,
       }
     case 'action':
