@@ -15,6 +15,15 @@ async function fillProgram(page: Page, indices = [0, 1, 2, 3, 4]) {
   for (const index of indices) await cards.nth(index).click()
 }
 
+// The installed clock keeps ticking with real time until it is paused, so a
+// fixed pause time can already lie in the past after a slow cold-cache load
+// ("Cannot fast-forward to the past"). Pause one second past the current fake
+// time instead — still a small jump, because fast-forwarding past the
+// Socket.IO ping interval expires the heartbeat and disconnects the client.
+async function pauseClock(page: Page) {
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
+}
+
 test('renders the programming interface', async ({ page }) => {
   await openGame(page)
 
@@ -302,7 +311,7 @@ test('plays every burst result before unlocking the next dealt hand', async ({ p
   await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
   await openGame(page)
   await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button').first()).toBeEnabled()
-  await page.clock.pauseAt(new Date('2026-01-01T00:00:01Z'))
+  await pauseClock(page)
   await fillProgram(page)
   await page.getByRole('button', { name: 'Done', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()
@@ -372,7 +381,7 @@ test('does not resend a program after its acknowledgement times out', async ({ p
   await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
   await openGame(page)
   await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button').first()).toBeEnabled()
-  await page.clock.pauseAt(new Date('2026-01-01T00:00:01Z'))
+  await pauseClock(page)
   await fillProgram(page)
   await page.getByRole('button', { name: 'Done', exact: true }).click()
   await expect.poll(async () => (await game.snapshot()).submissions.length).toBe(1)
