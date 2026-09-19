@@ -2,8 +2,11 @@ asyncapi: 3.1.0
 
 info:
   title: Game Service 
-  version: 0.0.0
+  version: 0.5.0-draft
   description: |
+    DRAFT v0.5 scaffold: TODO schemas are intentionally incomplete and are not
+    ready for implementation or code generation. Existing runtime types still
+    describe v0. See v05Communication.md for requirements and open decisions.
     Server API. Each Socket.IO event carries one JSON payload.
     Message name = Socket.IO event name.
     Room channel address = server broadcast destination.
@@ -18,10 +21,37 @@ channels:
     x-socketio:
       routing: client-to-server
     messages:
+      login:
+        $ref: '#/components/messages/Login'
+      joinGame:
+        $ref: '#/components/messages/JoinGame'
+      leaveGame:
+        $ref: '#/components/messages/LeaveGame'
       submitProgram:
         $ref: '#/components/messages/SubmitProgram'
       getPublicGameState:
         $ref: '#/components/messages/GetPublicGameState'
+
+  loginReplies:
+    address: null
+    description: Logical reply channel; delivered through the user.login acknowledgement.
+    messages:
+      result:
+        $ref: '#/components/messages/LoginResult'
+
+  joinReplies:
+    address: null
+    description: Logical reply channel; delivered through the game.join acknowledgement.
+    messages:
+      result:
+        $ref: '#/components/messages/JoinResult'
+
+  leaveReplies:
+    address: null
+    description: Logical reply channel; delivered through the game.leave acknowledgement.
+    messages:
+      result:
+        $ref: '#/components/messages/LeaveResult'
 
   programReplies:
     address: null
@@ -62,14 +92,57 @@ channels:
         $ref: '#/components/messages/ProgramSubmitted'
       robotActionResolved:
         $ref: '#/components/messages/RobotActionResolved'
+      playerJoined:
+        $ref: '#/components/messages/PlayerJoined'
+      playerLeft:
+        $ref: '#/components/messages/PlayerLeft'
+      phaseChanged:
+        $ref: '#/components/messages/PhaseChanged'
 
-  lobby:
-    address: 'game:{gameId}:lobby'
-    parameters:
-      gameId:
-        description: Game identifier
 
 operations:
+  handleLogin:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/login'
+    reply:
+      channel:
+        $ref: '#/channels/loginReplies'
+      messages:
+        - $ref: '#/channels/loginReplies/messages/result'
+      x-socketio:
+        acknowledgement: true
+
+  handleJoinGame:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/joinGame'
+    reply:
+      channel:
+        $ref: '#/channels/joinReplies'
+      messages:
+        - $ref: '#/channels/joinReplies/messages/result'
+      x-socketio:
+        acknowledgement: true
+
+  handleLeaveGame:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/leaveGame'
+    reply:
+      channel:
+        $ref: '#/channels/leaveReplies'
+      messages:
+        - $ref: '#/channels/leaveReplies/messages/result'
+      x-socketio:
+        acknowledgement: true
+
   receiveProgram:
     action: receive
     channel:
@@ -110,15 +183,71 @@ operations:
 
 components:
   messages:
+    Login:
+      name: user.login
+      description: Find or create a user from a username; never create game participation.
+      payload:
+        $ref: '#/components/schemas/Login'
+
+    LoginResult:
+      name: user.loginResult
+      description: Acknowledgement only. TODO success and rejection variants; return user identity, never player or robot.
+      payload:
+        $ref: '#/components/schemas/LoginResult'
+
+    JoinGame:
+      name: game.join
+      description: Join the configured game using the approved connection identity.
+      payload:
+        $ref: '#/components/schemas/JoinGame'
+
+    JoinResult:
+      name: game.joinResult
+      description: Acknowledgement only. TODO assignment, initial state, private hand, and rejection variants.
+      payload:
+        $ref: '#/components/schemas/JoinResult'
+
+    LeaveGame:
+      name: game.leave
+      description: Leave game participation. TODO repeated-leave and connection lifecycle behavior.
+      payload:
+        $ref: '#/components/schemas/LeaveGame'
+
+    LeaveResult:
+      name: game.leaveResult
+      description: Acknowledgement only. TODO confirmation and rejection variants.
+      payload:
+        $ref: '#/components/schemas/LeaveResult'
+
+    PlayerJoined:
+      name: game.playerJoined
+      description: Proposed event. TODO participant and robot data for existing clients; no private hand.
+      payload:
+        $ref: '#/components/schemas/PlayerJoined'
+
+    PlayerLeft:
+      name: game.playerLeft
+      description: Proposed event. TODO identifiers needed to remove the participant and robot.
+      payload:
+        $ref: '#/components/schemas/PlayerLeft'
+
+    PhaseChanged:
+      name: game.phaseChanged
+      description: Proposed event. TODO authoritative phase transition payload and ordering.
+      payload:
+        $ref: '#/components/schemas/PhaseChanged'
+
     SubmitProgram:
       name: program.submit
       payload:
         type: object
         additionalProperties: false
-        required: [gameId, cardIds]
+        required: [gameId, playerId, cardIds]
         properties:
           gameId:
             $ref: '#/components/schemas/GameId'
+          playerId:
+            $ref: '#/components/schemas/PlayerId'
           cardIds:
             type: array
             description: Card instance IDs in register order.
@@ -196,6 +325,84 @@ components:
           - $ref: '#/components/schemas/PublicGameStateNotFound'
 
   schemas:
+    Username:
+      type: string
+      minLength: 1
+      maxLength: 30
+      description: No trimming or character restrictions. TODO agree Unicode counting across client and service.
+
+    UserId:
+      type: string
+      description: Stable user identity, separate from player and socket IDs. TODO agree format and storage lifetime.
+
+    User:
+      type: object
+      required: [userId, username]
+      properties:
+        userId:
+          $ref: '#/components/schemas/UserId'
+        username:
+          $ref: '#/components/schemas/Username'
+
+    Login:
+      type: object
+      additionalProperties: false
+      required: [username]
+      properties:
+        username:
+          $ref: '#/components/schemas/Username'
+
+    JoinGame:
+      type: object
+      additionalProperties: false
+      required: [gameId]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+
+    LeaveGame:
+      type: object
+      additionalProperties: false
+      required: [gameId]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+
+    LoginResult:
+      type: object
+      x-draft: true
+      description: 'TODO: Use User in the success result; agree outcome names and rejection variants.'
+
+    PlayerAssignment:
+      type: object
+      x-draft: true
+      description: 'TODO: Include gameId, playerId, and robotId; agree shape with the internal model.'
+
+    JoinResult:
+      type: object
+      x-draft: true
+      description: 'TODO: Combine PlayerAssignment, PublicGameState, and the private Card array on success; agree rejection variants.'
+
+    LeaveResult:
+      type: object
+      x-draft: true
+      description: 'TODO: Agree confirmation, rejection, and repeated-leave behavior.'
+
+    PlayerJoined:
+      type: object
+      x-draft: true
+      description: 'TODO: Reuse participant and Robot shapes; define recipients and initial submission status.'
+
+    PlayerLeft:
+      type: object
+      x-draft: true
+      description: 'TODO: Identify the player and robot removed; agree effects on the submission barrier.'
+
+    PhaseChanged:
+      type: object
+      x-draft: true
+      description: 'TODO: Define phase and any game/round context needed to handle queued events.'
+
     GameId:
       type: string
       format: uuid
@@ -263,6 +470,7 @@ components:
           $ref: '#/components/schemas/Position'
 
     PublicGameState:
+      description: 'TODO: add participant/submission state needed by joining clients; agree antenna presentation.'
       type: object
       required: [gameId, board, robots, phase]
       properties:
@@ -276,6 +484,7 @@ components:
             $ref: '#/components/schemas/Robot'
         phase:
           type: string
+          description: 'TODO: remove or explain legacy WAITING; v0.5 has no lobby phase. EXECUTING means domain activation.'
           enum: [WAITING, PROGRAMMING, EXECUTING]
 
     PublicGameStateFound:
