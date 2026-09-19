@@ -67,7 +67,16 @@ let
             restart = "on_failure";
             backoff_seconds = 2;
           };
-
+          readiness_probe = {
+            exec.command = ''
+              ${pkgs.curl}/bin/curl --fail --silent --max-time 2 \
+              "http://127.0.0.1:$WEB_PORT/" > /dev/null             
+            '';
+            initial_delay_seconds = 1;
+            period_seconds = 10;
+            timeout_seconds = 5;
+            failure_threshold = 3;
+          };
           shutdown = {
             signal = 15;
             timeout_seconds = 10;
