@@ -1,5 +1,7 @@
 export type {
   ClientToServerEvents,
+  JoinResultAcknowledgement,
+  LoginResultAcknowledgement,
   ProgramResultAcknowledgement,
   PublicGameStateAcknowledgement,
   ServerToClientEvents,
@@ -14,7 +16,12 @@ export type {
   GamePhase,
   GetPublicGameState,
   Instruction,
+  JoinGame,
+  JoinResult,
+  Login,
+  LoginResult,
   Orientation,
+  PlayerAssignment,
   PlayerId,
   Position,
   ProgramResult,
@@ -26,6 +33,8 @@ export type {
   RobotId,
   RobotActionResolved,
   Tile,
+  User,
+  UserId,
 } from './payloads.js'
 export {
   getPublicGameStateSchema,

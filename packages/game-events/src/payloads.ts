@@ -1,7 +1,33 @@
 export type GameId = string
+export type UserId = string
 export type PlayerId = string
 export type RobotId = string
 export type CardId = string
+
+export type User = Readonly<{
+  userId: UserId
+  username: string
+}>
+
+export type Login = Readonly<{ username: string }>
+
+export type LoginResult =
+  | Readonly<{ outcome: 'LOGGED_IN'; user: User }>
+  | Readonly<{
+      outcome:
+        | 'INVALID_USERNAME'
+        | 'INVALID_REQUEST'
+        | 'ALREADY_LOGGED_IN'
+        | 'INTERNAL_ERROR'
+    }>
+
+export type JoinGame = Readonly<{ gameId: GameId }>
+
+export type PlayerAssignment = Readonly<{
+  gameId: GameId
+  playerId: PlayerId
+  robotId: RobotId
+}>
 
 export type Instruction = 'MOVE_1' | 'TURN_LEFT'
 
@@ -80,4 +106,23 @@ export type PublicGameStateResult =
     }>
   | Readonly<{
       outcome: 'GAME_NOT_FOUND'
+    }>
+
+export type JoinResult =
+  | Readonly<{
+      outcome: 'JOINED'
+      assignment: PlayerAssignment
+      state: PublicGameState
+      hand: readonly Card[]
+      programSubmitted: boolean
+    }>
+  | Readonly<{
+      outcome:
+        | 'LOGIN_REQUIRED'
+        | 'INVALID_REQUEST'
+        | 'GAME_NOT_FOUND'
+        | 'NO_SPAWN_AVAILABLE'
+        | 'USER_ALREADY_IN_GAME'
+        | 'ALREADY_IN_GAME'
+        | 'INTERNAL_ERROR'
     }>
