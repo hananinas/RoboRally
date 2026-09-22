@@ -9,9 +9,10 @@ import type {
 
 type LoginFailure = Exclude<LoginResult, { outcome: 'LOGGED_IN' }>['outcome']
 type JoinFailure = Exclude<JoinResult, { outcome: 'JOINED' }>['outcome']
+export type LoginError = LoginFailure | 'LOGIN_REQUIRED' | 'TIMEOUT'
 
 export type SessionState =
-  | { status: 'editing'; username: string; error: LoginFailure | 'LOGIN_REQUIRED' | null }
+  | { status: 'editing'; username: string; error: LoginError | null }
   | { status: 'logging-in'; username: string }
   | { status: 'joining'; user: User }
   | { status: 'join-failed'; user: User; error: Exclude<JoinFailure, 'LOGIN_REQUIRED'> }
@@ -28,6 +29,7 @@ export type SessionEvent =
   | { type: 'username-changed'; username: string }
   | { type: 'login-submitted' }
   | { type: 'login-result'; result: LoginResult }
+  | { type: 'login-timeout' }
   | { type: 'join-retried' }
   | { type: 'join-result'; result: JoinResult }
 
@@ -50,6 +52,10 @@ export function sessionReducer(state: SessionState, event: SessionEvent): Sessio
       return event.result.outcome === 'LOGGED_IN'
         ? { status: 'joining', user: event.result.user }
         : { status: 'editing', username: state.username, error: event.result.outcome }
+    case 'login-timeout':
+      return state.status === 'logging-in'
+        ? { status: 'editing', username: state.username, error: 'TIMEOUT' }
+        : state
     case 'join-retried':
       return state.status === 'join-failed'
         ? { status: 'joining', user: state.user }

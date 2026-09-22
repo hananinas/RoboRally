@@ -1,9 +1,16 @@
-import { useState, type FormEvent } from 'react'
+import type { FormEvent } from 'react'
 import './Lobby.css'
 import { isValidUsername } from './username.ts'
+import type { SocketStatus } from '../../useGameSocket.ts'
 
 type LobbyProps = {
-  onSubmitUsername?: (username: string) => void
+  connectionStatus: SocketStatus
+  error: string | null
+  onSubmitUsername: (username: string) => void
+  onUsernameChange: (username: string) => void
+  pending: boolean
+  pendingLabel: string
+  username: string
 }
 
 function BotIcon() {
@@ -29,15 +36,23 @@ function BoardBackground() {
   )
 }
 
-export default function Lobby({ onSubmitUsername }: LobbyProps) {
-  const [username, setUsername] = useState('')
+export default function Lobby({
+  connectionStatus,
+  error,
+  onSubmitUsername,
+  onUsernameChange,
+  pending,
+  pendingLabel,
+  username,
+}: LobbyProps) {
   const usernameLength = Array.from(username).length
   const usernameIsValid = isValidUsername(username)
+  const connecting = connectionStatus === 'connecting'
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!usernameIsValid) return
-    onSubmitUsername?.(username)
+    onSubmitUsername(username)
   }
 
   return (
@@ -59,25 +74,31 @@ export default function Lobby({ onSubmitUsername }: LobbyProps) {
               aria-describedby="username-help"
               aria-invalid={usernameLength > 30}
               autoComplete="username"
+              disabled={pending}
               name="username"
-              onChange={(event) => setUsername(event.target.value)}
+              onChange={(event) => onUsernameChange(event.target.value)}
               placeholder="e.g. CircuitBreaker"
               type="text"
               value={username}
             />
           </label>
           <p
-            className={`lobby-validation${usernameLength > 30 ? ' lobby-validation--error' : ''}`}
+            className={`lobby-validation${usernameLength > 30 || error ? ' lobby-validation--error' : ''}`}
             id="username-help"
+            role={error ? 'alert' : undefined}
           >
-            {usernameLength > 30 ? 'Username cannot exceed 30 characters.' : 'Use 1–30 characters.'}
+            {error ?? (usernameLength > 30
+              ? 'Username cannot exceed 30 characters.'
+              : 'Use 1–30 characters.')}
           </p>
           <button
             className="lobby-primary-button"
-            disabled={!usernameIsValid}
+            disabled={!usernameIsValid || pending || connecting}
             type="submit"
           >
-            Continue
+            {pending ? pendingLabel
+              : connecting ? 'Connecting…'
+                : connectionStatus === 'connected' ? 'Continue' : 'Retry connection'}
           </button>
         </form>
       </section>

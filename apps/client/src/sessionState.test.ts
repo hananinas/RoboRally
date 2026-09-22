@@ -56,6 +56,14 @@ describe('sessionReducer', () => {
     expect(state).toEqual({ status: 'editing', username: '  ', error: 'INVALID_USERNAME' })
   })
 
+  it('allows retry after a login timeout', () => {
+    let state = sessionReducer(createSessionState(), { type: 'username-changed', username: 'Player' })
+    state = sessionReducer(state, { type: 'login-submitted' })
+    state = sessionReducer(state, { type: 'login-timeout' })
+
+    expect(state).toEqual({ status: 'editing', username: 'Player', error: 'TIMEOUT' })
+  })
+
   it('retries a failed join without returning to login', () => {
     let state = sessionReducer(joiningState(), {
       type: 'join-result',
