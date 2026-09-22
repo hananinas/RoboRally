@@ -8,15 +8,26 @@ Will update with a more conceptual domain diagram which will be used for present
         class Game {
         +board: Board
         +players: Player[]
+        +antenna: Antenna
+        +roundNumber: int
         -phase: GamePhase
         -currentRegister: int
         -activatedRobotIds: RobotId[] set
+        -submittedPlayerIds: PlayerId[] set
         -deck: Card[] unordered
         -dealCards()
         +submitProgram(PlayerId playerId, Card[5] program)
-        +executeCurrentRegister()
-        -nextRobotByPriority() RobotId
-        -executeCard(RobotId robotId, Card card)
+        +hasSubmittedProgram(PlayerId playerId) bool
+        +recheckProgrammingPhase()
+        +executeNextAction() NextActionResult
+        -nextRobotByPriority() Robot
+        -executeCard(Robot robot, Card card)
+        }
+
+        class Antenna {
+        +x: int
+        +y: int
+        +angle: number
         }
 
         class Board {
@@ -63,7 +74,8 @@ Will update with a more conceptual domain diagram which will be used for present
         class TurnLeft
 
         Game "1" *--> "1" Board
-        Game *--> "1..*" Player
+        Game *--> "0..*" Player
+        Game "1" *--> "1" Antenna
         Board "1" *-- "1..*" Tile
 
         Robot --> Direction
@@ -81,11 +93,22 @@ Will update with a more conceptual domain diagram which will be used for present
 
 # Game
 
-Responsible for dictating the game loop: dealing cards, taking programs, and executing their registers.
+Game owns programming, activation, register advancement, and the round number.
+It deals the fixed card supply to each player and accepts one five-card program
+per player. Activation starts only when the nonempty roster has all submitted.
+An empty game stays in programming. There is no timer.
 
-Keeps track of the current phase and register. `submitProgram()` checks a player's five cards before assigning them to their Robot. During activation, Game chooses the next robot from those that have not acted yet, using current positions on Board and the priority antenna. It reads that robot's card and applies it: movement goes through Board, while turns change Robot's direction. Priority is worked out again after each robot acts.
+`executeNextAction()` executes one robot and returns its action, round number,
+and zero-based register index. Game recalculates priority from current Board
+positions after every action. Every robot acts before the next register starts.
+Board effects run after the last robot in a register; there are none in V0.
+After register five, Game clears all programs and submission state, increments
+the round number, deals every player's next hand, and returns to programming.
 
-Board elements activate after the robot actions in each register. This is a no-op in V0, but leaves room for ordered board effects later. After the fifth register, Game returns to the programming phase.
+The service publishes each result before scheduling the next action. It sends
+explicit phase events and private hands but does not count registers or decide
+when activation starts. See [the communication guide](v0Communication.md) for
+the fixed-roster integration hooks used by issues #68 and #69.
 
 # Board
 
@@ -122,20 +145,21 @@ Later, directional board elements such as lasers or conveyor belts can use Direc
 
 # Pseudocode to be used as inspiration for later implementations:
 
-## Register execution:
+## Action execution
+
+The service schedules one action at a time so later membership handlers can run
+between actions. It does not wait for client animation acknowledgements.
 
 ```
-game.startActivationPhase()                     # currentRegister = 0
-while game.currentRegister < 5:
-    remaining = game.getActiveRobotIds()
-    while remaining is not empty:
-        robotId = game.getNextRobot(remaining)    # Uses current Board positions and antenna
-        card = robot(robotId).getProgramCard(game.currentRegister)
-        game.executeCard(robotId, card)           # Movement via Board, turning via Robot
-        remaining.remove(robotId)                 # Priority is checked again for the next robot
-    game.activateBoardElements()                  # No-op in V0; ordered effects later
-    game.finishRegister()                         # Advance to the next register
-game.finishRound()                                # Return to programming phase
+game.submitProgram(playerId, cards)             # Game checks the submission barrier
+broadcast any resulting phase change
+while game.phase == activation:
+    result = game.executeNextAction()          # Game selects robot and advances registers
+    broadcast result                           # Preserve this order for client playback
+    broadcast any resulting phase change
+    if game.phase == programming:
+        send each player their private hand
+    yield to the service event loop
 ```
 
 ## Laser obstacle:
@@ -162,7 +186,13 @@ board.firstRobotHit(position, direction):
 
 ## Robot priority (TypeScript reference implementation):
 
-The antenna is passed explicitly because the current Board model does not store it yet. Its `angle` is in radians from east; with board coordinates increasing south, positive angles rotate clockwise. Call this again after each robot acts, using only robots that have not activated in the current register. Exact ties keep the first ID in `remaining`.
+Game stores a fixed, positioned antenna. Its `angle` is in radians from east;
+with board coordinates increasing south, positive angles rotate clockwise.
+The default is `(floor(width / 2), 0)` facing south, or `Math.PI / 2`.
+Call the algorithm after each robot acts, using only robots that have not
+activated in the current register. Exact ties keep roster order. The antenna
+does not occupy a robot tile. The implementation scans once without allocating
+score tuples; this reference illustrates the same ordering.
 
 ```ts
 type RobotId = string

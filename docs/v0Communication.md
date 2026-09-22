@@ -1,81 +1,104 @@
-# Communication between components in v0
+# Communication between the client and Game Service
 
-The communication contract between client and server is defined in `docs/asyncapi.yaml`. A rendered version can be found in `docs/asyncapi.html`.
+The implemented event contract is in [AsyncAPI](asyncapi.yaml), with a
+[rendered reference](asyncapi.html). Multiplayer rounds use the phase and round
+fields proposed in [PR #76](https://github.com/hananinas/RoboRally/pull/76).
+Login, joining, and membership changes remain in their separate issues.
 
-Additionally, I want to give some context of how this communication works in v0:
+## Round flow
 
-For v0 we have decided to only model:
-- sending the initial game state to the client
-- in a never ending repeated loop:
-    1. deal a hand of cards to the player
-    2. accept a program of 5 cards from a player
-    3. Loop over the card's server side, executing them one by one and sending the results/changes in robot board position back after each execution
-
-
-The below sequence diagram highlights this flow if information. Additionally, to the client and game server I added the socketIo rooms as objects to make the flow of information clear. 
-
+The service accepts a fixed roster. It waits for every player to submit, with no
+programming timer. Each robot acts once per register, in recalculated antenna
+order. Game advances through five registers and then starts the next round.
 
 ```mermaid
-
 sequenceDiagram
-    participant Client
-    participant Server as Game server
-    participant Private as game:{gameId}:player:{playerId}
-    participant Public as game:{gameId}:public
-
-    Client->>Server: game.getPublicGameState {gameId}
-    alt Game exists
-        Server-->>Client: Acknowledgement: GAME_FOUND with PublicGameState
-    else Unknown gameId
-        Server-->>Client: Acknowledgement: GAME_NOT_FOUND
+    participant A as Client A
+    participant S as Game Service
+    participant B as Client B
+    A->>S: program.submit {gameId, roundNumber, playerId, cardIds}
+    S-->>A: Acknowledgement: ACCEPTED
+    S-->>A: program.submitted
+    S-->>B: program.submitted
+    Note over A,B: Programming continues until every player submits
+    B->>S: program.submit {gameId, roundNumber, playerId, cardIds}
+    S-->>B: Acknowledgement: ACCEPTED
+    S-->>A: program.submitted
+    S-->>B: program.submitted
+    S-->>A: game.phaseChanged EXECUTING
+    S-->>B: game.phaseChanged EXECUTING
+    loop Five registers, every robot in antenna order
+        S-->>A: robot.actionResolved
+        S-->>B: robot.actionResolved
     end
-
-    loop Rounds repeat forever
-        Server->>Private: cards.dealt {cards}
-        Private-->>Client: cards.dealt {cards}
-
-        Note over Client: Player chooses five cards
-        Client->>Server: program.submit {gameId, cardIds}
-
-        break Invalid program
-            Server-->>Client: Acknowledgement: INVALID_PROGRAM
-        end
-          
-        Note over Server: Store program
-        Server-->>Client: Acknowledgement: ACCEPTED
-        Server->>Public: program.submitted {playerId}
-
-        loop Registers 1 through 5
-            Note over Server: Execute instruction
-            Server->>Public: robot.actionResolved
-            Public-->>Client: robot.actionResolved
-        end
-    end
-
+    S-->>A: game.phaseChanged PROGRAMMING, next round
+    S-->>B: game.phaseChanged PROGRAMMING, next round
+    S-->>A: cards.dealt, A's hand
+    S-->>B: cards.dealt, B's hand
+    Note over A,B: Finish playback before clearing registers and enabling cards
 ```
 
-## Client and Game Service coordination
+Every update includes `gameId` and `roundNumber`. Action results also include
+`registerIndex`, from zero through four. Several robots share a register index.
+Blocked moves still produce results. The service sends each result immediately
+and yields between actions, without waiting for animation acknowledgements.
 
-The client uses the shared types in `@robo-rally/game-events`. Configure its game
-UUID with `VITE_GAME_ID` and service origin with `VITE_GAME_SERVICE_URL`.
+`program.submitted` shares readiness with all game connections, including the
+submitter. It never changes another player's local submission state or starts
+activation. Only `game.phaseChanged` announces activation or programming.
 
-1. On connection, the client requests `game.getPublicGameState`. The service sends
-   the initial hand through `cards.dealt`; it may arrive before the state response.
-2. The service acknowledges with `GAME_FOUND` and the board, robots, and phase, or
-   `GAME_NOT_FOUND`. The hand stays locked until the initial state loads.
-3. The client submits five distinct card IDs in register order through
-   `program.submit`. `INVALID_PROGRAM` preserves the selection for retry;
-   `ACCEPTED` locks submission until the next hand.
-4. The service sends `program.submitted` to other clients and broadcasts one
-   `robot.actionResolved` event per register, in order.
-5. After register five, the service returns to programming and sends `cards.dealt`.
-   The client clears its registers and keeps controls locked until playback
-   finishes. It does not request another state snapshot.
+## Client initialization and playback
 
-Every resolved position and orientation is displayed in order, including with
-reduced motion enabled. A five-second acknowledgement timeout keeps submission
-locked because the outcome is unknown; the client does not retry automatically.
+The client uses `@robo-rally/game-events`. Set `VITE_GAME_ID` to the game UUID and
+`GAME_SERVICE_URL` to the Game Service origin for the Vite proxy.
 
-The board is fixed for v0. Robot positions are initialized from the first snapshot
-and subsequently updated through resolved-action events. Reconnection,
-synchronization, and replay remain outside this change (#13).
+1. On connection, request `game.getPublicGameState`. The current entry path sends
+   the initial private hand through `cards.dealt`, which can arrive first.
+2. Apply the snapshot's board, robots, round, and phase. Buffer the hand
+   until its matching snapshot arrives. The private hand identifies the controlled
+   player until the join assignment replaces this entry path in #66 and #69.
+3. Submit five distinct card IDs in order, with the assigned player and round.
+   `ACCEPTED` locks the program while other players submit. `INVALID_PROGRAM`
+   preserves the selection for retry. The service checks the connection's assigned
+   player, current round, hand, and Game's submission rules.
+4. Queue every action in received order. Keep the selected registers visible until
+   playback ends, even if the next programming phase and hand have already arrived.
+5. Enable programming only with a matching private hand, the programming phase,
+   and no remaining playback. Ignore stale rounds, other games, and other players'
+   hands. Do not request another snapshot between rounds.
+
+Reduced motion still preserves action order. After five seconds without a
+submission acknowledgement, keep the program locked because its outcome is
+unknown. Never resend automatically. Reconnection and replay remain in #13.
+
+## Fixed-roster integration hooks
+
+`createGameSocketServer(httpServer, session)` accepts a `GameSession` containing
+`gameId`, `game`, and `playerForConnection(socket)`. The resolver supplies an
+existing Player from trusted service-side assignment. The service rejects a
+missing assignment or a Player outside the roster. It never uses a submitted
+player ID to grant control. Tests inject independent assignments through this
+resolver. Default startup still uses the existing one-player development game;
+this issue does not introduce a second login or join mechanism.
+
+The interfaces for the related issues are:
+
+- **#68, submissions:** resolve cards from the assigned player's hand and call
+  `Game.submitProgram(playerId, cards)`. Acknowledge before shared readiness and
+  phase events. `Game.hasSubmittedProgram(playerId)` exposes readiness without
+  exposing cards. The required player/round fields and stale-round check are
+  already implemented so a delayed previous-round request cannot start a new round.
+- **#69, membership:** Game's roster is fixed here. Membership code must update
+  eligibility and invoke `Game.recheckProgrammingPhase()` after programming-time
+  removals. Publish membership changes before calling the service's shared
+  `advanceGame()` path. That path publishes phase changes and schedules one
+  `Game.executeNextAction()` at a time, leaving an event-loop boundary between
+  actions. Activation-time participation and early completion on removal belong
+  to the membership implementation and must follow #63's contract.
+- **#70, model:** Game owns the round, barrier, antenna priority, register advance,
+  and next hands. Board owns positions. Player owns its hand and robot. Robot
+  owns its program and direction. Connection and user identity stay in the service.
+
+The existing fixed-deck behavior remains: every player receives the supplied
+card supply each round, without drawing or shuffling. Per-player decks and card
+rules are not changed by multiplayer progression.

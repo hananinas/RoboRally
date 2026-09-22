@@ -62,6 +62,8 @@ channels:
         $ref: '#/components/messages/ProgramSubmitted'
       robotActionResolved:
         $ref: '#/components/messages/RobotActionResolved'
+      phaseChanged:
+        $ref: '#/components/messages/PhaseChanged'
 
   lobby:
     address: 'game:{gameId}:lobby'
@@ -115,10 +117,14 @@ components:
       payload:
         type: object
         additionalProperties: false
-        required: [gameId, cardIds]
+        required: [gameId, playerId, roundNumber, cardIds]
         properties:
           gameId:
             $ref: '#/components/schemas/GameId'
+          playerId:
+            $ref: '#/components/schemas/PlayerId'
+          roundNumber:
+            $ref: '#/components/schemas/RoundNumber'
           cardIds:
             type: array
             description: Card instance IDs in register order.
@@ -128,12 +134,22 @@ components:
             items:
               $ref: '#/components/schemas/CardId'
 
+      description: |
+        Submit once per round during PROGRAMMING. The service checks the assigned
+        player and current round before resolving five distinct cards from that
+        player's hand. Rejection leaves accepted programs unchanged.
     CardsDealt:
       name: cards.dealt
       payload:
         type: object
-        required: [cards]
+        required: [gameId, roundNumber, playerId, cards]
         properties:
+          gameId:
+            $ref: '#/components/schemas/GameId'
+          roundNumber:
+            $ref: '#/components/schemas/RoundNumber'
+          playerId:
+            $ref: '#/components/schemas/PlayerId'
           cards:
             type: array
             items:
@@ -153,23 +169,65 @@ components:
 
     ProgramSubmitted:
       name: program.submitted
-      description: Reveals readiness, never the submitted cards.
+      description: |
+        After ACCEPTED, broadcast readiness to every game connection, including
+        the submitter. Never disclose cards. This event does not start activation.
       payload:
         type: object
-        required: [playerId]
+        required: [gameId, roundNumber, playerId]
         properties:
+          gameId:
+            $ref: '#/components/schemas/GameId'
+          roundNumber:
+            $ref: '#/components/schemas/RoundNumber'
           playerId:
             $ref: '#/components/schemas/PlayerId'
 
+    PhaseChanged:
+      name: game.phaseChanged
+      description: |
+        Broadcast once per transition. EXECUTING follows the final submission
+        notification and precedes all actions. PROGRAMMING follows the last
+        action, increments the round, and precedes private cards.dealt events.
+        Clients finish queued playback before displaying programming or clearing
+        registers, and wait for the matching hand before enabling input.
+      payload:
+        type: object
+        additionalProperties: false
+        required: [gameId, roundNumber, phase]
+        properties:
+          gameId:
+            $ref: '#/components/schemas/GameId'
+          roundNumber:
+            $ref: '#/components/schemas/RoundNumber'
+          phase:
+            $ref: '#/components/schemas/GamePhase'
+
     RobotActionResolved:
       name: robot.actionResolved
+      description: |
+        One result per robot per register, including blocked moves. Send in
+        register order, recalculating antenna priority after each robot acts.
+        Clients preserve every result in playback; no animation acknowledgement
+        or programming timer controls server progression.
       payload:
         type: object
         required:
+          - gameId
+          - roundNumber
+          - registerIndex
           - robotId
           - instruction
           - position
         properties:
+          gameId:
+            $ref: '#/components/schemas/GameId'
+          roundNumber:
+            $ref: '#/components/schemas/RoundNumber'
+          registerIndex:
+            type: integer
+            minimum: 0
+            maximum: 4
           robotId:
             $ref: '#/components/schemas/RobotId'
           instruction:
@@ -196,6 +254,33 @@ components:
           - $ref: '#/components/schemas/PublicGameStateNotFound'
 
   schemas:
+    RoundNumber:
+      type: integer
+      minimum: 1
+      description: Starts at 1 and increments after five registers. Empty games stay idle.
+
+    GamePhase:
+      type: string
+      enum: [PROGRAMMING, EXECUTING]
+
+    Antenna:
+      type: object
+      additionalProperties: false
+      required: [x, y, angle]
+      properties:
+        x:
+          type: integer
+          minimum: 0
+        y:
+          type: integer
+          minimum: 0
+        angle:
+          type: number
+      description: |
+        Fixed in-board coordinates and a finite angle in radians clockwise from
+        east. The default is top centre, facing south: floor(width/2), 0, pi/2.
+        It does not reserve a tile or introduce board effects.
+
     GameId:
       type: string
       format: uuid
@@ -264,10 +349,14 @@ components:
 
     PublicGameState:
       type: object
-      required: [gameId, board, robots, phase]
+      required: [gameId, roundNumber, antenna, board, robots, phase]
       properties:
         gameId:
           $ref: '#/components/schemas/GameId'
+        roundNumber:
+          $ref: '#/components/schemas/RoundNumber'
+        antenna:
+          $ref: '#/components/schemas/Antenna'
         board:
           $ref: '#/components/schemas/Board'
         robots:
@@ -275,8 +364,7 @@ components:
           items:
             $ref: '#/components/schemas/Robot'
         phase:
-          type: string
-          enum: [WAITING, PROGRAMMING, EXECUTING]
+          $ref: '#/components/schemas/GamePhase'
 
     PublicGameStateFound:
       type: object
