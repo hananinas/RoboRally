@@ -594,14 +594,60 @@ components:
         properties:
           gameId:
             $ref: '#/components/schemas/GameId'
+      description: |-
+        Only the connection that successfully joined the requested game may read its snapshot.
+        Login alone, including the same username on another connection, grants no access.
+        Check the service's current connection-to-game membership, not client-supplied identity.
+        Leaving or disconnecting removes access. Reading never joins or subscribes the caller.
+        Return GAME_NOT_FOUND without state for unknown games, nonmembers, or malformed requests,
+        retaining the existing non-disclosing rejection shape. The first snapshot is supplied
+        by successful game.join after membership is established.
 
     PublicGameStateResult:
       name: game.publicGameStateResult
-      description: Result returned through the game.getPublicGameState acknowledgement.
+      description: Acknowledgement for game.getPublicGameState. GAME_FOUND is available only to the requesting connection's current game membership; GAME_NOT_FOUND means no accessible game and contains no state.
       payload:
         oneOf:
           - $ref: '#/components/schemas/PublicGameStateFound'
           - $ref: '#/components/schemas/PublicGameStateNotFound'
+      examples:
+        - name: memberSnapshot
+          summary: Joined connection reads its game
+          payload:
+            outcome: GAME_FOUND
+            state:
+              gameId: 00000000-0000-4000-8000-000000000001
+              board:
+                width: 1
+                height: 1
+                tiles:
+                  - position:
+                      x: 0
+                      y: 0
+                    type: EMPTY
+              robots:
+                - robotId: 00000000-0000-4000-8000-000000000003
+                  playerId: 00000000-0000-4000-8000-000000000002
+                  position:
+                    coordinate:
+                      x: 0
+                      y: 0
+                    orientation: NORTH
+              phase: PROGRAMMING
+              roundNumber: 1
+              antenna:
+                x: 0
+                y: 0
+                angle: 1.5707963267948966
+              players:
+                - playerId: 00000000-0000-4000-8000-000000000002
+                  username: Dane
+                  programSubmitted: false
+                  participatesInRound: true
+        - name: nonmember
+          summary: Before joining, after leaving, or a different connection using the same username
+          payload:
+            outcome: GAME_NOT_FOUND
 
   schemas:
     Username:
@@ -617,7 +663,7 @@ components:
     UserId:
       type: string
       format: uuid
-      description: Opaque service-issued user ID, separate from player and socket IDs. Storage lifetime does not change the client flow.
+      description: "Opaque service-issued user ID, separate from player and socket IDs. Storage lifetime is deferred to #65 and does not change the client flow."
 
     User:
       type: object
@@ -941,6 +987,7 @@ components:
         outcome:
           type: string
           enum: [ GAME_NOT_FOUND ]
+      description: "No accessible game: the game is unknown, the connection is not a member, or the request is malformed. Do not return state or reveal whether an inaccessible game exists."
 
     Board:
       type: object

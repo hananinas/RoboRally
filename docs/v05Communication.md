@@ -30,7 +30,7 @@ Requests use acknowledgement callbacks; replies are not separate emitted events.
 | `user.login` | Username → user identity, never a player/robot |
 | `game.join` | Game ID → assignment, public state, private hand |
 | `game.leave` | Game ID → leave result |
-| `game.getPublicGameState` | Game ID → snapshot; reading does not join |
+| `game.getPublicGameState` | Game ID → snapshot for members only; reading does not join |
 | `program.submit` | Game ID, round number, player ID, five card IDs → accepted/rejected |
 
 The game room receives `game.playerJoined`, `game.playerLeft`, `program.submitted`,
@@ -68,6 +68,29 @@ We can log in from several tabs with the same username, but only one can join a 
 game. The others get `USER_ALREADY_IN_GAME` and can retry after that player leaves.
 For now we check this in `game.join`; later it belongs at lobby entry.
 
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Game Service
+    participant Others as Existing players
+    C->>S: user.login {username}
+    alt Valid username
+        S-->>C: LOGGED_IN {user}
+        C->>S: game.join {gameId}
+        alt Join accepted
+            S-->>C: JOINED {assignment, state, hand, programSubmitted}
+            S-->>Others: game.playerJoined
+            Note over C,S: Apply initialization before later game updates
+        else Join rejected
+            S-->>C: Rejection outcome
+            Note over C: Keep login and allow a manual retry
+        end
+    else Invalid username
+        S-->>C: INVALID_USERNAME
+        Note over C: Keep input and show the error
+    end
+```
+
 A few things to keep in mind when wiring up the client:
 
 - Keep the same socket from login through gameplay, and use `VITE_GAME_ID` for joining.
@@ -84,6 +107,11 @@ A few things to keep in mind when wiring up the client:
 - Keep programming disabled during activation, after submission, without cards, or
   while playback is running. A disconnected client needs a new connection and login.
 
+Only the connection that joined a game can read its snapshot. Login alone—even with
+the same username in another tab—isn't enough. Nonmembers receive `GAME_NOT_FOUND`
+without state; leaving or disconnecting removes access. The initial snapshot still
+comes with a successful join.
+
 Exact payloads and rejection codes are in [the contract](asyncapi.yaml).
 
 ## Round and membership rules
@@ -94,4 +122,6 @@ at the top centre of the test board, facing south.
 
 See [multiplayer rounds](v05Rounds.md) for event order, mid-round changes, readiness,
 and the handoff with [#70](https://github.com/hananinas/RoboRally/issues/70).
-User storage lifetime is still open; it doesn't change these message shapes.
+User storage lifetime is deferred to [#65](https://github.com/hananinas/RoboRally/issues/65);
+it does not block this contract. [#70](https://github.com/hananinas/RoboRally/issues/70)
+will use these agreed behaviors when defining the internal model.
