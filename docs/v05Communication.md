@@ -38,6 +38,11 @@ Replies use acknowledgement callbacks, not separate emitted events.
 | `game.getPublicGameState` | Game ID → snapshot for members only; reading does not join |
 | `program.submit` | Game ID, round number, player ID, five card IDs → accepted/rejected |
 
+For `program.submit`, `INVALID_PROGRAM` means the request failed validation or game rules;
+`INTERNAL_ERROR` means the service failed before accepting it. Both leave the program
+unchanged. If no acknowledgement arrives, the result is unknown; the client must not
+automatically resend the program.
+
 ### Server updates
 
 All carry game and round IDs. Hands and submitted cards stay private.

@@ -541,10 +541,10 @@ components:
             enum:
               - ACCEPTED
               - INVALID_PROGRAM
+              - INTERNAL_ERROR
       description: >-
-        Acknowledgement before shared submission/phase events. INVALID_PROGRAM also covers stale
-        round, duplicate, wrong phase/ownership, malformed input, and invalid cards; no game state
-        changes.
+        INVALID_PROGRAM rejects an invalid submission. INTERNAL_ERROR means acceptance failed.
+        Neither changes game state. No acknowledgement means the outcome is unknown.
 
     ProgramSubmitted:
       name: program.submitted
