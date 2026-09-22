@@ -6,7 +6,7 @@ info:
   description: |-
     v0.5 contract draft for review. Login, joining, membership, and multiplayer
     phase payloads are specified; runtime implementation still follows separately.
-    See v05Communication.md for the flow and v05Rounds.md for progression rules.
+    See Communication.md for the flow and progression rules.
     Each Socket.IO event carries one JSON payload. Message name = event name.
     Room channel address = server broadcast destination. Commands go directly to
     the service; results use acknowledgement callbacks, not separate reply events.
@@ -1001,7 +1001,7 @@ components:
       description: >-
         Broadcast once per transition. EXECUTING keeps the round number and follows the
         final submission event. PROGRAMMING increments the round, resets submissions,
-        and precedes private hands. See v05Rounds.md for progression and leave rules.
+        and precedes private hands. See Communication.md for progression and leave rules.
 
     # Shared types
     UserId:
