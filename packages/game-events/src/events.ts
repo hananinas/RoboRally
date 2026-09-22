@@ -1,6 +1,7 @@
 import type {
   CardsDealt,
   GetPublicGameState,
+  PhaseChanged,
   ProgramResult,
   ProgramSubmitted,
   PublicGameStateResult,
@@ -27,6 +28,7 @@ export interface ClientToServerEvents {
 
 export interface ServerToClientEvents {
   'cards.dealt': (payload: CardsDealt) => void
+  'game.phaseChanged': (payload: PhaseChanged) => void
   'program.submitted': (payload: ProgramSubmitted) => void
   'robot.actionResolved': (payload: RobotActionResolved) => void
 }
