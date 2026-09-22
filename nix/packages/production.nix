@@ -106,10 +106,10 @@ pkgs.writeShellApplication {
     export GAME_PORT="''${GAME_PORT:-3001}"
     export WEB_PORT="''${WEB_PORT:-8088}"
     export PC_PORT="''${PC_PORT:-18080}"
-    export IP="''${IP:-127.0.0.1}"
     export CADDY_DATA_DIR="''${CADDY_DATA_DIR:-$HOME/.local/share/caddy}"
+    export WEB_BIND="''${WEB_BIND:-127.0.0.1}"
     export WEB_SCHEME="''${WEB_SCHEME:-http}"
-
+    export WEB_HOST="''${WEB_HOST:-}"
     logDir="''${XDG_STATE_HOME:-$HOME/.local/state}/robo-rally/$PC_PORT"
     mkdir -p "$logDir"
 
