@@ -5,6 +5,9 @@ Multiplayer phase and membership behavior is specified too; runtime implementati
 See [the contract](asyncapi.yaml) or [rendered reference](asyncapi.html) for details;
 [the v0 guide](v0Communication.md) describes the current implementation.
 
+[Login and joining](#login-and-joining) · [Round flow](#round-flow) ·
+[Round rules](v05Rounds.md) · [API reference](asyncapi.html)
+
 ## The flow
 
 1. Enter a username of **1–30 characters**, without trimming or character restrictions.
@@ -23,7 +26,9 @@ first `cards.dealt` when programming starts.
 
 ## Messages
 
-Requests use acknowledgement callbacks; replies are not separate emitted events.
+### Requests
+
+Replies use acknowledgement callbacks, not separate emitted events.
 
 | Request | Sends → receives |
 | --- | --- |
@@ -33,34 +38,18 @@ Requests use acknowledgement callbacks; replies are not separate emitted events.
 | `game.getPublicGameState` | Game ID → snapshot for members only; reading does not join |
 | `program.submit` | Game ID, round number, player ID, five card IDs → accepted/rejected |
 
-The game room receives `game.playerJoined`, `game.playerLeft`, `program.submitted`,
-`game.phaseChanged`, and `robot.actionResolved`. These updates carry game and round IDs.
-`cards.dealt` goes only to the player's private room; hands and submitted cards are never public.
+### Server updates
 
-## Round flow
+All carry game and round IDs. Hands and submitted cards stay private.
 
-Both clients have logged in and joined separately before this sequence starts.
-
-```mermaid
-sequenceDiagram
-    participant A as Client A
-    participant S as Game Service
-    participant B as Client B
-    A->>S: program.submit
-    S-->>A: Ack: ACCEPTED
-    Note over A,B: Shared submission status, wait for B
-    B->>S: program.submit
-    S-->>B: Ack: ACCEPTED
-    Note over A,B: game.phaseChanged: EXECUTING
-    loop Five registers, robots in recalculated antenna order
-        S-->>A: robot.actionResolved
-        S-->>B: robot.actionResolved
-    end
-    Note over A,B: game.phaseChanged: PROGRAMMING
-    S-->>A: cards.dealt (A's hand)
-    S-->>B: cards.dealt (B's hand)
-    Note over A,B: Finish playback before enabling input
-```
+| Event | Recipients | Purpose |
+| --- | --- | --- |
+| `game.playerJoined` | Existing members | Add the new player and robot |
+| `game.playerLeft` | Remaining members | Remove the player and robot |
+| `program.submitted` | All members | Update submission status |
+| `game.phaseChanged` | All members | Start activation or programming |
+| `robot.actionResolved` | All members | Play the next resolved action |
+| `cards.dealt` | That player only | Receive the next hand |
 
 ## Login and joining
 
@@ -113,6 +102,31 @@ without state; leaving or disconnecting removes access. The initial snapshot sti
 comes with a successful join.
 
 Exact payloads and rejection codes are in [the contract](asyncapi.yaml).
+
+## Round flow
+
+Both clients have logged in and joined separately before this sequence starts.
+
+```mermaid
+sequenceDiagram
+    participant A as Client A
+    participant S as Game Service
+    participant B as Client B
+    A->>S: program.submit
+    S-->>A: Ack: ACCEPTED
+    Note over A,B: Shared submission status, wait for B
+    B->>S: program.submit
+    S-->>B: Ack: ACCEPTED
+    Note over A,B: game.phaseChanged: EXECUTING
+    loop Five registers, robots in recalculated antenna order
+        S-->>A: robot.actionResolved
+        S-->>B: robot.actionResolved
+    end
+    Note over A,B: game.phaseChanged: PROGRAMMING
+    S-->>A: cards.dealt (A's hand)
+    S-->>B: cards.dealt (B's hand)
+    Note over A,B: Finish playback before enabling input
+```
 
 ## Round and membership rules
 
