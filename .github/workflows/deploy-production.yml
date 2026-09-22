@@ -43,7 +43,9 @@ jobs:
             --no-update-lock-file \
             --print-build-logs
 
-      - name: Deploy production release
+      - name: Deploy production
         run: |
-          release=$(readlink -f "$RUNNER_TEMP/robo-rally-release")
-          sudo -n /nix/var/nix/profiles/robo-rally-tools/bin/deploy-robo-rally "$release"
+          release=$(readlink -e result)
+
+          sudo -n /nix/var/nix/profiles/robo-rally-tools/bin/deploy-robo-rally \
+            "$release"
