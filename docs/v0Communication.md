@@ -1,6 +1,8 @@
 # Communication between components in v0
 
-The communication contract between client and server is defined in `docs/asyncapi.yaml`. A rendered version can be found in `docs/asyncapi.html`.
+This document describes the implemented v0 flow. The next contract is being drafted in
+[asyncapi.yaml](asyncapi.yaml), with [rendered documentation](asyncapi.html) and a
+[v0.5 communication guide](v05Communication.md). The v0.5 draft is not implemented yet.
 
 Additionally, I want to give some context of how this communication works in v0:
 
