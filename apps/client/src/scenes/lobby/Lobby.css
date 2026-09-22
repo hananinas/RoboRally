@@ -63,7 +63,7 @@
 
 .lobby-field {
   display: block;
-  margin-bottom: 14px;
+  margin-bottom: 6px;
 }
 
 .lobby-field span {
@@ -91,6 +91,17 @@
   border-color: #e0bb1f;
 }
 
+.lobby-validation {
+  min-height: 18px;
+  margin: 0 0 8px;
+  color: #9aa4b0;
+  font-size: 12px;
+}
+
+.lobby-validation--error {
+  color: #e8786e;
+}
+
 .lobby-primary-button {
   width: 100%;
   margin-top: 6px;
@@ -103,4 +114,9 @@
   font-size: 14.5px;
   font-weight: 700;
   cursor: pointer;
+}
+
+.lobby-primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }

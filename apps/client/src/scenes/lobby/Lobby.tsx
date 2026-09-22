@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import './Lobby.css'
+import { isValidUsername } from './username.ts'
 
 type LobbyProps = {
   onSubmitUsername?: (username: string) => void
@@ -30,9 +31,12 @@ function BoardBackground() {
 
 export default function Lobby({ onSubmitUsername }: LobbyProps) {
   const [username, setUsername] = useState('')
+  const usernameLength = Array.from(username).length
+  const usernameIsValid = isValidUsername(username)
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!usernameIsValid) return
     onSubmitUsername?.(username)
   }
 
@@ -52,6 +56,8 @@ export default function Lobby({ onSubmitUsername }: LobbyProps) {
           <label className="lobby-field">
             <span>Username</span>
             <input
+              aria-describedby="username-help"
+              aria-invalid={usernameLength > 30}
               autoComplete="username"
               name="username"
               onChange={(event) => setUsername(event.target.value)}
@@ -60,7 +66,17 @@ export default function Lobby({ onSubmitUsername }: LobbyProps) {
               value={username}
             />
           </label>
-          <button className="lobby-primary-button" type="submit">
+          <p
+            className={`lobby-validation${usernameLength > 30 ? ' lobby-validation--error' : ''}`}
+            id="username-help"
+          >
+            {usernameLength > 30 ? 'Username cannot exceed 30 characters.' : 'Use 1–30 characters.'}
+          </p>
+          <button
+            className="lobby-primary-button"
+            disabled={!usernameIsValid}
+            type="submit"
+          >
             Continue
           </button>
         </form>
