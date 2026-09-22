@@ -18,6 +18,11 @@ export type DisplayRobot = Robot & Readonly<{ angle: number }>
 export const ROBOT_MOVE_DURATION_MS = 600
 export const ROBOT_TURN_DURATION_MS = 300
 
+export function robotActionDuration(action: ResolvedRobotAction, reducedMotion: boolean): number {
+  return reducedMotion ? 200
+    : action.instruction === 'TURN_LEFT' ? ROBOT_TURN_DURATION_MS : ROBOT_MOVE_DURATION_MS
+}
+
 export type RobotPlaybackState = Readonly<{
   robots: readonly DisplayRobot[]
   pending: readonly ResolvedRobotAction[]
@@ -84,36 +89,33 @@ export function robotPlaybackReducer(
   return state.active ? queued : startNext(queued)
 }
 
+export function useRobotPlaybackTimer(
+  active: ResolvedRobotAction | null,
+  dispatch: (event: { type: 'complete' }) => void,
+) {
+  useEffect(() => {
+    if (!active) return
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const duration = robotActionDuration(active, reducedMotion)
+    const timer = window.setTimeout(() => dispatch({ type: 'complete' }), duration)
+    return () => window.clearTimeout(timer)
+  }, [active, dispatch])
+}
+
 export function useRobotPlayback(initialRobots: readonly Robot[]) {
   const [state, dispatch] = useReducer(
     robotPlaybackReducer,
     initialRobots,
     createRobotPlaybackState,
   )
-
-  useEffect(() => {
-    if (!state.active) return
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const duration = reducedMotion
-      ? 200
-      : state.active.instruction === 'TURN_LEFT'
-        ? ROBOT_TURN_DURATION_MS
-        : ROBOT_MOVE_DURATION_MS
-    const timer = window.setTimeout(() => dispatch({ type: 'complete' }), duration)
-    return () => window.clearTimeout(timer)
-  }, [state.active])
+  useRobotPlaybackTimer(state.active, dispatch)
 
   const enqueue = useCallback((action: ResolvedRobotAction) => {
     dispatch({ type: 'enqueue', action })
   }, [])
-  const reset = useCallback((robots: readonly Robot[]) => {
-    dispatch({ type: 'reset', robots })
-  }, [])
 
   return {
     robots: state.robots,
-    isPlaying: state.active !== null,
     enqueue,
-    reset,
   }
 }

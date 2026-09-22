@@ -3,7 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "files": ["dist"],
   "scripts": {
+    "install-dev": "pnpm --filter @robo-rally/game-service... install --frozen-lockfile --prod=false",
+    "dev": "tsx watch --clear-screen=false src/main.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "test": "vitest run",
@@ -15,6 +18,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.4.1",
+    "tsx": "^4.23.13",
     "socket.io-client": "^4.8.3",
     "typescript": "~7.0.2",
     "vitest": "^4.1.11"
