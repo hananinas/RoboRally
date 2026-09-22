@@ -4,6 +4,7 @@ import type {
   GamePhase as GamePhasePayload,
   Instruction,
   Orientation,
+  PhaseChanged,
   PublicGameState,
   RobotActionResolved,
   Tile as TilePayload,
@@ -17,8 +18,8 @@ import {
   type Game,
   type GameId,
   type GamePhase,
+  type NextActionResult,
   type Player,
-  type RobotActionResult,
 } from './game/index.js'
 
 const orientations: Record<Direction, Orientation> = {
@@ -67,6 +68,8 @@ export function presentPublicGameState(
 
   return {
     gameId,
+    roundNumber: game.roundNumber,
+    antenna: game.antenna,
     board: {
       width: game.board.width,
       height: game.board.height,
@@ -84,14 +87,27 @@ export function presentPublicGameState(
   }
 }
 
-export function presentCardsDealt(player: Player): CardsDealt {
-  return { cards: player.hand.map(presentCard) }
+export function presentPhaseChanged(gameId: GameId, game: Game): PhaseChanged {
+  return { gameId, roundNumber: game.roundNumber, phase: phases[game.phase] }
+}
+
+export function presentCardsDealt(
+  gameId: GameId,
+  roundNumber: number,
+  player: Player,
+): CardsDealt {
+  return { gameId, roundNumber, playerId: player.id, cards: player.hand.map(presentCard) }
 }
 
 export function presentRobotActionResolved(
-  action: RobotActionResult,
+  gameId: GameId,
+  result: NextActionResult,
 ): RobotActionResolved {
+  const { action, roundNumber, registerIndex } = result
   return {
+    gameId,
+    roundNumber,
+    registerIndex,
     robotId: action.robotId,
     instruction: instructionFor(action.card),
     position: {
