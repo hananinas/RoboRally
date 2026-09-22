@@ -7,9 +7,9 @@ let
         auto_https off
         persist_config off
     }
-
-    http://127.0.0.1:{$WEB_PORT} {
-      bind 127.0.0.1
+    
+    http://:{$WEB_PORT} {
+      bind {$IP}
 
       @socketio path /socket.io /socket.io/*
       handle @socketio {
@@ -94,6 +94,7 @@ pkgs.writeShellApplication {
     export GAME_PORT="''${GAME_PORT:-3001}"
     export WEB_PORT="''${WEB_PORT:-8088}"
     export PC_PORT="''${PC_PORT:-18080}"
+    export IP="''${IP:-127.0.0.1}"
 
     logDir="''${XDG_STATE_HOME:-$HOME/.local/state}/robo-rally/$PC_PORT"
     mkdir -p "$logDir"
