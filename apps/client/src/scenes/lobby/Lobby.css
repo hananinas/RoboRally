@@ -37,10 +37,6 @@
   box-shadow: 0 20px 60px rgb(0 0 0 / 35%);
 }
 
-.lobby-panel--wide {
-  width: min(100% - 48px, 520px);
-}
-
 .lobby-brand {
   display: flex;
   align-items: center;
@@ -58,51 +54,11 @@
   color: #e0bb1f;
 }
 
-.lobby-tagline,
-.lobby-status,
-.lobby-hint {
+.lobby-tagline {
+  margin: 0 0 26px;
   color: #9aa4b0;
   font-size: 13px;
   line-height: 1.5;
-}
-
-.lobby-tagline {
-  margin: 0 0 26px;
-}
-
-.lobby-tabs {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 22px;
-  padding: 4px;
-  border: 1px solid #4c5560;
-  border-radius: 10px;
-  background: #2b323b;
-}
-
-.lobby-tabs button {
-  flex: 1;
-  padding: 9px 0;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: #9aa4b0;
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.lobby-tabs button.active {
-  background: #454e59;
-  color: #eef1f4;
-}
-
-.lobby-error {
-  min-height: 15px;
-  margin: -6px 0 12px;
-  color: #c94b3f;
-  font-size: 12.5px;
 }
 
 .lobby-field {
@@ -110,8 +66,7 @@
   margin-bottom: 14px;
 }
 
-.lobby-field span,
-.lobby-code-label {
+.lobby-field span {
   display: block;
   margin-bottom: 6px;
   color: #9aa4b0;
@@ -120,6 +75,7 @@
 }
 
 .lobby-field input {
+  box-sizing: border-box;
   width: 100%;
   padding: 11px 12px;
   border: 1px solid #4c5560;
@@ -131,165 +87,20 @@
   font-size: 14px;
 }
 
-.lobby-primary-button,
-.lobby-secondary-button {
+.lobby-field input:focus-visible {
+  border-color: #e0bb1f;
+}
+
+.lobby-primary-button {
   width: 100%;
+  margin-top: 6px;
   padding: 12px 0;
+  border: 0;
   border-radius: 9px;
+  background: #e0bb1f;
+  color: #241f0a;
   font: inherit;
   font-size: 14.5px;
   font-weight: 700;
   cursor: pointer;
-}
-
-.lobby-primary-button {
-  margin-top: 6px;
-  border: 0;
-  background: #e0bb1f;
-  color: #241f0a;
-}
-
-.lobby-primary-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.lobby-secondary-button {
-  border: 1px solid #4c5560;
-  background: transparent;
-  color: #eef1f4;
-}
-
-.lobby-divider {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 18px 0;
-  color: #9aa4b0;
-  font-size: 11.5px;
-}
-
-.lobby-divider span {
-  flex: 1;
-  height: 1px;
-  background: #4c5560;
-}
-
-.lobby-header,
-.lobby-header-actions,
-.lobby-actions,
-.lobby-player-row {
-  display: flex;
-  align-items: center;
-}
-
-.lobby-header {
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.lobby-header-actions {
-  gap: 10px;
-}
-
-.lobby-code {
-  color: #e0bb1f;
-  font-family: monospace;
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: 3px;
-}
-
-.lobby-copy-button,
-.lobby-leave-button {
-  border-radius: 7px;
-  font: inherit;
-  cursor: pointer;
-}
-
-.lobby-copy-button {
-  padding: 6px 10px;
-  border: 1px solid #4c5560;
-  background: #454e59;
-  color: #eef1f4;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.lobby-leave-button {
-  border: 0;
-  background: transparent;
-  color: #9aa4b0;
-  font-size: 12.5px;
-  text-decoration: underline;
-}
-
-.lobby-status {
-  margin: 18px 0 12px;
-}
-
-.lobby-status strong {
-  color: #eef1f4;
-}
-
-.lobby-player-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-.lobby-player-row {
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid #4c5560;
-  border-radius: 10px;
-  background: #2b323b;
-}
-
-.lobby-player-row--empty {
-  color: #9aa4b0;
-  font-size: 13px;
-}
-
-.lobby-player-name {
-  flex: 1;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.lobby-player-tag {
-  padding: 2px 7px;
-  border: 1px solid #8a7420;
-  border-radius: 6px;
-  background: rgb(224 187 31 / 12%);
-  color: #e0bb1f;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-}
-
-.lobby-actions {
-  gap: 10px;
-}
-
-.lobby-actions > * {
-  flex: 1;
-}
-
-.lobby-hint {
-  margin: 10px 0 0;
-  text-align: center;
-}
-
-@media (max-width: 560px) {
-  .lobby-header,
-  .lobby-actions {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .lobby-header-actions {
-    justify-content: space-between;
-  }
 }
