@@ -62,10 +62,8 @@ describe('Game programming', () => {
     expect(game.phase).toBe('activation')
   })
 
-  it('requires one player and at least five distinct cards in V0', () => {
+  it('requires at least five distinct cards in the fixed supply', () => {
     const { board, player, deck } = createGame()
-    expect(() => new Game(board, [], deck)).toThrow(RangeError)
-    expect(() => new Game(board, [player, player], deck)).toThrow(RangeError)
     expect(() => new Game(board, [player], deck.slice(0, 4))).toThrow(RangeError)
     expect(() => new Game(board, [player], [deck[0], deck[0], ...deck.slice(1, 5)])).toThrow(RangeError)
   })

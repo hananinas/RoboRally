@@ -26,7 +26,7 @@ describe('single-player game', () => {
   })
 
   it('deals nine distinct, contract-valid cards in a fixed order', () => {
-    const { gameId, player } = createSinglePlayerGame()
+    const { gameId, game, player } = createSinglePlayerGame()
     const cardIds = player.hand.map((card) => card.id)
 
     expect(player.hand).toHaveLength(9)
@@ -42,8 +42,15 @@ describe('single-player game', () => {
       TurnLeft,
       Move1,
     ])
-    expect(parseSubmitProgram({ gameId, cardIds: cardIds.slice(0, 5) })).toEqual({
+    expect(parseSubmitProgram({
       gameId,
+      playerId: player.id,
+      roundNumber: game.roundNumber,
+      cardIds: cardIds.slice(0, 5),
+    })).toEqual({
+      gameId,
+      playerId: player.id,
+      roundNumber: game.roundNumber,
       cardIds: cardIds.slice(0, 5),
     })
   })
