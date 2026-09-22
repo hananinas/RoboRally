@@ -4,9 +4,9 @@ info:
   title: Game Service 
   version: 0.5.0-draft
   description: |
-    DRAFT v0.5 scaffold: TODO schemas are intentionally incomplete and are not
-    ready for implementation or code generation. Existing runtime types still
-    describe v0. See v05Communication.md for requirements and open decisions.
+    DRAFT v0.5 contract. Login and join shapes are specified for the client
+    entry flow, including duplicate-user rejection and joining during activation.
+    Other TODO schemas remain incomplete. Existing runtime types still describe v0.
     Server API. Each Socket.IO event carries one JSON payload.
     Message name = Socket.IO event name.
     Room channel address = server broadcast destination.
@@ -185,27 +185,148 @@ components:
   messages:
     Login:
       name: user.login
-      description: Find or create a user from a username; never create game participation.
+      description: |
+        Find or create a user from a username; never create game participation.
+        Multiple connections may log in as the same user. Exclusivity is checked
+        only when joining the same game, not during login.
       payload:
         $ref: '#/components/schemas/Login'
 
+      examples:
+        - name: "username"
+          summary: "Exact username, no normalization"
+          payload:
+            username: "Dane"
+
     LoginResult:
       name: user.loginResult
-      description: Acknowledgement only. TODO success and rejection variants; return user identity, never player or robot.
+      description: Acknowledgement only. Return approved user identity or a rejection; never player or robot.
       payload:
         $ref: '#/components/schemas/LoginResult'
 
+      examples:
+        - name: "loggedIn"
+          summary: "Same shape for new and existing users"
+          payload:
+            outcome: "LOGGED_IN"
+            user:
+              userId: "00000000-0000-4000-8000-000000000004"
+              username: "Dane"
+        - name: "invalidUsername"
+          summary: "Empty or overlong username"
+          payload:
+            outcome: "INVALID_USERNAME"
+
     JoinGame:
       name: game.join
-      description: Join the configured game using the approved connection identity.
+      description: |
+        Join the configured game using the approved connection identity.
+        Reject USER_ALREADY_IN_GAME when another connection owns this user's
+        membership in this game. Reserve/check membership atomically, including
+        simultaneous joins. There is no separate lobby step in v0.5.
+        During EXECUTING, place the new robot but exclude it from the current
+        activation; return an empty hand and programSubmitted false. At the next
+        PROGRAMMING phase it receives cards.dealt and counts toward submission.
       payload:
         $ref: '#/components/schemas/JoinGame'
 
+      examples:
+        - name: "join"
+          summary: "Configured shared game"
+          payload:
+            gameId: "00000000-0000-4000-8000-000000000001"
+
     JoinResult:
       name: game.joinResult
-      description: Acknowledgement only. TODO assignment, initial state, private hand, and rejection variants.
+      description: Acknowledgement only. Return assignment, initial state, private hand, and submission status together, or a rejection.
       payload:
         $ref: '#/components/schemas/JoinResult'
+
+      examples:
+        - name: "joinedProgramming"
+          summary: "One-tile illustrative board; normal initial hand"
+          payload:
+            outcome: "JOINED"
+            assignment:
+              gameId: "00000000-0000-4000-8000-000000000001"
+              playerId: "00000000-0000-4000-8000-000000000002"
+              robotId: "00000000-0000-4000-8000-000000000003"
+            state:
+              gameId: "00000000-0000-4000-8000-000000000001"
+              board:
+                width: 1
+                height: 1
+                tiles:
+                  - position:
+                      x: 0
+                      y: 0
+                    type: "EMPTY"
+              robots:
+                - robotId: "00000000-0000-4000-8000-000000000003"
+                  playerId: "00000000-0000-4000-8000-000000000002"
+                  position:
+                    coordinate:
+                      x: 0
+                      y: 0
+                    orientation: "NORTH"
+              phase: "PROGRAMMING"
+            hand:
+              - id: "00000000-0000-4000-8000-000000000101"
+                instruction: "MOVE_1"
+              - id: "00000000-0000-4000-8000-000000000102"
+                instruction: "TURN_LEFT"
+              - id: "00000000-0000-4000-8000-000000000103"
+                instruction: "MOVE_1"
+              - id: "00000000-0000-4000-8000-000000000104"
+                instruction: "TURN_LEFT"
+              - id: "00000000-0000-4000-8000-000000000105"
+                instruction: "MOVE_1"
+              - id: "00000000-0000-4000-8000-000000000106"
+                instruction: "TURN_LEFT"
+              - id: "00000000-0000-4000-8000-000000000107"
+                instruction: "MOVE_1"
+              - id: "00000000-0000-4000-8000-000000000108"
+                instruction: "TURN_LEFT"
+              - id: "00000000-0000-4000-8000-000000000109"
+                instruction: "MOVE_1"
+            programSubmitted: false
+        - name: "joinedActivation"
+          summary: "New player sits out activation and waits for cards"
+          payload:
+            outcome: "JOINED"
+            assignment:
+              gameId: "00000000-0000-4000-8000-000000000001"
+              playerId: "00000000-0000-4000-8000-000000000002"
+              robotId: "00000000-0000-4000-8000-000000000003"
+            state:
+              gameId: "00000000-0000-4000-8000-000000000001"
+              board:
+                width: 1
+                height: 1
+                tiles:
+                  - position:
+                      x: 0
+                      y: 0
+                    type: "EMPTY"
+              robots:
+                - robotId: "00000000-0000-4000-8000-000000000003"
+                  playerId: "00000000-0000-4000-8000-000000000002"
+                  position:
+                    coordinate:
+                      x: 0
+                      y: 0
+                    orientation: "NORTH"
+              phase: "EXECUTING"
+            hand: []
+            programSubmitted: false
+        - name: "duplicateUser"
+          summary: "Another connection already owns membership"
+          payload:
+            outcome: "USER_ALREADY_IN_GAME"
+        - name: "spawnUnavailable"
+          summary: "No partial membership was created"
+          payload:
+            outcome: "NO_SPAWN_AVAILABLE"
 
     LeaveGame:
       name: game.leave
@@ -329,14 +450,20 @@ components:
       type: string
       minLength: 1
       maxLength: 30
-      description: No trimming or character restrictions. TODO agree Unicode counting across client and service.
+      description: |
+        Count Unicode code points (Array.from(username).length in JavaScript), not
+        UTF-16 code units. Preserve the exact string, including whitespace and case;
+        no trimming, case folding, or Unicode normalization. Extra request properties
+        are rejected separately as INVALID_REQUEST.
 
     UserId:
       type: string
-      description: Stable user identity, separate from player and socket IDs. TODO agree format and storage lifetime.
+      format: uuid
+      description: Opaque service-issued user ID, separate from player and socket IDs. Storage lifetime does not change the client flow.
 
     User:
       type: object
+      additionalProperties: false
       required: [userId, username]
       properties:
         userId:
@@ -369,19 +496,104 @@ components:
           $ref: '#/components/schemas/GameId'
 
     LoginResult:
+      oneOf:
+        - $ref: '#/components/schemas/LoginAccepted'
+        - $ref: '#/components/schemas/LoginRejected'
+
+    LoginAccepted:
       type: object
-      x-draft: true
-      description: 'TODO: Use User in the success result; agree outcome names and rejection variants.'
+      additionalProperties: false
+      required: [outcome, user]
+      properties:
+        outcome:
+          type: string
+          enum: [LOGGED_IN]
+        user:
+          $ref: '#/components/schemas/User'
+
+    LoginRejected:
+      type: object
+      additionalProperties: false
+      required: [outcome]
+      properties:
+        outcome:
+          type: string
+          enum: [INVALID_USERNAME, INVALID_REQUEST, ALREADY_LOGGED_IN, INTERNAL_ERROR]
+      description: |
+        INVALID_USERNAME covers a missing/non-string username or a length outside 1–30.
+        INVALID_REQUEST covers a non-object request or additional properties.
+        ALREADY_LOGGED_IN means this connection is bound to a different username.
+        Repeating login with the same username returns LOGGED_IN with the same user.
+        INTERNAL_ERROR is an unexpected service failure; do not expose internals.
 
     PlayerAssignment:
       type: object
-      x-draft: true
-      description: 'TODO: Include gameId, playerId, and robotId; agree shape with the internal model.'
+      additionalProperties: false
+      required: [gameId, playerId, robotId]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+        playerId:
+          $ref: '#/components/schemas/PlayerId'
+        robotId:
+          $ref: '#/components/schemas/RobotId'
 
     JoinResult:
+      oneOf:
+        - $ref: '#/components/schemas/JoinAccepted'
+        - $ref: '#/components/schemas/JoinRejected'
+
+    JoinAccepted:
       type: object
-      x-draft: true
-      description: 'TODO: Combine PlayerAssignment, PublicGameState, and the private Card array on success; agree rejection variants.'
+      additionalProperties: false
+      required: [outcome, assignment, state, hand, programSubmitted]
+      properties:
+        outcome:
+          type: string
+          enum: [JOINED]
+        assignment:
+          $ref: '#/components/schemas/PlayerAssignment'
+        state:
+          $ref: '#/components/schemas/PublicGameState'
+        hand:
+          type: array
+          items:
+            $ref: '#/components/schemas/Card'
+          description: Empty for a new player joining during EXECUTING; their first hand arrives via cards.dealt at the next PROGRAMMING phase.
+        programSubmitted:
+          type: boolean
+          description: Whether this player has already submitted for the current round. Locks duplicate submission on repeated joins.
+      description: |
+        assignment.gameId equals the requested game and state.gameId. state.robots
+        contains assignment.robotId owned by assignment.playerId. The hand is private
+        to this assignment. Apply this result atomically before processing later events.
+        A new join during PROGRAMMING receives the normal initial hand and counts
+        toward this round's submissions immediately. A new join during EXECUTING
+        has hand [] and programSubmitted false; participation starts next round.
+        Repeated joins by the owning connection preserve the actual current hand
+        and submission status, rather than resetting an existing player's program.
+
+    JoinRejected:
+      type: object
+      additionalProperties: false
+      required: [outcome]
+      properties:
+        outcome:
+          type: string
+          enum: [LOGIN_REQUIRED, INVALID_REQUEST, GAME_NOT_FOUND, NO_SPAWN_AVAILABLE, USER_ALREADY_IN_GAME, ALREADY_IN_GAME, INTERNAL_ERROR]
+      description: |
+        LOGIN_REQUIRED means no approved identity on this connection.
+        INVALID_REQUEST covers malformed payloads, invalid game UUIDs, or extra properties.
+        GAME_NOT_FOUND means the configured game is unavailable.
+        NO_SPAWN_AVAILABLE means no valid centre-then-left position remains; no partial
+        membership or robot is created. There is no configured player cap.
+        USER_ALREADY_IN_GAME means another connection already owns this user's
+        membership in the requested game. Login remains valid; retry after that
+        membership is released. Duplicate-user rejection belongs here, not in login.
+        ALREADY_IN_GAME means this connection belongs to a different game.
+        Repeating a join for the same game returns the existing assignment and a fresh
+        snapshot/hand/submission status, without creating another robot or notification.
+        Rejections retain login. INTERNAL_ERROR must leave no partial assignment.
 
     LeaveResult:
       type: object
@@ -484,8 +696,8 @@ components:
             $ref: '#/components/schemas/Robot'
         phase:
           type: string
-          description: 'TODO: remove or explain legacy WAITING; v0.5 has no lobby phase. EXECUTING means domain activation.'
-          enum: [WAITING, PROGRAMMING, EXECUTING]
+          description: EXECUTING means domain activation. v0.5 has no lobby or WAITING phase.
+          enum: [PROGRAMMING, EXECUTING]
 
     PublicGameStateFound:
       type: object

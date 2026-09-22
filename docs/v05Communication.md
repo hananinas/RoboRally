@@ -1,6 +1,7 @@
 # Communication in v0.5
 
-**Draft for review.** Message names and unfinished payloads are proposed, not implemented.
+**Draft for review.** Login/join behavior below is specified for the entry screen.
+Other unfinished messages are still proposals; runtime implementation follows separately.
 See [the contract](asyncapi.yaml) or [rendered reference](asyncapi.html) for details;
 [the v0 guide](v0Communication.md) describes the current implementation.
 
@@ -16,7 +17,9 @@ See [the contract](asyncapi.yaml) or [rendered reference](asyncapi.html) for det
    Send results immediately; clients play them in order before enabling the next hand.
 
 There is no lobby phase, host, player cap, or timer. Players can join and leave at any
-point; exactly how this affects an ongoing round still needs agreement.
+point. Joining during programming counts toward that round. Joining during activation
+places the robot but it sits out that activation, receives `hand: []`, and gets its
+first `cards.dealt` when programming starts.
 
 ## Messages
 
@@ -60,26 +63,39 @@ sequenceDiagram
     Note over A,B: Finish playback before enabling input
 ```
 
-## Things we need to get right
+## Login and joining
 
-- The connection's approved identity determines ownership; don't trust a supplied player ID.
-- Apply join initialization before later updates without losing events. Repeated joins
-  must not create duplicate players or notifications.
-- Accepted submission does not mean activation has started. Use explicit phase updates.
-- Rejections leave accepted state unchanged. Timeouts may have an unknown outcome;
-  agree retry behavior before automatically resending.
+We can log in from several tabs with the same username, but only one can join a given
+game. The others get `USER_ALREADY_IN_GAME` and can retry after that player leaves.
+For now we check this in `game.join`; later it belongs at lobby entry.
+
+A few things to keep in mind when wiring up the client:
+
+- Keep the same socket from login through gameplay, and use `VITE_GAME_ID` for joining.
+  Show an error if it isn't configured correctly.
+- Count username characters with `Array.from(username).length` so emoji count correctly.
+- Disable the form while waiting. After login, keep the username fixed; a failed join
+  should let us retry without logging in again. `LOGIN_REQUIRED` takes us back to login.
+- Listen before joining, apply the returned assignment/state/hand/submission status
+  together, then process later events in order. No extra initial snapshot or hand request.
+  The server must leave no gap between that snapshot and live updates.
+- After five seconds without a reply, show an error and let the user retry manually.
+  The same request on the same socket returns the existing identity/assignment, not a
+  duplicate. A join retry returns fresh state; ignore old replies and earlier events.
+- Keep programming disabled during activation, after submission, without cards, or
+  while playback is running. A disconnected client needs a new connection and login.
+
+Exact payloads and rejection codes are in [the contract](asyncapi.yaml).
 
 ## Still to agree
 
-- User storage lifetime, ID format, Unicode counting, and simultaneous logins under one username.
-- Mid-round joins, leaving/disconnecting (including the last player), repeated leaves,
-  and whether login survives leaving or a rejected join.
-- What happens when there is no available spawn tile, without leaving a partial assignment.
-- Reply outcomes, snapshot contents/access, update recipients, and context needed for queued events.
-  Resolve legacy `WAITING`; wire `EXECUTING` means domain activation.
+- Leaving/disconnect cleanup, especially the last player and stale memberships that
+  could prevent another tab from joining. Does an explicit leave keep us logged in?
+- User storage lifetime and the remaining public-state/update details, including
+  snapshot access and context for queued events.
 
 Agree these with [#70](https://github.com/hananinas/RoboRally/issues/70), then finish the
-YAML TODOs, add success/failure examples, validate, and regenerate the HTML. Runtime
+remaining YAML TODOs and examples, validate, and regenerate the HTML. Runtime
 implementation stays in [#65](https://github.com/hananinas/RoboRally/issues/65),
 [#69](https://github.com/hananinas/RoboRally/issues/69),
 [#68](https://github.com/hananinas/RoboRally/issues/68), and
