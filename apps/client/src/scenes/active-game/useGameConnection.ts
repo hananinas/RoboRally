@@ -1,6 +1,13 @@
-import type { ClientToServerEvents, ServerToClientEvents } from '@robo-rally/game-events'
+import type {
+  CardsDealt,
+  ProgramSubmitted,
+  RobotActionResolved,
+} from '@robo-rally/game-events'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { io, type Socket } from 'socket.io-client'
+import {
+  ACKNOWLEDGEMENT_TIMEOUT_MS,
+  type GameSocket,
+} from '../../useGameSocket.ts'
 import { useRobotPlaybackTimer } from './board/robotPlayback.ts'
 import {
   createClientGameState,
@@ -9,14 +16,9 @@ import {
   type GameStateEvent,
 } from './gameState.ts'
 
-const ACKNOWLEDGEMENT_TIMEOUT_MS = 5000
-
-type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>
-
-export default function useGameConnection() {
+export default function useGameConnection(socket: GameSocket) {
   const [state, setState] = useState(createClientGameState)
   const current = useRef(state)
-  const socketRef = useRef<GameSocket | null>(null)
 
   // Keep event-time state current so submission checks see updates before React renders.
   const dispatch = useCallback((event: GameStateEvent) => {
@@ -32,19 +34,12 @@ export default function useGameConnection() {
       return
     }
 
-    const socket: GameSocket = io({
-      autoConnect: false,
-      // Rejoining/replay needs a protocol of its own (#13). Never silently
-      // reconnect and resend a program whose acknowledgement may have been lost.
-      reconnection: false,
-    })
-    socketRef.current = socket
-
-    socket.on('connect', () => {
+    let active = true
+    const handleConnect = () => {
       dispatch({ type: 'connected' })
       socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit(
         'game.getPublicGameState', { gameId }, (error, result) => {
-          if (socketRef.current !== socket || !socket.connected) return
+          if (!active || !socket.connected) return
           if (error) {
             dispatch({ type: 'error', message: 'Could not load game state. Reload to try again.' })
           } else if (result.outcome === 'GAME_NOT_FOUND') {
@@ -54,43 +49,57 @@ export default function useGameConnection() {
           }
         },
       )
-    })
-    socket.on('connect_error', () => {
+    }
+    const handleConnectError = () => {
       dispatch({ type: 'error', message: 'Could not connect to the Game Service.' })
-    })
-    socket.on('disconnect', () => {
+    }
+    const handleDisconnect = () => {
       dispatch({ type: 'disconnected' })
-    })
-    socket.on('cards.dealt', ({ cards }) => {
+    }
+    const handleCardsDealt = ({ cards }: CardsDealt) => {
       dispatch({ type: 'dealt', cards })
-    })
-    socket.on('program.submitted', ({ playerId }) => dispatch({ type: 'submitted', playerId }))
-    socket.on('robot.actionResolved', (action) => dispatch({ type: 'action', action }))
-    socket.connect()
+    }
+    const handleProgramSubmitted = ({ playerId }: ProgramSubmitted) => {
+      dispatch({ type: 'submitted', playerId })
+    }
+    const handleActionResolved = (action: RobotActionResolved) => {
+      dispatch({ type: 'action', action })
+    }
+
+    socket.on('connect', handleConnect)
+    socket.on('connect_error', handleConnectError)
+    socket.on('disconnect', handleDisconnect)
+    socket.on('cards.dealt', handleCardsDealt)
+    socket.on('program.submitted', handleProgramSubmitted)
+    socket.on('robot.actionResolved', handleActionResolved)
+    if (socket.connected) handleConnect()
 
     return () => {
-      socketRef.current = null
-      socket.removeAllListeners()
-      socket.disconnect()
+      active = false
+      socket.off('connect', handleConnect)
+      socket.off('connect_error', handleConnectError)
+      socket.off('disconnect', handleDisconnect)
+      socket.off('cards.dealt', handleCardsDealt)
+      socket.off('program.submitted', handleProgramSubmitted)
+      socket.off('robot.actionResolved', handleActionResolved)
     }
-  }, [dispatch])
+  }, [dispatch, socket])
 
   useRobotPlaybackTimer(state.playback.active, dispatch)
 
   const submit = useCallback(() => {
-    const socket = socketRef.current
     const payload = createSubmission(current.current)
-    if (!socket?.connected || !payload) return
+    if (!socket.connected || !payload) return
     const handVersion = current.current.handVersion
     dispatch({ type: 'submit' })
     socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit('program.submit', payload, (error, result) => {
       // Disconnect also fails pending acknowledgements; preserve its reload guidance.
-      if (socketRef.current !== socket || !socket.connected) return
+      if (!socket.connected) return
       dispatch(error
         ? { type: 'submission-unknown', handVersion }
         : { type: 'result', result, handVersion })
     })
-  }, [dispatch])
+  }, [dispatch, socket])
 
   return { state, dispatch, submit }
 }

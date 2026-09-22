@@ -6,9 +6,10 @@ import RegisterPanel from './components/RegisterPanel.tsx'
 import { canProgram } from './gameState.ts'
 import useGameConnection from './useGameConnection.ts'
 import useOverlayLayout from './useOverlayLayout.ts'
+import type { GameSocket } from '../../useGameSocket.ts'
 
-function ActiveGame() {
-  const { state, dispatch, submit } = useGameConnection()
+function ActiveGame({ socket }: { socket: GameSocket }) {
+  const { state, dispatch, submit } = useGameConnection(socket)
   const {
     handBelowHud,
     handRef,
