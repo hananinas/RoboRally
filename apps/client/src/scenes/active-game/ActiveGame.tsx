@@ -23,7 +23,9 @@ function ActiveGame() {
     : phase === 'EXECUTING' ? 'Executing' : 'Waiting'
   const status = !state.connected ? 'Not connected'
     : state.gameId === null ? 'Loading game…'
-      : !hasHand && phase === 'PROGRAMMING' ? 'Waiting for cards…' : phaseLabel
+      : phase === 'PROGRAMMING' && state.handRoundNumber !== state.roundNumber ? 'Waiting for cards…'
+        : phase === 'PROGRAMMING' && state.submission === 'accepted' ? 'Program accepted · Waiting for other players'
+          : phaseLabel
   const registeredCardIds = new Set(
     state.registers.flatMap((card) => (card ? [card.id] : [])),
   )

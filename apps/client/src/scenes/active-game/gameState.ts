@@ -1,10 +1,12 @@
 import type {
-  Card,
+  CardsDealt,
   GameId,
   GamePhase,
   Instruction,
+  PhaseChanged,
   PlayerId,
   ProgramResult,
+  ProgramSubmitted,
   PublicGameState,
   RobotActionResolved,
   SubmitProgram,
@@ -27,12 +29,17 @@ export type ClientGameState = {
   connected: boolean
   gameId: GameId | null
   phase: GamePhase | null
+  roundNumber: number | null
+  playerId: PlayerId | null
+  submittedPlayerIds: readonly PlayerId[]
   playerIds: readonly PlayerId[]
   board: BoardRenderModel | null
   playback: RobotPlaybackState
   hand: readonly ProgramCard[]
   registers: Registers
   handVersion: number
+  handRoundNumber: number | null
+  pendingHand: CardsDealt | null
   submission: 'idle' | 'pending' | 'accepted' | 'uncertain'
   error: string | null
 }
@@ -42,8 +49,9 @@ export type GameStateEvent =
   | { type: 'disconnected' }
   | { type: 'error'; message: string }
   | { type: 'initial-state'; state: PublicGameState }
-  | { type: 'dealt'; cards: readonly Card[] }
-  | { type: 'submitted'; playerId: string }
+  | { type: 'dealt'; hand: CardsDealt }
+  | { type: 'submitted'; submission: ProgramSubmitted }
+  | { type: 'phase'; phase: PhaseChanged }
   | { type: 'action'; action: RobotActionResolved }
   | { type: 'complete' }
   | { type: 'place'; cardId: string; registerIndex: number }
@@ -68,12 +76,17 @@ export function createClientGameState(): ClientGameState {
     connected: false,
     gameId: null,
     phase: null,
+    roundNumber: null,
+    playerId: null,
+    submittedPlayerIds: [],
     playerIds: [],
     board: null,
     playback: createRobotPlaybackState([]),
     hand: [],
     registers: emptyRegisters(),
     handVersion: 0,
+    handRoundNumber: null,
+    pendingHand: null,
     submission: 'idle',
     error: null,
   }
@@ -82,18 +95,44 @@ export function createClientGameState(): ClientGameState {
 export function canProgram(state: ClientGameState): boolean {
   return state.connected &&
     state.phase === 'PROGRAMMING' &&
-    state.handVersion > 0 &&
-    !state.playback.active && 
+    state.playerId !== null &&
+    state.handRoundNumber === state.roundNumber &&
+    !state.playback.active &&
     state.submission === 'idle'
 }
 
 export function createSubmission(state: ClientGameState): SubmitProgram | null {
-  if (!canProgram(state) || state.gameId === null) return null
+  if (!canProgram(state) || state.gameId === null || state.playerId === null || state.roundNumber === null) return null
   const [first, second, third, fourth, fifth] = state.registers
   if (!first || !second || !third || !fourth || !fifth) return null
   return {
     gameId: state.gameId,
+    roundNumber: state.roundNumber,
+    playerId: state.playerId,
     cardIds: [first.id, second.id, third.id, fourth.id, fifth.id],
+  }
+}
+
+// A hand can arrive before its phase or while the previous round is still playing.
+function activateHand(state: ClientGameState): ClientGameState {
+  const hand = state.pendingHand
+  if (!hand || hand.gameId !== state.gameId || state.roundNumber === null ||
+    hand.roundNumber < state.roundNumber || hand.roundNumber > state.roundNumber + 1 ||
+    !state.playerIds.includes(hand.playerId) ||
+    (state.playerId !== null && hand.playerId !== state.playerId)) return state
+  if (hand.roundNumber !== state.roundNumber || state.phase !== 'PROGRAMMING' || state.playback.active) {
+    return state.playerId === null ? { ...state, playerId: hand.playerId } : state
+  }
+  return {
+    ...state,
+    playerId: hand.playerId,
+    hand: hand.cards.map((card) => ({ id: card.id, label: cardLabels[card.instruction] })),
+    handRoundNumber: hand.roundNumber,
+    handVersion: state.handVersion + 1,
+    pendingHand: null,
+    registers: emptyRegisters(),
+    submission: 'idle',
+    error: state.connected ? null : state.error,
   }
 }
 
@@ -114,10 +153,12 @@ export function gameStateReducer(
       return { ...state, error: event.message }
     case 'initial-state': {
       const snapshot = event.state
-      return {
+      if (state.gameId !== null) return state
+      return activateHand({
         ...state,
         gameId: snapshot.gameId,
         phase: snapshot.phase,
+        roundNumber: snapshot.roundNumber,
         playerIds: snapshot.robots.map((robot) => robot.playerId),
         playback: createRobotPlaybackState(
           snapshot.robots.map((robot) => ({ ...robot, colour: '#c74f4f' })),
@@ -135,33 +176,50 @@ export function gameStateReducer(
             })),
           },
         ),
-      }
+      })
     }
-    case 'dealt':
-      return {
+    case 'dealt': {
+      const hand = event.hand
+      if (state.gameId === null) return { ...state, pendingHand: hand }
+      if (hand.gameId !== state.gameId || state.roundNumber === null ||
+        hand.roundNumber < state.roundNumber || hand.roundNumber > state.roundNumber + 1 ||
+        hand.roundNumber === state.handRoundNumber ||
+        !state.playerIds.includes(hand.playerId) ||
+        (state.playerId !== null && hand.playerId !== state.playerId)) return state
+      return activateHand({ ...state, pendingHand: hand })
+    }
+    case 'submitted': {
+      const submission = event.submission
+      if (submission.gameId !== state.gameId || submission.roundNumber !== state.roundNumber ||
+        state.phase !== 'PROGRAMMING' || !state.playerIds.includes(submission.playerId) ||
+        state.submittedPlayerIds.includes(submission.playerId)) return state
+      return { ...state, submittedPlayerIds: [...state.submittedPlayerIds, submission.playerId] }
+    }
+    case 'phase': {
+      const phase = event.phase
+      if (phase.gameId !== state.gameId || state.roundNumber === null) return state
+      const executing = phase.roundNumber === state.roundNumber &&
+        phase.phase === 'EXECUTING' && state.phase === 'PROGRAMMING'
+      const nextRound = phase.roundNumber === state.roundNumber + 1 &&
+        phase.phase === 'PROGRAMMING' && state.phase === 'EXECUTING'
+      if (!executing && !nextRound) return state
+      return activateHand({
         ...state,
-        hand: event.cards.map((card) => ({ id: card.id, label: cardLabels[card.instruction] })),
-        phase: state.gameId === null ? null : 'PROGRAMMING',
-        handVersion: state.handVersion + 1,
-        registers: emptyRegisters(),
-        submission: 'idle',
-        error: null,
-      }
-    case 'submitted':
-      if (!state.playerIds.includes(event.playerId)) return state
-      return {
-        ...state,
-        submission: 'accepted',
-        phase: 'EXECUTING',
-        error: null,
-      }
+        phase: phase.phase,
+        roundNumber: phase.roundNumber,
+        submittedPlayerIds: nextRound ? [] : state.submittedPlayerIds,
+      })
+    }
     case 'action':
+      if (event.action.gameId !== state.gameId || event.action.roundNumber !== state.roundNumber ||
+        state.phase !== 'EXECUTING' ||
+        !state.playback.robots.some((robot) => robot.robotId === event.action.robotId)) return state
       return {
         ...state,
         playback: robotPlaybackReducer(state.playback, { type: 'enqueue', action: event.action }),
       }
     case 'complete':
-      return { ...state, playback: robotPlaybackReducer(state.playback, { type: 'complete' }) }
+      return activateHand({ ...state, playback: robotPlaybackReducer(state.playback, { type: 'complete' }) })
     case 'place': {
       if (!canProgram(state)) return state
       const card = state.hand.find((candidate) => candidate.id === event.cardId)
