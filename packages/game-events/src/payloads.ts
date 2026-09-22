@@ -2,6 +2,22 @@ export type GameId = string
 export type PlayerId = string
 export type RobotId = string
 export type CardId = string
+export type UserId = string
+
+export type User = Readonly<{
+  userId: UserId
+  username: string
+}>
+
+export type LoginResult =
+  | Readonly<{ outcome: 'LOGGED_IN'; user: User }>
+  | Readonly<{
+      outcome:
+        | 'INVALID_USERNAME'
+        | 'INVALID_REQUEST'
+        | 'ALREADY_LOGGED_IN'
+        | 'INTERNAL_ERROR'
+    }>
 
 export type Instruction = 'MOVE_1' | 'TURN_LEFT'
 
