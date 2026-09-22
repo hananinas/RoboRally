@@ -219,14 +219,10 @@ components:
     # Membership
     JoinGame:
       name: game.join
-      description: |
-        Join the configured game using the approved connection identity.
-        Reject USER_ALREADY_IN_GAME when another connection owns this user's
-        membership in this game. Reserve/check membership atomically, including
-        simultaneous joins. There is no separate lobby step in v0.5.
-        During EXECUTING, place the new robot but exclude it from the current
-        activation; return an empty hand and programSubmitted false. At the next
-        PROGRAMMING phase it receives cards.dealt and counts toward submission.
+      description: >-
+        Use the approved connection identity. Reserve membership atomically; another
+        connection using this user gets USER_ALREADY_IN_GAME. A player joining during
+        EXECUTING sits out until the next PROGRAMMING phase.
       payload:
         $ref: '#/components/schemas/JoinGame'
 
@@ -429,14 +425,9 @@ components:
         properties:
           gameId:
             $ref: '#/components/schemas/GameId'
-      description: |-
-        Only the connection that successfully joined the requested game may read its snapshot.
-        Login alone, including the same username on another connection, grants no access.
-        Check the service's current connection-to-game membership, not client-supplied identity.
-        Leaving or disconnecting removes access. Reading never joins or subscribes the caller.
-        Return GAME_NOT_FOUND without state for unknown games, nonmembers, or malformed requests,
-        retaining the existing non-disclosing rejection shape. The first snapshot is supplied
-        by successful game.join after membership is established.
+      description: >-
+        Only this connection's current game membership grants access; reading does not join.
+        Return GAME_NOT_FOUND without state for unknown games, nonmembers, or malformed requests.
 
     PublicGameStateResult:
       name: game.publicGameStateResult
@@ -449,39 +440,6 @@ components:
           - $ref: '#/components/schemas/PublicGameStateFound'
           - $ref: '#/components/schemas/PublicGameStateNotFound'
       examples:
-        - name: memberSnapshot
-          summary: Joined connection reads its game
-          payload:
-            outcome: GAME_FOUND
-            state:
-              gameId: 00000000-0000-4000-8000-000000000001
-              board:
-                width: 1
-                height: 1
-                tiles:
-                  - position:
-                      x: 0
-                      y: 0
-                    type: EMPTY
-              robots:
-                - robotId: 00000000-0000-4000-8000-000000000003
-                  playerId: 00000000-0000-4000-8000-000000000002
-                  position:
-                    coordinate:
-                      x: 0
-                      y: 0
-                    orientation: NORTH
-              phase: PROGRAMMING
-              roundNumber: 1
-              antenna:
-                x: 0
-                y: 0
-                angle: 1.5707963267948966
-              players:
-                - playerId: 00000000-0000-4000-8000-000000000002
-                  username: Dane
-                  programSubmitted: false
-                  participatesInRound: true
         - name: nonmember
           summary: Before joining, after leaving, or a different connection using the same username
           payload:
@@ -805,16 +763,12 @@ components:
           description: >-
             Whether this player has already submitted for the current round. Locks duplicate
             submission on repeated joins.
-      description: |-
-        assignment.gameId equals the requested game and state.gameId. state.robots
-        contains assignment.robotId owned by assignment.playerId. The hand is private
-        to this assignment. Apply this result atomically before processing later events.
-        A new join during PROGRAMMING receives the normal initial hand and counts
-        toward this round's submissions immediately. A new join during EXECUTING
-        has hand [] and programSubmitted false; participation starts next round.
-        Repeated joins by the owning connection preserve the actual current hand
-        and submission status, rather than resetting an existing player's program.
-         state.players contains the assigned player; its programSubmitted value equals the private top-level field. A new activation-time join has participatesInRound false. The snapshot is not a replay; show current positions and process only later actions.
+      description: >-
+        Assignment, state, private hand, and submission status describe the same instant.
+        State includes the assigned player and robot. Apply them before live updates.
+        A new player participates immediately during
+        PROGRAMMING; during EXECUTING they receive hand [] and sit out until the next round.
+        Repeated joins return the current assignment, hand, and status without reset or notification.
 
     JoinRejected:
       type: object
@@ -833,19 +787,12 @@ components:
               ALREADY_IN_GAME,
               INTERNAL_ERROR
             ]
-      description: |
-        LOGIN_REQUIRED means no approved identity on this connection.
-        INVALID_REQUEST covers malformed payloads, invalid game UUIDs, or extra properties.
-        GAME_NOT_FOUND means the configured game is unavailable.
-        NO_SPAWN_AVAILABLE means no valid centre-then-left position remains; no partial
-        membership or robot is created. There is no configured player cap.
-        USER_ALREADY_IN_GAME means another connection already owns this user's
-        membership in the requested game. Login remains valid; retry after that
-        membership is released. Duplicate-user rejection belongs here, not in login.
-        ALREADY_IN_GAME means this connection belongs to a different game.
-        Repeating a join for the same game returns the existing assignment and a fresh
-        snapshot/hand/submission status, without creating another robot or notification.
-        Rejections retain login. INTERNAL_ERROR must leave no partial assignment.
+      description: >-
+        LOGIN_REQUIRED: no approved user. INVALID_REQUEST: malformed request.
+        GAME_NOT_FOUND: unavailable game. NO_SPAWN_AVAILABLE: no valid spawn.
+        USER_ALREADY_IN_GAME: another connection owns this user's membership.
+        ALREADY_IN_GAME: this connection joined another game. INTERNAL_ERROR: no partial
+        assignment. No rejection creates membership; login remains valid.
 
     LeaveGame:
       type: object
@@ -1052,13 +999,9 @@ components:
         phase:
           $ref: "#/components/schemas/GamePhase"
       description: >-
-        Broadcast to every current game connection once per transition. EXECUTING keeps this round
-        number and follows the final submission notification. PROGRAMMING increments the round,
-        resets all submission flags, makes current players eligible, and precedes their private
-        cards.dealt. Start activation only for a nonempty roster with every current player
-        submitted. Removal during PROGRAMMING rechecks this condition. Removal during EXECUTING
-        cancels only future actions for that robot. If no eligible robots remain, finish activation
-        once and enter next-round PROGRAMMING; with no players, stay idle and deal to nobody.
+        Broadcast once per transition. EXECUTING keeps the round number and follows the
+        final submission event. PROGRAMMING increments the round, resets submissions,
+        and precedes private hands. See v05Rounds.md for progression and leave rules.
 
     # Shared types
     UserId:
