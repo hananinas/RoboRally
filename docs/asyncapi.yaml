@@ -4,12 +4,8 @@ info:
   title: Game Service
   version: 0.5.0-draft
   description: |-
-    v0.5 contract draft for review. Login, joining, membership, and multiplayer
-    phase payloads are specified; runtime implementation still follows separately.
-    See Communication.md for the flow and progression rules.
-    Each Socket.IO event carries one JSON payload. Message name = event name.
-    Room channel address = server broadcast destination. Commands go directly to
-    the service; results use acknowledgement callbacks, not separate reply events.
+  This document describes RoboRally's client-server communication. No code change regarding communication should be made without updating this document. 
+  Server broadcast destinations represent SocketIO Rooms. 
 defaultContentType: application/json
 
 channels:
@@ -39,7 +35,9 @@ channels:
 
   joinReplies:
     address: null
-    description: Logical reply channel; delivered through the game.join acknowledgement.
+    description: |
+      Logical reply channel
+      Delivered through the acknowledgement of game.join
     messages:
       result:
         $ref: '#/components/messages/JoinResult'
@@ -507,9 +505,7 @@ components:
     ProgramSubmitted:
       name: program.submitted
       description: >-
-        After acknowledging ACCEPTED, broadcast to all current game connections including the
-        submitter; set this player's submission flag. Never disclose cards. The last notification
-        precedes EXECUTING.
+        Event signaling another player has submitted their program.
       payload:
         type: object
         required:
