@@ -71,7 +71,7 @@ describe('sessionReducer', () => {
     })
     state = sessionReducer(state, { type: 'join-retried' })
 
-    expect(state).toEqual({ status: 'joining', user })
+    expect(state).toEqual({ status: 'joining', user, queuedEvents: [] })
   })
 
   it('returns to login when joining requires it', () => {
@@ -81,6 +81,27 @@ describe('sessionReducer', () => {
     })
 
     expect(state).toEqual({ status: 'editing', username: user.username, error: 'LOGIN_REQUIRED' })
+  })
+
+  it('queues gameplay events received while joining', () => {
+    const state = sessionReducer(joiningState(), {
+      type: 'game-event-received',
+      event: { type: 'cards.dealt', payload: { cards: [] } },
+    })
+
+    expect(state).toMatchObject({
+      status: 'joining',
+      queuedEvents: [{ type: 'cards.dealt', payload: { cards: [] } }],
+    })
+  })
+
+  it('keeps login identity available after a join timeout', () => {
+    const state = sessionReducer(joiningState(), {
+      type: 'join-error',
+      error: 'TIMEOUT',
+    })
+
+    expect(state).toEqual({ status: 'join-failed', user, error: 'TIMEOUT' })
   })
 
   it('ignores duplicate submissions and results outside their pending state', () => {

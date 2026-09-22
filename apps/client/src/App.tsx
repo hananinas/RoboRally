@@ -1,8 +1,14 @@
-import { useReducer, useRef } from 'react'
+import type {
+  CardsDealt,
+  ProgramSubmitted,
+  RobotActionResolved,
+} from '@robo-rally/game-events'
+import { useEffect, useReducer, useRef } from 'react'
 import Lobby from './scenes/lobby/Lobby.tsx'
 import {
   createSessionState,
   sessionReducer,
+  type JoinError,
   type LoginError,
 } from './sessionState.ts'
 import useGameSocket, { ACKNOWLEDGEMENT_TIMEOUT_MS } from './useGameSocket.ts'
@@ -16,21 +22,93 @@ const loginErrors: Record<LoginError, string> = {
   TIMEOUT: 'The Game Service did not respond. Please try again.',
 }
 
+const joinErrors: Record<JoinError, string> = {
+  INVALID_REQUEST: 'The configured game ID is invalid.',
+  GAME_NOT_FOUND: 'The configured game could not be found.',
+  NO_SPAWN_AVAILABLE: 'The game has no available spawn position.',
+  USER_ALREADY_IN_GAME: 'This username is already participating from another connection.',
+  ALREADY_IN_GAME: 'This connection has already joined a different game.',
+  INTERNAL_ERROR: 'The Game Service could not join the game. Please try again.',
+  CONNECTION_ERROR: 'Connection lost before the game could be joined.',
+  GAME_ID_MISSING: 'Set VITE_GAME_ID to the shared game ID and restart the client.',
+  TIMEOUT: 'The Game Service did not respond to the join request. Please try again.',
+}
+
 function App() {
   const connection = useGameSocket()
   const [session, dispatch] = useReducer(sessionReducer, undefined, createSessionState)
   const loginPending = useRef(false)
   const loginAttempt = useRef(0)
+  const joinPending = useRef(false)
+  const joinAttempt = useRef(0)
+
+  useEffect(() => {
+    const handleCardsDealt = (payload: CardsDealt) => {
+      dispatch({ type: 'game-event-received', event: { type: 'cards.dealt', payload } })
+    }
+    const handleProgramSubmitted = (payload: ProgramSubmitted) => {
+      dispatch({ type: 'game-event-received', event: { type: 'program.submitted', payload } })
+    }
+    const handleActionResolved = (payload: RobotActionResolved) => {
+      dispatch({ type: 'game-event-received', event: { type: 'robot.actionResolved', payload } })
+    }
+
+    connection.socket.on('cards.dealt', handleCardsDealt)
+    connection.socket.on('program.submitted', handleProgramSubmitted)
+    connection.socket.on('robot.actionResolved', handleActionResolved)
+    return () => {
+      connection.socket.off('cards.dealt', handleCardsDealt)
+      connection.socket.off('program.submitted', handleProgramSubmitted)
+      connection.socket.off('robot.actionResolved', handleActionResolved)
+    }
+  }, [connection.socket])
+
+  useEffect(() => {
+    if (session.status !== 'joining' || joinPending.current) return
+    const gameId = import.meta.env.VITE_GAME_ID
+    if (!gameId) {
+      dispatch({ type: 'join-error', error: 'GAME_ID_MISSING' })
+      return
+    }
+    if (connection.status !== 'connected') {
+      dispatch({ type: 'join-error', error: 'CONNECTION_ERROR' })
+      return
+    }
+
+    joinPending.current = true
+    const attempt = ++joinAttempt.current
+    connection.socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit(
+      'game.join',
+      { gameId },
+      (error, result) => {
+        if (attempt !== joinAttempt.current) return
+        joinPending.current = false
+        dispatch(error
+          ? { type: 'join-error', error: 'TIMEOUT' }
+          : { type: 'join-result', result })
+      },
+    )
+  }, [connection.socket, connection.status, session.status])
 
   const username = session.status === 'editing' || session.status === 'logging-in'
     ? session.username
     : session.user.username
-  const pending = session.status === 'logging-in' || session.status === 'joining'
+  const pending = session.status === 'logging-in'
+    || session.status === 'joining'
+    || session.status === 'joined'
   const sessionError = session.status === 'editing' && session.error
     ? loginErrors[session.error]
-    : null
+    : session.status === 'join-failed' ? joinErrors[session.error] : null
 
   function submitUsername(submittedUsername: string) {
+    if (session.status === 'join-failed') {
+      if (connection.status !== 'connected') {
+        connection.connect()
+        return
+      }
+      dispatch({ type: 'join-retried' })
+      return
+    }
     if (session.status !== 'editing' || loginPending.current) return
     if (connection.status !== 'connected') {
       connection.connect()
@@ -63,7 +141,10 @@ function App() {
         type: 'username-changed', username: nextUsername,
       })}
       pending={pending}
-      pendingLabel={session.status === 'joining' ? 'Joining game…' : 'Logging in…'}
+      pendingLabel={session.status === 'logging-in' ? 'Logging in…'
+        : session.status === 'joined' ? 'Opening game…' : 'Joining game…'}
+      retryingJoin={session.status === 'join-failed'}
+      usernameLocked={session.status !== 'editing'}
       username={username}
     />
   )

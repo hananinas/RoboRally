@@ -10,6 +10,8 @@ type LobbyProps = {
   onUsernameChange: (username: string) => void
   pending: boolean
   pendingLabel: string
+  retryingJoin: boolean
+  usernameLocked: boolean
   username: string
 }
 
@@ -43,6 +45,8 @@ export default function Lobby({
   onUsernameChange,
   pending,
   pendingLabel,
+  retryingJoin,
+  usernameLocked,
   username,
 }: LobbyProps) {
   const usernameLength = Array.from(username).length
@@ -74,7 +78,7 @@ export default function Lobby({
               aria-describedby="username-help"
               aria-invalid={usernameLength > 30}
               autoComplete="username"
-              disabled={pending}
+              disabled={usernameLocked}
               name="username"
               onChange={(event) => onUsernameChange(event.target.value)}
               placeholder="e.g. CircuitBreaker"
@@ -98,6 +102,7 @@ export default function Lobby({
           >
             {pending ? pendingLabel
               : connecting ? 'Connecting…'
+                : retryingJoin && connectionStatus === 'connected' ? 'Retry joining'
                 : connectionStatus === 'connected' ? 'Continue' : 'Retry connection'}
           </button>
         </form>
