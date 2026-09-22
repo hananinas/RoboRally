@@ -13,9 +13,12 @@ export type Login = z.infer<typeof loginSchema>
 export type LoginRequestRejection = 'INVALID_REQUEST' | 'INVALID_USERNAME'
 
 export class LoginRequestError extends Error {
-  constructor(readonly outcome: LoginRequestRejection) {
+  readonly outcome: LoginRequestRejection
+
+  constructor(outcome: LoginRequestRejection) {
     super(outcome)
     this.name = 'LoginRequestError'
+    this.outcome = outcome
   }
 }
 
