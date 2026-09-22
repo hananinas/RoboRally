@@ -24,5 +24,8 @@
         pkgs = import nixpkgs { inherit system; };
         gameId = "00000000-0000-4000-8000-000000000001";
       });
+      deploy = import ../deploy/deploy.nix {
+        pkgs = import nixpkgs { inherit system; };
+      };
     };
 }
