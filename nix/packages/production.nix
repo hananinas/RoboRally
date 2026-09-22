@@ -12,7 +12,7 @@ let
     }
 
     {$WEB_SCHEME}://{$WEB_HOST}:{$WEB_PORT} {
-      bind {$IP}
+      bind {$WEB_BIND}
 
       @socketio path /socket.io /socket.io/*
       handle @socketio {
