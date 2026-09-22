@@ -113,13 +113,17 @@ export function createSubmission(state: ClientGameState): SubmitProgram | null {
   }
 }
 
+function isHandEligible(state: ClientGameState, hand: CardsDealt): boolean {
+  if (hand.gameId !== state.gameId || state.roundNumber === null) return false
+  if (hand.roundNumber < state.roundNumber || hand.roundNumber > state.roundNumber + 1) return false
+  return state.playerIds.includes(hand.playerId) &&
+    (state.playerId === null || hand.playerId === state.playerId)
+}
+
 // A hand can arrive before its phase or while the previous round is still playing.
 function activateHand(state: ClientGameState): ClientGameState {
   const hand = state.pendingHand
-  if (!hand || hand.gameId !== state.gameId || state.roundNumber === null ||
-    hand.roundNumber < state.roundNumber || hand.roundNumber > state.roundNumber + 1 ||
-    !state.playerIds.includes(hand.playerId) ||
-    (state.playerId !== null && hand.playerId !== state.playerId)) return state
+  if (!hand || !isHandEligible(state, hand)) return state
   if (hand.roundNumber !== state.roundNumber || state.phase !== 'PROGRAMMING' || state.playback.active) {
     return state.playerId === null ? { ...state, playerId: hand.playerId } : state
   }
@@ -181,11 +185,7 @@ export function gameStateReducer(
     case 'dealt': {
       const hand = event.hand
       if (state.gameId === null) return { ...state, pendingHand: hand }
-      if (hand.gameId !== state.gameId || state.roundNumber === null ||
-        hand.roundNumber < state.roundNumber || hand.roundNumber > state.roundNumber + 1 ||
-        hand.roundNumber === state.handRoundNumber ||
-        !state.playerIds.includes(hand.playerId) ||
-        (state.playerId !== null && hand.playerId !== state.playerId)) return state
+      if (!isHandEligible(state, hand) || hand.roundNumber === state.handRoundNumber) return state
       return activateHand({ ...state, pendingHand: hand })
     }
     case 'submitted': {
