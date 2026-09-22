@@ -1,7 +1,7 @@
 # Communication in v0.5
 
 **Draft for review.** Login/join behavior below is specified for the entry screen.
-Other unfinished messages are still proposals; runtime implementation follows separately.
+Multiplayer phase and membership behavior is specified too; runtime implementation follows separately.
 See [the contract](asyncapi.yaml) or [rendered reference](asyncapi.html) for details;
 [the v0 guide](v0Communication.md) describes the current implementation.
 
@@ -31,14 +31,13 @@ Requests use acknowledgement callbacks; replies are not separate emitted events.
 | `game.join` | Game ID → assignment, public state, private hand |
 | `game.leave` | Game ID → leave result |
 | `game.getPublicGameState` | Game ID → snapshot; reading does not join |
-| `program.submit` | Game ID, player ID, five card IDs → accepted/rejected |
+| `program.submit` | Game ID, round number, player ID, five card IDs → accepted/rejected |
 
 The game room receives `game.playerJoined`, `game.playerLeft`, `program.submitted`,
-`game.phaseChanged`, and `robot.actionResolved`. Exact recipients and payloads still
-need review. `cards.dealt` goes only to the player's private room; hands and submitted
-cards are never public.
+`game.phaseChanged`, and `robot.actionResolved`. These updates carry game and round IDs.
+`cards.dealt` goes only to the player's private room; hands and submitted cards are never public.
 
-## Proposed round
+## Round flow
 
 Both clients have logged in and joined separately before this sequence starts.
 
@@ -87,16 +86,12 @@ A few things to keep in mind when wiring up the client:
 
 Exact payloads and rejection codes are in [the contract](asyncapi.yaml).
 
-## Still to agree
+## Round and membership rules
 
-- Leaving/disconnect cleanup, especially the last player and stale memberships that
-  could prevent another tab from joining. Does an explicit leave keep us logged in?
-- User storage lifetime and the remaining public-state/update details, including
-  snapshot access and context for queued events.
+Disconnect counts as leaving: remove the robot and submission requirement, then let
+remaining players continue. Explicit leave keeps the user logged in. The antenna is
+at the top centre of the test board, facing south.
 
-Agree these with [#70](https://github.com/hananinas/RoboRally/issues/70), then finish the
-remaining YAML TODOs and examples, validate, and regenerate the HTML. Runtime
-implementation stays in [#65](https://github.com/hananinas/RoboRally/issues/65),
-[#69](https://github.com/hananinas/RoboRally/issues/69),
-[#68](https://github.com/hananinas/RoboRally/issues/68), and
-[#67](https://github.com/hananinas/RoboRally/issues/67).
+See [multiplayer rounds](v05Rounds.md) for event order, mid-round changes, readiness,
+and the handoff with [#70](https://github.com/hananinas/RoboRally/issues/70).
+User storage lifetime is still open; it doesn't change these message shapes.
