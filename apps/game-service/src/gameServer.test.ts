@@ -174,6 +174,20 @@ describe('game Socket.IO connection', () => {
     })
   })
 
+  it('requires a fresh login after disconnect while retaining the user', async () => {
+    await connect()
+    const first = await login({ username: 'Dane' })
+    client.disconnect()
+
+    const replacement = createClient()
+    await connect(replacement)
+    const replacementOnServer = [...io.sockets.sockets.values()].find(
+      (socket) => socket.id === replacement.id,
+    )
+    expect(replacementOnServer?.data.user).toBeUndefined()
+    expect(await login({ username: 'Dane' }, replacement)).toEqual(first)
+  })
+
   it('rejects malformed login without changing connection identity', async () => {
     await connect()
 
