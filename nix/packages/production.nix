@@ -4,11 +4,14 @@ let
   caddyConfig = pkgs.writeText "robo-rally.Caddyfile" ''
     {
       admin off
-        auto_https off
-        persist_config off
+      persist_config off
+      auto_https disable_redirects
+      local_certs
+      skip_install_trust
+      storage file_system "{$CADDY_DATA_DIR}"
     }
-    
-    http://:{$WEB_PORT} {
+
+    {$WEB_SCHEME}://{$WEB_HOST}:{$WEB_PORT} {
       bind {$IP}
 
       @socketio path /socket.io /socket.io/*
@@ -69,8 +72,17 @@ let
           };
           readiness_probe = {
             exec.command = ''
-              ${pkgs.curl}/bin/curl --fail --silent --max-time 2 \
-              "http://127.0.0.1:$WEB_PORT/" > /dev/null             
+              if [ "$WEB_SCHEME" = https ]; then
+                exec ${pkgs.curl}/bin/curl --fail --silent --show-error \
+                  --max-time 3 --noproxy '*' \
+                  --cacert "$CADDY_DATA_DIR/pki/authorities/local/root.crt" \
+                  --resolve "$WEB_HOST:$WEB_PORT:127.0.0.1" \
+                  "https://$WEB_HOST:$WEB_PORT/" > /dev/null
+              else
+                exec ${pkgs.curl}/bin/curl --fail --silent --show-error \
+                  --max-time 3 --noproxy '*' \
+                  "http://127.0.0.1:$WEB_PORT/" > /dev/null
+              fi
             '';
             initial_delay_seconds = 1;
             period_seconds = 10;
@@ -95,6 +107,7 @@ pkgs.writeShellApplication {
     export WEB_PORT="''${WEB_PORT:-8088}"
     export PC_PORT="''${PC_PORT:-18080}"
     export IP="''${IP:-127.0.0.1}"
+    export CADDY_DATA_DIR="''${CADDY_DATA_DIR:-$HOME/.local/share/caddy}"
 
     logDir="''${XDG_STATE_HOME:-$HOME/.local/state}/robo-rally/$PC_PORT"
     mkdir -p "$logDir"
