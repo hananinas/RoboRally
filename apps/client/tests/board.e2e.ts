@@ -57,11 +57,11 @@ test('plays rapid server results one robot at a time without replacing its sprit
   if (!original) throw new Error('Robot sprite is unavailable')
 
   const steps = [
-    { robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 6 }, orientation: 'NORTH' } },
-    { robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 5 }, orientation: 'NORTH' } },
-    { robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 10, y: 5 }, orientation: 'WEST' } },
-    { robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 9, y: 5 }, orientation: 'WEST' } },
-    { robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 9, y: 5 }, orientation: 'SOUTH' } },
+    { gameId: 'demo', roundNumber: 1, registerIndex: 0, robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 6 }, orientation: 'NORTH' } },
+    { gameId: 'demo', roundNumber: 1, registerIndex: 1, robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 5 }, orientation: 'NORTH' } },
+    { gameId: 'demo', roundNumber: 1, registerIndex: 2, robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 10, y: 5 }, orientation: 'WEST' } },
+    { gameId: 'demo', roundNumber: 1, registerIndex: 3, robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 9, y: 5 }, orientation: 'WEST' } },
+    { gameId: 'demo', roundNumber: 1, registerIndex: 4, robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 9, y: 5 }, orientation: 'SOUTH' } },
   ] as const
   await page.evaluate((actions) => {
     (window as Window & { boardFixture: BoardHarnessApi }).boardFixture.enqueue(actions)
