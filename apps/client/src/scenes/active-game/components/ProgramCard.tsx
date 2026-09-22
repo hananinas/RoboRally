@@ -24,22 +24,9 @@ function instructionLabel(instruction: Instruction): string {
       return 'Turn Left'
   }
 }
-
-function CardIcon({ instruction }: { instruction: Instruction }) {
-  const icons: Record<Instruction, string> = {
-    MOVE_1: arrowUp1,
-    TURN_LEFT: arrowLeft,
-  }
-
-  return (
-    <img
-      src={icons[instruction]}
-      alt=""
-      aria-hidden="true"
-      className="program-card__icon"
-      draggable={false}
-    />
-  )
+const icons : Record <Instruction, string> ={
+  MOVE_1: arrowUp1,
+  TURN_LEFT: arrowLeft,
 }
 
 // Renders a programming card.
@@ -70,11 +57,18 @@ function ProgramCard({
         draggingClassName
       }
     >
-      <CardIcon instruction={card.instruction} />
+      
+      
+      <img
+  src={icons[card.instruction]}
+  alt=""
+  className="program-card__icon"
+  draggable={false}
+/>
 
-      <span className="program-card__label">
-        {label}
-      </span>
+<span className="program-card__label">
+  {instructionLabel(card.instruction)}
+</span>
     </button>
   )
 }
