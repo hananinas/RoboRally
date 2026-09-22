@@ -4,7 +4,8 @@
   "private": true,
   "packageManager": "pnpm@10.9.0",
   "scripts": {
-    "dev": "pnpm --filter @robo-rally/client dev",
+    "install-dev": "pnpm -r --workspace-concurrency=1 run install-dev",
+    "dev": "pnpm --parallel run dev",
     "build": "pnpm --recursive --if-present build",
     "lint": "pnpm --recursive --if-present lint",
     "test": "pnpm --recursive --if-present test",
