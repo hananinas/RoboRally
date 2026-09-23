@@ -214,6 +214,19 @@ describe('client game state', () => {
     ])
   })
 
+  it('does not erase a selected program when the same hand is dealt again', () => {
+    const state = selectProgram()
+    const submission = createSubmission(state)
+
+    const duplicate = gameStateReducer(state, {
+      type: 'dealt',
+      hand,
+    })
+
+    expect(duplicate.registers).toEqual(state.registers)
+    expect(createSubmission(duplicate)).toEqual(submission)
+  })
+
   it('freezes edits and duplicate submissions from send through acceptance', () => {
     let state = selectProgram()
     const registers = state.registers
@@ -362,6 +375,37 @@ describe('client game state', () => {
     })
     expect(state.playback.robots.find((robot) => robot.robotId === robotId)?.position)
       .toEqual(actions[4].position)
+  })
+
+  it('replaces old cards with the next hand only after playback finishes', () => {
+    const nextCards: readonly Card[] = cards.map((card) => ({
+      id: card.id.replace('10000000', '20000000'),
+      instruction: card.instruction === 'MOVE_1' ? 'TURN_LEFT' : 'MOVE_1',
+    }))
+    let state = selectProgram()
+    const previousRegisters = state.registers
+
+    state = changePhase(state, 'EXECUTING')
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, { type: 'dealt', hand: { ...hand, roundNumber: 2, cards: nextCards } })
+    state = changePhase(state, 'PROGRAMMING', 2)
+
+    expect(state.registers).toEqual(previousRegisters)
+    expect(canProgram(state)).toBe(false)
+
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(state.hand).toEqual(nextCards)
+    expect(state.registers).toEqual(emptyRegisters)
+    expect(canProgram(state)).toBe(true)
+
+    state = gameStateReducer(state, { type: 'place', cardId: cards[0].id, registerIndex: 0 })
+    expect(state.registers).toEqual(emptyRegisters)
+
+    for (const [registerIndex, card] of nextCards.slice(0, 5).entries()) {
+      state = gameStateReducer(state, { type: 'place', cardId: card.id, registerIndex })
+    }
+    expect(state.registers.slice(0, 5)).toEqual(nextCards.slice(0, 5))
+    expect(createSubmission(state)?.cardIds).toEqual(nextCards.slice(0, 5).map((card) => card.id))
   })
 
   it('records another player as ready without accepting or disabling the local program', () => {
