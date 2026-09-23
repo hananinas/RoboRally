@@ -4,8 +4,9 @@ info:
   title: Game Service
   version: 0.5.0-draft
   description: |-
-  This document describes RoboRally's client-server communication. No code change regarding communication should be made without updating this document. 
-  Server broadcast destinations represent SocketIO Rooms. 
+    This document describes RoboRally's client-server communication. No code change
+    regarding communication should be made without updating this document.
+    Server broadcast destinations represent Socket.IO rooms.
 defaultContentType: application/json
 
 channels:
@@ -28,7 +29,9 @@ channels:
 
   loginReplies:
     address: null
-    description: Logical reply channel; delivered through the user.login acknowledgement.
+    description: |
+      Logical reply channel
+      Delivered through the acknowledgement of user.login
     messages:
       result:
         $ref: '#/components/messages/LoginResult'
@@ -44,7 +47,9 @@ channels:
 
   leaveReplies:
     address: null
-    description: Logical reply channel; delivered through the game.leave acknowledgement.
+    description: |
+      Logical reply channel
+      Delivered through the acknowledgement of game.leave
     messages:
       result:
         $ref: '#/components/messages/LeaveResult'
@@ -52,8 +57,8 @@ channels:
   programReplies:
     address: null
     description: |
-      Logical reply channel, not a Socket.IO room.
-      Delivered through the acknowledgement callback of program.submit.
+      Logical reply channel
+      Delivered through the acknowledgement of program.submit
     messages:
       programResult:
         $ref: '#/components/messages/ProgramResult'
@@ -61,8 +66,8 @@ channels:
   publicGameStateReplies:
     address: null
     description: |
-      Logical reply channel, not a Socket.IO room.
-      Delivered through the acknowledgement callback of game.getPublicGameState
+      Logical reply channel
+      Delivered through the acknowledgement of game.getPublicGameState
     messages:
       publicGameStateResult:
         $ref: '#/components/messages/PublicGameStateResult'
@@ -92,8 +97,6 @@ channels:
         $ref: '#/components/messages/PlayerJoined'
       playerLeft:
         $ref: '#/components/messages/PlayerLeft'
-      phaseChanged:
-        $ref: '#/components/messages/PhaseChanged'
 
 operations:
   handleLogin:
@@ -182,10 +185,7 @@ components:
     # Login
     Login:
       name: user.login
-      description: |
-        Find or create a user from a username; never create game participation.
-        Multiple connections may log in as the same user. Exclusivity is checked
-        only when joining the same game, not during login.
+      description: Requests a user identity for a username.
       payload:
         $ref: '#/components/schemas/Login'
 
@@ -197,7 +197,7 @@ components:
 
     LoginResult:
       name: user.loginResult
-      description: Acknowledgement only. Return approved user identity or a rejection; never player or robot.
+      description: Returns an approved user identity or a rejection.
       payload:
         $ref: '#/components/schemas/LoginResult'
 
@@ -217,10 +217,7 @@ components:
     # Membership
     JoinGame:
       name: game.join
-      description: >-
-        Use the approved connection identity. Reserve membership atomically; another
-        connection using this user gets USER_ALREADY_IN_GAME. A player joining during
-        EXECUTING sits out until the next PROGRAMMING phase.
+      description: Requests participation in a game for the logged-in user.
       payload:
         $ref: '#/components/schemas/JoinGame'
 
@@ -233,8 +230,8 @@ components:
     JoinResult:
       name: game.joinResult
       description: >-
-        Acknowledgement only. Return assignment, initial state, private hand, and submission status
-        together, or a rejection.
+        Returns the player's assignment, game state, private hand, and submission
+        status, or a rejection.
       payload:
         $ref: '#/components/schemas/JoinResult'
 
@@ -266,7 +263,6 @@ components:
                       y: 0
                     orientation: NORTH
               phase: PROGRAMMING
-              roundNumber: 1
               antenna:
                 x: 0
                 y: 0
@@ -323,7 +319,6 @@ components:
                       y: 0
                     orientation: NORTH
               phase: EXECUTING
-              roundNumber: 1
               antenna:
                 x: 0
                 y: 0
@@ -346,11 +341,7 @@ components:
 
     LeaveGame:
       name: game.leave
-      description: >-
-        Remove only the requesting connection's membership/robot/program and private/public room
-        subscriptions, while preserving login. Acknowledge LEFT before notifying remaining clients.
-        Recheck progression after the removal event. Disconnect uses the same removal path without
-        an acknowledgement and releases membership immediately when the service detects it.
+      description: Requests removal of the logged-in user's game participation.
       payload:
         $ref: '#/components/schemas/LeaveGame'
       examples:
@@ -360,9 +351,7 @@ components:
 
     LeaveResult:
       name: game.leaveResult
-      description: >-
-        Acknowledgement only. Explicit leave preserves login. Repeating leave is safe and cannot
-        remove another connection's membership.
+      description: Confirms that the user left the game or returns a rejection.
       payload:
         $ref: '#/components/schemas/LeaveResult'
       examples:
@@ -373,16 +362,13 @@ components:
 
     PlayerJoined:
       name: game.playerJoined
-      description: >-
-        New participant and robot for existing clients; includes current-round eligibility and
-        submission status, never the hand.
+      description: Announces a new player and robot to existing game participants.
       payload:
         $ref: '#/components/schemas/PlayerJoined'
       examples:
         - name: joinDuringActivation
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
-            roundNumber: 1
             player:
               playerId: 00000000-0000-4000-8000-000000000002
               username: Dane
@@ -399,16 +385,13 @@ components:
 
     PlayerLeft:
       name: game.playerLeft
-      description: >-
-        Removal after explicit leave or detected disconnect. Emit once to remaining clients before
-        any phase transition the removal triggers.
+      description: Announces a player's removal after leaving or disconnecting.
       payload:
         $ref: '#/components/schemas/PlayerLeft'
       examples:
         - name: disconnect
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
-            roundNumber: 1
             playerId: 00000000-0000-4000-8000-000000000002
             robotId: 00000000-0000-4000-8000-000000000003
             reason: DISCONNECTED
@@ -424,15 +407,11 @@ components:
           gameId:
             $ref: '#/components/schemas/GameId'
       description: >-
-        Only this connection's current game membership grants access; reading does not join.
-        Return GAME_NOT_FOUND without state for unknown games, nonmembers, or malformed requests.
+        Requests the public state of the game joined by this connection.
 
     PublicGameStateResult:
       name: game.publicGameStateResult
-      description: >-
-        Acknowledgement for game.getPublicGameState. GAME_FOUND is available only to the requesting
-        connection's current game membership; GAME_NOT_FOUND means no accessible game and contains
-        no state.
+      description: Returns the public game state or GAME_NOT_FOUND.
       payload:
         oneOf:
           - $ref: '#/components/schemas/PublicGameStateFound'
@@ -453,7 +432,6 @@ components:
           - gameId
           - playerId
           - cardIds
-          - roundNumber
         properties:
           gameId:
             $ref: "#/components/schemas/GameId"
@@ -467,17 +445,12 @@ components:
             uniqueItems: true
             items:
               $ref: "#/components/schemas/CardId"
-          roundNumber:
-            $ref: "#/components/schemas/RoundNumber"
       description: >-
-        Submit once per round during PROGRAMMING. The round number must equal the current game
-        round. Accept only the connection-owned player and five distinct cards from their hand;
-        rejection changes nothing.
+        Submits five cards in register order for the connection-owned player.
       examples:
         - name: submit
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
-            roundNumber: 1
             playerId: 00000000-0000-4000-8000-000000000002
             cardIds:
               - 00000000-0000-4000-8000-000000000101
@@ -499,8 +472,9 @@ components:
               - INVALID_PROGRAM
               - INTERNAL_ERROR
       description: >-
-        INVALID_PROGRAM rejects an invalid submission. INTERNAL_ERROR means acceptance failed.
-        Neither changes game state. No acknowledgement means the outcome is unknown.
+        ACCEPTED confirms the program was stored. INVALID_PROGRAM rejects the
+        submission without changing game state. INTERNAL_ERROR means the service
+        failed before accepting it. No acknowledgement means the outcome is unknown.
 
     ProgramSubmitted:
       name: program.submitted
@@ -511,39 +485,16 @@ components:
         required:
           - playerId
           - gameId
-          - roundNumber
         properties:
           playerId:
             $ref: "#/components/schemas/PlayerId"
           gameId:
             $ref: "#/components/schemas/GameId"
-          roundNumber:
-            $ref: "#/components/schemas/RoundNumber"
       examples:
         - name: ready
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
-            roundNumber: 1
             playerId: 00000000-0000-4000-8000-000000000002
-
-    PhaseChanged:
-      name: game.phaseChanged
-      description: >-
-        Authoritative round/phase transition, broadcast to every current game connection. Clients
-        queue it after earlier action results.
-      payload:
-        $ref: '#/components/schemas/PhaseChanged'
-      examples:
-        - name: startActivation
-          payload:
-            gameId: 00000000-0000-4000-8000-000000000001
-            roundNumber: 1
-            phase: EXECUTING
-        - name: nextProgramming
-          payload:
-            gameId: 00000000-0000-4000-8000-000000000001
-            roundNumber: 2
-            phase: PROGRAMMING
 
     RobotActionResolved:
       name: robot.actionResolved
@@ -554,7 +505,6 @@ components:
           - instruction
           - position
           - gameId
-          - roundNumber
           - registerIndex
         properties:
           robotId:
@@ -565,23 +515,17 @@ components:
             $ref: "#/components/schemas/Position"
           gameId:
             $ref: "#/components/schemas/GameId"
-          roundNumber:
-            $ref: "#/components/schemas/RoundNumber"
           registerIndex:
             type: integer
             minimum: 0
             maximum: 4
             description: Zero-based register index; display 1–5. Multiple robot actions can share one index.
       description: >-
-        One result per eligible robot per register, including blocked moves. Broadcast immediately
-        to all joined clients. Ordered by register then recalculated antenna priority; clients
-        preserve every result in playback. Use game/round IDs to ignore stale results; do not wait
-        for animation acknowledgements.
+        Reports the resulting robot state after one programmed instruction.
       examples:
         - name: firstRegister
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
-            roundNumber: 1
             registerIndex: 0
             robotId: 00000000-0000-4000-8000-000000000003
             instruction: MOVE_1
@@ -598,7 +542,6 @@ components:
         required:
           - cards
           - gameId
-          - roundNumber
           - playerId
         properties:
           cards:
@@ -607,19 +550,14 @@ components:
               $ref: "#/components/schemas/Card"
           gameId:
             $ref: "#/components/schemas/GameId"
-          roundNumber:
-            $ref: "#/components/schemas/RoundNumber"
           playerId:
             $ref: "#/components/schemas/PlayerId"
       description: >-
-        Private hand for the named player and round, sent after PROGRAMMING. Initial hand arrives in
-        JOINED, not a second event. A late-activation join receives its first cards here. Ignore an
-        old round or a different assignment.
+        Private hand dealt to the named player for a programming round.
       examples:
         - name: nextHand
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
-            roundNumber: 2
             playerId: 00000000-0000-4000-8000-000000000002
             cards:
               - id: 00000000-0000-4000-8000-000000000101
@@ -756,15 +694,10 @@ components:
             cards.dealt at the next PROGRAMMING phase.
         programSubmitted:
           type: boolean
-          description: >-
-            Whether this player has already submitted for the current round. Locks duplicate
-            submission on repeated joins.
+          description: Whether this player has submitted for the current round.
       description: >-
-        Assignment, state, private hand, and submission status describe the same instant.
-        State includes the assigned player and robot. Apply them before live updates.
-        A new player participates immediately during
-        PROGRAMMING; during EXECUTING they receive hand [] and sit out until the next round.
-        Repeated joins return the current assignment, hand, and status without reset or notification.
+        A new player participates immediately during PROGRAMMING. During EXECUTING,
+        they receive an empty hand and sit out until the next round.
 
     JoinRejected:
       type: object
@@ -816,9 +749,7 @@ components:
         gameId:
           $ref: "#/components/schemas/GameId"
       description: >-
-        The connection no longer participates in this game. Keep its approved login. Repeating leave
-        on a known game returns LEFT without another removal event; never remove membership owned by
-        another connection.
+        The connection no longer participates in this game. Its login remains valid.
     LeaveRejected:
       type: object
       additionalProperties: false
@@ -833,8 +764,7 @@ components:
             - GAME_NOT_FOUND
             - INTERNAL_ERROR
       description: >-
-        Malformed/unknown/unauthenticated requests change nothing. Reuse login/join rejection
-        meanings. Unexpected failures must not leave partially removed membership.
+        A rejected leave request does not change game membership.
     PlayerState:
       type: object
       additionalProperties: false
@@ -853,46 +783,36 @@ components:
         participatesInRound:
           type: boolean
       description: >-
-        Public readiness only; never cards. A player joining during EXECUTING has both flags false.
-        At the next PROGRAMMING phase all current players participate and all submission flags
-        reset.
+        Public participation and submission status; never contains cards.
 
     PlayerJoined:
       type: object
       additionalProperties: false
       required:
         - gameId
-        - roundNumber
         - player
         - robot
       properties:
         gameId:
           $ref: "#/components/schemas/GameId"
-        roundNumber:
-          $ref: "#/components/schemas/RoundNumber"
         player:
           $ref: "#/components/schemas/PlayerState"
         robot:
           $ref: "#/components/schemas/Robot"
       description: >-
-        Send to existing game connections after the new connection receives JOINED. player.playerId
-        equals robot.playerId. The snapshot already includes the joining player, so do not send them
-        this event. Duplicate joins emit nothing.
+        player.playerId must equal robot.playerId.
 
     PlayerLeft:
       type: object
       additionalProperties: false
       required:
         - gameId
-        - roundNumber
         - playerId
         - robotId
         - reason
       properties:
         gameId:
           $ref: "#/components/schemas/GameId"
-        roundNumber:
-          $ref: "#/components/schemas/RoundNumber"
         playerId:
           $ref: "#/components/schemas/PlayerId"
         robotId:
@@ -903,20 +823,15 @@ components:
             - LEFT
             - DISCONNECTED
       description: >-
-        Broadcast to remaining game connections after atomic removal. roundNumber is the round the
-        player left, before any resulting phase transition. Remove the player/robot from display and
-        readiness. Process after earlier queued actions, not ahead of their playback.
+        Identifies the removed player and robot and whether they left explicitly or disconnected.
 
     # Snapshots
     PublicGameState:
       description: >-
-        Authoritative snapshot at the join/read boundary. Player flags, robots, phase, round, and
-        antenna describe the same instant. Each player maps to exactly one robot via robot.playerId.
-        Private hand/submission fields in JOINED agree with that player entry.
+        Public board, robot, player, phase, and antenna state for a game.
       type: object
       required:
         - gameId
-        - roundNumber
         - board
         - antenna
         - players
@@ -933,8 +848,6 @@ components:
             $ref: "#/components/schemas/Robot"
         phase:
           $ref: "#/components/schemas/GamePhase"
-        roundNumber:
-          $ref: "#/components/schemas/RoundNumber"
         antenna:
           $ref: "#/components/schemas/Antenna"
         players:
@@ -965,14 +878,6 @@ components:
         No accessible game: the game is unknown, the connection is not a member, or the request is
         malformed. Do not return state or reveal whether an inaccessible game exists.
 
-    # Rounds
-    RoundNumber:
-      type: integer
-      minimum: 1
-      description: >-
-        Starts at 1. Increment once when activation ends, including early completion because no
-        eligible robots remain. Both phases of a round use that number. With no players, PROGRAMMING
-        remains idle and never advances by itself.
     GamePhase:
       type: string
       enum:
@@ -980,32 +885,11 @@ components:
         - EXECUTING
       description: EXECUTING means domain activation. No lobby/WAITING phase.
 
-    PhaseChanged:
-      type: object
-      additionalProperties: false
-      required:
-        - gameId
-        - roundNumber
-        - phase
-      properties:
-        gameId:
-          $ref: "#/components/schemas/GameId"
-        roundNumber:
-          $ref: "#/components/schemas/RoundNumber"
-        phase:
-          $ref: "#/components/schemas/GamePhase"
-      description: >-
-        Broadcast once per transition. EXECUTING keeps the round number and follows the
-        final submission event. PROGRAMMING increments the round, resets submissions,
-        and precedes private hands. See Communication.md for progression and leave rules.
-
     # Shared types
     UserId:
       type: string
       format: uuid
-      description: >-
-        Opaque service-issued user ID, separate from player and socket IDs. Storage lifetime is
-        deferred to #65 and does not change the client flow.
+      description: Opaque service-issued user identifier.
 
     GameId:
       type: string

@@ -7,15 +7,13 @@ callbacks; game updates arrive as events. This guide describes the v0.5 flow.
 
 ## Login and joining
 
-A username contains 1–30 Unicode code points. The service preserves it exactly,
-without trimming or character restrictions, and returns a user ID. Login creates
-no player, robot, or game membership.
+The client logs in with a username and receives a user ID. Login creates no
+player, robot, or game membership.
 
 The client then sends `game.join` on the same socket for the configured game.
 `JOINED` returns the player/robot assignment, public state, private hand, and
-submission status together. The client applies them before live game events; it
-does not request a second initial snapshot or hand. A future lobby can fit between
-login and joining.
+submission status together. The client applies them before live game events. A
+future lobby can fit between login and joining.
 
 Multiple connections may log in as the same user, but only one may join a given
 game. Another connection receives `USER_ALREADY_IN_GAME`. A failed join leaves the
@@ -51,10 +49,10 @@ sequenceDiagram
 
 Each player submits five distinct card IDs in register order for the current round.
 The service checks ownership and waits until all current players have submitted.
-It then announces `EXECUTING` and resolves five registers. Within each register,
-robots act in antenna priority order, recalculated after each action. Afterward,
-the service announces the next `PROGRAMMING` round and deals each player a private
-hand. Clients play resolved actions in event order before enabling programming.
+It then resolves five registers. Within each register, robots act in antenna
+priority order, recalculated after each action. Afterward, the service deals each
+player a private hand for the next round. Clients play resolved actions in event
+order before enabling the newly dealt hand.
 
 The sequence keeps public and private Socket.IO rooms visible. Both clients have
 already joined and received their initial hand in the `JOINED` acknowledgement.
@@ -69,21 +67,15 @@ sequenceDiagram
     participant Public as game:{gameId}:public
 
     loop Each round
-        A->>Server: program.submit {gameId, roundNumber, playerId, cardIds}
+        A->>Server: program.submit {gameId, playerId, cardIds}
         Server-->>A: Acknowledgement: ACCEPTED
         Server->>Public: program.submitted {playerId: A}
-        Public-->>A: program.submitted
         Public-->>B: program.submitted
 
-        B->>Server: program.submit {gameId, roundNumber, playerId, cardIds}
+        B->>Server: program.submit {gameId, playerId, cardIds}
         Server-->>B: Acknowledgement: ACCEPTED
         Server->>Public: program.submitted {playerId: B}
         Public-->>A: program.submitted
-        Public-->>B: program.submitted
-
-        Server->>Public: game.phaseChanged {phase: EXECUTING}
-        Public-->>A: game.phaseChanged
-        Public-->>B: game.phaseChanged
         loop Registers 1 through 5
             loop Eligible robots in antenna order
                 Note over Server: Execute next instruction
@@ -93,9 +85,6 @@ sequenceDiagram
             end
         end
 
-        Server->>Public: game.phaseChanged {phase: PROGRAMMING}
-        Public-->>A: game.phaseChanged
-        Public-->>B: game.phaseChanged
         Server->>PrivateA: cards.dealt {cards}
         PrivateA-->>A: cards.dealt {cards}
         Server->>PrivateB: cards.dealt {cards}
@@ -125,11 +114,12 @@ The antenna is at the top centre of the board, facing south. The test board uses
 tile. [The priority algorithm](game_model_UML.md#robot-priority-typescript-reference-implementation)
 defines the action order.
 
-The client uses `VITE_GAME_ID` for the shared game and `VITE_GAME_SERVICE_URL` for
-the service. It listens before joining, applies the `JOINED` result together, and
-then processes later events in order. It keeps programming locked during
-activation, after submission, without a hand, or while playback is running.
+The client uses `VITE_GAME_ID` for the shared game and connects to the Game Service
+at the application's origin. It listens before joining, applies the `JOINED`
+result together, and then processes later events in order. It keeps programming
+locked during activation, after submission, without a hand, or while playback is
+running.
 A hand may arrive before playback ends; keep it until all queued actions finish.
-Queue removals and phase changes behind earlier resolved actions.
+Queue membership changes behind earlier resolved actions.
 Login and join requests may be retried manually after a five-second timeout on
 the same socket; repeated requests reuse the existing identity or assignment.
