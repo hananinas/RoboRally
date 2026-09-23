@@ -33,8 +33,8 @@ const selectedCardIds: ProgramCardIds = [
   cards[1].id,
   cards[2].id,
 ]
-const firstCard: ProgramCard = { id: cards[0].id, label: 'Move 1' }
-const secondCard: ProgramCard = { id: cards[1].id, label: 'Turn Left' }
+const firstCard: ProgramCard = cards[0]
+const secondCard: ProgramCard = cards[1]
 const emptyRegisters: Registers = Object.freeze(
   Array.from({ length: REGISTER_COUNT }, () => null),
 )

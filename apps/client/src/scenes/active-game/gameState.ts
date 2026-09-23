@@ -1,8 +1,8 @@
 import type {
+  Card,
   CardsDealt,
   GameId,
   GamePhase,
-  Instruction,
   PhaseChanged,
   PlayerId,
   ProgramResult,
@@ -18,10 +18,7 @@ import {
   type RobotPlaybackState,
 } from './board/robotPlayback.ts'
 
-export type ProgramCard = {
-  id: string
-  label: string
-}
+export type ProgramCard = Card
 
 export type Registers = readonly (ProgramCard | null)[]
 
@@ -61,11 +58,6 @@ export type GameStateEvent =
   | { type: 'submission-unknown'; handVersion: number }
 
 export const REGISTER_COUNT = 5
-
-const cardLabels: Record<Instruction, string> = {
-  MOVE_1: 'Move 1',
-  TURN_LEFT: 'Turn Left',
-}
 
 function emptyRegisters(): Registers {
   return Array.from({ length: REGISTER_COUNT }, () => null)
@@ -130,7 +122,7 @@ function activateHand(state: ClientGameState): ClientGameState {
   return {
     ...state,
     playerId: hand.playerId,
-    hand: hand.cards.map((card) => ({ id: card.id, label: cardLabels[card.instruction] })),
+    hand: hand.cards,
     handRoundNumber: hand.roundNumber,
     handVersion: state.handVersion + 1,
     pendingHand: null,
