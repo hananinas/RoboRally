@@ -18,6 +18,7 @@ export const OTHER_ROBOT_ID = '33333333-3333-4333-8333-333333333334'
 
 export function createPublicState(): PublicGameState {
   return {
+    players: [PLAYER_ID, OTHER_PLAYER_ID].map((playerId, index) => ({ playerId, username: `Player ${index + 1}`, programSubmitted: false, participatesInRound: true })),
     gameId: GAME_ID,
     phase: 'PROGRAMMING',
     roundNumber: 1,

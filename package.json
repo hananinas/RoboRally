@@ -8,8 +8,10 @@
     "dev": "pnpm --parallel run dev",
     "build": "pnpm --recursive --if-present build",
     "lint": "pnpm --recursive --if-present lint",
-    "test": "pnpm --recursive --if-present test",
-    "typecheck": "pnpm --recursive --if-present typecheck"
+    "test": "pnpm --recursive --if-present test && pnpm test:multiplayer",
+    "typecheck": "pnpm --recursive --if-present typecheck",
+    "demo": "pnpm --filter @robo-rally/game-events build && VITE_GAME_ID=00000000-0000-4000-8000-000000000001 pnpm --parallel --filter @robo-rally/client --filter @robo-rally/game-service dev",
+    "test:multiplayer": "pnpm --filter @robo-rally/game-events build && pnpm --filter @robo-rally/client exec playwright test --config playwright.real.config.ts"
   },
   "engines": {
     "node": ">=20.19"

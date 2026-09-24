@@ -8,6 +8,10 @@ export type {
 } from './events.js'
 export type {
   Antenna,
+  PublicPlayer,
+  LeaveResult,
+  PlayerJoined,
+  PlayerLeft,
   JoinGame,
   JoinResult,
   PlayerAssignment,

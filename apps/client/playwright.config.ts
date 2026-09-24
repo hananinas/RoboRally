@@ -6,6 +6,7 @@ const baseURL = 'http://127.0.0.1:4173'
 export default defineConfig({
   testDir: './tests',
   testMatch: '**/*.e2e.ts',
+  testIgnore: '**/*.real.e2e.ts',
   use: {
     baseURL,
     screenshot: 'only-on-failure',

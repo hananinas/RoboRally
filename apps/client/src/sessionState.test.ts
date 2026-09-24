@@ -18,6 +18,9 @@ const joined: Extract<JoinResult, { outcome: 'JOINED' }> = {
     gameId: '00000000-0000-4000-8000-000000000002',
     board: { width: 1, height: 1, tiles: [] },
     robots: [],
+    players: [],
+    roundNumber: 1,
+    antenna: { x: 0, y: 0, angle: Math.PI / 2 },
     phase: 'PROGRAMMING',
   },
   hand: [],
@@ -41,7 +44,6 @@ describe('sessionReducer', () => {
     expect(state).toMatchObject({
       status: 'joined',
       user,
-      assignment: joined.assignment,
     })
   })
 
@@ -71,7 +73,7 @@ describe('sessionReducer', () => {
     })
     state = sessionReducer(state, { type: 'join-retried' })
 
-    expect(state).toEqual({ status: 'joining', user, queuedEvents: [] })
+    expect(state).toEqual({ status: 'joining', user })
   })
 
   it('returns to login when joining requires it', () => {
@@ -81,18 +83,6 @@ describe('sessionReducer', () => {
     })
 
     expect(state).toEqual({ status: 'editing', username: user.username, error: 'LOGIN_REQUIRED' })
-  })
-
-  it('queues gameplay events received while joining', () => {
-    const state = sessionReducer(joiningState(), {
-      type: 'game-event-received',
-      event: { type: 'cards.dealt', payload: { cards: [] } },
-    })
-
-    expect(state).toMatchObject({
-      status: 'joining',
-      queuedEvents: [{ type: 'cards.dealt', payload: { cards: [] } }],
-    })
   })
 
   it('keeps login identity available after a join timeout', () => {

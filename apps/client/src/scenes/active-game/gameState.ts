@@ -1,5 +1,9 @@
 import type {
   Card,
+  JoinResult,
+  PlayerJoined,
+  PlayerLeft,
+  PublicPlayer,
   CardsDealt,
   GameId,
   GamePhase,
@@ -28,6 +32,8 @@ export type ClientGameState = {
   roundNumber: number | null
   playerId: PlayerId | null
   playerIds: readonly PlayerId[]
+  players: readonly PublicPlayer[]
+  pendingRobotRemovals: readonly string[]
   board: BoardRenderModel | null
   playback: RobotPlaybackState
   hand: readonly ProgramCard[]
@@ -40,6 +46,9 @@ export type ClientGameState = {
 }
 
 export type GameStateEvent =
+  | { type: 'joined'; result: Extract<JoinResult, { outcome: 'JOINED' }> }
+  | { type: 'player-joined'; payload: PlayerJoined }
+  | { type: 'player-left'; payload: PlayerLeft }
   | { type: 'connected' }
   | { type: 'disconnected' }
   | { type: 'error'; message: string }
@@ -68,6 +77,8 @@ export function createClientGameState(): ClientGameState {
     roundNumber: null,
     playerId: null,
     playerIds: [],
+    players: [],
+    pendingRobotRemovals: [],
     board: null,
     playback: createRobotPlaybackState([]),
     hand: [],
@@ -133,6 +144,36 @@ export function gameStateReducer(
   event: GameStateEvent,
 ): ClientGameState {
   switch (event.type) {
+    case 'joined': {
+      const { result } = event
+      let initialized = gameStateReducer({ ...createClientGameState(), connected: true, playerId: result.assignment.playerId }, {
+        type: 'initial-state', state: result.state,
+      })
+      if (result.hand.length) initialized = gameStateReducer(initialized, { type: 'dealt', hand: {
+        gameId: result.assignment.gameId, playerId: result.assignment.playerId,
+        roundNumber: result.state.roundNumber, cards: result.hand,
+      } })
+      return { ...initialized, submission: result.programSubmitted ? 'accepted' : 'idle' }
+    }
+    case 'player-joined': {
+      const { payload } = event
+      if (payload.gameId !== state.gameId || state.playerIds.includes(payload.player.playerId)) return state
+      const [robot] = createRobotPlaybackState([{ ...payload.robot, colour: '#428cb8' }]).robots
+      return { ...state, playerIds: [...state.playerIds, payload.player.playerId],
+        players: [...state.players, payload.player],
+        playback: { ...state.playback, robots: [...state.playback.robots, robot] } }
+    }
+    case 'player-left': {
+      const { payload } = event
+      if (payload.gameId !== state.gameId) return state
+      return { ...state,
+        playerIds: state.playerIds.filter((id) => id !== payload.playerId),
+        players: state.players.filter((player) => player.playerId !== payload.playerId),
+        pendingRobotRemovals: state.playback.active ? [...state.pendingRobotRemovals, payload.robotId] : state.pendingRobotRemovals,
+        playback: state.playback.active ? state.playback : { ...state.playback,
+          robots: state.playback.robots.filter((robot) => robot.robotId !== payload.robotId) },
+      }
+    }
     case 'connected':
       return { ...state, connected: true, error: null }
     case 'disconnected':
@@ -151,9 +192,10 @@ export function gameStateReducer(
         gameId: snapshot.gameId,
         phase: snapshot.phase,
         roundNumber: snapshot.roundNumber,
+        players: snapshot.players,
         playerIds: snapshot.robots.map((robot) => robot.playerId),
         playback: createRobotPlaybackState(
-          snapshot.robots.map((robot) => ({ ...robot, colour: '#c74f4f' })),
+          snapshot.robots.map((robot) => ({ ...robot, colour: robot.playerId === state.playerId ? '#c74f4f' : '#428cb8' })),
         ),
         board: createBoardRenderModel(
           snapshot.board.width,
@@ -198,8 +240,11 @@ export function gameStateReducer(
         ...state,
         playback: robotPlaybackReducer(state.playback, { type: 'enqueue', action: event.action }),
       }
-    case 'complete':
-      return activateHand({ ...state, playback: robotPlaybackReducer(state.playback, { type: 'complete' }) })
+    case 'complete': {
+      let playback = robotPlaybackReducer(state.playback, { type: 'complete' })
+      if (!playback.active) playback = { ...playback, robots: playback.robots.filter((robot) => !state.pendingRobotRemovals.includes(robot.robotId)) }
+      return activateHand({ ...state, playback, pendingRobotRemovals: playback.active ? state.pendingRobotRemovals : [] })
+    }
     case 'place': {
       if (!canProgram(state)) return state
       const card = state.hand.find((candidate) => candidate.id === event.cardId)

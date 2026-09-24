@@ -2,6 +2,8 @@ import { expect, test } from './game-fixture.ts'
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/')
+  await page.getByLabel('Username').fill('Player 1')
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Player 1', exact: true })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button')).toHaveCount(9)
 })

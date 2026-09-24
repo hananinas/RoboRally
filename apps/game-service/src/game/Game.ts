@@ -24,7 +24,8 @@ export type NextActionResult = Readonly<{
 
 export class Game {
   readonly board: Board
-  readonly players: readonly Player[]
+  private readonly roster: Player[]
+  private readonly activePlayerIds = new Set<PlayerId>()
   readonly antenna: Antenna
   private readonly deck: readonly Card[]
   private currentPhase: GamePhase = 'programming'
@@ -58,10 +59,41 @@ export class Game {
     }
 
     this.board = board
-    this.players = Object.freeze([...players])
+    this.roster = [...players]
     this.antenna = Object.freeze({ ...antenna })
     this.deck = [...deck]
     this.dealCards()
+  }
+
+  get players(): readonly Player[] {
+    return Object.freeze([...this.roster])
+  }
+
+  participatesInRound(playerId: PlayerId): boolean {
+    return this.currentPhase === 'programming' || this.activePlayerIds.has(playerId)
+  }
+
+  addPlayer(player: Player, position: Position): void {
+    if (this.roster.some((existing) => existing.id === player.id || existing.robot.id === player.robot.id)) {
+      throw new Error('Player or robot is already in the game')
+    }
+    this.board.placeRobot(player.robot.id, position)
+    this.roster.push(player)
+    player.setHand(this.currentPhase === 'programming' ? this.deck : [])
+  }
+
+  removePlayer(playerId: PlayerId): void {
+    const index = this.roster.findIndex((player) => player.id === playerId)
+    if (index === -1) return
+    const [player] = this.roster.splice(index, 1)
+    this.board.removeRobot(player.robot.id)
+    player.robot.clearProgram()
+    this.submittedPlayerIds.delete(playerId)
+    this.activePlayerIds.delete(playerId)
+    this.activatedRobotIds.delete(player.robot.id)
+    if (this.currentPhase === 'programming') this.recheckProgrammingPhase()
+    else if (this.activePlayerIds.size === 0) this.finishRound()
+    else if (this.activatedRobotIds.size === this.activePlayerIds.size) this.finishRegister()
   }
 
   get phase(): GamePhase {
@@ -136,7 +168,7 @@ export class Game {
       direction: robot.direction,
     }
 
-    if (this.activatedRobotIds.size === this.players.length) {
+    if (this.activatedRobotIds.size === this.activePlayerIds.size) {
       this.activateBoardElements()
       this.finishRegister()
     }
@@ -149,6 +181,8 @@ export class Game {
   }
 
   private startActivationPhase(): void {
+    this.activePlayerIds.clear()
+    for (const player of this.roster) this.activePlayerIds.add(player.id)
     this.currentPhase = 'activation'
     this.registerIndex = 0
     this.activatedRobotIds.clear()
@@ -163,7 +197,8 @@ export class Game {
 
     // Radians start east and increase clockwise because board y increases south.
     // Recheck current positions every action; exact ties retain roster order.
-    for (const { robot } of this.players) {
+    for (const { id, robot } of this.roster) {
+      if (!this.activePlayerIds.has(id)) continue
       if (this.activatedRobotIds.has(robot.id)) continue
       const position = this.board.positionOf(robot.id)
       const dx = position.x - this.antenna.x
@@ -205,6 +240,7 @@ export class Game {
   private finishRound(): void {
     for (const player of this.players) player.robot.clearProgram()
     this.submittedPlayerIds.clear()
+    this.activePlayerIds.clear()
     this.currentRound++
     this.registerIndex = 0
     this.dealCards()

@@ -4,10 +4,11 @@ import Panel from './Panel.tsx'
 
 type PlayerPanelProps = {
   player: { name: string }
+  participants?: readonly string[]
 }
 
 // Shows collapsible player details.
-function PlayerPanel({ player }: PlayerPanelProps) {
+function PlayerPanel({ player, participants }: PlayerPanelProps) {
   const [expanded, setExpanded] = useState(true)
 
   return (
@@ -18,6 +19,7 @@ function PlayerPanel({ player }: PlayerPanelProps) {
       </header>
       {expanded && (
         <div className="player-panel__details">
+          {participants && <p aria-label="Participants">Players: {participants.join(', ')} · Your robot is red</p>}
           {['Checkpoints', 'Health', 'Energy', 'Upgrades'].map((section) => (
             <section key={section} className="player-panel__detail">
               <h2>{section}</h2>

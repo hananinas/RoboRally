@@ -56,3 +56,7 @@ export function createSinglePlayerGame(): SinglePlayerGame {
 
   return Object.freeze({ gameId: GAME_ID, game, player })
 }
+
+export function createSharedGame(): Readonly<{ gameId: GameId; game: Game }> {
+  return { gameId: GAME_ID, game: new Game(createBoard(), [], createHand()) }
+}

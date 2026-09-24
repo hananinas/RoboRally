@@ -4,7 +4,10 @@ import { createGameSocketServer } from './gameServer.js'
 
 const host = '127.0.0.1'
 const port = parseGameServicePort(process.env.PORT)
-const httpServer = createServer()
+const httpServer = createServer((request, response) => {
+  response.writeHead(request.url === '/health' ? 200 : 404)
+  response.end(request.url === '/health' ? 'ok' : 'Not found')
+})
 const io = createGameSocketServer(httpServer)
 
 httpServer.listen(port, host, () => {

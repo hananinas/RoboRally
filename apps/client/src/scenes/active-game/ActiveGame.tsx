@@ -19,8 +19,8 @@ function getGameStatus(state: ClientGameState): string {
   return 'Waiting'
 }
 
-function ActiveGame() {
-  const { state, dispatch, submit } = useGameConnection()
+function ActiveGame({ game, username }: { game: ReturnType<typeof useGameConnection>; username: string }) {
+  const { state, dispatch, submit } = game
   const {
     handBelowHud,
     handRef,
@@ -41,12 +41,12 @@ function ActiveGame() {
   ].filter(Boolean).join(' ')
 
   return (
-    <div className="game">
+    <div className="game" data-active-register={state.playback.active?.registerIndex} data-active-robot-id={state.playback.active?.robotId}>
       {state.board && <BoardViewport board={state.board} robots={state.playback.robots} />}
       <div ref={overlayRef} className={overlayClassName}>
         <aside className="game-hud" aria-label="Game controls">
           <div ref={hudContentRef} className="game-hud__content">
-            <PlayerPanel player={{ name: 'Player 1' }} />
+            <PlayerPanel player={{ name: username }} participants={state.players.map((player) => player.username)} />
             <RegisterPanel
               registers={state.registers}
               disabled={disabled}

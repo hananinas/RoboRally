@@ -54,6 +54,10 @@ export class Board {
     this.robotPositions.set(robotId, { ...position })
   }
 
+  removeRobot(robotId: RobotId): void {
+    this.robotPositions.delete(robotId)
+  }
+
   positionOf(robotId: RobotId): Position {
     const position = this.robotPositions.get(robotId)
     if (!position) {

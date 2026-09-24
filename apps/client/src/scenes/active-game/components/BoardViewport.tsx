@@ -170,6 +170,7 @@ function RobotPiece({
       )}
       data-board-tile={`${robot.position.coordinate.x},${robot.position.coordinate.y}`}
       data-robot-id={robot.robotId}
+      data-orientation={robot.position.orientation}
       preserveAspectRatio="xMidYMid meet"
       style={style}
       viewBox={component.asset.viewBox}

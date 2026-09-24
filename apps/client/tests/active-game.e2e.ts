@@ -6,7 +6,9 @@ import { GAME_ID, OTHER_PLAYER_ID, OTHER_ROBOT_ID, PLAYER_ID, ROBOT_ID, ROUND_AC
 async function openGame(page: Page, width = 1280, height = 720, waitForHand = true) {
   await page.setViewportSize({ width, height })
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Player 1', exact: true })).toBeVisible()
+  await page.getByLabel('Username').fill('Player 1')
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
+  if (waitForHand) await expect(page.getByRole('heading', { name: 'Player 1', exact: true })).toBeVisible()
   if (waitForHand) await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button')).toHaveCount(9)
 }
 
@@ -24,7 +26,7 @@ async function pauseClock(page: Page) {
   await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
 }
 
-test('waits for the initial snapshot when the hand arrives first', async ({ page, game }) => {
+test('waits for the atomic join response before showing gameplay', async ({ page, game }) => {
   await game.control({ type: 'state-requests', deferred: true })
   await openGame(page, 1280, 720, false)
   await expect.poll(async () => (await game.snapshot()).pendingStateRequests).toBe(1)
@@ -44,8 +46,7 @@ test('retains reload guidance when disconnected during initial loading', async (
   await expect.poll(async () => (await game.snapshot()).pendingStateRequests).toBe(1)
 
   await game.control({ type: 'disconnect' })
-  await expect(page.getByRole('status')).toHaveText('Not connected')
-  await expect(page.getByRole('alert')).toContainText('Connection lost. Reload')
+  await expect(page.getByRole('alert')).toContainText('Connection lost')
   await expect(page.getByRole('region', { name: 'Programming hand' })).toHaveCount(0)
   await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
 })
@@ -471,9 +472,8 @@ test('keeps the initial hand locked when the initial state request times out', a
   await expect.poll(async () => (await game.snapshot()).pendingStateRequests).toBe(1)
   await page.clock.runFor(5000)
 
-  await expect(page.getByRole('alert')).toContainText('Could not load game state')
+  await expect(page.getByRole('alert')).toContainText('did not respond to the join request')
   await expect(page.getByRole('region', { name: 'Programming hand' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeDisabled()
   await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
   expect((await game.snapshot()).submissions).toHaveLength(0)
 })

@@ -1,8 +1,5 @@
-import type {
-  CardsDealt,
-  ProgramSubmitted,
-  RobotActionResolved,
-} from '@robo-rally/game-events'
+import ActiveGame from './scenes/active-game/ActiveGame.tsx'
+import useGameConnection from './scenes/active-game/useGameConnection.ts'
 import { useEffect, useReducer, useRef } from 'react'
 import Lobby from './scenes/lobby/Lobby.tsx'
 import {
@@ -36,32 +33,13 @@ const joinErrors: Record<JoinError, string> = {
 
 function App() {
   const connection = useGameSocket()
+  const game = useGameConnection(connection.socket)
+  const { initialize } = game
   const [session, dispatch] = useReducer(sessionReducer, undefined, createSessionState)
   const loginPending = useRef(false)
   const loginAttempt = useRef(0)
   const joinPending = useRef(false)
   const joinAttempt = useRef(0)
-
-  useEffect(() => {
-    const handleCardsDealt = (payload: CardsDealt) => {
-      dispatch({ type: 'game-event-received', event: { type: 'cards.dealt', payload } })
-    }
-    const handleProgramSubmitted = (payload: ProgramSubmitted) => {
-      dispatch({ type: 'game-event-received', event: { type: 'program.submitted', payload } })
-    }
-    const handleActionResolved = (payload: RobotActionResolved) => {
-      dispatch({ type: 'game-event-received', event: { type: 'robot.actionResolved', payload } })
-    }
-
-    connection.socket.on('cards.dealt', handleCardsDealt)
-    connection.socket.on('program.submitted', handleProgramSubmitted)
-    connection.socket.on('robot.actionResolved', handleActionResolved)
-    return () => {
-      connection.socket.off('cards.dealt', handleCardsDealt)
-      connection.socket.off('program.submitted', handleProgramSubmitted)
-      connection.socket.off('robot.actionResolved', handleActionResolved)
-    }
-  }, [connection.socket])
 
   useEffect(() => {
     if (session.status !== 'joining' || joinPending.current) return
@@ -83,12 +61,13 @@ function App() {
       (error, result) => {
         if (attempt !== joinAttempt.current) return
         joinPending.current = false
+        if (!error && result.outcome === 'JOINED') initialize(result)
         dispatch(error
-          ? { type: 'join-error', error: 'TIMEOUT' }
+          ? { type: 'join-error', error: connection.socket.connected ? 'TIMEOUT' : 'CONNECTION_ERROR' }
           : { type: 'join-result', result })
       },
     )
-  }, [connection.socket, connection.status, session.status])
+  }, [connection.socket, connection.status, session.status, initialize])
 
   const username = session.status === 'editing' || session.status === 'logging-in'
     ? session.username
@@ -132,6 +111,8 @@ function App() {
     )
   }
 
+  if (session.status === 'joined') return <ActiveGame game={game} username={session.user.username} />
+
   return (
     <Lobby
       connectionStatus={connection.status}
@@ -142,7 +123,7 @@ function App() {
       })}
       pending={pending}
       pendingLabel={session.status === 'logging-in' ? 'Logging in…'
-        : session.status === 'joined' ? 'Opening game…' : 'Joining game…'}
+        : 'Joining game…'}
       retryingJoin={session.status === 'join-failed'}
       usernameLocked={session.status !== 'editing'}
       username={username}

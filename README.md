@@ -8,16 +8,26 @@
 
 Building a web-based multiplayer version of the board game `Robo Rally`.
 
-## Current state
+## Multiplayer demo
 
-The client and Game Service implement the v0 single-player loop using shared
-Socket.IO game events. Browser tests use an isolated contract fixture rather
-than starting the production service.
+On `demo/multiplayer`, run `pnpm install` followed by `pnpm demo`.
+Open the client URL printed by Vite in two browser windows, enter different
+usernames, and join before either player submits. Select five cards and press
+Done in each window. The first player waits for the other; both clients play
+all robot actions before enabling the next hand. Repeat for another round.
+Closing a window removes that player and lets the remaining players continue.
 
-The Game Service keeps users in memory, keyed by their exact username. User IDs
-last only as long as that service instance: a restart creates a new ID for the
-same username. A new connection must log in again, but receives the existing
-ID while the service runs.
+This local integration combines #83, #82, #64, and the #76 contract now on main.
+It adds the membership and client initialization needed to connect those pieces.
+The demo retains #83's explicit phase events and round numbers; these extend the
+merged #76 contract and must be reconciled before promoting the integration to main.
+User identities and games are in memory. Reload to log in again after disconnect.
+The fixed demo hand contains Move 1 and Turn Left; this is a multiplayer gameplay
+loop, without victory conditions or the full board-game rules.
+
+`pnpm test:multiplayer` starts the real service and two independent browser clients,
+checks every action across two rounds, and verifies disconnect cleanup.
+`pnpm test` includes this scenario alongside the unit and fixture browser tests.
 
 ## Development Setup
 

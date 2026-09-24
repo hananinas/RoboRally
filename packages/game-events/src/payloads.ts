@@ -1,5 +1,4 @@
 export type GameId = string
-export type UserId = string
 export type PlayerId = string
 export type RobotId = string
 export type CardId = string
@@ -19,31 +18,6 @@ export type LoginResult =
         | 'ALREADY_LOGGED_IN'
         | 'INTERNAL_ERROR'
     }>
-
-export type User = Readonly<{
-  userId: UserId
-  username: string
-}>
-
-export type Login = Readonly<{ username: string }>
-
-export type LoginResult =
-  | Readonly<{ outcome: 'LOGGED_IN'; user: User }>
-  | Readonly<{
-      outcome:
-        | 'INVALID_USERNAME'
-        | 'INVALID_REQUEST'
-        | 'ALREADY_LOGGED_IN'
-        | 'INTERNAL_ERROR'
-    }>
-
-export type JoinGame = Readonly<{ gameId: GameId }>
-
-export type PlayerAssignment = Readonly<{
-  gameId: GameId
-  playerId: PlayerId
-  robotId: RobotId
-}>
 
 export type Instruction = 'MOVE_1' | 'TURN_LEFT'
 
@@ -98,6 +72,7 @@ export type PublicGameState = Readonly<{
   antenna: Antenna
   board: Board
   robots: readonly Robot[]
+  players: readonly PublicPlayer[]
   phase: GamePhase
 }>
 
@@ -108,7 +83,7 @@ export type CardsDealt = Readonly<{
   cards: readonly Card[]
 }>
 
-export type ProgramResultOutcome = 'ACCEPTED' | 'INVALID_PROGRAM'
+export type ProgramResultOutcome = 'ACCEPTED' | 'INVALID_PROGRAM' | 'INTERNAL_ERROR'
 
 export type ProgramResult = Readonly<{
   outcome: ProgramResultOutcome
@@ -142,27 +117,12 @@ export type PublicGameStateResult =
       outcome: 'GAME_NOT_FOUND'
     }>
 
-export type JoinResult =
-  | Readonly<{
-      outcome: 'JOINED'
-      assignment: PlayerAssignment
-      state: PublicGameState
-      hand: readonly Card[]
-      programSubmitted: boolean
-    }>
-  | Readonly<{
-      outcome:
-        | 'LOGIN_REQUIRED'
-        | 'INVALID_REQUEST'
-        | 'GAME_NOT_FOUND'
-        | 'NO_SPAWN_AVAILABLE'
-        | 'USER_ALREADY_IN_GAME'
-        | 'ALREADY_IN_GAME'
-        | 'INTERNAL_ERROR'
-    }>
-
+export type PublicPlayer = Readonly<{ playerId: PlayerId; username: string; programSubmitted: boolean; participatesInRound: boolean }>
 export type JoinGame = Readonly<{ gameId: GameId }>
 export type PlayerAssignment = Readonly<{ gameId: GameId; playerId: PlayerId; robotId: RobotId }>
 export type JoinResult =
   | Readonly<{ outcome: 'JOINED'; assignment: PlayerAssignment; state: PublicGameState; hand: readonly Card[]; programSubmitted: boolean }>
   | Readonly<{ outcome: 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND' | 'NO_SPAWN_AVAILABLE' | 'USER_ALREADY_IN_GAME' | 'ALREADY_IN_GAME' | 'INTERNAL_ERROR' }>
+export type LeaveResult = Readonly<{ outcome: 'LEFT' | 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'NOT_IN_GAME' }>
+export type PlayerJoined = Readonly<{ gameId: GameId; roundNumber: number; player: PublicPlayer; robot: Robot }>
+export type PlayerLeft = Readonly<{ gameId: GameId; roundNumber: number; playerId: PlayerId; robotId: RobotId }>

@@ -1,46 +1,41 @@
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import type { CardsDealt, ClientToServerEvents, ServerToClientEvents, SubmitProgram } from '@robo-rally/game-events'
+import type { JoinResult, CardsDealt, ClientToServerEvents, ServerToClientEvents, SubmitProgram } from '@robo-rally/game-events'
 import { io as connectSocket, type Socket } from 'socket.io-client'
 import { expect, it } from 'vitest'
-import { Board, Direction, EmptyTile, Game, Player, Robot, TurnLeft } from './game/index.js'
+import { createSharedGame } from './game/SinglePlayerGame.js'
 import { createGameSocketServer } from './gameServer.js'
 
 it('waits for the roster, broadcasts register-major actions, and deals two private next rounds', async () => {
-  const gameId = '00000000-0000-4000-8000-000000000001'
-  const players = [2, 3].map((id) => new Player(
-    `00000000-0000-4000-8000-00000000000${id}`,
-    new Robot(`robot-${id}`, Direction.NORTH),
-  ))
-  const board = new Board(Array.from({ length: 3 }, () =>
-    Array.from({ length: 3 }, () => new EmptyTile())))
-  board.placeRobot(players[0].robot.id, { x: 0, y: 2 })
-  board.placeRobot(players[1].robot.id, { x: 1, y: 1 })
-  const deck = Array.from({ length: 5 }, (_, index) =>
-    new TurnLeft(`00000000-0000-4000-8000-00000000010${index}`))
-  const game = new Game(board, players, deck)
+  const { gameId, game } = createSharedGame()
   const httpServer = createServer()
-  let connectionIndex = 0
-  const server = createGameSocketServer(httpServer, {
-    gameId, game, playerForConnection: () => players[connectionIndex++],
-  })
+  const server = createGameSocketServer(httpServer, { gameId, game })
+  const assignments: Extract<JoinResult, { outcome: 'JOINED' }>[] = []
   const clients: Socket<ServerToClientEvents, ClientToServerEvents>[] = []
   const events: { name: string; payload: unknown }[][] = [[], []]
   try {
     await new Promise<void>((resolve) => httpServer.listen(0, '127.0.0.1', resolve))
     const url = `http://127.0.0.1:${(httpServer.address() as AddressInfo).port}`
-    for (let index = 0; index < players.length; index++) {
+    for (let index = 0; index < 2; index++) {
       const socket: Socket<ServerToClientEvents, ClientToServerEvents> = connectSocket(url, {
         transports: ['websocket'], autoConnect: false, reconnection: false,
       })
       clients.push(socket)
       socket.onAny((name, payload: unknown) => events[index].push({ name, payload }))
-      const initialHand = new Promise<CardsDealt>((resolve) => socket.once('cards.dealt', resolve))
+      const connected = new Promise<void>((resolve) => socket.once('connect', resolve))
       socket.connect()
-      expect(await initialHand).toMatchObject({ gameId, roundNumber: 1, playerId: players[index].id })
+      await connected
+      await socket.timeout(1000).emitWithAck('user.login', { username: `Player ${index}` })
+      const assignment = await socket.timeout(1000).emitWithAck('game.join', { gameId })
+      if (assignment.outcome !== 'JOINED') throw new Error('join failed')
+      assignments.push(assignment)
       events[index] = []
     }
 
+    const players = game.players
+    const deck = assignments[0].hand.filter((card) => card.instruction === 'MOVE_1')
+    await clients[0].timeout(1000).emitWithAck('game.getPublicGameState', { gameId })
+    events[0] = []
     for (const roundNumber of [1, 2]) {
       const submissions = players.map((player): SubmitProgram => ({
         gameId, roundNumber, playerId: player.id,
@@ -75,13 +70,13 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
         expect(events[index][13].payload).toEqual({ gameId, roundNumber: roundNumber + 1, phase: 'PROGRAMMING' })
         const actions = events[index].filter((event) => event.name === 'robot.actionResolved')
         expect(actions.map((event) => event.payload)).toEqual(
-          Array.from({ length: 5 }, (_, registerIndex) => [1, 0].map((playerIndex) => ({
+          Array.from({ length: 5 }, (_, registerIndex) => [0, 1].map((playerIndex) => ({
             gameId, roundNumber, registerIndex,
             robotId: players[playerIndex].robot.id,
-            instruction: 'TURN_LEFT',
+            instruction: 'MOVE_1',
             position: {
-              coordinate: playerIndex === 0 ? { x: 0, y: 2 } : { x: 1, y: 1 },
-              orientation: ['WEST', 'SOUTH', 'EAST', 'NORTH'][(registerIndex + roundNumber - 1) % 4],
+              coordinate: { x: 10 - playerIndex, y: Math.max(0, 7 - (roundNumber - 1) * 5 - registerIndex - 1) },
+              orientation: 'NORTH',
             },
           }))).flat(),
         )

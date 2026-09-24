@@ -61,6 +61,7 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
 export function presentPublicGameState(
   gameId: GameId,
   game: Game,
+  usernameForPlayer: (playerId: string) => string = (id) => id,
 ): PublicGameState {
   const tiles = Array.from({ length: game.board.height }, (_, y) =>
     Array.from({ length: game.board.width }, (_, x) => presentTile(game, x, y)),
@@ -75,6 +76,12 @@ export function presentPublicGameState(
       height: game.board.height,
       tiles,
     },
+    players: game.players.map((player) => ({
+      playerId: player.id,
+      username: usernameForPlayer(player.id),
+      programSubmitted: game.hasSubmittedProgram(player.id),
+      participatesInRound: game.participatesInRound(player.id),
+    })),
     robots: game.players.map((player) => ({
       robotId: player.robot.id,
       playerId: player.id,

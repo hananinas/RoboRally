@@ -43,6 +43,7 @@ const stationaryRobotId = '30000000-0000-4000-8000-000000000002'
 const publicState: PublicGameState = {
   gameId: '40000000-0000-4000-8000-000000000001',
   phase: 'PROGRAMMING',
+  players: [],
   roundNumber: 1,
   antenna: { x: 2, y: 0, angle: Math.PI / 2 },
   board: {

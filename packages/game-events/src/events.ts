@@ -1,5 +1,8 @@
 import type {
   CardsDealt,
+  LeaveResult,
+  PlayerJoined,
+  PlayerLeft,
   JoinGame,
   JoinResult,
   GetPublicGameState,
@@ -23,6 +26,7 @@ export type PublicGameStateAcknowledgement = (
 export type JoinResultAcknowledgement = (result: JoinResult) => void
 
 export interface ClientToServerEvents {
+  'game.leave': (payload: JoinGame, acknowledge: (result: LeaveResult) => void) => void
   'game.join': (payload: JoinGame, acknowledge: JoinResultAcknowledgement) => void
   'user.login': (payload: Login, acknowledge: LoginAcknowledgement) => void
   'program.submit': (
@@ -36,6 +40,8 @@ export interface ClientToServerEvents {
 }
 
 export interface ServerToClientEvents {
+  'game.playerJoined': (payload: PlayerJoined) => void
+  'game.playerLeft': (payload: PlayerLeft) => void
   'cards.dealt': (payload: CardsDealt) => void
   'game.phaseChanged': (payload: PhaseChanged) => void
   'program.submitted': (payload: ProgramSubmitted) => void

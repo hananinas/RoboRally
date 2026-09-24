@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import type { Server as HttpServer } from 'node:http'
 import {
   parseGetPublicGameState,
@@ -11,10 +12,11 @@ import {
 } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
 import {
-  createSinglePlayerGame,
+  Player,
+  Robot,
+  Direction,
   type Card,
   type Game,
-  type Player,
 } from './game/index.js'
 import {
   presentCardsDealt,
@@ -22,9 +24,10 @@ import {
   presentPublicGameState,
   presentRobotActionResolved,
 } from './gamePresenter.js'
+import { createSharedGame } from './game/SinglePlayerGame.js'
 import { createUserRegistry } from './userRegistry.js'
 
-export type GameSocketData = { user?: User }
+export type GameSocketData = { user?: User; playerId?: string }
 
 export type GameSocketServer = Server<
   ClientToServerEvents,
@@ -33,18 +36,12 @@ export type GameSocketServer = Server<
   GameSocketData
 >
 
-export type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents>
+export type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents, {}, GameSocketData>
 
 export type GameSession = Readonly<{
   gameId: string
   game: Game
-  playerForConnection: (socket: GameSocket) => Player | undefined
 }>
-
-function defaultSession(): GameSession {
-  const { gameId, game, player } = createSinglePlayerGame()
-  return { gameId, game, playerForConnection: () => player }
-}
 
 function publicRoom(gameId: string): string {
   return `game:${gameId}:public`
@@ -70,11 +67,18 @@ function resolveProgram(
 
 export function createGameSocketServer(
   httpServer: HttpServer,
-  session: GameSession = defaultSession(),
+  session: GameSession = createSharedGame(),
 ): GameSocketServer {
   const io = new Server<ClientToServerEvents, ServerToClientEvents, {}, GameSocketData>(httpServer)
   const users = createUserRegistry()
-  const { gameId, game, playerForConnection } = session
+  const { gameId, game } = session
+  const members = new Map<string, { user: User; socketId: string; player: Player }>()
+  const snapshot = () => presentPublicGameState(gameId, game, (id) => members.get(id)?.user.username ?? id)
+  const ownedPlayer = (socket: GameSocket) => {
+    const member = socket.data.playerId ? members.get(socket.data.playerId) : undefined
+    return member?.socketId === socket.id && member.user.userId === socket.data.user?.userId
+      ? member.player : undefined
+  }
   let publishedPhase = game.phase
   let publishedRound = game.roundNumber
   let scheduledAction: NodeJS.Immediate | undefined
@@ -117,13 +121,6 @@ export function createGameSocketServer(
   })
 
   io.on('connection', (socket) => {
-    const player = playerForConnection(socket)
-    if (!player || !game.players.includes(player)) {
-      socket.disconnect(true)
-      return
-    }
-    socket.join([publicRoom(gameId), playerRoom(gameId, player.id)])
-
     socket.on('user.login', (payload, acknowledge) => {
       if (typeof acknowledge !== 'function') return
 
@@ -156,15 +153,83 @@ export function createGameSocketServer(
       }
     })
 
+    socket.on('game.join', (payload, acknowledge) => {
+      if (typeof acknowledge !== 'function') return
+      const user = socket.data.user
+      if (!user) { acknowledge({ outcome: 'LOGIN_REQUIRED' }); return }
+      let requestedGame: string
+      try { requestedGame = parseGetPublicGameState(payload).gameId }
+      catch { acknowledge({ outcome: 'INVALID_REQUEST' }); return }
+      if (requestedGame !== gameId) { acknowledge({ outcome: 'GAME_NOT_FOUND' }); return }
+      let player = ownedPlayer(socket)
+      const repeated = !!player
+      if (!player) {
+        if ([...members.values()].some((member) => member.user.userId === user.userId)) {
+          acknowledge({ outcome: 'USER_ALREADY_IN_GAME' }); return
+        }
+        const y = Math.floor(game.board.height / 2)
+        let x = Math.floor(game.board.width / 2)
+        while (x >= 0 && game.board.occupantAt({ x, y })) x--
+        if (x < 0) { acknowledge({ outcome: 'NO_SPAWN_AVAILABLE' }); return }
+        player = new Player(randomUUID(), new Robot(randomUUID(), Direction.NORTH))
+        game.addPlayer(player, { x, y })
+        members.set(player.id, { user, socketId: socket.id, player })
+        socket.data.playerId = player.id
+      }
+      // No asynchronous work between the snapshot acknowledgement and room access.
+      // Socket.IO's default in-memory adapter joins synchronously.
+      const state = snapshot()
+      acknowledge({
+        outcome: 'JOINED',
+        assignment: { gameId, playerId: player.id, robotId: player.robot.id },
+        state, hand: presentCardsDealt(gameId, game.roundNumber, player).cards,
+        programSubmitted: game.hasSubmittedProgram(player.id),
+      })
+      if (!repeated) {
+        io.to(publicRoom(gameId)).emit('game.playerJoined', {
+          gameId, roundNumber: game.roundNumber,
+          player: state.players.find((entry) => entry.playerId === player.id)!,
+          robot: state.robots.find((entry) => entry.robotId === player.robot.id)!,
+        })
+      }
+      socket.join([publicRoom(gameId), playerRoom(gameId, player.id)])
+    })
+
+    function leave(): boolean {
+      const player = ownedPlayer(socket)
+      if (!player) return false
+      const roundNumber = game.roundNumber
+      socket.leave(publicRoom(gameId))
+      socket.leave(playerRoom(gameId, player.id))
+      members.delete(player.id)
+      delete socket.data.playerId
+      game.removePlayer(player.id)
+      io.to(publicRoom(gameId)).emit('game.playerLeft', {
+        gameId, roundNumber, playerId: player.id, robotId: player.robot.id,
+      })
+      advanceGame()
+      return true
+    }
+
+    socket.on('game.leave', (payload, acknowledge) => {
+      if (typeof acknowledge !== 'function') return
+      if (!socket.data.user) { acknowledge({ outcome: 'LOGIN_REQUIRED' }); return }
+      let requestedGame: string
+      try { requestedGame = parseGetPublicGameState(payload).gameId }
+      catch { acknowledge({ outcome: 'INVALID_REQUEST' }); return }
+      acknowledge({ outcome: requestedGame === gameId && leave() ? 'LEFT' : 'NOT_IN_GAME' })
+    })
+    socket.on('disconnect', () => { leave() })
+
     socket.on('game.getPublicGameState', (payload, acknowledge) => {
       if (typeof acknowledge !== 'function') return
 
       try {
         const request = parseGetPublicGameState(payload)
-        if (request.gameId === gameId) {
+        if (request.gameId === gameId && ownedPlayer(socket)) {
           acknowledge({
             outcome: 'GAME_FOUND',
-            state: presentPublicGameState(gameId, game),
+            state: snapshot(),
           })
           return
         }
@@ -178,6 +243,8 @@ export function createGameSocketServer(
     socket.on('program.submit', (payload, acknowledge) => {
       if (typeof acknowledge !== 'function') return
 
+      const player = ownedPlayer(socket)
+      if (!player) { acknowledge({ outcome: 'INVALID_PROGRAM' }); return }
       try {
         const submission = parseSubmitProgram(payload)
         const program = resolveProgram(player, submission.cardIds)
@@ -205,7 +272,6 @@ export function createGameSocketServer(
       advanceGame()
     })
 
-    socket.emit('cards.dealt', presentCardsDealt(gameId, game.roundNumber, player))
   })
 
   return io

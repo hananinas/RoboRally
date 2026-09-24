@@ -6,7 +6,7 @@ import type {
   ProgramResultAcknowledgement,
   ProgramResultOutcome,
   PublicGameState,
-  PublicGameStateAcknowledgement,
+  JoinResultAcknowledgement,
   ServerToClientEvents,
   SubmitProgram,
 } from '@robo-rally/game-events'
@@ -15,6 +15,7 @@ import {
   createPublicState,
   GAME_ID,
   PLAYER_ID,
+  ROBOT_ID,
   type FixtureControl,
   type FixtureSnapshot,
 } from './game-fixture-data.ts'
@@ -30,7 +31,7 @@ type Fixture = {
   deferred: boolean
   stateRequests: number
   deferState: boolean
-  pendingState: { socket: GameSocket; acknowledge: PublicGameStateAcknowledgement }[]
+  pendingState: { socket: GameSocket; acknowledge: JoinResultAcknowledgement }[]
   pending: { socket: GameSocket; acknowledge: ProgramResultAcknowledgement }[]
 }
 
@@ -52,6 +53,11 @@ function snapshot(fixture: Fixture): FixtureSnapshot {
     stateRequests: fixture.stateRequests,
     pendingStateRequests: fixture.pendingState.length,
   }
+}
+
+function joinResult(fixture: Fixture): Parameters<JoinResultAcknowledgement>[0] {
+  return { outcome: 'JOINED', assignment: { gameId: GAME_ID, playerId: PLAYER_ID, robotId: ROBOT_ID },
+    state: fixture.state, hand: fixture.cards, programSubmitted: false }
 }
 
 function acknowledgeProgram(
@@ -93,7 +99,7 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
       break
     case 'respond-state':
       for (const pending of fixture.pendingState.splice(0)) {
-        pending.acknowledge({ outcome: 'GAME_FOUND', state: fixture.state })
+        pending.acknowledge(joinResult(fixture))
       }
       break
     case 'submission':
@@ -195,17 +201,14 @@ io.on('connection', (socket) => {
   }
   fixture.sockets.add(socket)
 
-  socket.on('game.getPublicGameState', ({ gameId }, acknowledge) => {
+  socket.on('user.login', ({ username }, acknowledge) => {
+    acknowledge({ outcome: 'LOGGED_IN', user: { userId: PLAYER_ID, username } })
+  })
+  socket.on('game.join', ({ gameId }, acknowledge) => {
     fixture.stateRequests += 1
-    if (gameId !== GAME_ID) {
-      acknowledge({ outcome: 'GAME_NOT_FOUND' })
-      return
-    }
-    if (fixture.deferState) {
-      fixture.pendingState.push({ socket, acknowledge })
-    } else {
-      acknowledge({ outcome: 'GAME_FOUND', state: fixture.state })
-    }
+    if (gameId !== GAME_ID) { acknowledge({ outcome: 'GAME_NOT_FOUND' }); return }
+    if (fixture.deferState) fixture.pendingState.push({ socket, acknowledge })
+    else acknowledge(joinResult(fixture))
   })
 
   socket.on('program.submit', (payload, acknowledge) => {
@@ -231,9 +234,7 @@ io.on('connection', (socket) => {
     fixture.pendingState = fixture.pendingState.filter((pending) => pending.socket !== socket)
   })
 
-  socket.emit('cards.dealt', {
-    gameId: GAME_ID, roundNumber: fixture.state.roundNumber, playerId: PLAYER_ID, cards: fixture.cards,
-  })
+
 })
 
 httpServer.listen(4174, '127.0.0.1')
