@@ -587,10 +587,7 @@ components:
       minLength: 1
       maxLength: 30
       description: |
-        Count Unicode code points (Array.from(username).length in JavaScript), not
-        UTF-16 code units. Preserve the exact string, including whitespace and case;
-        no trimming, case folding, or Unicode normalization. Extra request properties
-        are rejected separately as INVALID_REQUEST.
+        Username length is measured in Unicode code points. Whitespace and case are preserved; no normalization is applied yet.
 
     User:
       type: object
