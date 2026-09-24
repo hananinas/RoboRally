@@ -1,5 +1,6 @@
 export type {
   ClientToServerEvents,
+  JoinResultAcknowledgement,
   LoginAcknowledgement,
   ProgramResultAcknowledgement,
   PublicGameStateAcknowledgement,
@@ -7,6 +8,9 @@ export type {
 } from './events.js'
 export type {
   Antenna,
+  JoinGame,
+  JoinResult,
+  PlayerAssignment,
   Board,
   Card,
   CardId,

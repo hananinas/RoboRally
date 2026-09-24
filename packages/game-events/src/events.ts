@@ -1,5 +1,7 @@
 import type {
   CardsDealt,
+  JoinGame,
+  JoinResult,
   GetPublicGameState,
   PhaseChanged,
   LoginResult,
@@ -18,7 +20,10 @@ export type PublicGameStateAcknowledgement = (
   result: PublicGameStateResult,
 ) => void
 
+export type JoinResultAcknowledgement = (result: JoinResult) => void
+
 export interface ClientToServerEvents {
+  'game.join': (payload: JoinGame, acknowledge: JoinResultAcknowledgement) => void
   'user.login': (payload: Login, acknowledge: LoginAcknowledgement) => void
   'program.submit': (
     payload: SubmitProgram,
