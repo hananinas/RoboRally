@@ -14,6 +14,11 @@ The client and Game Service implement the v0 single-player loop using shared
 Socket.IO game events. Browser tests use an isolated contract fixture rather
 than starting the production service.
 
+The Game Service keeps users in memory, keyed by their exact username. User IDs
+last only as long as that service instance: a restart creates a new ID for the
+same username. A new connection must log in again, but receives the existing
+ID while the service runs.
+
 ## Development Setup
 
 The recommended development environment uses Nix together with direnv. You do not need to run NixOS. The Nix package manager can also be installed on other Linux distributions and macOS.

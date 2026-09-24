@@ -1,10 +1,13 @@
 import type { Server as HttpServer } from 'node:http'
 import {
   parseGetPublicGameState,
+  LoginRequestError,
+  parseLogin,
   parseSubmitProgram,
   type ClientToServerEvents,
   type ProgramCardIds,
   type ServerToClientEvents,
+  type User,
 } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
 import {
@@ -19,10 +22,15 @@ import {
   presentPublicGameState,
   presentRobotActionResolved,
 } from './gamePresenter.js'
+import { createUserRegistry } from './userRegistry.js'
+
+export type GameSocketData = { user?: User }
 
 export type GameSocketServer = Server<
   ClientToServerEvents,
-  ServerToClientEvents
+  ServerToClientEvents,
+  {},
+  GameSocketData
 >
 
 export type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents>
@@ -64,7 +72,8 @@ export function createGameSocketServer(
   httpServer: HttpServer,
   session: GameSession = defaultSession(),
 ): GameSocketServer {
-  const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer)
+  const io = new Server<ClientToServerEvents, ServerToClientEvents, {}, GameSocketData>(httpServer)
+  const users = createUserRegistry()
   const { gameId, game, playerForConnection } = session
   let publishedPhase = game.phase
   let publishedRound = game.roundNumber
@@ -114,6 +123,38 @@ export function createGameSocketServer(
       return
     }
     socket.join([publicRoom(gameId), playerRoom(gameId, player.id)])
+
+    socket.on('user.login', (payload, acknowledge) => {
+      if (typeof acknowledge !== 'function') return
+
+      let username: string
+      try {
+        username = parseLogin(payload).username
+      } catch (error) {
+        acknowledge({
+          outcome:
+            error instanceof LoginRequestError ? error.outcome : 'INTERNAL_ERROR',
+        })
+        return
+      }
+
+      if (socket.data.user) {
+        acknowledge(
+          socket.data.user.username === username
+            ? { outcome: 'LOGGED_IN', user: socket.data.user }
+            : { outcome: 'ALREADY_LOGGED_IN' },
+        )
+        return
+      }
+
+      try {
+        const user = users.findOrCreate(username)
+        socket.data.user = user
+        acknowledge({ outcome: 'LOGGED_IN', user })
+      } catch {
+        acknowledge({ outcome: 'INTERNAL_ERROR' })
+      }
+    })
 
     socket.on('game.getPublicGameState', (payload, acknowledge) => {
       if (typeof acknowledge !== 'function') return
