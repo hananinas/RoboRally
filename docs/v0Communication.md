@@ -88,7 +88,8 @@ The interfaces for the related issues are:
   phase events. `Game.hasSubmittedProgram(playerId)` exposes readiness without
   exposing cards. The required player/round fields and stale-round check are
   already implemented so a delayed previous-round request cannot start a new round.
-- **#69, membership:** Game's roster is fixed here. Membership code must update
+- **#69, membership:** Game's roster is fixed here; add/remove APIs and wiring
+  to the local `advanceGame()` closure remain for #69. Membership code must update
   eligibility and invoke `Game.recheckProgrammingPhase()` after programming-time
   removals. Publish membership changes before calling the service's shared
   `advanceGame()` path. That path publishes phase changes and schedules one

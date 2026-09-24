@@ -205,7 +205,6 @@ export class Game {
   private finishRound(): void {
     for (const player of this.players) player.robot.clearProgram()
     this.submittedPlayerIds.clear()
-    this.activatedRobotIds.clear()
     this.currentRound++
     this.registerIndex = 0
     this.dealCards()

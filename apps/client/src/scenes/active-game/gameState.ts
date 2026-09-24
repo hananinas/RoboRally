@@ -6,7 +6,6 @@ import type {
   PhaseChanged,
   PlayerId,
   ProgramResult,
-  ProgramSubmitted,
   PublicGameState,
   RobotActionResolved,
   SubmitProgram,
@@ -28,7 +27,6 @@ export type ClientGameState = {
   phase: GamePhase | null
   roundNumber: number | null
   playerId: PlayerId | null
-  submittedPlayerIds: readonly PlayerId[]
   playerIds: readonly PlayerId[]
   board: BoardRenderModel | null
   playback: RobotPlaybackState
@@ -47,7 +45,6 @@ export type GameStateEvent =
   | { type: 'error'; message: string }
   | { type: 'initial-state'; state: PublicGameState }
   | { type: 'dealt'; hand: CardsDealt }
-  | { type: 'submitted'; submission: ProgramSubmitted }
   | { type: 'phase'; phase: PhaseChanged }
   | { type: 'action'; action: RobotActionResolved }
   | { type: 'complete' }
@@ -70,7 +67,6 @@ export function createClientGameState(): ClientGameState {
     phase: null,
     roundNumber: null,
     playerId: null,
-    submittedPlayerIds: [],
     playerIds: [],
     board: null,
     playback: createRobotPlaybackState([]),
@@ -180,13 +176,6 @@ export function gameStateReducer(
       if (!isHandEligible(state, hand) || hand.roundNumber === state.handRoundNumber) return state
       return activateHand({ ...state, pendingHand: hand })
     }
-    case 'submitted': {
-      const submission = event.submission
-      if (submission.gameId !== state.gameId || submission.roundNumber !== state.roundNumber ||
-        state.phase !== 'PROGRAMMING' || !state.playerIds.includes(submission.playerId) ||
-        state.submittedPlayerIds.includes(submission.playerId)) return state
-      return { ...state, submittedPlayerIds: [...state.submittedPlayerIds, submission.playerId] }
-    }
     case 'phase': {
       const phase = event.phase
       if (phase.gameId !== state.gameId || state.roundNumber === null) return state
@@ -199,7 +188,6 @@ export function gameStateReducer(
         ...state,
         phase: phase.phase,
         roundNumber: phase.roundNumber,
-        submittedPlayerIds: nextRound ? [] : state.submittedPlayerIds,
       })
     }
     case 'action':

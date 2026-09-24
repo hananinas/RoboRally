@@ -276,10 +276,6 @@ describe('client game state', () => {
       type: 'submission-unknown',
       handVersion: state.handVersion,
     })
-    state = gameStateReducer(state, {
-      type: 'submitted',
-      submission: { gameId: publicState.gameId, roundNumber: 1, playerId: hand.playerId },
-    })
     expect(state.submission).toBe('uncertain')
 
     expect(canProgram(state)).toBe(false)
@@ -408,17 +404,8 @@ describe('client game state', () => {
     expect(createSubmission(state)?.cardIds).toEqual(nextCards.slice(0, 5).map((card) => card.id))
   })
 
-  it('records another player as ready without accepting or disabling the local program', () => {
+  it('keeps the phase in programming after local acceptance', () => {
     let state = selectProgram()
-    const submission = createSubmission(state)
-    state = gameStateReducer(state, {
-      type: 'submitted',
-      submission: { gameId: publicState.gameId, roundNumber: 1, playerId: publicState.robots[1].playerId },
-    })
-    expect(state.submittedPlayerIds).toEqual([publicState.robots[1].playerId])
-    expect(state.submission).toBe('idle')
-    expect(canProgram(state)).toBe(true)
-    expect(createSubmission(state)).toEqual(submission)
     state = gameStateReducer(state, { type: 'submit' })
     state = gameStateReducer(state, { type: 'result', result: { outcome: 'ACCEPTED' }, handVersion: state.handVersion })
     expect(state.phase).toBe('PROGRAMMING')
@@ -445,9 +432,6 @@ describe('client game state', () => {
     expect(gameStateReducer(state, { type: 'dealt', hand: { ...hand, roundNumber: 2 } })).toBe(state)
     expect(gameStateReducer(state, { type: 'action', action: actions[0] })).toBe(state)
     expect(changePhase(state, 'EXECUTING', 1)).toBe(state)
-    expect(gameStateReducer(state, {
-      type: 'submitted', submission: { gameId: publicState.gameId, roundNumber: 1, playerId: hand.playerId },
-    })).toBe(state)
     expect(gameStateReducer(state, {
       type: 'phase', phase: { gameId: 'another-game', roundNumber: 2, phase: 'EXECUTING' },
     })).toBe(state)
