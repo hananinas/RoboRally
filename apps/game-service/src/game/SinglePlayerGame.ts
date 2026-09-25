@@ -33,11 +33,28 @@ export type SinglePlayerGame = Readonly<{
 }>
 
 function createBoard(): Board {
-  return new Board(
-    Array.from({ length: BOARD_HEIGHT }, () =>
-      Array.from({ length: BOARD_WIDTH }, () => new EmptyTile()),
-    ),
+  const tiles = Array.from({ length: BOARD_HEIGHT }, () =>
+    Array.from({ length: BOARD_WIDTH }, () => new EmptyTile()),
   )
+
+  // A short barrier ahead of the spawns: the second northward Move 1 is blocked.
+  tiles[6][9] = new EmptyTile([Direction.NORTH])
+  tiles[6][10] = new EmptyTile([Direction.NORTH])
+  tiles[6][11] = new EmptyTile([Direction.NORTH, Direction.EAST])
+
+  // An open corner to the northwest, away from the starting area.
+  tiles[3][5] = new EmptyTile([Direction.NORTH, Direction.WEST])
+  tiles[3][6] = new EmptyTile([Direction.NORTH])
+  tiles[3][7] = new EmptyTile([Direction.NORTH])
+  tiles[4][5] = new EmptyTile([Direction.WEST])
+
+  // A short passage ending in an alcove, plus a separate southeast pillar.
+  tiles[10][5] = new EmptyTile([Direction.EAST, Direction.WEST])
+  tiles[11][5] = new EmptyTile([Direction.EAST, Direction.WEST])
+  tiles[12][5] = new EmptyTile([Direction.EAST, Direction.SOUTH, Direction.WEST])
+  tiles[10][15] = new EmptyTile([Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST])
+
+  return new Board(tiles)
 }
 
 function createHand(): readonly Card[] {

@@ -69,13 +69,14 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
         expect(events[index][2].payload).toEqual({ gameId, roundNumber, phase: 'EXECUTING' })
         expect(events[index][13].payload).toEqual({ gameId, roundNumber: roundNumber + 1, phase: 'PROGRAMMING' })
         const actions = events[index].filter((event) => event.name === 'robot.actionResolved')
+        // Both robots reach the nearby wall on their first move and remain there.
         expect(actions.map((event) => event.payload)).toEqual(
           Array.from({ length: 5 }, (_, registerIndex) => [0, 1].map((playerIndex) => ({
             gameId, roundNumber, registerIndex,
             robotId: players[playerIndex].robot.id,
             instruction: 'MOVE_1',
             position: {
-              coordinate: { x: 10 - playerIndex, y: Math.max(0, 7 - (roundNumber - 1) * 5 - registerIndex - 1) },
+              coordinate: { x: 10 - playerIndex, y: 6 },
               orientation: 'NORTH',
             },
           }))).flat(),

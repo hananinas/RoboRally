@@ -16,10 +16,8 @@
   --board-surface-shading: inset 0 0 8px #0002, inset 0 0 2px #0006;
   --board-hole-shadow: 0 0 2px #0004;
   --board-hole-blur: 3px;
-  --board-wall-black-start: #272e32;
-  --board-wall-black-end: #1c2124;
-  --board-wall-yellow-start: #e2cc04;
-  --board-wall-yellow-end: #b4a301;
+  --board-wall-black: #272e32;
+  --board-wall-yellow: #e2cc04;
   --tank-move-duration: 600ms;
   --tank-turn-duration: 300ms;
   --tank-motion-easing: cubic-bezier(0.4, 0, 0.2, 1);
@@ -101,36 +99,14 @@
   border-radius: 50%;
 }
 
-.board-piece--wall-edge-black {
-  background: linear-gradient(
-    45deg,
-    var(--board-wall-black-start),
-    var(--board-wall-black-end)
-  );
-}
-
-.board-piece--wall-edge-yellow {
-  background: linear-gradient(
-    45deg,
-    var(--board-wall-yellow-start),
-    var(--board-wall-yellow-end)
-  );
-}
-
+.board-piece--wall-edge-black,
 .board-piece--wall-black {
-  background: linear-gradient(
-    45deg,
-    var(--board-wall-black-start),
-    var(--board-wall-black-end)
-  );
+  background: var(--board-wall-black);
 }
 
+.board-piece--wall-edge-yellow,
 .board-piece--wall-yellow {
-  background: linear-gradient(
-    45deg,
-    var(--board-wall-yellow-start),
-    var(--board-wall-yellow-end)
-  );
+  background: var(--board-wall-yellow);
 }
 
 .board-piece--shadow {
