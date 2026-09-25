@@ -21,5 +21,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Build game service
-        run: nix build .#game-service --print-build-logs
+      - name: Build production
+        env:
+          VITE_GAME_ID: "00000000-0000-4000-8000-000000000001"
+        run: |
+          nix build .#production \
+          --impure \
+          --no-update-lock-file \
+          --print-build-logs

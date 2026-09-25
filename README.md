@@ -14,6 +14,40 @@ The client and Game Service implement the v0 single-player loop using shared
 Socket.IO game events. Browser tests use an isolated contract fixture rather
 than starting the production service.
 
+RoboRally is available at: https://se2-c.compute.dtu.dk
+
+### Trusting the SSL certificate
+We are using a self signed certificate. This means we have to trust the server public root certificate to be able to use https. This becomes especially relevant when we implement authentication features. The app will not work with plain http at that point.
+
+#### NixOS
+
+Place `infra/robo-rally-root.crt` beside the NixOS configuration module containing:
+
+```nix
+security.pki.certificateFiles = [
+  ./robo-rally-root.crt
+];
+
+programs.firefox = {
+  enable = true;
+  policies.Certificates.Install = [
+    "${./robo-rally-root.crt}"
+  ];
+};
+```
+
+#### Other Distros
+
+```sh
+sudo install -m 0644 infra/robo-rally-root.crt \
+  /usr/local/share/ca-certificates/robo-rally-root.crt
+
+sudo update-ca-certificates
+```
+
+Then in firefox add a setting trusting this certificate.
+
+
 ## Development Setup
 
 The recommended development environment uses Nix together with direnv. You do not need to run NixOS. The Nix package manager can also be installed on other Linux distributions and macOS.
