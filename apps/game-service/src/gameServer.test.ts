@@ -2,6 +2,7 @@ import { createServer, type Server as HttpServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type {
   ClientToServerEvents,
+  LoginResult,
   ProgramResult,
   PublicGameStateResult,
   RobotActionResolved,
@@ -83,6 +84,20 @@ describe('game Socket.IO connection', () => {
     )
   }
 
+  function login(
+    payload: unknown,
+    socket: ClientSocket<ServerToClientEvents, ClientToServerEvents> = client,
+  ): Promise<LoginResult> {
+    const untypedClient = socket as unknown as {
+      emit: (
+        event: 'user.login',
+        request: unknown,
+        acknowledge: (result: LoginResult) => void,
+      ) => void
+    }
+    return new Promise((resolve) => untypedClient.emit('user.login', payload, resolve))
+  }
+
   function getPublicGameState(
     payload: unknown,
   ): Promise<PublicGameStateResult> {
@@ -128,6 +143,69 @@ describe('game Socket.IO connection', () => {
         `game:${singlePlayerGame.gameId}:player:${singlePlayerGame.player.id}`,
       ]),
     )
+  })
+
+  it('binds an approved user to the connection and reuses it on repeated login', async () => {
+    await connect()
+
+    const result = await login({ username: 'Dane' })
+    expect(result).toEqual({
+      outcome: 'LOGGED_IN',
+      user: { userId: expect.any(String), username: 'Dane' },
+    })
+    expect(await login({ username: 'Dane' })).toEqual(result)
+    expect([...io.sockets.sockets.values()][0].data.user).toEqual(
+      result.outcome === 'LOGGED_IN' ? result.user : undefined,
+    )
+  })
+
+  it('shares a user across connections but keeps each socket independently logged in', async () => {
+    await connect()
+    const other = createClient()
+    await connect(other)
+
+    const first = await login({ username: 'Dane' })
+    expect(await login({ username: 'Dane' }, other)).toEqual(first)
+    expect(await login({ username: 'Other' })).toEqual({
+      outcome: 'ALREADY_LOGGED_IN',
+    })
+    expect(await login({ username: 'Other' }, other)).toEqual({
+      outcome: 'ALREADY_LOGGED_IN',
+    })
+  })
+
+  it('requires a fresh login after disconnect while retaining the user', async () => {
+    await connect()
+    const first = await login({ username: 'Dane' })
+    client.disconnect()
+
+    const replacement = createClient()
+    await connect(replacement)
+    const replacementOnServer = [...io.sockets.sockets.values()].find(
+      (socket) => socket.id === replacement.id,
+    )
+    expect(replacementOnServer?.data.user).toBeUndefined()
+    expect(await login({ username: 'Dane' }, replacement)).toEqual(first)
+  })
+
+  it('rejects malformed login without changing connection identity', async () => {
+    await connect()
+
+    expect(await login(null)).toEqual({ outcome: 'INVALID_REQUEST' })
+    expect(await login({ username: 'Dane', extra: true })).toEqual({
+      outcome: 'INVALID_REQUEST',
+    })
+    expect(await login({ username: '' })).toEqual({
+      outcome: 'INVALID_USERNAME',
+    })
+    expect([...io.sockets.sockets.values()][0].data.user).toBeUndefined()
+
+    const approved = await login({ username: 'Dane' })
+    expect(approved.outcome).toBe('LOGGED_IN')
+    expect(await login({ username: '' })).toEqual({
+      outcome: 'INVALID_USERNAME',
+    })
+    expect(await login({ username: 'Dane' })).toEqual(approved)
   })
 
   it('acknowledges the current public game state', async () => {
@@ -178,6 +256,7 @@ describe('game Socket.IO connection', () => {
       emit: (event: string, payload: unknown) => void
     }
 
+    untypedClient.emit('user.login', { username: 'Dane' })
     untypedClient.emit('game.getPublicGameState', null)
     untypedClient.emit('program.submit', {
       gameId: singlePlayerGame.gameId,
@@ -185,6 +264,7 @@ describe('game Socket.IO connection', () => {
     })
 
     const state = await getPublicGameState({ gameId: singlePlayerGame.gameId })
+    expect([...io.sockets.sockets.values()][0].data.user).toBeUndefined()
     expect(state.outcome).toBe('GAME_FOUND')
     expect(singlePlayerGame.game.phase).toBe('programming')
     expect(singlePlayerGame.player.robot.program).toEqual([])

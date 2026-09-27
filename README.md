@@ -14,6 +14,11 @@ The client and Game Service implement the v0 single-player loop using shared
 Socket.IO game events. Browser tests use an isolated contract fixture rather
 than starting the production service.
 
+The Game Service keeps users in memory, keyed by their exact username. User IDs
+last only as long as that service instance: a restart creates a new ID for the
+same username. A new connection must log in again, but receives the existing
+ID while the service runs.
+
 RoboRally is available at: https://se2-c.compute.dtu.dk
 
 ### Trusting the SSL certificate
