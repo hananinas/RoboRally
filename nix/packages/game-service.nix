@@ -44,8 +44,8 @@ pkgs.stdenvNoCC.mkDerivation (finalAttrs: {
     version = builtins.hashFile "sha256" ../../pnpm-lock.yaml;
     inherit pnpm;
 
-    fetcherVersion = 3;
-    hash = "sha256-Zm1uIHXdLMZFFuyd8Iv1V4X6KpPaYXYM6LZ8ZrupPnM=";
+    fetcherVersion = 4;
+    hash = "sha256-h/sE15af+oM8fqdT3RjOKf+cC7B8dAY8G+llGg9TtoE=";
   };
 
   nativeBuildInputs = [
