@@ -1,5 +1,6 @@
 import type {
   Card,
+  JoinResult,
   ProgramCardIds,
   PublicGameState,
   RobotActionResolved,
@@ -72,11 +73,49 @@ const actions: readonly RobotActionResolved[] = [
   { robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 3 }, orientation: 'SOUTH' } },
 ]
 
-function programmingState(): ClientGameState {
-  let state = gameStateReducer(createClientGameState(), { type: 'connected' })
-  state = gameStateReducer(state, { type: 'initial-state', state: publicState })
-  return gameStateReducer(state, { type: 'dealt', cards })
+const result: Extract<JoinResult, { outcome: 'JOINED' }> = {
+  outcome: 'JOINED',
+  assignment: { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, robotId },
+  state: publicState,
+  hand: cards,
+  programSubmitted: false,
 }
+
+function programmingState(): ClientGameState {
+  return gameStateReducer(createClientGameState(), { type: 'joined', result })
+}
+
+describe('join initialization', () => {
+  it('initializes assignment, board and hand together and accepts subsequent events', () => {
+    const state = gameStateReducer(createClientGameState(), { type: 'joined', result })
+    expect(state.assignment).toEqual(result.assignment)
+    expect(state.board).not.toBeNull()
+    expect(state.hand).toEqual(cards)
+    expect(state.playback.robots).toHaveLength(publicState.robots.length)
+    expect(canProgram(state)).toBe(true)
+    const updated = gameStateReducer(state, { type: 'action', action: actions[0] })
+    expect(updated.playback.active).toEqual(actions[0])
+  })
+
+  it('preserves an executing phase with an empty initial hand', () => {
+    const state = gameStateReducer(createClientGameState(), {
+      type: 'joined', result: { ...result, state: { ...publicState, phase: 'EXECUTING' }, hand: [] },
+    })
+    expect(state.phase).toBe('EXECUTING')
+    expect(state.handVersion).toBe(0)
+    expect(canProgram(state)).toBe(false)
+  })
+
+  it('replaces old state on join and preserves accepted submission status', () => {
+    const state = gameStateReducer(selectProgram(), {
+      type: 'joined', result: { ...result, programSubmitted: true },
+    })
+    expect(state.registers).toEqual(emptyRegisters)
+    expect(state.submission).toBe('accepted')
+    expect(canProgram(state)).toBe(false)
+    expect(gameStateReducer(state, { type: 'reset' })).toEqual(createClientGameState())
+  })
+})
 
 function selectProgram(state = programmingState()): ClientGameState {
   for (const [registerIndex, cardId] of selectedCardIds.entries()) {
@@ -130,25 +169,43 @@ describe('removeCard', () => {
 })
 
 describe('client game state', () => {
-  it('keeps an early hand locked and initializes robots from the first snapshot', () => {
-    let state = gameStateReducer(createClientGameState(), { type: 'connected' })
-    state = gameStateReducer(state, { type: 'dealt', cards })
-    expect(state.gameId).toBeNull()
+  it('keeps programming locked until joined', () => {
+    let state = createClientGameState()
+    expect(state.assignment).toBeNull()
     expect(state.phase).toBeNull()
     expect(canProgram(state)).toBe(false)
     state = gameStateReducer(state, { type: 'place', cardId: cards[0].id, registerIndex: 0 })
     expect(state.registers).toEqual(emptyRegisters)
     expect(createSubmission(state)).toBeNull()
 
-    state = gameStateReducer(state, { type: 'initial-state', state: publicState })
+    state = gameStateReducer(state, { type: 'joined', result })
     expect(state.board).not.toBeNull()
     expect(state.playback.robots).toMatchObject(publicState.robots)
     expect(canProgram(state)).toBe(true)
   })
 
+  it('requires an assignment even with a hand and a selected program', () => {
+    const state = { ...selectProgram(), assignment: null }
+    expect(canProgram(state)).toBe(false)
+    expect(createSubmission(state)).toBeNull()
+    expect(gameStateReducer(state, { type: 'dealt', cards }).phase).toBeNull()
+  })
+
+  it('uses the assignment game identity for submission', () => {
+    const assignment = { ...result.assignment, gameId: '40000000-0000-4000-8000-000000000002' }
+    const state = selectProgram(gameStateReducer(createClientGameState(), {
+      type: 'joined', result: { ...result, assignment },
+    }))
+    expect(createSubmission(state)).toEqual({
+      gameId: assignment.gameId,
+      cardIds: selectedCardIds,
+    })
+  })
+
   it('requires a dealt hand and disables editing when execution starts', () => {
-    let state = gameStateReducer(createClientGameState(), { type: 'connected' })
-    state = gameStateReducer(state, { type: 'initial-state', state: publicState })
+    let state = gameStateReducer(createClientGameState(), {
+      type: 'joined', result: { ...result, hand: [] },
+    })
     expect(canProgram(state)).toBe(false)
 
     state = gameStateReducer(state, { type: 'dealt', cards })
@@ -333,17 +390,35 @@ describe('client game state', () => {
       .toEqual(actions[4].position)
   })
 
-  it('preserves selection but locks editing and submission on connection loss', () => {
-    let state = selectProgram()
-    const registers = state.registers
-    state = gameStateReducer(state, { type: 'disconnected' })
+  it.each(['idle', 'pending'] as const)('preserves the game and locks editing on connection loss with submission %s', (submission) => {
+    const selected = selectProgram()
+    const before = submission === 'pending'
+      ? gameStateReducer(selected, { type: 'submit' })
+      : selected
+    let state = gameStateReducer(before, { type: 'disconnected' })
 
+    expect(state).toEqual({
+      ...before,
+      connected: false,
+      error: 'Connection lost. Reload to connect again; your program was not resent.',
+    })
     expect(canProgram(state)).toBe(false)
     expect(createSubmission(state)).toBeNull()
     state = gameStateReducer(state, { type: 'remove', registerIndex: 0 })
     state = gameStateReducer(state, { type: 'place', cardId: cards[5].id, registerIndex: 0 })
     state = gameStateReducer(state, { type: 'submit' })
-    expect(state.registers).toEqual(registers)
+    expect(state.registers).toEqual(before.registers)
+    expect(state.submission).toBe(submission)
     expect(createSubmission(state)).toBeNull()
+  })
+
+  it('initializes a fresh connected game after disconnect', () => {
+    const disconnected = gameStateReducer(selectProgram(), { type: 'disconnected' })
+    const state = gameStateReducer(disconnected, { type: 'joined', result })
+
+    expect(state.connected).toBe(true)
+    expect(state.error).toBeNull()
+    expect(state.registers).toEqual(emptyRegisters)
+    expect(canProgram(state)).toBe(true)
   })
 })
