@@ -217,31 +217,33 @@ If recovery succeeds and the client still retains its local game state, Socket.I
 
 The client applies the recovered events in order and continues using its existing player and robot assignments.
 
-It does not need to call user.login or game.join.
-
 ```mermaid
 sequenceDiagram
     participant A as Player A
     participant S as Game Service
+    participant Public as game:{gameId}:public
+    participant PrivateA as game:{gameId}:player:{A}
     participant B as Player B
 
-    Note over A,S: Connection lost
-    Note over A: Show Connection lost message and pause/disable game
+    Note over A: Connection lost
+    Note over A: Show disconnected status and disable gameplay
     Note over S: Detect disconnect and pause after current action
-    S-->>B: Announce pause and disconnected player
-    Note over B:  Show Connection lost message and pause/disable game
 
-    A->>S: Attempt Socket.IO reconnection
-    S-->>A: Restore session and replay missed events
-    Note over A: Apply recovered events
+    S->>Public: game.playerConnectionChanged {gameId, playerId: A, connected: false, paused: true}
+    Public-->>B: game.playerConnectionChanged
+    Note over B: Show waiting for Player A and disable gameplay
 
-    alt All remaining players are connected
-        S-->>A: Announce game resumed
-        S-->>B: Announce game resumed
-        Note over S: Continue preserved game
-    else Another player is disconnected
-        Note over S: Game remains paused
-    end
+    A->>S: Socket.IO reconnection
+    Note over A,Public: Restore public room membership
+    Note over A,PrivateA: Restore private room membership
+    S-->>A: Replay missed public and private events
+
+    S->>Public: game.playerConnectionChanged {gameId, playerId: A, connected: true, paused: false}
+    Public-->>A: game.playerConnectionChanged
+    Public-->>B: game.playerConnectionChanged
+
+    Note over S: Continue gameplay from preserved state
+    Note over A,B: Unpause clients
 ```
 
 #### Failed connection state recovery
@@ -264,34 +266,38 @@ The client replaces its local game state with the returned JOINED data before pr
 sequenceDiagram
     participant A as Player A
     participant S as Game Service
+    participant Public as game:{gameId}:public
+    participant PrivateA as game:{gameId}:player:{A}
     participant B as Player B
 
-    Note over A,S: Connection lost
-    Note over A:  Show Connection lost message and pause/disable game
+    Note over A: Connection lost
+    Note over A: Show disconnected status and disable gameplay
     Note over S: Detect disconnect and pause after current action
-    S-->>B: Announce pause and disconnected player
-    Note over B:  Show Connection lost message and pause/disable game
 
-    A->>S: Establish connection
-    S-->>A: Connection restored without recovery
+    S->>Public: game.playerConnectionChanged {gameId, playerId: A, connected: false, paused: true}
+    Public-->>B: game.playerConnectionChanged
+    Note over B: Show waiting for Player A and disable gameplay
+
+    A->>S: Establish Socket.IO connection
     Note over A: socket.recovered is false
+    Note over S: Game remains paused until membership is reattached
 
-    A->>S: user.login
-    S-->>A: LOGGED_IN
-    A->>S: game.join
-    S-->>A: JOINED with existing assignment and current state
-    Note over A: Replace local state with JOINED data
+    A->>S: user.login {username}
+    S-->>A: Acknowledgement: LOGGED_IN {user}
+    A->>S: game.join {gameId}
+    Note over A,Public: Restore public room membership
+    Note over A,PrivateA: Restore private room membership
 
-    alt All remaining players are connected
-        S-->>A: Announce game resumed
-        S-->>B: Announce game resumed
-        Note over S: Continue preserved game
-    else Another player is disconnected
-        Note over S: Game remains paused
-    end
+    S-->>A: Acknowledgement: JOINED {assignment, state, hand, programSubmitted}
+    Note over A: Clear outdated state and apply JOINED data
 
+    S->>Public: game.playerConnectionChanged {gameId, playerId: A, connected: true, paused: false}
+    Public-->>A: game.playerConnectionChanged
+    Public-->>B: game.playerConnectionChanged
+
+    Note over S: Continue gameplay from preserved state
+    Note over A,B: Unpause game
 ```
-
 
 ### Resuming the game
 The game remains paused while any remaining player is disconnected. Once all remaining players are connected, the server announces that the game has resumed before continuing gameplay from the preserved game state.
