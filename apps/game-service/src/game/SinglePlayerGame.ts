@@ -1,5 +1,5 @@
 import { Board } from './Board.js'
-import { Move1, TurnLeft, type Card } from './Card.js'
+import { BackUp, Move1, Move2, Move3, TurnLeft, TurnRight, UTurn, type Card } from './Card.js'
 import { Game } from './Game.js'
 import type { GameId } from './ids.js'
 import { Player } from './Player.js'
@@ -39,10 +39,21 @@ function createBoard(): Board {
     ),
   )
 }
+const HAND_CARD_TYPES =[
+Move1,
+Move2,
+Move3, 
+BackUp,
+TurnLeft,
+TurnRight, 
+UTurn,
+Move1,
+TurnLeft,
+] 
 
 function createHand(): readonly Card[] {
   return CARD_IDS.map((id, index) =>
-    index % 2 === 0 ? new Move1(id) : new TurnLeft(id),
+    new HAND_CARD_TYPES[index](id)
   )
 }
 

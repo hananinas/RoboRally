@@ -3,7 +3,13 @@ export type PlayerId = string
 export type RobotId = string
 export type CardId = string
 
-export type Instruction = 'MOVE_1' | 'TURN_LEFT'
+export type Instruction = | 'MOVE_1'
+  | 'MOVE_2'
+  | 'MOVE_3'
+  | 'BACK_UP'
+  | 'TURN_LEFT'
+  | 'TURN_RIGHT'
+  | 'U_TURN'
 
 export type Card = Readonly<{
   id: CardId

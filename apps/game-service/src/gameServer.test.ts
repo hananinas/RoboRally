@@ -227,10 +227,10 @@ describe('game Socket.IO connection', () => {
     const resolvedActions = await actions
     expect(resolvedActions.map((action) => action.instruction)).toEqual([
       'MOVE_1',
+      'MOVE_2',
+      'MOVE_3',
+      'BACK_UP',
       'TURN_LEFT',
-      'MOVE_1',
-      'TURN_LEFT',
-      'MOVE_1',
     ])
     expect(await nextHand).toEqual(presentCardsDealt(singlePlayerGame.player))
     expect(singlePlayerGame.game.phase).toBe('programming')

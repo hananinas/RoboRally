@@ -1,9 +1,16 @@
 import type { Board } from './Board.js'
-import { Move1, TurnLeft, type Card } from './Card.js'
+import {Move1,
+        Move2,
+        Move3,
+        TurnLeft, 
+        TurnRight, 
+        UTurn,
+        BackUp,
+        type Card } from './Card.js'
 import type { PlayerId, RobotId } from './ids.js'
 import type { Player } from './Player.js'
 import type { Robot } from './Robot.js'
-import type { Direction, Position } from './spatial.js'
+import { opposite, type Direction, type Position } from './spatial.js'
 
 export type GamePhase = 'programming' | 'activation'
 
@@ -133,10 +140,21 @@ export class Game {
     const robot = this.robotById(robotId)
     // This will probably inflate far too much in the future.
     // We should find a cleaner solution here
-    if (card instanceof Move1) {
+      if (card instanceof Move1) {
       this.board.moveRobot(robotId, robot.direction, 1)
+    } else if (card instanceof Move2) {
+      this.board.moveRobot(robotId, robot.direction, 2)
+    } else if (card instanceof Move3) {
+      this.board.moveRobot(robotId, robot.direction, 3)
+    } else if (card instanceof BackUp) {
+      // Moves one space backwards; the robot keeps facing the same way.
+      this.board.moveRobot(robotId, opposite(robot.direction), 1)
     } else if (card instanceof TurnLeft) {
       robot.turnLeft()
+    } else if (card instanceof TurnRight) {
+      robot.turnRight()
+    } else if (card instanceof UTurn) {
+      robot.uTurn()
     } else {
       throw new Error(`Unsupported card ${card.id}`)
     }
