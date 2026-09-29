@@ -123,3 +123,92 @@ A hand may arrive before playback ends; keep it until all queued actions finish.
 Queue membership changes behind earlier resolved actions.
 Login and join requests may be retried manually after a five-second timeout on
 the same socket; repeated requests reuse the existing identity or assignment.
+
+
+
+## Reconnection
+A player’s game membership is independent of their connection to the server. When the connection is lost, the client must indicate that it is disconnected and prevent gameplay submissions until the connection and game state have been restored.
+
+### Pausing on disconnection
+
+When the server detects that a player has disconnected, it pauses the game. An action already in progress completes, but no subsequent action is executed. The current game state is preserved.
+
+All clients must disable the game while the game is paused, and the server must reject any submissions it receives during that time. Connected clients are informed that the game is paused and which players are disconnected.
+
+
+### Restoring the connections
+After an unexpected connection loss, the client attempts to reconnect automatically through Socket.IO. If Socket.IO can reestablish the connection, it will try to replay missed events through its connection [state recovery mechanism](https://socket.io/docs/v4/connection-state-recovery). 
+
+
+If recovery succeeds and the client retains its local game state, it applies the recovered events and continues using its existing player and robot assignments.
+
+If recovery fails or the client has restarted, the client must establish a connection and use user.login followed by game.join. 
+When the user already belongs to the game, game.join attaches the connection to the existing player and robot. It preserves their game state and returns their current assignment and state. It does not create another player or robot or emit game.playerJoined.
+
+
+### Resuming the game
+The game remains paused while any remaining player is disconnected. Once all remaining players are connected, the server announces that the game has resumed before continuing gameplay from the preserved game state.
+
+
+### Sequence diagrams
+
+#### Successful connection state recovery
+```mermaid
+sequenceDiagram
+    participant A as Player A
+    participant S as Game Service
+    participant B as Player B
+
+    Note over A,S: Connection lost
+    Note over A: Show Connection lost message and pause/disable game
+    Note over S: Detect disconnect and pause after current action
+    S-->>B: Announce pause and disconnected player
+    Note over B:  Show Connection lost message and pause/disable game
+
+    A->>S: Attempt Socket.IO reconnection
+    S-->>A: Restore session and replay missed events
+    Note over A: Apply recovered events
+
+    alt All remaining players are connected
+        S-->>A: Announce game resumed
+        S-->>B: Announce game resumed
+        Note over S: Continue preserved game
+    else Another player is disconnected
+        Note over S: Game remains paused
+    end
+```
+
+#### Failed connection state recovery 
+```mermaid
+sequenceDiagram
+    participant A as Player A
+    participant S as Game Service
+    participant B as Player B
+
+    Note over A,S: Connection lost
+    Note over A:  Show Connection lost message and pause/disable game
+    Note over S: Detect disconnect and pause after current action
+    S-->>B: Announce pause and disconnected player
+    Note over B:  Show Connection lost message and pause/disable game
+
+    A->>S: Establish connection
+    S-->>A: Connection restored without recovery
+    Note over A: socket.recovered is false
+
+    A->>S: user.login
+    S-->>A: LOGGED_IN
+    A->>S: game.join
+    S-->>A: JOINED with existing assignment and current state
+    Note over A: Replace local state with JOINED data
+
+    alt All remaining players are connected
+        S-->>A: Announce game resumed
+        S-->>B: Announce game resumed
+        Note over S: Continue preserved game
+    else Another player is disconnected
+        Note over S: Game remains paused
+    end
+
+```
+
+
