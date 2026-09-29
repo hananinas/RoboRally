@@ -10,21 +10,21 @@ The client logs in with a username and receives a user ID.
 
 The client first logs in with a username:
 
-user.login
+`user.login`
 
 A successful login returns:
 
-LOGGED_IN {user}
+`LOGGED_IN {user}`
 
 The client then sends:
 
-game.join {gameId}
+`game.join {gameId}`
 
 on the same socket for the configured game.
 
 A successful join returns:
 
-JOINED {assignment, state, hand, programSubmitted}
+`JOINED {assignment, state, hand, programSubmitted}`
 
 The acknowledgement contains the player's current robot assignment, public game state, private hand, and program-submission status. The client must apply all JOINED data before processing later live game events. A future lobby may be inserted between login and joining without changing this model.
 
@@ -36,17 +36,17 @@ Existing members may reconnect at any time. When an existing member sends game.j
 
 If another connection attempts to join the same game for that user, it receives:
 
-USER_ALREADY_IN_GAME
+`USER_ALREADY_IN_GAME`
 
 A failed join leaves the user logged in and the client may attempt another join later.
 
 Only the connection associated with the membership may read that game's public snapshot through:
 
-game.getPublicGameState
+`game.getPublicGameState`
 
 Other connections receive:
 
-GAME_NOT_FOUND
+`GAME_NOT_FOUND`
 
 without receiving game state.
 
@@ -86,17 +86,17 @@ During the programming phase, each player submits five distinct card IDs in regi
 
 The client sends:
 
-program.submit {gameId, playerId, cardIds}
+`program.submit {gameId, playerId, cardIds}`
 
 The service verifies that the submitted cards belong to the player and that the submission is valid for the current game phase.
 
 A successful submission receives:
 
-ACCEPTED
+`ACCEPTED`
 
 The server then emits:
 
-program.submitted {playerId}
+`program.submitted {playerId}`
 
 to the game's public room.
 
@@ -105,11 +105,11 @@ This informs other players that the player has submitted their program without r
 
 ### Submission failures
 
-INVALID_PROGRAM indicates that the submitted program is malformed, stale, contains duplicate cards, contains cards the player does not own, or was submitted during an invalid game phase.
+`INVALID_PROGRAM` indicates that the submitted program is malformed, stale, contains duplicate cards, contains cards the player does not own, or was submitted during an invalid game phase.
 
 An invalid submission does not replace or modify the player's current program.
 
-INTERNAL_ERROR means that the service failed before accepting the program.
+`INTERNAL_ERROR` means that the service failed before accepting the program.
 
 If the client receives no acknowledgement, the outcome is unknown. The client must not automatically resend the submission because the original request may have been accepted.
 
@@ -120,7 +120,7 @@ Once all players have submitted, the service resolves the five registers in orde
 
 Each resolved action is emitted publicly as:
 
-robot.actionResolved
+`robot.actionResolved`
 
 Clients must process resolved actions in the order in which they are received.
 
@@ -143,7 +143,7 @@ After all five registers have been resolved, the service deals each player a pri
 
 Each player receives:
 
-cards.dealt {cards}
+`cards.dealt {cards}`
 
 through their private Socket.IO room.
 
@@ -248,11 +248,11 @@ sequenceDiagram
 
 establishes a connection and performs the normal initialization flow:
 
-user.login
+`user.login`
 
 followed by:
 
-game.join
+`game.join`
 
 Because the user is already a game member, game.join restores the connection to the existing player and robot.
 
