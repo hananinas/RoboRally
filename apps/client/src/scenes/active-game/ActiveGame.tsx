@@ -4,11 +4,14 @@ import PlayerPanel from './components/PlayerPanel.tsx'
 import ProgrammingHand from './components/ProgrammingHand.tsx'
 import RegisterPanel from './components/RegisterPanel.tsx'
 import { canProgram } from './gameState.ts'
-import useGameConnection from './useGameConnection.ts'
+import type useGameConnection from './useGameConnection.ts'
 import useOverlayLayout from './useOverlayLayout.ts'
 
-function ActiveGame() {
-  const { state, dispatch, submit } = useGameConnection()
+function ActiveGame({ game, username }: {
+  game: ReturnType<typeof useGameConnection>
+  username: string
+}) {
+  const { state, dispatch, submit } = game
   const {
     handBelowHud,
     handRef,
@@ -22,8 +25,7 @@ function ActiveGame() {
   const phaseLabel = phase === 'PROGRAMMING' ? 'Programming'
     : phase === 'EXECUTING' ? 'Executing' : 'Waiting'
   const status = !state.connected ? 'Not connected'
-    : state.gameId === null ? 'Loading game…'
-      : !hasHand && phase === 'PROGRAMMING' ? 'Waiting for cards…' : phaseLabel
+    : !hasHand && phase === 'PROGRAMMING' ? 'Waiting for cards…' : phaseLabel
   const registeredCardIds = new Set(
     state.registers.flatMap((card) => (card ? [card.id] : [])),
   )
@@ -39,7 +41,7 @@ function ActiveGame() {
       <div ref={overlayRef} className={overlayClassName}>
         <aside className="game-hud" aria-label="Game controls">
           <div ref={hudContentRef} className="game-hud__content">
-            <PlayerPanel player={{ name: 'Player 1' }} />
+            <PlayerPanel player={{ name: username }} />
             <RegisterPanel
               registers={state.registers}
               disabled={disabled}
