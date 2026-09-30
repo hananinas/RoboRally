@@ -44,7 +44,7 @@ function ProgrammingHand({
   onPlaceCard,
 }: ProgrammingHandProps) {
   const [drag, setDrag] = useState<CardDrag | null>(null)
-  const highlightedIndex = useGameKeybinds(cards, disabled, onPlaceCard)
+  const [highlightedIndex, highlightCard] = useGameKeybinds(cards, disabled, onPlaceCard)
 
   // Starts pointer tracking.
   function startDrag(card: Card, event: PointerEvent<HTMLButtonElement>) {
@@ -138,6 +138,7 @@ function ProgrammingHand({
             onPointerUp={finishDrag}
             onPointerCancel={cancelDrag}
             onLostPointerCapture={cancelDrag}
+            onMouseEnter={() => highlightCard(index)}
             style={{
               outline: index === highlightedIndex ? '3px solid orange' : undefined,
               outlineOffset: '3px',

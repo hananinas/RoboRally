@@ -4,7 +4,7 @@ export default function useGameKeybinds(
   cards: readonly ProgramCard[],
   disabled: boolean,
   onPlaceCard: (card: ProgramCard, registerIndex: number) => void,
-) {
+) : [number, (cardIndex: number) => void]  {
 
     const [highlightedCardIndex, setHighlightedCardIndex] = useState(0)
 
@@ -60,5 +60,5 @@ export default function useGameKeybinds(
       }
     }, [])
 
-    return highlightedCardIndex
+    return [highlightedCardIndex, highlightCard]
 }
