@@ -1,33 +1,62 @@
 import type { ButtonHTMLAttributes } from 'react'
-import type { ProgramCard as Card } from '../gameState.ts'
+import type {
+  Card
+} from '@robo-rally/game-events'
 
-type ProgramCardProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  card: Card
-  size: 'hand' | 'register'
-  selected?: boolean
-  dragging?: boolean
-  label?: string
-}
+import { instructionIcons, instructionLabel } from './cardInstructions.ts'
 
-// Renders a blank program card.
+type ProgramCardProps =
+  ButtonHTMLAttributes<HTMLButtonElement> & {
+    card: Card
+    size: 'hand' | 'register'
+    selected?: boolean
+    dragging?: boolean
+    label?: string
+  }
+
+
+
+// Renders a programming card.
 function ProgramCard({
   card,
   size,
   selected = false,
   dragging = false,
-  label = card.label,
+  label = instructionLabel(card.instruction),
   ...buttonProps
 }: ProgramCardProps) {
-  const selectedClassName = selected ? ' program-card--selected' : ''
-  const draggingClassName = dragging ? ' program-card--dragging' : ''
+  const selectedClassName = selected
+    ? ' program-card--selected'
+    : ''
+
+  const draggingClassName = dragging
+    ? ' program-card--dragging'
+    : ''
 
   return (
     <button
       {...buttonProps}
-      className={`program-card program-card--${size}${selectedClassName}${draggingClassName}`}
       type="button"
       aria-label={label}
-    />
+      className={
+        `program-card program-card--${size}` +
+        selectedClassName +
+        draggingClassName
+      }
+    >
+      
+      
+          <img
+        src={instructionIcons[card.instruction]}
+        alt=""
+        className="program-card__icon"
+        draggable={false}
+      />
+
+      <span className="program-card__label">
+        {instructionLabel(card.instruction)}
+      </span>
+    </button>
   )
 }
 

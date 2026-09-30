@@ -2,7 +2,6 @@ import type {
   Card,
   GameId,
   GamePhase,
-  Instruction,
   PlayerId,
   ProgramResult,
   PublicGameState,
@@ -16,10 +15,7 @@ import {
   type RobotPlaybackState,
 } from './board/robotPlayback.ts'
 
-export type ProgramCard = {
-  id: string
-  label: string
-}
+export type ProgramCard = Card
 
 export type Registers = readonly (ProgramCard | null)[]
 
@@ -54,11 +50,6 @@ export type GameStateEvent =
 
 export const REGISTER_COUNT = 5
 
-const cardLabels: Record<Instruction, string> = {
-  MOVE_1: 'Move 1',
-  TURN_LEFT: 'Turn Left',
-}
-
 function emptyRegisters(): Registers {
   return Array.from({ length: REGISTER_COUNT }, () => null)
 }
@@ -83,7 +74,7 @@ export function canProgram(state: ClientGameState): boolean {
   return state.connected &&
     state.phase === 'PROGRAMMING' &&
     state.handVersion > 0 &&
-    !state.playback.active && 
+    !state.playback.active &&
     state.submission === 'idle'
 }
 
@@ -140,7 +131,7 @@ export function gameStateReducer(
     case 'dealt':
       return {
         ...state,
-        hand: event.cards.map((card) => ({ id: card.id, label: cardLabels[card.instruction] })),
+        hand: event.cards,
         phase: state.gameId === null ? null : 'PROGRAMMING',
         handVersion: state.handVersion + 1,
         registers: emptyRegisters(),

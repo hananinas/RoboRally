@@ -5,5 +5,12 @@ export abstract class Card {
 }
 
 export class Move1 extends Card {}
+export class Move2 extends Card{}
+export class Move3 extends Card{}
 
+export class BackUp extends Card{}
+
+export class TurnRight extends Card{}
 export class TurnLeft extends Card {}
+export class UTurn extends Card {}
+

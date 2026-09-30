@@ -1,0 +1,51 @@
+name: Deploy production
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag, for example v1.0.0'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: robo-rally-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted]
+    environment: production
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Check out release
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.sha }}
+          persist-credentials: false
+
+      - name: Build production
+        env:
+          VITE_GAME_ID: "00000000-0000-4000-8000-000000000001"
+        run: |
+          nix build .#production \
+            --impure \
+            --no-update-lock-file \
+            --print-build-logs
+
+      - name: Deploy production
+        run: |
+          release=$(readlink -e result)
+
+          sudo -n /nix/var/nix/profiles/robo-rally-tools/bin/deploy-robo-rally \
+            "$release"

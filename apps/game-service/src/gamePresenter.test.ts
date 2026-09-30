@@ -91,15 +91,15 @@ describe('game presenter', () => {
     expectTypeOf(dealt).toEqualTypeOf<CardsDealt>()
     expect(dealt.cards).toHaveLength(9)
     expect(dealt.cards.map((card) => card.instruction)).toEqual([
-      'MOVE_1',
+      'MOVE_1', 
+      'MOVE_2', 
+      'MOVE_3', 
+      'BACK_UP', 
+      'TURN_LEFT', 
+      'TURN_RIGHT', 
+      'U_TURN', 
+      'MOVE_1', 
       'TURN_LEFT',
-      'MOVE_1',
-      'TURN_LEFT',
-      'MOVE_1',
-      'TURN_LEFT',
-      'MOVE_1',
-      'TURN_LEFT',
-      'MOVE_1',
     ])
     expect(dealt.cards[0]).toEqual({
       id: player.hand[0].id,
@@ -109,8 +109,9 @@ describe('game presenter', () => {
   })
 
   it.each([
-    { cardIndex: 0, instruction: 'MOVE_1' },
-    { cardIndex: 1, instruction: 'TURN_LEFT' },
+    { cardIndex: 1, instruction: 'MOVE_2' }, { cardIndex: 2, instruction: 'MOVE_3' },
+{ cardIndex: 3, instruction: 'BACK_UP' }, { cardIndex: 4, instruction: 'TURN_LEFT' },
+{ cardIndex: 5, instruction: 'TURN_RIGHT' }, { cardIndex: 6, instruction: 'U_TURN' },
   ] as const)('presents a resolved $instruction action', ({ cardIndex, instruction }) => {
     const { player } = createSinglePlayerGame()
     const action = {

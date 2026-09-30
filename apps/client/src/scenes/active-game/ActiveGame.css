@@ -259,16 +259,46 @@
   overscroll-behavior-inline: contain;
   pointer-events: auto;
 }
-
+/* code for card */
 .program-card {
   appearance: none;
-  display: block;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   flex: none;
-  padding: 0;
+  padding: 0.5rem;
   border: 0;
-  background: #b9b9b9;
+  background: linear-gradient(180deg, #1684d8 0%, #07579b 100%);
+  color: #fff;
   cursor: pointer;
   touch-action: none;
+}
+
+.program-card__icon {
+  display: block;
+  flex-shrink: 0;
+  
+}
+
+.program-card--hand .program-card__icon {
+  width: 3rem;
+  height: 3rem;
+}
+
+.program-card--register .program-card__icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.program-card__label {
+  font-weight: 700;
+  text-align: center;
+}
+
+.program-card--register .program-card__label {
+  display: none;
 }
 
 .program-card--hand {

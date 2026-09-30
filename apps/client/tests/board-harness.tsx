@@ -31,7 +31,7 @@ declare global {
 
 const hand: readonly ProgramCard[] = Array.from({ length: 9 }, (_, index) => ({
   id: `board-fixture-card-${index}`,
-  label: index % 2 === 0 ? 'Move 1' : 'Turn Left',
+  instruction: index % 2 === 0 ? 'MOVE_1' : 'TURN_LEFT',
 }))
 
 export default function BoardHarness() {
