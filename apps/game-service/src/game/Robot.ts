@@ -1,6 +1,7 @@
+
 import type { Card } from './Card.js'
 import type { RobotId } from './ids.js'
-import { Direction, turnLeft } from './spatial.js'
+import { Direction, turnLeft, turnRight,opposite } from './spatial.js'
 
 export class Robot {
   private currentDirection: Direction
@@ -43,5 +44,11 @@ export class Robot {
 
   turnLeft(): void {
     this.currentDirection = turnLeft(this.currentDirection)
+  }
+  turnRight():void{
+    this.currentDirection = turnRight(this.currentDirection)
+  }
+  uTurn():void {
+    this.currentDirection = opposite(this.currentDirection)
   }
 }
