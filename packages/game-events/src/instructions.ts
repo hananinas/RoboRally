@@ -1,3 +1,4 @@
+// Shared for execution/playback consistency; move effects to the server when they depend on game state.
 export const instructions = {
   MOVE_1: { kind: 'move', steps: 1 },
   MOVE_2: { kind: 'move', steps: 2 },
