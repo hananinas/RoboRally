@@ -466,3 +466,72 @@ test('retains reload guidance and the selected program when disconnected during 
   expect((await game.snapshot()).submissions).toHaveLength(1)
   await expect(page.getByRole('alert')).toContainText('Reload')
 })
+
+test('displays all basic cards and plays their results across two programs', async ({ page, game }) => {
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
+  await openGame(page)
+  const hand = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
+  await expect(hand.first()).toBeEnabled()
+  await pauseClock(page)
+
+  const labels = ['Move 1', 'Move 2', 'Move 3', 'Back Up', 'Turn Left', 'Turn Right', 'U-Turn', 'Move 1', 'Turn Left']
+  const icons = new Set<string>()
+  for (const [index, label] of labels.entries()) {
+    await expect(hand.nth(index)).toHaveAccessibleName(label)
+    await expect(hand.nth(index)).toHaveText(label)
+    if (index < 7) {
+      const image = hand.nth(index).locator('img')
+      icons.add(await image.getAttribute('src') ?? '')
+      expect(await image.evaluate((element: HTMLImageElement) => element.complete && element.naturalWidth > 0)).toBe(true)
+    }
+  }
+
+  expect(icons.size).toBe(7)
+
+  const rounds = [
+    {
+      indices: [0, 1, 2, 3, 4],
+      steps: [
+        { instruction: 'MOVE_1', x: 5, y: 4, orientation: 'NORTH', angle: '0deg', duration: 600 },
+        { instruction: 'MOVE_2', x: 5, y: 2, orientation: 'NORTH', angle: '0deg', duration: 600 },
+        { instruction: 'MOVE_3', x: 5, y: 0, orientation: 'NORTH', angle: '0deg', duration: 600 },
+        { instruction: 'BACK_UP', x: 5, y: 1, orientation: 'NORTH', angle: '0deg', duration: 600 },
+        { instruction: 'TURN_LEFT', x: 5, y: 1, orientation: 'WEST', angle: '-90deg', duration: 300 },
+      ],
+    },
+    {
+      indices: [5, 6, 0, 4, 1],
+      steps: [
+        { instruction: 'TURN_RIGHT', x: 5, y: 1, orientation: 'NORTH', angle: '0deg', duration: 300 },
+        { instruction: 'U_TURN', x: 5, y: 1, orientation: 'SOUTH', angle: '-180deg', duration: 300 },
+        { instruction: 'MOVE_1', x: 5, y: 2, orientation: 'SOUTH', angle: '-180deg', duration: 600 },
+        { instruction: 'TURN_LEFT', x: 5, y: 2, orientation: 'EAST', angle: '-270deg', duration: 300 },
+        { instruction: 'MOVE_2', x: 7, y: 2, orientation: 'EAST', angle: '-270deg', duration: 600 },
+      ],
+    },
+  ] as const
+  const robot = page.locator(`[data-robot-id="${ROBOT_ID}"]`).first()
+  for (const round of rounds) {
+    const cards = (await game.snapshot()).cards
+    await fillProgram(page, [...round.indices])
+    for (const [register, index] of round.indices.entries()) {
+      await expect(page.getByRole('button', { name: `${labels[index]}, remove from register ${register + 1}`, exact: true })).toBeVisible()
+    }
+    await page.getByRole('button', { name: 'Done', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()
+    const submitted = (await game.snapshot()).submissions.at(-1)
+    expect(submitted?.cardIds).toEqual(round.indices.map(index => cards[index].id))
+    await game.control({ type: 'round', actions: round.steps.map(step => ({
+      robotId: ROBOT_ID,
+      instruction: step.instruction,
+      position: { coordinate: { x: step.x, y: step.y }, orientation: step.orientation },
+    })) })
+    for (const step of round.steps) {
+      await expect(robot).toHaveAttribute('data-board-tile', `${step.x},${step.y}`)
+      await expect.poll(() => robot.evaluate(element => (element as SVGElement).style.getPropertyValue('--board-piece-angle'))).toBe(step.angle)
+      await expect(hand.first()).toBeDisabled()
+      await page.clock.runFor(step.duration)
+    }
+    await expect(hand.first()).toBeEnabled()
+  }
+})

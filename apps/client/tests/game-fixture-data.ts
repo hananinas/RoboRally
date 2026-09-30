@@ -31,6 +31,11 @@ export function createPublicState(): PublicGameState {
   }
 }
 
+export const HAND_INSTRUCTIONS = [
+  'MOVE_1', 'MOVE_2', 'MOVE_3', 'BACK_UP', 'TURN_LEFT',
+  'TURN_RIGHT', 'U_TURN', 'MOVE_1', 'TURN_LEFT',
+] as const
+
 export const ROUND_ACTIONS: readonly RobotActionResolved[] = [
   { robotId: ROBOT_ID, instruction: 'MOVE_1', position: { coordinate: { x: 5, y: 4 }, orientation: 'NORTH' } },
   { robotId: ROBOT_ID, instruction: 'MOVE_1', position: { coordinate: { x: 5, y: 3 }, orientation: 'NORTH' } },
