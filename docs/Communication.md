@@ -123,3 +123,121 @@ A hand may arrive before playback ends; keep it until all queued actions finish.
 Queue membership changes behind earlier resolved actions.
 Login and join requests may be retried manually after a five-second timeout on
 the same socket; repeated requests reuse the existing identity or assignment.
+
+
+## Reconnection
+A player’s game membership is independent of their connection to the server. When the connection is lost, the client must indicate that it is disconnected and prevent gameplay submissions until the connection and game state have been restored.
+
+After an unexpected connection loss, the client attempts to reconnect automatically through Socket.IO. If Socket.IO can reestablish the connection, it will try to replay missed events through it's connection [state recovery mechanism](https://socket.io/docs/v4/connection-state-recovery). IF this fails, or if automatic reconnection fails or the client has restarted it must go thorugh the synchronization mechanism described in the next section. 
+
+The below sequence diagrams shows how successful reconnection using Socket.IO's features would look like. 
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Game Service
+
+    Note over C,S: Connected and synchronized
+    Note over C,S: Connection lost
+    Note over C: Show disconnected status
+    Note over C: Disable gameplay submissions
+
+    C->>S: Attempt Socket.IO reconnection
+    S-->>C: Restore connection and replay missed events
+    Note over C: Apply recovered events
+
+```
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Game Service
+    
+    Note over C,S: Connected and synchronized
+    Note over C,S: Connection lost
+    
+    Note over C: Show disconnected status
+    Note over C: Disable gameplay submissions
+    
+    C->>S: Attempt Socket.IO reconnection
+    S-->>C: Connection restored
+   
+    Note over C: socket.recovered is false
+    Note over C,S: Continue with snapshot synchronization
+```
+
+## Synchronization
+
+Players can disconnect at any time. This could be due to several reasons:
+
+1. Client actively disconnects
+2. Client crashes
+3. Unreliable client internet/VPN connection
+
+This can lead either to a complete loss of client game state or the client becoming unsynchronized through missed updated, leading to the client holding a different game state than the server. 
+
+The application must detect these situations and restore synchronization. In all cases, recovery consists of requesting a complete snapshot of the public game state and the player’s own private state, then replacing the corresponding local state.
+
+
+### Complete loss of game state
+If the client no longer has a usable local game state, for example after a crash or page reload, it must reconnect, restore its player session, and request a complete snapshot.
+
+sequenceDiagram
+    participant C as Client
+    participant S as Game Service
+
+    Note over C: Client restarts after crash or page reload
+    Note over C: Keep gameplay submissions disabled
+
+    C->>S: Establish connection
+    S-->>C: Connection established
+
+    Note over C,S: Continue with snapshot synchronization
+
+### Partial loss or inconsistency of game state
+A client may retain its local game state but miss or incorrectly apply updates. One way to detect this would be to include the complete resulting state with every server update. The client could apply the update and compare its resulting state with the server’s state. However, this would increase message size.
+Instead, server updates can include a hash of the resulting state. After applying an update, the client calculates a hash of the corresponding local state and compares the two. If they differ, the client requests a complete snapshot and replaces its local state.
+Each hash must describe the state immediately after its corresponding update, so that the client compares states from the same point in the game.
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Game Service
+
+    S-->>C: Game update and resulting state hash
+    Note over C: Apply update and calculate local hash
+
+    alt Hashes match
+        Note over C: Continue normal interaction
+    else Hashes differ
+        Note over C: Show unsynchronised status
+        Note over C: Disable gameplay submissions
+        Note over C,S: Continue with snapshot synchronization
+    end
+```
+
+### Applying a snapshot
+While synchronization is in progress, the client must prevent gameplay submissions and coordinate incoming updates with snapshot replacement. Updates already included in the snapshot must not be applied again, and later updates must not be lost. Any queued animations based on the replaced state must be cleared or reconciled.
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Game Service
+
+    Note over C: Disabled gameplay submissions
+    Note over C: Buffer incoming game updates
+    C->>S: Request complete snapshot
+    Note over S: Capture consistent public and private state
+    S-->>C: Snapshot with version number
+
+    Note over C: Replace public and private state together
+    Note over C: Discard buffered updates covered by snapshot
+    Note over C: Apply newer buffered updates
+
+    alt State hashes match
+        Note over C: Resume live update processing
+        Note over C: Enable interaction as game rules allow
+    else State hash mismatch
+        Note over C: Keep gameplay submissions disabled
+        C->>S: Request a fresh snapshot
+    end
+```
