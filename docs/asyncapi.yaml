@@ -20,8 +20,6 @@ channels:
         $ref: '#/components/messages/Login'
       joinGame:
         $ref: '#/components/messages/JoinGame'
-      leaveGame:
-        $ref: '#/components/messages/LeaveGame'
       submitProgram:
         $ref: '#/components/messages/SubmitProgram'
       getPublicGameState:
@@ -44,15 +42,6 @@ channels:
     messages:
       result:
         $ref: '#/components/messages/JoinResult'
-
-  leaveReplies:
-    address: null
-    description: |
-      Logical reply channel
-      Delivered through the acknowledgement of game.leave
-    messages:
-      result:
-        $ref: '#/components/messages/LeaveResult'
 
   programReplies:
     address: null
@@ -95,8 +84,8 @@ channels:
         $ref: '#/components/messages/RobotActionResolved'
       playerJoined:
         $ref: '#/components/messages/PlayerJoined'
-      playerLeft:
-        $ref: '#/components/messages/PlayerLeft'
+      playerConnectionChanged:
+        $ref: '#/components/messages/PlayerConnectionChanged'
 
 operations:
   handleLogin:
@@ -124,20 +113,6 @@ operations:
         $ref: '#/channels/joinReplies'
       messages:
         - $ref: '#/channels/joinReplies/messages/result'
-      x-socketio:
-        acknowledgement: true
-
-  handleLeaveGame:
-    action: receive
-    channel:
-      $ref: '#/channels/commands'
-    messages:
-      - $ref: '#/channels/commands/messages/leaveGame'
-    reply:
-      channel:
-        $ref: '#/channels/leaveReplies'
-      messages:
-        - $ref: '#/channels/leaveReplies/messages/result'
       x-socketio:
         acknowledgement: true
 
@@ -182,7 +157,6 @@ operations:
 components:
   messages:
 
-    # Login
     Login:
       name: user.login
       description: Requests a user identity for a username.
@@ -214,10 +188,11 @@ components:
           payload:
             outcome: "INVALID_USERNAME"
 
-    # Membership
     JoinGame:
       name: game.join
-      description: Requests participation in a game for the logged-in user.
+      description: |
+        Joins the configured game or reconnects the logged-in user to their existing
+        membership. New membership is rejected after the first program is accepted.
       payload:
         $ref: '#/components/schemas/JoinGame'
 
@@ -236,7 +211,7 @@ components:
         $ref: '#/components/schemas/JoinResult'
 
       examples:
-        - name: joinedProgramming
+        - name: joined
           summary: One-tile illustrative board; normal initial hand
           payload:
             outcome: JOINED
@@ -271,7 +246,8 @@ components:
                 - playerId: 00000000-0000-4000-8000-000000000002
                   username: Dane
                   programSubmitted: false
-                  participatesInRound: true
+                  connected: true
+              paused: false
             hand:
               - id: 00000000-0000-4000-8000-000000000101
                 instruction: MOVE_1
@@ -292,44 +268,6 @@ components:
               - id: 00000000-0000-4000-8000-000000000109
                 instruction: MOVE_1
             programSubmitted: false
-        - name: joinedActivation
-          summary: New player sits out activation and waits for cards
-          payload:
-            outcome: JOINED
-            assignment:
-              gameId: 00000000-0000-4000-8000-000000000001
-              playerId: 00000000-0000-4000-8000-000000000002
-              robotId: 00000000-0000-4000-8000-000000000003
-            state:
-              gameId: 00000000-0000-4000-8000-000000000001
-              board:
-                width: 1
-                height: 1
-                tiles:
-                  - position:
-                      x: 0
-                      y: 0
-                    type: EMPTY
-              robots:
-                - robotId: 00000000-0000-4000-8000-000000000003
-                  playerId: 00000000-0000-4000-8000-000000000002
-                  position:
-                    coordinate:
-                      x: 0
-                      y: 0
-                    orientation: NORTH
-              phase: EXECUTING
-              antenna:
-                x: 0
-                y: 0
-                angle: 1.5707963267948966
-              players:
-                - playerId: 00000000-0000-4000-8000-000000000002
-                  username: Dane
-                  programSubmitted: false
-                  participatesInRound: false
-            hand: []
-            programSubmitted: false
         - name: duplicateUser
           summary: Another connection already owns membership
           payload:
@@ -338,65 +276,17 @@ components:
           summary: No partial membership was created
           payload:
             outcome: NO_SPAWN_AVAILABLE
-
-    LeaveGame:
-      name: game.leave
-      description: Requests removal of the logged-in user's game participation.
-      payload:
-        $ref: '#/components/schemas/LeaveGame'
-      examples:
-        - name: leave
+        - name: gameAlreadyStarted
+          summary: A new player attempts to join after the first accepted program
           payload:
-            gameId: 00000000-0000-4000-8000-000000000001
-
-    LeaveResult:
-      name: game.leaveResult
-      description: Confirms that the user left the game or returns a rejection.
-      payload:
-        $ref: '#/components/schemas/LeaveResult'
-      examples:
-        - name: left
-          payload:
-            outcome: LEFT
-            gameId: 00000000-0000-4000-8000-000000000001
+            outcome: GAME_ALREADY_STARTED
 
     PlayerJoined:
       name: game.playerJoined
       description: Announces a new player and robot to existing game participants.
       payload:
         $ref: '#/components/schemas/PlayerJoined'
-      examples:
-        - name: joinDuringActivation
-          payload:
-            gameId: 00000000-0000-4000-8000-000000000001
-            player:
-              playerId: 00000000-0000-4000-8000-000000000002
-              username: Dane
-              programSubmitted: false
-              participatesInRound: false
-            robot:
-              robotId: 00000000-0000-4000-8000-000000000003
-              playerId: 00000000-0000-4000-8000-000000000002
-              position:
-                coordinate:
-                  x: 0
-                  y: 0
-                orientation: NORTH
 
-    PlayerLeft:
-      name: game.playerLeft
-      description: Announces a player's removal after leaving or disconnecting.
-      payload:
-        $ref: '#/components/schemas/PlayerLeft'
-      examples:
-        - name: disconnect
-          payload:
-            gameId: 00000000-0000-4000-8000-000000000001
-            playerId: 00000000-0000-4000-8000-000000000002
-            robotId: 00000000-0000-4000-8000-000000000003
-            reason: DISCONNECTED
-
-    # Snapshots
     GetPublicGameState:
       name: game.getPublicGameState
       payload:
@@ -418,11 +308,9 @@ components:
           - $ref: '#/components/schemas/PublicGameStateNotFound'
       examples:
         - name: nonmember
-          summary: Before joining, after leaving, or a different connection using the same username
           payload:
             outcome: GAME_NOT_FOUND
 
-    # Rounds
     SubmitProgram:
       name: program.submit
       payload:
@@ -471,10 +359,12 @@ components:
               - ACCEPTED
               - INVALID_PROGRAM
               - INTERNAL_ERROR
+              - GAME_PAUSED
       description: >-
         ACCEPTED confirms the program was stored. INVALID_PROGRAM rejects the
         submission without changing game state. INTERNAL_ERROR means the service
-        failed before accepting it. No acknowledgement means the outcome is unknown.
+        failed before accepting it. GAME_PAUSED rejects a submission because the game is paused. 
+        No acknowledgement means the outcome is unknown.
 
     ProgramSubmitted:
       name: program.submitted
@@ -578,6 +468,33 @@ components:
                 instruction: TURN_LEFT
               - id: 00000000-0000-4000-8000-000000000109
                 instruction: MOVE_1
+
+    PlayerConnectionChanged:
+      name: game.playerConnectionChanged
+      description: >-
+        Announces an existing player's connection status and the resulting
+        game pause state. 
+      payload:
+        $ref: '#/components/schemas/PlayerConnectionChanged'
+      examples:
+        - name: disconnected
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            connected: false
+            paused: true
+        - name: reconnectedWhileAnotherPlayerIsDisconnected
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            connected: true
+            paused: true
+        - name: reconnectedAndGameResumed
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            connected: true
+            paused: false
 
   schemas:
 
@@ -686,15 +603,12 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Card"
-          description: >-
-            Empty for a new player joining during EXECUTING; their first hand arrives via
-            cards.dealt at the next PROGRAMMING phase.
+          description: The player's current private hand.
+
         programSubmitted:
           type: boolean
           description: Whether this player has submitted for the current round.
-      description: >-
-        A new player participates immediately during PROGRAMMING. During EXECUTING,
-        they receive an empty hand and sit out until the next round.
+      description:  Returns a new assignment or preserves the existing assignment when reconnecting.
 
     JoinRejected:
       type: object
@@ -710,58 +624,15 @@ components:
               GAME_NOT_FOUND,
               NO_SPAWN_AVAILABLE,
               USER_ALREADY_IN_GAME,
-              ALREADY_IN_GAME,
+              GAME_ALREADY_STARTED,
               INTERNAL_ERROR
             ]
       description: >-
         LOGIN_REQUIRED: no approved user. INVALID_REQUEST: malformed request.
         GAME_NOT_FOUND: unavailable game. NO_SPAWN_AVAILABLE: no valid spawn.
-        USER_ALREADY_IN_GAME: another connection owns this user's membership.
-        ALREADY_IN_GAME: this connection joined another game. INTERNAL_ERROR: no partial
-        assignment. No rejection creates membership; login remains valid.
+        GAME_ALREADY_STARTED: The game has already accepted its first program.
+        USER_ALREADY_IN_GAME: another connection currently owns this user's membership. 
 
-    LeaveGame:
-      type: object
-      additionalProperties: false
-      required: [ gameId ]
-      properties:
-        gameId:
-          $ref: '#/components/schemas/GameId'
-
-    LeaveResult:
-      oneOf:
-        - $ref: "#/components/schemas/LeaveAccepted"
-        - $ref: "#/components/schemas/LeaveRejected"
-    LeaveAccepted:
-      type: object
-      additionalProperties: false
-      required:
-        - outcome
-        - gameId
-      properties:
-        outcome:
-          type: string
-          enum:
-            - LEFT
-        gameId:
-          $ref: "#/components/schemas/GameId"
-      description: >-
-        The connection no longer participates in this game. Its login remains valid.
-    LeaveRejected:
-      type: object
-      additionalProperties: false
-      required:
-        - outcome
-      properties:
-        outcome:
-          type: string
-          enum:
-            - LOGIN_REQUIRED
-            - INVALID_REQUEST
-            - GAME_NOT_FOUND
-            - INTERNAL_ERROR
-      description: >-
-        A rejected leave request does not change game membership.
     PlayerState:
       type: object
       additionalProperties: false
@@ -769,7 +640,7 @@ components:
         - playerId
         - username
         - programSubmitted
-        - participatesInRound
+        - connected
       properties:
         playerId:
           $ref: "#/components/schemas/PlayerId"
@@ -777,7 +648,7 @@ components:
           $ref: "#/components/schemas/Username"
         programSubmitted:
           type: boolean
-        participatesInRound:
+        connected:
           type: boolean
       description: >-
         Public participation and submission status; never contains cards.
@@ -799,30 +670,6 @@ components:
       description: >-
         player.playerId must equal robot.playerId.
 
-    PlayerLeft:
-      type: object
-      additionalProperties: false
-      required:
-        - gameId
-        - playerId
-        - robotId
-        - reason
-      properties:
-        gameId:
-          $ref: "#/components/schemas/GameId"
-        playerId:
-          $ref: "#/components/schemas/PlayerId"
-        robotId:
-          $ref: "#/components/schemas/RobotId"
-        reason:
-          type: string
-          enum:
-            - LEFT
-            - DISCONNECTED
-      description: >-
-        Identifies the removed player and robot and whether they left explicitly or disconnected.
-
-    # Snapshots
     PublicGameState:
       description: >-
         Public board, robot, player, phase, and antenna state for a game.
@@ -834,6 +681,7 @@ components:
         - players
         - robots
         - phase
+        - paused
       properties:
         gameId:
           $ref: "#/components/schemas/GameId"
@@ -851,6 +699,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PlayerState"
+        paused:
+          type: boolean
+          description: Whether gameplay is paused because a game member is disconnected.
 
     PublicGameStateFound:
       type: object
@@ -1004,3 +855,23 @@ components:
         east (south is pi/2), matching the documented priority algorithm. Does not occupy a robot
         slot or add board effects. The current 21×15 test board uses x=10, y=0, angle=pi/2 (south).
         For other widths use floor(width/2), y=0, facing south; keep configuration fixed per game.
+
+    PlayerConnectionChanged:
+      type: object
+      additionalProperties: false
+      required:
+        - gameId
+        - playerId
+        - connected
+        - paused
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+        playerId:
+          $ref: '#/components/schemas/PlayerId'
+        connected:
+          type: boolean
+          description: The player's connection status after this change.
+        paused:
+          type: boolean
+          description: Whether any game member remains disconnected after this change.
