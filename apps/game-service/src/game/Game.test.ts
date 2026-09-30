@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Board, Direction, EmptyTile, Game, Move1, Player, Robot, TurnLeft } from './index.js'
-import type { Card } from './index.js'
+import { Board, Direction, EmptyTile, Game, Card, Player, Robot } from './index.js'
 
 function createGame() {
   const board = new Board([[new EmptyTile(), new EmptyTile()]])
@@ -8,12 +7,12 @@ function createGame() {
   board.placeRobot(robot.id, { x: 0, y: 0 })
   const player = new Player('player-1', robot)
   const deck: Card[] = [
-    new Move1('move-1'),
-    new TurnLeft('left-1'),
-    new Move1('move-2'),
-    new TurnLeft('left-2'),
-    new Move1('move-3'),
-    new TurnLeft('left-3'),
+    new Card('move-1', 'MOVE_1'),
+    new Card('left-1', 'TURN_LEFT'),
+    new Card('move-2', 'MOVE_1'),
+    new Card('left-2', 'TURN_LEFT'),
+    new Card('move-3', 'MOVE_1'),
+    new Card('left-3', 'TURN_LEFT'),
   ]
   const game = new Game(board, [player], deck)
   return { board, robot, player, deck, game }
@@ -53,8 +52,8 @@ describe('Game programming', () => {
     expect(() => game.submitProgram('unknown', valid)).toThrow()
     expect(() => game.submitProgram(player.id, deck.slice(0, 4))).toThrow(RangeError)
     expect(() => game.submitProgram(player.id, [deck[0], deck[0], ...deck.slice(1, 4)])).toThrow(RangeError)
-    expect(() => game.submitProgram(player.id, [...deck.slice(0, 4), new Move1('foreign')])).toThrow()
-    expect(() => game.submitProgram(player.id, [new Move1(deck[0].id), ...deck.slice(1, 5)])).toThrow()
+    expect(() => game.submitProgram(player.id, [...deck.slice(0, 4), new Card('foreign', 'MOVE_1')])).toThrow()
+    expect(() => game.submitProgram(player.id, [new Card(deck[0].id, 'MOVE_1'), ...deck.slice(1, 5)])).toThrow()
 
     expect(game.phase).toBe('programming')
     expect(robot.program).toEqual([])

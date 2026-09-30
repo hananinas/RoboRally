@@ -1,6 +1,6 @@
+import type { Instruction } from '@robo-rally/game-events'
 import { describe, expect, it, vi } from 'vitest'
-import { Board, Direction, EmptyTile, Game, Move1, Player, Robot, TurnLeft } from './index.js'
-import type { Card } from './index.js'
+import { Board, Direction, EmptyTile, Game, Card, Player, Robot } from './index.js'
 
 function createGame(deck: Card[]) {
   const board = new Board(Array.from({ length: 3 }, () =>
@@ -15,7 +15,7 @@ function createGame(deck: Card[]) {
 
 describe('Game activation loop', () => {
   it('executes one register per call and returns to programming after five', () => {
-    const deck = Array.from({ length: 5 }, (_, index) => new TurnLeft(`left-${index}`))
+    const deck = Array.from({ length: 5 }, (_, index) => new Card(`left-${index}`, 'TURN_LEFT'))
     const { robot, player, game } = createGame(deck)
     expect(() => game.executeCurrentRegister()).toThrow()
     game.submitProgram(player.id, deck)
@@ -51,13 +51,13 @@ describe('Game activation loop', () => {
     expect(robot.direction).toBe(Direction.WEST)
   })
 
-  it('interprets Move1 through Board using the direction after a turn', () => {
+  it('interprets movement through Board using the direction after a turn', () => {
     const deck: Card[] = [
-      new TurnLeft('left-1'),
-      new Move1('move-1'),
-      new TurnLeft('left-2'),
-      new TurnLeft('left-3'),
-      new TurnLeft('left-4'),
+      new Card('left-1', 'TURN_LEFT'),
+      new Card('move-1', 'MOVE_1'),
+      new Card('left-2', 'TURN_LEFT'),
+      new Card('left-3', 'TURN_LEFT'),
+      new Card('left-4', 'TURN_LEFT'),
     ]
     const { board, player, game } = createGame(deck)
     const move = vi.spyOn(board, 'moveRobot')
@@ -72,8 +72,8 @@ describe('Game activation loop', () => {
     expect(game.executeCurrentRegister().actions[0].card).toBe(deck[2])
   })
 
-  it('reports the position reached by Move1', () => {
-    const deck = Array.from({ length: 5 }, (_, index) => new Move1(`move-${index}`))
+  it('reports the position reached by movement', () => {
+    const deck = Array.from({ length: 5 }, (_, index) => new Card(`move-${index}`, 'MOVE_1'))
     const { board, player, game } = createGame(deck)
     game.submitProgram(player.id, deck)
 
@@ -81,5 +81,60 @@ describe('Game activation loop', () => {
 
     expect(result.actions[0].position).toEqual({ x: 2, y: 1 })
     expect(board.positionOf('robot-1')).toEqual({ x: 2, y: 1 })
+  })
+})
+
+function resolveCard(instruction: Instruction, direction: Direction, tiles: EmptyTile[][]) {
+  const board = new Board(tiles)
+  const robot = new Robot('robot', direction)
+  board.placeRobot(robot.id, { x: 3, y: 3 })
+  const player = new Player('player', robot)
+  const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, instruction))
+  const game = new Game(board, [player], cards)
+  game.submitProgram(player.id, cards)
+  return game.executeCurrentRegister().actions[0]
+}
+
+function tiles() {
+  return Array.from({ length: 7 }, () => Array.from({ length: 7 }, () => new EmptyTile()))
+}
+
+describe('programming card effects', () => {
+  it.each([
+    ['MOVE_1', 4], ['MOVE_2', 5], ['MOVE_3', 6], ['BACK_UP', 2],
+  ] as const)('executes %s without changing facing', (instruction, x) => {
+    const action = resolveCard(instruction, Direction.EAST, tiles())
+    expect(action.position).toEqual({ x, y: 3 })
+    expect(action.direction).toBe(Direction.EAST)
+  })
+
+  it.each(['MOVE_2', 'MOVE_3'] as const)('stops %s at walls and edges', (instruction) => {
+    for (const distance of [0, 1]) {
+      const grid = tiles()
+      grid[3][3 + distance] = new EmptyTile([Direction.EAST])
+      expect(resolveCard(instruction, Direction.EAST, grid).position).toEqual({ x: 3 + distance, y: 3 })
+      expect(resolveCard(instruction, Direction.EAST, tiles().map(row => row.slice(0, 4 + distance))).position)
+        .toEqual({ x: 3 + distance, y: 3 })
+    }
+  })
+
+  it('blocks backing up without changing facing', () => {
+    const grid = tiles()
+    grid[3][3] = new EmptyTile([Direction.WEST])
+    const action = resolveCard('BACK_UP', Direction.EAST, grid)
+    expect(action.position).toEqual({ x: 3, y: 3 })
+    expect(action.direction).toBe(Direction.EAST)
+  })
+
+  it.each([
+    ['TURN_LEFT', [Direction.WEST, Direction.SOUTH, Direction.EAST, Direction.NORTH]],
+    ['TURN_RIGHT', [Direction.EAST, Direction.NORTH, Direction.WEST, Direction.SOUTH]],
+    ['U_TURN', [Direction.SOUTH, Direction.EAST, Direction.NORTH, Direction.WEST]],
+  ] as const)('executes %s from every direction on the same tile', (instruction, expected) => {
+    for (const [index, direction] of [Direction.NORTH, Direction.WEST, Direction.SOUTH, Direction.EAST].entries()) {
+      const action = resolveCard(instruction, direction, tiles())
+      expect(action.direction).toBe(expected[index])
+      expect(action.position).toEqual({ x: 3, y: 3 })
+    }
   })
 })
