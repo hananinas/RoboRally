@@ -11,15 +11,9 @@ export default function useGameKeybinds(
     function highlightCard(cardIndex: number) {
       if (cards.length === 0) return
 
-      const firstCardIndex = 0
-      const lastCardIndex = cards.length - 1
+      const wrappedIndex = ((cardIndex % cards.length) + cards.length) % cards.length
 
-      const boundedIndex = Math.max(
-        firstCardIndex,
-        Math.min(lastCardIndex, cardIndex),
-      )
-
-      setHighlightedCardIndex(boundedIndex)
+      setHighlightedCardIndex(wrappedIndex)
     }
 
     const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
