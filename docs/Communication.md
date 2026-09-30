@@ -32,7 +32,9 @@ The acknowledgement contains the player's current robot assignment, public game 
 
 New players may join a game until the server accepts the first program submission. Accepting that submission starts the game and permanently closes joining to new players. Later attempts by new players receive GAME_ALREADY_STARTED. 
 
-Existing members may reconnect at any time. When an existing member sends game.join, the server attaches the new connection to the existing player and robot and returns their current assignment and state through JOINED.
+In case of disconnection, existing members may reconnect at any time. If the tab is left open SocketIO will automatically try to reestablish the connection. In case of a closed tab, the player can reopen the webpage in another tab to reconnect. In case multiple tabs are used, the first connection to reclaim a disconnected membership becomes its owner. A later connection cannot replace that owner, even if its Socket.IO session was successfully recovered. 
+
+When an existing member sends game.join while not being connected, the server attaches the new connection to the existing player and robot and returns their current assignment and state through JOINED.
 
 If another connection attempts to join the same game for that user, it receives:
 
@@ -248,7 +250,7 @@ sequenceDiagram
 
 #### Failed connection state recovery
 
-establishes a connection and performs the normal initialization flow:
+Once Socket.IO has reconnected, if state recovery was unsuccessful, the client performs the normal initialization flow by sending
 
 `user.login`
 
