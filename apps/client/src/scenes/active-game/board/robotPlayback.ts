@@ -1,3 +1,4 @@
+import { instructions } from '@robo-rally/game-events'
 import type {
   Orientation,
   Position,
@@ -17,14 +18,9 @@ export type DisplayRobot = Robot & Readonly<{ angle: number }>
 
 export const ROBOT_MOVE_DURATION_MS = 600
 export const ROBOT_TURN_DURATION_MS = 300
-const TURN_INSTRUCTIONS: ReadonlySet<ResolvedRobotAction['instruction']> = new Set([
-  'TURN_LEFT',
-  'TURN_RIGHT',
-  'U_TURN',
-])
 export function robotActionDuration(action: ResolvedRobotAction, reducedMotion: boolean): number {
   return reducedMotion ? 200
-    : TURN_INSTRUCTIONS.has(action.instruction) ? ROBOT_TURN_DURATION_MS : ROBOT_MOVE_DURATION_MS
+    : instructions[action.instruction].kind === 'turn' ? ROBOT_TURN_DURATION_MS : ROBOT_MOVE_DURATION_MS
 }
 
 export type RobotPlaybackState = Readonly<{

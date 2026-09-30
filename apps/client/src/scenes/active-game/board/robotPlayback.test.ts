@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DEMO_ROBOTS } from './demoBoard.ts'
 import {
   createRobotPlaybackState,
+  robotActionDuration,
   robotPlaybackReducer,
   type ResolvedRobotAction,
 } from './robotPlayback.ts'
@@ -47,5 +48,17 @@ describe('robot playback', () => {
 
     state = robotPlaybackReducer(state, { type: 'reset', robots: DEMO_ROBOTS })
     expect(state).toEqual(createRobotPlaybackState(DEMO_ROBOTS))
+  })
+})
+
+
+describe('robot action timing', () => {
+  it.each([
+    ['MOVE_1', 600], ['MOVE_2', 600], ['MOVE_3', 600], ['BACK_UP', 600],
+    ['TURN_LEFT', 300], ['TURN_RIGHT', 300], ['U_TURN', 300],
+  ] as const)('times %s and respects reduced motion', (instruction, duration) => {
+    const action = { ...steps[0], instruction }
+    expect(robotActionDuration(action, false)).toBe(duration)
+    expect(robotActionDuration(action, true)).toBe(200)
   })
 })
