@@ -35,7 +35,7 @@ function RegisterSlot({
   const cardClassName = card
     ? 'register__card register__card--filled'
     : 'register__card'
-  const registerIndex = card || disabled ? undefined : index
+  const registerIndex = disabled ? undefined : index
 
   return (
     <li className="register">
