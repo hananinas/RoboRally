@@ -67,22 +67,20 @@ export function createGameSocketServer(
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer)
   const { gameId, game, playerForConnection } = session
   let publishedPhase = game.phase
-  let publishedRound = game.roundNumber
   let scheduledAction: NodeJS.Immediate | undefined
   let closed = false
 
   // Submission and future membership handlers share this progression path.
   function advanceGame(): void {
     if (closed) return
-    if (publishedPhase !== game.phase || publishedRound !== game.roundNumber) {
+    if (publishedPhase !== game.phase) {
       publishedPhase = game.phase
-      publishedRound = game.roundNumber
       io.to(publicRoom(gameId)).emit('game.phaseChanged', presentPhaseChanged(gameId, game))
       if (game.phase === 'programming') {
         for (const player of game.players) {
           io.to(playerRoom(gameId, player.id)).emit(
             'cards.dealt',
-            presentCardsDealt(gameId, game.roundNumber, player),
+            presentCardsDealt(gameId, player),
           )
         }
       }
@@ -143,7 +141,6 @@ export function createGameSocketServer(
         if (
           submission.gameId !== gameId ||
           submission.playerId !== player.id ||
-          submission.roundNumber !== game.roundNumber ||
           !program
         ) {
           throw new Error('Program does not belong to this game')
@@ -157,14 +154,13 @@ export function createGameSocketServer(
       acknowledge({ outcome: 'ACCEPTED' })
       io.to(publicRoom(gameId)).emit('program.submitted', {
         gameId,
-        roundNumber: game.roundNumber,
         playerId: player.id,
       })
 
       advanceGame()
     })
 
-    socket.emit('cards.dealt', presentCardsDealt(gameId, game.roundNumber, player))
+    socket.emit('cards.dealt', presentCardsDealt(gameId, player))
   })
 
   return io

@@ -45,12 +45,10 @@ describe('single-player game', () => {
     expect(parseSubmitProgram({
       gameId,
       playerId: player.id,
-      roundNumber: game.roundNumber,
       cardIds: cardIds.slice(0, 5),
     })).toEqual({
       gameId,
       playerId: player.id,
-      roundNumber: game.roundNumber,
       cardIds: cardIds.slice(0, 5),
     })
   })

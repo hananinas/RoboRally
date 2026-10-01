@@ -62,7 +62,6 @@ describe('Game fixed-roster programming', () => {
     const empty = new Game(board, [], deck)
     empty.recheckProgrammingPhase()
     expect(empty.phase).toBe('programming')
-    expect(empty.roundNumber).toBe(1)
     expect(empty.currentRegister).toBe(0)
     expect(() => empty.executeNextAction()).toThrow()
     expect(() => empty.submitProgram(player.id, deck.slice(0, 5))).toThrow()
@@ -106,8 +105,7 @@ describe('Game multiplayer activation', () => {
     const programs = players.map((_, playerIndex) =>
       Array.from({ length: 5 }, (_, registerIndex) => deck[(playerIndex + registerIndex) % deck.length]),
     )
-    for (let roundNumber = 1; roundNumber <= 2; roundNumber++) {
-      expect(game.roundNumber).toBe(roundNumber)
+    for (let round = 1; round <= 2; round++) {
       players.forEach((player, index) => {
         expect(player.hand).toEqual(deck)
         game.submitProgram(player.id, programs[index])
@@ -119,7 +117,6 @@ describe('Game multiplayer activation', () => {
         for (let robotIndex = 0; robotIndex < expectedOrder.length; robotIndex++) {
           const player = expectedOrder[robotIndex]
           const result = game.executeNextAction()
-          expect(result.roundNumber).toBe(roundNumber)
           expect(result.registerIndex).toBe(registerIndex)
           expect(result.action.robotId).toBe(player.robot.id)
           expect(result.action.card).toBe(programs[players.indexOf(player)][registerIndex])
@@ -129,7 +126,6 @@ describe('Game multiplayer activation', () => {
         }
       }
 
-      expect(game.roundNumber).toBe(roundNumber + 1)
       for (const player of players) {
         expect(player.robot.program).toEqual([])
         expect(player.hand).toEqual(deck)

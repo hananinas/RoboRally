@@ -117,14 +117,12 @@ components:
       payload:
         type: object
         additionalProperties: false
-        required: [gameId, playerId, roundNumber, cardIds]
+        required: [gameId, playerId, cardIds]
         properties:
           gameId:
             $ref: '#/components/schemas/GameId'
           playerId:
             $ref: '#/components/schemas/PlayerId'
-          roundNumber:
-            $ref: '#/components/schemas/RoundNumber'
           cardIds:
             type: array
             description: Card instance IDs in register order.
@@ -136,18 +134,16 @@ components:
 
       description: |
         Submit once per round during PROGRAMMING. The service checks the assigned
-        player and current round before resolving five distinct cards from that
+        player and current programming phase before resolving five distinct cards from that
         player's hand. Rejection leaves accepted programs unchanged.
     CardsDealt:
       name: cards.dealt
       payload:
         type: object
-        required: [gameId, roundNumber, playerId, cards]
+        required: [gameId, playerId, cards]
         properties:
           gameId:
             $ref: '#/components/schemas/GameId'
-          roundNumber:
-            $ref: '#/components/schemas/RoundNumber'
           playerId:
             $ref: '#/components/schemas/PlayerId'
           cards:
@@ -174,12 +170,10 @@ components:
         the submitter. Never disclose cards. This event does not start activation.
       payload:
         type: object
-        required: [gameId, roundNumber, playerId]
+        required: [gameId, playerId]
         properties:
           gameId:
             $ref: '#/components/schemas/GameId'
-          roundNumber:
-            $ref: '#/components/schemas/RoundNumber'
           playerId:
             $ref: '#/components/schemas/PlayerId'
 
@@ -194,12 +188,10 @@ components:
       payload:
         type: object
         additionalProperties: false
-        required: [gameId, roundNumber, phase]
+        required: [gameId, phase]
         properties:
           gameId:
             $ref: '#/components/schemas/GameId'
-          roundNumber:
-            $ref: '#/components/schemas/RoundNumber'
           phase:
             $ref: '#/components/schemas/GamePhase'
 
@@ -214,7 +206,6 @@ components:
         type: object
         required:
           - gameId
-          - roundNumber
           - registerIndex
           - robotId
           - instruction
@@ -222,8 +213,6 @@ components:
         properties:
           gameId:
             $ref: '#/components/schemas/GameId'
-          roundNumber:
-            $ref: '#/components/schemas/RoundNumber'
           registerIndex:
             type: integer
             minimum: 0
@@ -254,10 +243,6 @@ components:
           - $ref: '#/components/schemas/PublicGameStateNotFound'
 
   schemas:
-    RoundNumber:
-      type: integer
-      minimum: 1
-      description: Starts at 1 and increments after five registers. Empty games stay idle.
 
     GamePhase:
       type: string
@@ -349,12 +334,10 @@ components:
 
     PublicGameState:
       type: object
-      required: [gameId, roundNumber, antenna, board, robots, phase]
+      required: [gameId, antenna, board, robots, phase]
       properties:
         gameId:
           $ref: '#/components/schemas/GameId'
-        roundNumber:
-          $ref: '#/components/schemas/RoundNumber'
         antenna:
           $ref: '#/components/schemas/Antenna'
         board:

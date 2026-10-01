@@ -30,7 +30,6 @@ describe('Game activation loop', () => {
     for (let registerIndex = 0; registerIndex < 5; registerIndex++) {
       const result = game.executeNextAction()
       expect(result).toEqual({
-        roundNumber: 1,
         registerIndex,
         action: {
           robotId: robot.id,
@@ -45,11 +44,10 @@ describe('Game activation loop', () => {
 
     expect(robot.program).toEqual([])
     expect(player.hand).toEqual(deck)
-    expect(game.roundNumber).toBe(2)
     expect(() => game.executeNextAction()).toThrow()
 
     game.submitProgram(player.id, deck)
-    expect(game.executeNextAction()).toMatchObject({ roundNumber: 2, registerIndex: 0 })
+    expect(game.executeNextAction()).toMatchObject({ registerIndex: 0 })
     expect(robot.direction).toBe(Direction.WEST)
   })
 

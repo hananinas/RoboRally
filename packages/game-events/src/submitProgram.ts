@@ -19,7 +19,6 @@ export const submitProgramSchema = z
   .strictObject({
     gameId: z.uuid(),
     playerId: z.uuid(),
-    roundNumber: z.int().min(1),
     cardIds: programCardIdsSchema,
   })
   .readonly()

@@ -123,7 +123,7 @@ describe('game Socket.IO connection', () => {
     await connect()
 
     expect(await dealt).toEqual(
-      presentCardsDealt(singlePlayerGame.gameId, 1, singlePlayerGame.player),
+      presentCardsDealt(singlePlayerGame.gameId, singlePlayerGame.player),
     )
   })
 
@@ -179,7 +179,6 @@ describe('game Socket.IO connection', () => {
     untypedClient.emit('program.submit', {
       gameId: singlePlayerGame.gameId,
       playerId: singlePlayerGame.player.id,
-      roundNumber: 1,
       cardIds,
     })
 
@@ -213,14 +212,12 @@ describe('game Socket.IO connection', () => {
     const result = await submitProgram({
       gameId: singlePlayerGame.gameId,
       playerId: singlePlayerGame.player.id,
-      roundNumber: 1,
       cardIds: selectedCards.map((card) => card.id),
     })
 
     expect(result).toEqual({ outcome: 'ACCEPTED' })
     expect(await submitted).toEqual({
       gameId: singlePlayerGame.gameId,
-      roundNumber: 1,
       playerId: singlePlayerGame.player.id,
     })
     expect(submittedToPlayer).toHaveBeenCalledExactlyOnceWith(await submitted)
@@ -233,7 +230,7 @@ describe('game Socket.IO connection', () => {
       'MOVE_1',
     ])
     expect(await nextHand).toEqual(
-      presentCardsDealt(singlePlayerGame.gameId, 2, singlePlayerGame.player),
+      presentCardsDealt(singlePlayerGame.gameId, singlePlayerGame.player),
     )
     expect(singlePlayerGame.game.phase).toBe('programming')
     expect(singlePlayerGame.game.currentRegister).toBe(0)
@@ -261,7 +258,6 @@ describe('game Socket.IO connection', () => {
     const valid = {
       gameId: singlePlayerGame.gameId,
       playerId: singlePlayerGame.player.id,
-      roundNumber: 1,
       cardIds,
     }
     const invalidPayloads: readonly unknown[] = [

@@ -11,7 +11,7 @@ const cardIds = [
   '00000000-0000-4000-8000-000000000005',
 ] as const
 
-const validPayload = { gameId, playerId, roundNumber: 1, cardIds }
+const validPayload = { gameId, playerId, cardIds }
 
 describe('parseSubmitProgram', () => {
   it('accepts five distinct card IDs in register order', () => {
@@ -25,9 +25,7 @@ describe('parseSubmitProgram', () => {
     ['an empty object', {}],
     ['a missing game ID', { ...validPayload, gameId: undefined }],
     ['a missing player ID', { ...validPayload, playerId: undefined }],
-    ['a missing round', { ...validPayload, roundNumber: undefined }],
-    ['a zero round', { ...validPayload, roundNumber: 0 }],
-    ['a fractional round', { ...validPayload, roundNumber: 1.5 }],
+    ['a legacy round number', { ...validPayload, roundNumber: 1 }],
     ['a missing card list', { ...validPayload, cardIds: undefined }],
     ['an invalid game ID', { ...validPayload, gameId: 'game-1' }],
     ['an invalid player ID', { ...validPayload, playerId: 'player-1' }],

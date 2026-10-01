@@ -1,8 +1,8 @@
 # Communication between the client and Game Service
 
 The implemented event contract is in [AsyncAPI](asyncapi.yaml), with a
-[rendered reference](asyncapi.html). Multiplayer rounds use the phase and round
-fields proposed in [PR #76](https://github.com/hananinas/RoboRally/pull/76).
+[rendered reference](asyncapi.html). Multiplayer rounds use the phase events
+defined in [PR #76](https://github.com/hananinas/RoboRally/pull/76).
 Login, joining, and membership changes remain in their separate issues.
 
 ## Round flow
@@ -16,12 +16,12 @@ sequenceDiagram
     participant A as Client A
     participant S as Game Service
     participant B as Client B
-    A->>S: program.submit {gameId, roundNumber, playerId, cardIds}
+    A->>S: program.submit {gameId, playerId, cardIds}
     S-->>A: Acknowledgement: ACCEPTED
     S-->>A: program.submitted
     S-->>B: program.submitted
     Note over A,B: Programming continues until every player submits
-    B->>S: program.submit {gameId, roundNumber, playerId, cardIds}
+    B->>S: program.submit {gameId, playerId, cardIds}
     S-->>B: Acknowledgement: ACCEPTED
     S-->>A: program.submitted
     S-->>B: program.submitted
@@ -38,7 +38,7 @@ sequenceDiagram
     Note over A,B: Finish playback before clearing registers and enabling cards
 ```
 
-Every update includes `gameId` and `roundNumber`. Action results also include
+Every update includes `gameId`. Action results also include
 `registerIndex`, from zero through four. Several robots share a register index.
 Blocked moves still produce results. The service sends each result immediately
 and yields between actions, without waiting for animation acknowledgements.
@@ -54,18 +54,18 @@ The client uses `@robo-rally/game-events`. Set `VITE_GAME_ID` to the game UUID a
 
 1. On connection, request `game.getPublicGameState`. The current entry path sends
    the initial private hand through `cards.dealt`, which can arrive first.
-2. Apply the snapshot's board, robots, round, and phase. Buffer the hand
+2. Apply the snapshot's board, robots, and phase. Buffer the hand
    until its matching snapshot arrives. The private hand identifies the controlled
    player until the join assignment replaces this entry path in #66 and #69.
-3. Submit five distinct card IDs in order, with the assigned player and round.
+3. Submit five distinct card IDs in order, with the assigned player.
    `ACCEPTED` locks the program while other players submit. `INVALID_PROGRAM`
    preserves the selection for retry. The service checks the connection's assigned
-   player, current round, hand, and Game's submission rules.
+   player, current phase, hand, and Game's submission rules.
 4. Queue every action in received order. Keep the selected registers visible until
    playback ends, even if the next programming phase and hand have already arrived.
-5. Enable programming only with a matching private hand, the programming phase,
-   and no remaining playback. Ignore stale rounds, other games, and other players'
-   hands. Do not request another snapshot between rounds.
+5. Enable programming only with a private hand received for the programming phase
+   and no remaining playback. Ignore hands for other games or players and repeated
+   hands during the same programming phase. Do not request another snapshot between rounds.
 
 Reduced motion still preserves action order. After five seconds without a
 submission acknowledgement, keep the program locked because its outcome is
@@ -86,9 +86,12 @@ The interfaces for the related issues are:
 - **#68, submissions:** resolve cards from the assigned player's hand and call
   `Game.submitProgram(playerId, cards)`. Acknowledge before shared readiness and
   phase events. `Game.hasSubmittedProgram(playerId)` exposes readiness without
-  exposing cards. The required player/round fields and stale-round check are
-  already implemented so a delayed previous-round request cannot start a new round.
-- **#69, membership:** Game's roster is fixed here. Membership code must update
+  exposing cards. The service validates the assigned player, current phase, and
+  hand; the wire contract has no round number. A delayed request with the same
+  card IDs as a later fixed-deck hand cannot be distinguished by its payload.
+- **#69, membership:** The roster is fixed here. #69 must integrate membership
+  changes with Game's eligibility and progression; these hooks alone do not
+  implement joining, leaving, or disconnect handling. Membership code must update
   eligibility and invoke `Game.recheckProgrammingPhase()` after programming-time
   removals. Publish membership changes before calling the service's shared
   `advanceGame()` path. That path publishes phase changes and schedules one

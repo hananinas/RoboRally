@@ -20,7 +20,6 @@ export function createPublicState(): PublicGameState {
   return {
     gameId: GAME_ID,
     phase: 'PROGRAMMING',
-    roundNumber: 1,
     antenna: { x: 5, y: 0, angle: Math.PI / 2 },
     board: {
       width: 11,
@@ -43,11 +42,11 @@ export function createPublicState(): PublicGameState {
 }
 
 export const ROUND_ACTIONS: readonly RobotActionResolved[] = [
-  { gameId: GAME_ID, roundNumber: 1, registerIndex: 0, robotId: ROBOT_ID, instruction: 'MOVE_1', position: { coordinate: { x: 5, y: 4 }, orientation: 'NORTH' } },
-  { gameId: GAME_ID, roundNumber: 1, registerIndex: 1, robotId: ROBOT_ID, instruction: 'MOVE_1', position: { coordinate: { x: 5, y: 3 }, orientation: 'NORTH' } },
-  { gameId: GAME_ID, roundNumber: 1, registerIndex: 2, robotId: ROBOT_ID, instruction: 'TURN_LEFT', position: { coordinate: { x: 5, y: 3 }, orientation: 'WEST' } },
-  { gameId: GAME_ID, roundNumber: 1, registerIndex: 3, robotId: ROBOT_ID, instruction: 'MOVE_1', position: { coordinate: { x: 4, y: 3 }, orientation: 'WEST' } },
-  { gameId: GAME_ID, roundNumber: 1, registerIndex: 4, robotId: ROBOT_ID, instruction: 'TURN_LEFT', position: { coordinate: { x: 4, y: 3 }, orientation: 'SOUTH' } },
+  { gameId: GAME_ID, registerIndex: 0, robotId: ROBOT_ID, instruction: 'MOVE_1', position: { coordinate: { x: 5, y: 4 }, orientation: 'NORTH' } },
+  { gameId: GAME_ID, registerIndex: 1, robotId: ROBOT_ID, instruction: 'MOVE_1', position: { coordinate: { x: 5, y: 3 }, orientation: 'NORTH' } },
+  { gameId: GAME_ID, registerIndex: 2, robotId: ROBOT_ID, instruction: 'TURN_LEFT', position: { coordinate: { x: 5, y: 3 }, orientation: 'WEST' } },
+  { gameId: GAME_ID, registerIndex: 3, robotId: ROBOT_ID, instruction: 'MOVE_1', position: { coordinate: { x: 4, y: 3 }, orientation: 'WEST' } },
+  { gameId: GAME_ID, registerIndex: 4, robotId: ROBOT_ID, instruction: 'TURN_LEFT', position: { coordinate: { x: 4, y: 3 }, orientation: 'SOUTH' } },
 ]
 
 export type FixtureControl =

@@ -68,7 +68,6 @@ export function presentPublicGameState(
 
   return {
     gameId,
-    roundNumber: game.roundNumber,
     antenna: game.antenna,
     board: {
       width: game.board.width,
@@ -88,25 +87,23 @@ export function presentPublicGameState(
 }
 
 export function presentPhaseChanged(gameId: GameId, game: Game): PhaseChanged {
-  return { gameId, roundNumber: game.roundNumber, phase: phases[game.phase] }
+  return { gameId, phase: phases[game.phase] }
 }
 
 export function presentCardsDealt(
   gameId: GameId,
-  roundNumber: number,
   player: Player,
 ): CardsDealt {
-  return { gameId, roundNumber, playerId: player.id, cards: player.hand.map(presentCard) }
+  return { gameId, playerId: player.id, cards: player.hand.map(presentCard) }
 }
 
 export function presentRobotActionResolved(
   gameId: GameId,
   result: NextActionResult,
 ): RobotActionResolved {
-  const { action, roundNumber, registerIndex } = result
+  const { action, registerIndex } = result
   return {
     gameId,
-    roundNumber,
     registerIndex,
     robotId: action.robotId,
     instruction: instructionFor(action.card),

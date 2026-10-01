@@ -12,7 +12,7 @@ function getGameStatus(state: ClientGameState): string {
   if (state.gameId === null) return 'Loading game…'
   if (state.playback.active || state.phase === 'EXECUTING') return 'Executing'
   if (state.phase === 'PROGRAMMING') {
-    if (state.handRoundNumber !== state.roundNumber) return 'Waiting for cards…'
+    if (!state.handReady) return 'Waiting for cards…'
     if (state.submission === 'accepted') return 'Program accepted · Waiting for other players'
     return 'Programming'
   }

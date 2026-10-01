@@ -7,11 +7,11 @@ import {
 } from './robotPlayback.ts'
 
 const steps: readonly ResolvedRobotAction[] = [
-  { gameId: 'demo', roundNumber: 1, registerIndex: 0, robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 6 }, orientation: 'NORTH' } },
-  { gameId: 'demo', roundNumber: 1, registerIndex: 1, robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 5 }, orientation: 'NORTH' } },
-  { gameId: 'demo', roundNumber: 1, registerIndex: 2, robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 10, y: 5 }, orientation: 'WEST' } },
-  { gameId: 'demo', roundNumber: 1, registerIndex: 3, robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 9, y: 5 }, orientation: 'WEST' } },
-  { gameId: 'demo', roundNumber: 1, registerIndex: 4, robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 9, y: 5 }, orientation: 'SOUTH' } },
+  { gameId: 'demo', registerIndex: 0, robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 6 }, orientation: 'NORTH' } },
+  { gameId: 'demo', registerIndex: 1, robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 5 }, orientation: 'NORTH' } },
+  { gameId: 'demo', registerIndex: 2, robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 10, y: 5 }, orientation: 'WEST' } },
+  { gameId: 'demo', registerIndex: 3, robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 9, y: 5 }, orientation: 'WEST' } },
+  { gameId: 'demo', registerIndex: 4, robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 9, y: 5 }, orientation: 'SOUTH' } },
 ]
 
 describe('robot playback', () => {

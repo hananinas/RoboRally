@@ -9,7 +9,6 @@ Will update with a more conceptual domain diagram which will be used for present
         +board: Board
         +players: Player[]
         +antenna: Antenna
-        +roundNumber: int
         -phase: GamePhase
         -currentRegister: int
         -activatedRobotIds: RobotId[] set
@@ -93,17 +92,17 @@ Will update with a more conceptual domain diagram which will be used for present
 
 # Game
 
-Game owns programming, activation, register advancement, and the round number.
+Game owns programming, activation, and register advancement.
 It deals the fixed card supply to each player and accepts one five-card program
 per player. Activation starts only when the nonempty roster has all submitted.
 An empty game stays in programming. There is no timer.
 
-`executeNextAction()` executes one robot and returns its action, round number,
-and zero-based register index. Game recalculates priority from current Board
+`executeNextAction()` executes one robot and returns its action and zero-based
+register index. Game recalculates priority from current Board
 positions after every action. Every robot acts before the next register starts.
 Board effects run after the last robot in a register; there are none in V0.
-After register five, Game clears all programs and submission state, increments
-the round number, deals every player's next hand, and returns to programming.
+After register five, Game clears all programs and submission state, deals every
+player's next hand, and returns to programming.
 
 The service publishes each result before scheduling the next action. It sends
 explicit phase events and private hands but does not count registers or decide

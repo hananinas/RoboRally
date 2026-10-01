@@ -305,7 +305,7 @@ test('preserves the selected program after rejection and submits the same ordere
   await expect(hand.nth(4)).toBeDisabled()
   await expect(hand.nth(0)).toBeEnabled()
 
-  const submitted = { gameId: GAME_ID, roundNumber: 1, playerId: PLAYER_ID, cardIds: indices.map((index) => game.initial.cards[index].id) }
+  const submitted = { gameId: GAME_ID, playerId: PLAYER_ID, cardIds: indices.map((index) => game.initial.cards[index].id) }
   await expect.poll(async () => (await game.snapshot()).submissions).toEqual([submitted])
   await game.control({ type: 'submission', outcome: 'ACCEPTED', deferred: false })
   await done.click()
@@ -323,7 +323,7 @@ test('prevents duplicate submissions while awaiting an acknowledgement and after
   await expect(page.getByRole('button', { name: 'Submitting…', exact: true })).toBeDisabled()
   await expect(page.getByRole('button', { name: /remove from register/ }).first()).toBeDisabled()
   await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button').last()).toBeDisabled()
-  const submitted = { gameId: GAME_ID, roundNumber: 1, playerId: PLAYER_ID, cardIds: game.initial.cards.slice(0, 5).map((card) => card.id) }
+  const submitted = { gameId: GAME_ID, playerId: PLAYER_ID, cardIds: game.initial.cards.slice(0, 5).map((card) => card.id) }
   await expect.poll(async () => (await game.snapshot()).submissions).toEqual([submitted])
 
   await game.control({ type: 'acknowledge', outcome: 'ACCEPTED' })
@@ -381,8 +381,8 @@ test('plays every burst result and starts the next program without refreshing st
   await page.getByRole('button', { name: 'Done', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()
   await expect.poll(async () => (await game.snapshot()).submissions).toEqual([
-    { gameId: GAME_ID, roundNumber: 1, playerId: PLAYER_ID, cardIds: game.initial.cards.slice(0, 5).map((card) => card.id) },
-    { gameId: GAME_ID, roundNumber: 2, playerId: PLAYER_ID, cardIds: nextRound.cards.slice(0, 5).map((card) => card.id) },
+    { gameId: GAME_ID, playerId: PLAYER_ID, cardIds: game.initial.cards.slice(0, 5).map((card) => card.id) },
+    { gameId: GAME_ID, playerId: PLAYER_ID, cardIds: nextRound.cards.slice(0, 5).map((card) => card.id) },
   ])
   expect((await game.snapshot()).stateRequests).toBe(1)
 })
@@ -391,7 +391,7 @@ test('keeps programming editable when another player submits', async ({ page, ga
   await openGame(page)
   await game.control({
     type: 'submitted',
-    submission: { gameId: GAME_ID, roundNumber: 1, playerId: OTHER_PLAYER_ID },
+    submission: { gameId: GAME_ID, playerId: OTHER_PLAYER_ID },
   })
   await expect(page.getByRole('status')).toHaveText('Programming')
   await fillProgram(page)
@@ -434,7 +434,7 @@ test('plays both robots in every register before accepting the next hand', async
   await expect(page.getByRole('status')).toHaveText('Programming')
 })
 
-test('waits for its next hand after playback and ignores stale or foreign hands', async ({ page, game }) => {
+test('waits for its next hand after playback and ignores foreign hands', async ({ page, game }) => {
   await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
   await openGame(page)
   await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button').first()).toBeEnabled()
@@ -450,11 +450,9 @@ test('waits for its next hand after playback and ignores stale or foreign hands'
     await page.clock.runFor(action.instruction === 'TURN_LEFT' ? 300 : 600)
   }
   await expect(page.getByRole('status')).toHaveText('Waiting for cards…')
-  const hand = { gameId: GAME_ID, roundNumber: 2, playerId: PLAYER_ID, cards: nextRound.cards }
-  await game.control({ type: 'hand', hand: { ...hand, roundNumber: 1 } })
+  const hand = { gameId: GAME_ID, playerId: PLAYER_ID, cards: nextRound.cards }
   await game.control({ type: 'hand', hand: { ...hand, playerId: OTHER_PLAYER_ID } })
   await game.control({ type: 'hand', hand: { ...hand, gameId: 'another-game' } })
-  await game.control({ type: 'phase', phase: { gameId: GAME_ID, roundNumber: 1, phase: 'EXECUTING' } })
   await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button').last()).toBeDisabled()
   await expect(page.getByRole('button', { name: /remove from register/ })).toHaveCount(5)
   await game.control({ type: 'deal' })
@@ -496,7 +494,6 @@ test('does not resend a program after its acknowledgement times out', async ({ p
   await expect(registered.first()).toBeDisabled()
   expect((await game.snapshot()).submissions).toEqual([{
     gameId: GAME_ID,
-    roundNumber: 1,
     playerId: PLAYER_ID,
     cardIds: game.initial.cards.slice(0, 5).map((card) => card.id),
   }])
@@ -522,8 +519,8 @@ test('does not resend a program after its acknowledgement times out', async ({ p
   await fillProgram(page)
   await page.getByRole('button', { name: 'Done', exact: true }).click()
   await expect.poll(async () => (await game.snapshot()).submissions).toEqual([
-    { gameId: GAME_ID, roundNumber: 1, playerId: PLAYER_ID, cardIds: game.initial.cards.slice(0, 5).map((card) => card.id) },
-    { gameId: GAME_ID, roundNumber: 2, playerId: PLAYER_ID, cardIds: nextRound.cards.slice(0, 5).map((card) => card.id) },
+    { gameId: GAME_ID, playerId: PLAYER_ID, cardIds: game.initial.cards.slice(0, 5).map((card) => card.id) },
+    { gameId: GAME_ID, playerId: PLAYER_ID, cardIds: nextRound.cards.slice(0, 5).map((card) => card.id) },
   ])
   expect((await game.snapshot()).stateRequests).toBe(1)
 })

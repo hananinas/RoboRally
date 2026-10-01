@@ -6,7 +6,6 @@ import type {
   PhaseChanged,
   PlayerId,
   ProgramResult,
-  ProgramSubmitted,
   PublicGameState,
   RobotActionResolved,
   SubmitProgram,
@@ -26,16 +25,14 @@ export type ClientGameState = {
   connected: boolean
   gameId: GameId | null
   phase: GamePhase | null
-  roundNumber: number | null
   playerId: PlayerId | null
-  submittedPlayerIds: readonly PlayerId[]
   playerIds: readonly PlayerId[]
   board: BoardRenderModel | null
   playback: RobotPlaybackState
   hand: readonly ProgramCard[]
   registers: Registers
   handVersion: number
-  handRoundNumber: number | null
+  handReady: boolean
   pendingHand: CardsDealt | null
   submission: 'idle' | 'pending' | 'accepted' | 'uncertain'
   error: string | null
@@ -47,7 +44,6 @@ export type GameStateEvent =
   | { type: 'error'; message: string }
   | { type: 'initial-state'; state: PublicGameState }
   | { type: 'dealt'; hand: CardsDealt }
-  | { type: 'submitted'; submission: ProgramSubmitted }
   | { type: 'phase'; phase: PhaseChanged }
   | { type: 'action'; action: RobotActionResolved }
   | { type: 'complete' }
@@ -68,16 +64,14 @@ export function createClientGameState(): ClientGameState {
     connected: false,
     gameId: null,
     phase: null,
-    roundNumber: null,
     playerId: null,
-    submittedPlayerIds: [],
     playerIds: [],
     board: null,
     playback: createRobotPlaybackState([]),
     hand: [],
     registers: emptyRegisters(),
     handVersion: 0,
-    handRoundNumber: null,
+    handReady: false,
     pendingHand: null,
     submission: 'idle',
     error: null,
@@ -88,27 +82,24 @@ export function canProgram(state: ClientGameState): boolean {
   return state.connected &&
     state.phase === 'PROGRAMMING' &&
     state.playerId !== null &&
-    state.handRoundNumber === state.roundNumber &&
+    state.handReady &&
     !state.playback.active &&
     state.submission === 'idle'
 }
 
 export function createSubmission(state: ClientGameState): SubmitProgram | null {
-  if (!canProgram(state) || state.gameId === null || state.playerId === null || state.roundNumber === null) return null
+  if (!canProgram(state) || state.gameId === null || state.playerId === null) return null
   const [first, second, third, fourth, fifth] = state.registers
   if (!first || !second || !third || !fourth || !fifth) return null
   return {
     gameId: state.gameId,
-    roundNumber: state.roundNumber,
     playerId: state.playerId,
     cardIds: [first.id, second.id, third.id, fourth.id, fifth.id],
   }
 }
 
 function isHandEligible(state: ClientGameState, hand: CardsDealt): boolean {
-  if (hand.gameId !== state.gameId || state.roundNumber === null) return false
-  if (hand.roundNumber < state.roundNumber || hand.roundNumber > state.roundNumber + 1) return false
-  return state.playerIds.includes(hand.playerId) &&
+  return hand.gameId === state.gameId && state.playerIds.includes(hand.playerId) &&
     (state.playerId === null || hand.playerId === state.playerId)
 }
 
@@ -116,14 +107,14 @@ function isHandEligible(state: ClientGameState, hand: CardsDealt): boolean {
 function activateHand(state: ClientGameState): ClientGameState {
   const hand = state.pendingHand
   if (!hand || !isHandEligible(state, hand)) return state
-  if (hand.roundNumber !== state.roundNumber || state.phase !== 'PROGRAMMING' || state.playback.active) {
+  if (state.phase !== 'PROGRAMMING' || state.playback.active) {
     return state.playerId === null ? { ...state, playerId: hand.playerId } : state
   }
   return {
     ...state,
     playerId: hand.playerId,
     hand: hand.cards,
-    handRoundNumber: hand.roundNumber,
+    handReady: true,
     handVersion: state.handVersion + 1,
     pendingHand: null,
     registers: emptyRegisters(),
@@ -154,7 +145,6 @@ export function gameStateReducer(
         ...state,
         gameId: snapshot.gameId,
         phase: snapshot.phase,
-        roundNumber: snapshot.roundNumber,
         playerIds: snapshot.robots.map((robot) => robot.playerId),
         playback: createRobotPlaybackState(
           snapshot.robots.map((robot) => ({ ...robot, colour: '#c74f4f' })),
@@ -177,33 +167,23 @@ export function gameStateReducer(
     case 'dealt': {
       const hand = event.hand
       if (state.gameId === null) return { ...state, pendingHand: hand }
-      if (!isHandEligible(state, hand) || hand.roundNumber === state.handRoundNumber) return state
+      if (!isHandEligible(state, hand) || (state.phase === 'PROGRAMMING' && state.handReady && !state.pendingHand)) return state
       return activateHand({ ...state, pendingHand: hand })
-    }
-    case 'submitted': {
-      const submission = event.submission
-      if (submission.gameId !== state.gameId || submission.roundNumber !== state.roundNumber ||
-        state.phase !== 'PROGRAMMING' || !state.playerIds.includes(submission.playerId) ||
-        state.submittedPlayerIds.includes(submission.playerId)) return state
-      return { ...state, submittedPlayerIds: [...state.submittedPlayerIds, submission.playerId] }
     }
     case 'phase': {
       const phase = event.phase
-      if (phase.gameId !== state.gameId || state.roundNumber === null) return state
-      const executing = phase.roundNumber === state.roundNumber &&
-        phase.phase === 'EXECUTING' && state.phase === 'PROGRAMMING'
-      const nextRound = phase.roundNumber === state.roundNumber + 1 &&
-        phase.phase === 'PROGRAMMING' && state.phase === 'EXECUTING'
+      if (phase.gameId !== state.gameId) return state
+      const executing = phase.phase === 'EXECUTING' && state.phase === 'PROGRAMMING'
+      const nextRound = phase.phase === 'PROGRAMMING' && state.phase === 'EXECUTING'
       if (!executing && !nextRound) return state
       return activateHand({
         ...state,
         phase: phase.phase,
-        roundNumber: phase.roundNumber,
-        submittedPlayerIds: nextRound ? [] : state.submittedPlayerIds,
+        handReady: nextRound ? false : state.handReady,
       })
     }
     case 'action':
-      if (event.action.gameId !== state.gameId || event.action.roundNumber !== state.roundNumber ||
+      if (event.action.gameId !== state.gameId ||
         state.phase !== 'EXECUTING' ||
         !state.playback.robots.some((robot) => robot.robotId === event.action.robotId)) return state
       return {

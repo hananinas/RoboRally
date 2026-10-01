@@ -43,7 +43,6 @@ const stationaryRobotId = '30000000-0000-4000-8000-000000000002'
 const publicState: PublicGameState = {
   gameId: '40000000-0000-4000-8000-000000000001',
   phase: 'PROGRAMMING',
-  roundNumber: 1,
   antenna: { x: 2, y: 0, angle: Math.PI / 2 },
   board: {
     width: 5,
@@ -67,16 +66,16 @@ const publicState: PublicGameState = {
   ],
 }
 const actions: readonly RobotActionResolved[] = [
-  { gameId: publicState.gameId, roundNumber: 1, registerIndex: 0, robotId, instruction: 'MOVE_1', position: { coordinate: { x: 2, y: 2 }, orientation: 'NORTH' } },
-  { gameId: publicState.gameId, roundNumber: 1, registerIndex: 1, robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 2, y: 2 }, orientation: 'WEST' } },
-  { gameId: publicState.gameId, roundNumber: 1, registerIndex: 2, robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 2 }, orientation: 'WEST' } },
-  { gameId: publicState.gameId, roundNumber: 1, registerIndex: 3, robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 1, y: 2 }, orientation: 'SOUTH' } },
-  { gameId: publicState.gameId, roundNumber: 1, registerIndex: 4, robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 3 }, orientation: 'SOUTH' } },
+  { gameId: publicState.gameId, registerIndex: 0, robotId, instruction: 'MOVE_1', position: { coordinate: { x: 2, y: 2 }, orientation: 'NORTH' } },
+  { gameId: publicState.gameId, registerIndex: 1, robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 2, y: 2 }, orientation: 'WEST' } },
+  { gameId: publicState.gameId, registerIndex: 2, robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 2 }, orientation: 'WEST' } },
+  { gameId: publicState.gameId, registerIndex: 3, robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 1, y: 2 }, orientation: 'SOUTH' } },
+  { gameId: publicState.gameId, registerIndex: 4, robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 3 }, orientation: 'SOUTH' } },
 ]
-const hand = { gameId: publicState.gameId, roundNumber: 1, playerId: publicState.robots[0].playerId, cards }
+const hand = { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, cards }
 
-function changePhase(state: ClientGameState, phase: 'PROGRAMMING' | 'EXECUTING', roundNumber = 1) {
-  return gameStateReducer(state, { type: 'phase', phase: { gameId: publicState.gameId, roundNumber, phase } })
+function changePhase(state: ClientGameState, phase: 'PROGRAMMING' | 'EXECUTING') {
+  return gameStateReducer(state, { type: 'phase', phase: { gameId: publicState.gameId, phase } })
 }
 
 function programmingState(): ClientGameState {
@@ -197,7 +196,6 @@ describe('client game state', () => {
     }
     expect(createSubmission(state)).toEqual({
       gameId: publicState.gameId,
-      roundNumber: 1,
       playerId: hand.playerId,
       cardIds: selectedCardIds,
     })
@@ -276,10 +274,6 @@ describe('client game state', () => {
       type: 'submission-unknown',
       handVersion: state.handVersion,
     })
-    state = gameStateReducer(state, {
-      type: 'submitted',
-      submission: { gameId: publicState.gameId, roundNumber: 1, playerId: hand.playerId },
-    })
     expect(state.submission).toBe('uncertain')
 
     expect(canProgram(state)).toBe(false)
@@ -296,8 +290,8 @@ describe('client game state', () => {
     const previousVersion = state.handVersion
     state = gameStateReducer(state, { type: 'submit' })
     state = changePhase(state, 'EXECUTING')
-    state = changePhase(state, 'PROGRAMMING', 2)
-    state = gameStateReducer(state, { type: 'dealt', hand: { ...hand, roundNumber: 2 } })
+    state = changePhase(state, 'PROGRAMMING')
+    state = gameStateReducer(state, { type: 'dealt', hand })
 
     expect(state.registers).toEqual(emptyRegisters)
     expect(canProgram(state)).toBe(true)
@@ -316,7 +310,6 @@ describe('client game state', () => {
     const submission = createSubmission(state)
     expect(submission).toEqual({
       gameId: publicState.gameId,
-      roundNumber: 2,
       playerId: hand.playerId,
       cardIds: selectedCardIds,
     })
@@ -348,8 +341,8 @@ describe('client game state', () => {
       state = gameStateReducer(state, { type: 'action', action })
     }
 
-    state = changePhase(state, 'PROGRAMMING', 2)
-    state = gameStateReducer(state, { type: 'dealt', hand: { ...hand, roundNumber: 2 } })
+    state = changePhase(state, 'PROGRAMMING')
+    state = gameStateReducer(state, { type: 'dealt', hand })
     expect(state.registers).toEqual(registers)
 
     const displayedAngles = [0, -90, -90, -180, -180]
@@ -369,7 +362,6 @@ describe('client game state', () => {
     state = selectProgram(state)
     expect(createSubmission(state)).toEqual({
       gameId: publicState.gameId,
-      roundNumber: 2,
       playerId: hand.playerId,
       cardIds: selectedCardIds,
     })
@@ -387,8 +379,8 @@ describe('client game state', () => {
 
     state = changePhase(state, 'EXECUTING')
     state = gameStateReducer(state, { type: 'action', action: actions[0] })
-    state = gameStateReducer(state, { type: 'dealt', hand: { ...hand, roundNumber: 2, cards: nextCards } })
-    state = changePhase(state, 'PROGRAMMING', 2)
+    state = gameStateReducer(state, { type: 'dealt', hand: { ...hand, cards: nextCards } })
+    state = changePhase(state, 'PROGRAMMING')
 
     expect(state.registers).toEqual(previousRegisters)
     expect(canProgram(state)).toBe(false)
@@ -408,48 +400,26 @@ describe('client game state', () => {
     expect(createSubmission(state)?.cardIds).toEqual(nextCards.slice(0, 5).map((card) => card.id))
   })
 
-  it('records another player as ready without accepting or disabling the local program', () => {
-    let state = selectProgram()
-    const submission = createSubmission(state)
-    state = gameStateReducer(state, {
-      type: 'submitted',
-      submission: { gameId: publicState.gameId, roundNumber: 1, playerId: publicState.robots[1].playerId },
-    })
-    expect(state.submittedPlayerIds).toEqual([publicState.robots[1].playerId])
-    expect(state.submission).toBe('idle')
-    expect(canProgram(state)).toBe(true)
-    expect(createSubmission(state)).toEqual(submission)
-    state = gameStateReducer(state, { type: 'submit' })
-    state = gameStateReducer(state, { type: 'result', result: { outcome: 'ACCEPTED' }, handVersion: state.handVersion })
-    expect(state.phase).toBe('PROGRAMMING')
-    expect(state.submission).toBe('accepted')
-    expect(canProgram(state)).toBe(false)
-  })
-
   it('requires the matching private hand after the new programming phase', () => {
     let state = selectProgram()
     state = changePhase(state, 'EXECUTING')
-    state = changePhase(state, 'PROGRAMMING', 2)
+    state = changePhase(state, 'PROGRAMMING')
     expect(canProgram(state)).toBe(false)
     expect(createSubmission(state)).toBeNull()
     for (const invalidHand of [
-      hand,
-      { ...hand, roundNumber: 2, playerId: publicState.robots[1].playerId },
-      { ...hand, roundNumber: 2, gameId: 'another-game' },
+      { ...hand, playerId: publicState.robots[1].playerId },
+      { ...hand, gameId: 'another-game' },
     ]) {
       expect(gameStateReducer(state, { type: 'dealt', hand: invalidHand })).toBe(state)
     }
-    state = gameStateReducer(state, { type: 'dealt', hand: { ...hand, roundNumber: 2 } })
+    state = gameStateReducer(state, { type: 'dealt', hand })
     expect(canProgram(state)).toBe(true)
     expect(state.registers).toEqual(emptyRegisters)
-    expect(gameStateReducer(state, { type: 'dealt', hand: { ...hand, roundNumber: 2 } })).toBe(state)
+    expect(gameStateReducer(state, { type: 'dealt', hand })).toBe(state)
     expect(gameStateReducer(state, { type: 'action', action: actions[0] })).toBe(state)
-    expect(changePhase(state, 'EXECUTING', 1)).toBe(state)
+    expect(changePhase(state, 'PROGRAMMING')).toBe(state)
     expect(gameStateReducer(state, {
-      type: 'submitted', submission: { gameId: publicState.gameId, roundNumber: 1, playerId: hand.playerId },
-    })).toBe(state)
-    expect(gameStateReducer(state, {
-      type: 'phase', phase: { gameId: 'another-game', roundNumber: 2, phase: 'EXECUTING' },
+      type: 'phase', phase: { gameId: 'another-game', phase: 'EXECUTING' },
     })).toBe(state)
   })
 
@@ -464,8 +434,8 @@ describe('client game state', () => {
     state = changePhase(state, 'EXECUTING')
     state = gameStateReducer(state, { type: 'action', action: first })
     state = gameStateReducer(state, { type: 'action', action: second })
-    state = gameStateReducer(state, { type: 'dealt', hand: { ...hand, roundNumber: 2 } })
-    expect(state.handRoundNumber).toBe(1)
+    state = gameStateReducer(state, { type: 'dealt', hand })
+    expect(state.pendingHand).toEqual(hand)
     expect(state.registers).toEqual(registers)
     state = gameStateReducer(state, { type: 'complete' })
     expect(state.playback.active).toEqual(second)
@@ -474,7 +444,7 @@ describe('client game state', () => {
     state = gameStateReducer(state, { type: 'complete' })
     expect(canProgram(state)).toBe(false)
     expect(state.registers).toEqual(registers)
-    state = changePhase(state, 'PROGRAMMING', 2)
+    state = changePhase(state, 'PROGRAMMING')
     expect(canProgram(state)).toBe(true)
     expect(state.registers).toEqual(emptyRegisters)
   })

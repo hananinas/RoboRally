@@ -37,22 +37,22 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
       socket.onAny((name, payload: unknown) => events[index].push({ name, payload }))
       const initialHand = new Promise<CardsDealt>((resolve) => socket.once('cards.dealt', resolve))
       socket.connect()
-      expect(await initialHand).toMatchObject({ gameId, roundNumber: 1, playerId: players[index].id })
+      expect(await initialHand).toMatchObject({ gameId, playerId: players[index].id })
       events[index] = []
     }
 
-    for (const roundNumber of [1, 2]) {
+    for (const round of [1, 2]) {
       const submissions = players.map((player): SubmitProgram => ({
-        gameId, roundNumber, playerId: player.id,
+        gameId, playerId: player.id,
         cardIds: [deck[0].id, deck[1].id, deck[2].id, deck[3].id, deck[4].id],
       }))
       expect(await clients[0].timeout(1000).emitWithAck('program.submit', submissions[0]))
         .toEqual({ outcome: 'ACCEPTED' })
       // Reading after submission fences delivery without relying on a sleep.
       const waiting = await clients[0].timeout(1000).emitWithAck('game.getPublicGameState', { gameId })
-      expect(waiting).toMatchObject({ outcome: 'GAME_FOUND', state: { phase: 'PROGRAMMING', roundNumber } })
+      expect(waiting).toMatchObject({ outcome: 'GAME_FOUND', state: { phase: 'PROGRAMMING' } })
       expect(events[0]).toEqual([{
-        name: 'program.submitted', payload: { gameId, roundNumber, playerId: players[0].id },
+        name: 'program.submitted', payload: { gameId, playerId: players[0].id },
       }])
       expect(await clients[0].timeout(1000).emitWithAck('program.submit', submissions[0]))
         .toEqual({ outcome: 'INVALID_PROGRAM' })
@@ -65,23 +65,23 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
         .toEqual({ outcome: 'ACCEPTED' })
       const hands = await Promise.all(nextHands)
       for (let index = 0; index < clients.length; index++) {
-        expect(hands[index]).toMatchObject({ gameId, roundNumber: roundNumber + 1, playerId: players[index].id })
+        expect(hands[index]).toMatchObject({ gameId, playerId: players[index].id })
         expect(events[index].map((event) => event.name)).toEqual([
           'program.submitted', 'program.submitted', 'game.phaseChanged',
           ...Array.from({ length: 10 }, () => 'robot.actionResolved'),
           'game.phaseChanged', 'cards.dealt',
         ])
-        expect(events[index][2].payload).toEqual({ gameId, roundNumber, phase: 'EXECUTING' })
-        expect(events[index][13].payload).toEqual({ gameId, roundNumber: roundNumber + 1, phase: 'PROGRAMMING' })
+        expect(events[index][2].payload).toEqual({ gameId, phase: 'EXECUTING' })
+        expect(events[index][13].payload).toEqual({ gameId, phase: 'PROGRAMMING' })
         const actions = events[index].filter((event) => event.name === 'robot.actionResolved')
         expect(actions.map((event) => event.payload)).toEqual(
           Array.from({ length: 5 }, (_, registerIndex) => [1, 0].map((playerIndex) => ({
-            gameId, roundNumber, registerIndex,
+            gameId, registerIndex,
             robotId: players[playerIndex].robot.id,
             instruction: 'TURN_LEFT',
             position: {
               coordinate: playerIndex === 0 ? { x: 0, y: 2 } : { x: 1, y: 1 },
-              orientation: ['WEST', 'SOUTH', 'EAST', 'NORTH'][(registerIndex + roundNumber - 1) % 4],
+              orientation: ['WEST', 'SOUTH', 'EAST', 'NORTH'][(registerIndex + round - 1) % 4],
             },
           }))).flat(),
         )
@@ -90,10 +90,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
           .toEqual([hands[index]])
         events[index] = []
       }
-      expect(await clients[0].timeout(1000).emitWithAck('program.submit', submissions[0]))
-        .toEqual({ outcome: 'INVALID_PROGRAM' })
       expect(game.phase).toBe('programming')
-      expect(game.roundNumber).toBe(roundNumber + 1)
       expect(players.map((player) => player.robot.program)).toEqual([[], []])
     }
   } finally {

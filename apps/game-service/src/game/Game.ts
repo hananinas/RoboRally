@@ -17,7 +17,6 @@ export type RobotActionResult = Readonly<{
 export type Antenna = Readonly<Position & { angle: number }>
 
 export type NextActionResult = Readonly<{
-  roundNumber: number
   registerIndex: number
   action: RobotActionResult
 }>
@@ -28,7 +27,6 @@ export class Game {
   readonly antenna: Antenna
   private readonly deck: readonly Card[]
   private currentPhase: GamePhase = 'programming'
-  private currentRound = 1
   private registerIndex = 0
   private readonly submittedPlayerIds = new Set<PlayerId>()
   private readonly activatedRobotIds = new Set<RobotId>()
@@ -66,10 +64,6 @@ export class Game {
 
   get phase(): GamePhase {
     return this.currentPhase
-  }
-
-  get roundNumber(): number {
-    return this.currentRound
   }
 
   get currentRegister(): number {
@@ -124,7 +118,6 @@ export class Game {
     const robot = this.nextRobotByPriority()
     if (!robot) throw new Error('No robots remain to activate')
 
-    const roundNumber = this.currentRound
     const registerIndex = this.registerIndex
     const card = robot.getProgramCard(registerIndex)
     this.executeCard(robot, card)
@@ -140,7 +133,7 @@ export class Game {
       this.activateBoardElements()
       this.finishRegister()
     }
-    return { roundNumber, registerIndex, action }
+    return { registerIndex, action }
   }
 
   private dealCards(): void {
@@ -205,8 +198,6 @@ export class Game {
   private finishRound(): void {
     for (const player of this.players) player.robot.clearProgram()
     this.submittedPlayerIds.clear()
-    this.activatedRobotIds.clear()
-    this.currentRound++
     this.registerIndex = 0
     this.dealCards()
     this.currentPhase = 'programming'

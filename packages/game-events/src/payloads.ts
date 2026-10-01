@@ -46,13 +46,11 @@ export type Antenna = Readonly<Coordinate & { angle: number }>
 
 export type PhaseChanged = Readonly<{
   gameId: GameId
-  roundNumber: number
   phase: GamePhase
 }>
 
 export type PublicGameState = Readonly<{
   gameId: GameId
-  roundNumber: number
   antenna: Antenna
   board: Board
   robots: readonly Robot[]
@@ -61,7 +59,6 @@ export type PublicGameState = Readonly<{
 
 export type CardsDealt = Readonly<{
   gameId: GameId
-  roundNumber: number
   playerId: PlayerId
   cards: readonly Card[]
 }>
@@ -74,13 +71,11 @@ export type ProgramResult = Readonly<{
 
 export type ProgramSubmitted = Readonly<{
   gameId: GameId
-  roundNumber: number
   playerId: PlayerId
 }>
 
 export type RobotActionResolved = Readonly<{
   gameId: GameId
-  roundNumber: number
   registerIndex: number
   robotId: RobotId
   instruction: Instruction
