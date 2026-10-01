@@ -1,6 +1,14 @@
 import { useEffect, useEffectEvent, useState } from 'react'
 import type { ProgramCard } from '../gameState.ts'
 
+export const KEYBINDS: readonly { keys: string; description: string }[] = [
+  { keys: 'h / l', description: 'Move the highlight to the previous / next card' },
+  { keys: '1-5', description: 'Place the highlighted card in the matching register' },
+  { keys: 'd, then 1-5', description: 'Remove the card from the matching register' },
+  { keys: 'u', description: 'Undo the last register change' },
+  { keys: 'Ctrl+R', description: 'Redo the last undone change' },
+]
+
 export default function useGameKeybinds(
   cards: readonly ProgramCard[],
   registeredCardIds: ReadonlySet<string>,
