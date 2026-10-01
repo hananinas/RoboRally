@@ -3,7 +3,8 @@ import BoardViewport from './components/BoardViewport.tsx'
 import PlayerPanel from './components/PlayerPanel.tsx'
 import ProgrammingHand from './components/ProgrammingHand.tsx'
 import RegisterPanel from './components/RegisterPanel.tsx'
-import { canProgram } from './gameState.ts'
+import useGameKeybinds from './components/useGameKeybinds.ts'
+import { canProgram, type ProgramCard } from './gameState.ts'
 import useGameConnection from './useGameConnection.ts'
 import useOverlayLayout from './useOverlayLayout.ts'
 
@@ -18,6 +19,8 @@ function ActiveGame() {
   } = useOverlayLayout(state.handVersion)
   const disabled = !canProgram(state)
   const handleRemove = (registerIndex: number) => dispatch({ type: 'remove', registerIndex })
+  const handlePlaceCard = (card: ProgramCard, registerIndex: number) =>
+    dispatch({ type: 'place', cardId: card.id, registerIndex })
   const hasHand = state.handVersion > 0
   const phase = state.playback.active ? 'EXECUTING' : state.phase
   const phaseLabel = phase === 'PROGRAMMING' ? 'Programming'
@@ -27,6 +30,9 @@ function ActiveGame() {
       : !hasHand && phase === 'PROGRAMMING' ? 'Waiting for cards…' : phaseLabel
   const registeredCardIds = new Set(
     state.registers.flatMap((card) => (card ? [card.id] : [])),
+  )
+  const [highlightedIndex, highlightCard, pendingDelete] = useGameKeybinds(
+    state.hand, registeredCardIds, disabled, handlePlaceCard, handleRemove,
   )
   const overlayClassName = [
     'game-overlay',
@@ -47,6 +53,7 @@ function ActiveGame() {
               submission={state.submission}
               status={status}
               error={state.error}
+              pendingDelete={pendingDelete}
               onRemove={handleRemove}
               onConfirm={submit}
             />
@@ -59,11 +66,12 @@ function ActiveGame() {
             cards={state.hand}
             registeredCardIds={registeredCardIds}
             disabled={disabled}
+            highlightedIndex={highlightedIndex}
+            onHighlightCard={highlightCard}
             onSelect={(card) => dispatch({
               type: 'place', cardId: card.id, registerIndex: state.registers.indexOf(null),
             })}
-            onPlaceCard={(card, registerIndex) => dispatch({ type: 'place', cardId: card.id, registerIndex })}
-            onRemoveCard={handleRemove}
+            onPlaceCard={handlePlaceCard}
           />
         )}
       </div>

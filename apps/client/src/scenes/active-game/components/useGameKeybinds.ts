@@ -7,7 +7,7 @@ export default function useGameKeybinds(
   disabled: boolean,
   onPlaceCard: (card: ProgramCard, registerIndex: number) => void,
   onRemoveCard: (registerIndex: number) => void,
-) : [number, (cardIndex: number) => void]  {
+) : [number, (cardIndex: number) => void, boolean]  {
 
     const [highlightedCardIndex, setHighlightedCardIndex] = useState(0)
     const [pendingDelete, setPendingDelete] = useState(false)
@@ -80,5 +80,5 @@ export default function useGameKeybinds(
       }
     }, [])
 
-    return [highlightedCardIndex, highlightCard]
+    return [highlightedCardIndex, highlightCard, pendingDelete]
 }

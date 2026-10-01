@@ -1,7 +1,6 @@
 import { useState, type PointerEvent, type Ref } from 'react'
 import type { ProgramCard as Card } from '../gameState.ts'
 import ProgramCard from './ProgramCard.tsx'
-import useGameKeybinds from './useGameKeybinds.ts'
 
 type CardDrag = {
   card: Card
@@ -19,9 +18,10 @@ type ProgrammingHandProps = {
   cards: readonly Card[]
   registeredCardIds: ReadonlySet<string>
   disabled: boolean
+  highlightedIndex: number
+  onHighlightCard: (cardIndex: number) => void
   onSelect: (card: Card) => void
   onPlaceCard: (card: Card, registerIndex: number) => void
-  onRemoveCard: (registerIndex: number) => void
 }
 
 const dragThreshold = 4
@@ -41,12 +41,12 @@ function ProgrammingHand({
   cards,
   registeredCardIds,
   disabled,
+  highlightedIndex,
+  onHighlightCard,
   onSelect,
   onPlaceCard,
-  onRemoveCard,
 }: ProgrammingHandProps) {
   const [drag, setDrag] = useState<CardDrag | null>(null)
-  const [highlightedIndex, highlightCard] = useGameKeybinds(cards, registeredCardIds, disabled, onPlaceCard, onRemoveCard)
 
   // Starts pointer tracking.
   function startDrag(card: Card, event: PointerEvent<HTMLButtonElement>) {
@@ -140,7 +140,7 @@ function ProgrammingHand({
             onPointerUp={finishDrag}
             onPointerCancel={cancelDrag}
             onLostPointerCapture={cancelDrag}
-            onMouseEnter={() => highlightCard(index)}
+            onMouseEnter={() => onHighlightCard(index)}
             style={{
               outline: index === highlightedIndex ? '3px solid orange' : undefined,
               outlineOffset: '3px',

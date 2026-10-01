@@ -6,6 +6,7 @@ import BoardViewport from '../src/scenes/active-game/components/BoardViewport.ts
 import PlayerPanel from '../src/scenes/active-game/components/PlayerPanel.tsx'
 import ProgrammingHand from '../src/scenes/active-game/components/ProgrammingHand.tsx'
 import RegisterPanel from '../src/scenes/active-game/components/RegisterPanel.tsx'
+import useGameKeybinds from '../src/scenes/active-game/components/useGameKeybinds.ts'
 import { DEMO_BOARD, DEMO_ROBOTS } from '../src/scenes/active-game/board/demoBoard.ts'
 import {
   useRobotPlayback,
@@ -45,6 +46,13 @@ export default function BoardHarness() {
   }, [enqueue])
 
   const registeredCardIds = new Set(registers.flatMap((card) => card ? [card.id] : []))
+  const handlePlaceCard = (card: ProgramCard, index: number) =>
+    setRegisters((current) => placeCard(current, card, index))
+  const handleRemove = (index: number) =>
+    setRegisters((current) => removeCard(current, index))
+  const [highlightedIndex, highlightCard, pendingDelete] = useGameKeybinds(
+    hand, registeredCardIds, confirmed, handlePlaceCard, handleRemove,
+  )
   const overlayClassName = [
     'game-overlay',
     handBelowHud && 'game-overlay--hand-below-hud',
@@ -61,10 +69,11 @@ export default function BoardHarness() {
             <RegisterPanel
               registers={registers}
               disabled={confirmed}
+              pendingDelete={pendingDelete}
               submission={confirmed ? 'accepted' : 'idle'}
               status="Programming"
               error={null}
-              onRemove={(index) => setRegisters((current) => removeCard(current, index))}
+              onRemove={handleRemove}
               onConfirm={() => setConfirmed(true)}
             />
           </div>
@@ -74,9 +83,10 @@ export default function BoardHarness() {
           cards={hand}
           registeredCardIds={registeredCardIds}
           disabled={confirmed}
+          highlightedIndex={highlightedIndex}
+          onHighlightCard={highlightCard}
           onSelect={(card) => setRegisters((current) => placeCard(current, card, current.indexOf(null)))}
-          onPlaceCard={(card, index) => setRegisters((current) => placeCard(current, card, index))}
-          onRemoveCard={(index) => setRegisters((current) => removeCard(current, index))}
+          onPlaceCard={handlePlaceCard}
         />
       </div>
     </div>
