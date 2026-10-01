@@ -1,7 +1,9 @@
 import { useEffect, useEffectEvent, useState } from 'react'
+import type { ProgramCard } from '../gameState.ts'
 
 export default function useGameKeybinds(
   cards: readonly ProgramCard[],
+  registeredCardIds: ReadonlySet<string>,
   disabled: boolean,
   onPlaceCard: (card: ProgramCard, registerIndex: number) => void,
 ) : [number, (cardIndex: number) => void]  {
@@ -11,7 +13,14 @@ export default function useGameKeybinds(
     function highlightCard(cardIndex: number) {
       if (cards.length === 0) return
 
-      const wrappedIndex = ((cardIndex % cards.length) + cards.length) % cards.length
+      const direction = Math.sign(cardIndex - highlightedCardIndex) || 1
+      let wrappedIndex = ((cardIndex % cards.length) + cards.length) % cards.length
+
+      for (let attempts = 0; attempts < cards.length; attempts++) {
+        const card = cards[wrappedIndex]
+        if (card && !registeredCardIds.has(card.id)) break
+        wrappedIndex = ((wrappedIndex + direction) % cards.length + cards.length) % cards.length
+      }
 
       setHighlightedCardIndex(wrappedIndex)
     }

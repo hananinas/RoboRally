@@ -44,7 +44,7 @@ function ProgrammingHand({
   onPlaceCard,
 }: ProgrammingHandProps) {
   const [drag, setDrag] = useState<CardDrag | null>(null)
-  const [highlightedIndex, highlightCard] = useGameKeybinds(cards, disabled, onPlaceCard)
+  const [highlightedIndex, highlightCard] = useGameKeybinds(cards, registeredCardIds, disabled, onPlaceCard)
 
   // Starts pointer tracking.
   function startDrag(card: Card, event: PointerEvent<HTMLButtonElement>) {
