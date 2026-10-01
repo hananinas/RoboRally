@@ -191,7 +191,6 @@ export function placeCard(
     !Number.isInteger(registerIndex) ||
     registerIndex < 0 ||
     registerIndex >= registers.length ||
-    registers[registerIndex] !== null ||
     registers.some((registeredCard) => registeredCard?.id === card.id)
 
   if (cannotPlace) return registers
