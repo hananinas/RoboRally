@@ -3,6 +3,7 @@ import type { ProgramCard } from '../gameState.ts'
 
 export const KEYBINDS: readonly { keys: string; description: string }[] = [
   { keys: 'h / l', description: 'Move the highlight to the previous / next card' },
+  { keys: '0 / $', description: 'Move the highlight to the first / last card' },
   { keys: '1-5', description: 'Place the highlighted card in the matching register' },
   { keys: 'd, then 1-5', description: 'Remove the card from the matching register' },
   { keys: 'dd', description: 'Clear all registers' },
@@ -24,11 +25,10 @@ export default function useGameKeybinds(
     const [highlightedCardIndex, setHighlightedCardIndex] = useState(0)
     const [pendingDelete, setPendingDelete] = useState(false)
 
-    function highlightCard(cardIndex: number) {
+    function highlightFrom(startIndex: number, direction: number) {
       if (cards.length === 0) return
 
-      const direction = Math.sign(cardIndex - highlightedCardIndex) || 1
-      let wrappedIndex = ((cardIndex % cards.length) + cards.length) % cards.length
+      let wrappedIndex = ((startIndex % cards.length) + cards.length) % cards.length
 
       for (let attempts = 0; attempts < cards.length; attempts++) {
         const card = cards[wrappedIndex]
@@ -37,6 +37,11 @@ export default function useGameKeybinds(
       }
 
       setHighlightedCardIndex(wrappedIndex)
+    }
+
+    function highlightCard(cardIndex: number) {
+      const direction = Math.sign(cardIndex - highlightedCardIndex) || 1
+      highlightFrom(cardIndex, direction)
     }
 
     const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
@@ -82,6 +87,14 @@ export default function useGameKeybinds(
 
       if (event.key === 'l') {
         highlightCard(highlightedCardIndex + 1)
+      }
+
+      if (event.key === '0') {
+        highlightFrom(0, 1)
+      }
+
+      if (event.key === '$') {
+        highlightFrom(cards.length - 1, -1)
       }
 
       if (/^[1-5]$/.test(event.key)) {
