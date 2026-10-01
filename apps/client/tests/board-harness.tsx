@@ -38,6 +38,8 @@ const hand: readonly ProgramCard[] = Array.from({ length: 9 }, (_, index) => ({
 export default function BoardHarness() {
   const { robots, enqueue } = useRobotPlayback(DEMO_ROBOTS)
   const [registers, setRegisters] = useState<Registers>(() => Array(5).fill(null))
+  const [registersPast, setRegistersPast] = useState<readonly Registers[]>([])
+  const [registersFuture, setRegistersFuture] = useState<readonly Registers[]>([])
   const [confirmed, setConfirmed] = useState(false)
   const { handBelowHud, handRef, hudContentRef, hudFits, overlayRef } = useOverlayLayout()
 
@@ -46,12 +48,36 @@ export default function BoardHarness() {
   }, [enqueue])
 
   const registeredCardIds = new Set(registers.flatMap((card) => card ? [card.id] : []))
-  const handlePlaceCard = (card: ProgramCard, index: number) =>
-    setRegisters((current) => placeCard(current, card, index))
-  const handleRemove = (index: number) =>
-    setRegisters((current) => removeCard(current, index))
+  const handlePlaceCard = (card: ProgramCard, index: number) => {
+    const next = placeCard(registers, card, index)
+    if (next === registers) return
+    setRegistersPast((past) => [...past, registers])
+    setRegistersFuture([])
+    setRegisters(next)
+  }
+  const handleRemove = (index: number) => {
+    const next = removeCard(registers, index)
+    if (next === registers) return
+    setRegistersPast((past) => [...past, registers])
+    setRegistersFuture([])
+    setRegisters(next)
+  }
+  const handleUndo = () => {
+    if (registersPast.length === 0) return
+    const previous = registersPast[registersPast.length - 1]
+    setRegistersPast((past) => past.slice(0, -1))
+    setRegistersFuture((future) => [...future, registers])
+    setRegisters(previous)
+  }
+  const handleRedo = () => {
+    if (registersFuture.length === 0) return
+    const next = registersFuture[registersFuture.length - 1]
+    setRegistersFuture((future) => future.slice(0, -1))
+    setRegistersPast((past) => [...past, registers])
+    setRegisters(next)
+  }
   const [highlightedIndex, highlightCard, pendingDelete] = useGameKeybinds(
-    hand, registeredCardIds, confirmed, handlePlaceCard, handleRemove,
+    hand, registeredCardIds, confirmed, handlePlaceCard, handleRemove, handleUndo, handleRedo,
   )
   const overlayClassName = [
     'game-overlay',

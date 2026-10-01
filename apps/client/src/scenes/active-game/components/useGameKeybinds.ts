@@ -7,6 +7,8 @@ export default function useGameKeybinds(
   disabled: boolean,
   onPlaceCard: (card: ProgramCard, registerIndex: number) => void,
   onRemoveCard: (registerIndex: number) => void,
+  onUndo: () => void,
+  onRedo: () => void,
 ) : [number, (cardIndex: number) => void, boolean]  {
 
     const [highlightedCardIndex, setHighlightedCardIndex] = useState(0)
@@ -30,6 +32,13 @@ export default function useGameKeybinds(
     const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
       if (disabled || cards.length === 0) return
 
+      if (event.ctrlKey && event.key === 'r') {
+        event.preventDefault()
+        setPendingDelete(false)
+        onRedo()
+        return
+      }
+
       // browser shortcuts and text composition alone.
       if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) {
         return
@@ -47,6 +56,11 @@ export default function useGameKeybinds(
 
       if (event.key === 'd') {
         setPendingDelete(true)
+        return
+      }
+
+      if (event.key === 'u') {
+        onUndo()
         return
       }
 
