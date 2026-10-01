@@ -106,7 +106,7 @@ player's next hand, and returns to programming.
 
 The service publishes each result before scheduling the next action. It sends
 explicit phase events and private hands but does not count registers or decide
-when activation starts. See [the communication guide](v0Communication.md) for
+when activation starts. See [the communication guide](Communication.md) for
 the fixed-roster integration hooks used by issues #68 and #69.
 
 # Board

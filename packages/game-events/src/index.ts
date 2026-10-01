@@ -1,5 +1,6 @@
 export type {
   ClientToServerEvents,
+  LoginAcknowledgement,
   ProgramResultAcknowledgement,
   PublicGameStateAcknowledgement,
   ServerToClientEvents,
@@ -15,6 +16,7 @@ export type {
   GamePhase,
   GetPublicGameState,
   Instruction,
+  LoginResult,
   Orientation,
   PhaseChanged,
   PlayerId,
@@ -28,7 +30,11 @@ export type {
   RobotId,
   RobotActionResolved,
   Tile,
+  User,
+  UserId,
 } from './payloads.js'
+export { loginSchema, LoginRequestError, parseLogin } from './login.js'
+export type { Login, LoginRequestRejection } from './login.js'
 export {
   getPublicGameStateSchema,
   parseGetPublicGameState,

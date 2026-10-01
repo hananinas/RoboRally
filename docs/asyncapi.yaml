@@ -1,15 +1,13 @@
 asyncapi: 3.1.0
 
 info:
-  title: Game Service 
-  version: 0.0.0
-  description: |
-    Server API. Each Socket.IO event carries one JSON payload.
-    Message name = Socket.IO event name.
-    Room channel address = server broadcast destination.
-    Commands are emitted directly to the server.
+  title: Game Service
+  version: 0.5.0-draft
+  description: |-
+    This document describes RoboRally's client-server communication. No code change
+    regarding communication should be made without updating this document.
+    Server broadcast destinations represent Socket.IO rooms.
 defaultContentType: application/json
-
 
 channels:
   commands:
@@ -18,25 +16,47 @@ channels:
     x-socketio:
       routing: client-to-server
     messages:
+      login:
+        $ref: '#/components/messages/Login'
+      joinGame:
+        $ref: '#/components/messages/JoinGame'
       submitProgram:
         $ref: '#/components/messages/SubmitProgram'
       getPublicGameState:
         $ref: '#/components/messages/GetPublicGameState'
 
+  loginReplies:
+    address: null
+    description: |
+      Logical reply channel
+      Delivered through the acknowledgement of user.login
+    messages:
+      result:
+        $ref: '#/components/messages/LoginResult'
+
+  joinReplies:
+    address: null
+    description: |
+      Logical reply channel
+      Delivered through the acknowledgement of game.join
+    messages:
+      result:
+        $ref: '#/components/messages/JoinResult'
+
   programReplies:
     address: null
     description: |
-      Logical reply channel, not a Socket.IO room. 
-      Delivered through the acknowledgement callback of program.submit.
+      Logical reply channel
+      Delivered through the acknowledgement of program.submit
     messages:
       programResult:
         $ref: '#/components/messages/ProgramResult'
 
   publicGameStateReplies:
     address: null
-    description: | 
-      Logical reply channel, not a Socket.IO room. 
-      Delivered through the acknowledgement callback of game.getPublicGameState
+    description: |
+      Logical reply channel
+      Delivered through the acknowledgement of game.getPublicGameState
     messages:
       publicGameStateResult:
         $ref: '#/components/messages/PublicGameStateResult'
@@ -64,14 +84,40 @@ channels:
         $ref: '#/components/messages/RobotActionResolved'
       phaseChanged:
         $ref: '#/components/messages/PhaseChanged'
-
-  lobby:
-    address: 'game:{gameId}:lobby'
-    parameters:
-      gameId:
-        description: Game identifier
+      playerJoined:
+        $ref: '#/components/messages/PlayerJoined'
+      playerConnectionChanged:
+        $ref: '#/components/messages/PlayerConnectionChanged'
 
 operations:
+  handleLogin:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/login'
+    reply:
+      channel:
+        $ref: '#/channels/loginReplies'
+      messages:
+        - $ref: '#/channels/loginReplies/messages/result'
+      x-socketio:
+        acknowledgement: true
+
+  handleJoinGame:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/joinGame'
+    reply:
+      channel:
+        $ref: '#/channels/joinReplies'
+      messages:
+        - $ref: '#/channels/joinReplies/messages/result'
+      x-socketio:
+        acknowledgement: true
+
   receiveProgram:
     action: receive
     channel:
@@ -95,7 +141,7 @@ operations:
     action: send
     channel:
       $ref: '#/channels/public'
-  
+
   handleGetGameState:
     action: receive
     channel:
@@ -112,17 +158,175 @@ operations:
 
 components:
   messages:
+
+    Login:
+      name: user.login
+      description: Requests a user identity for a username.
+      payload:
+        $ref: '#/components/schemas/Login'
+
+      examples:
+        - name: "username"
+          summary: "Exact username, no normalization"
+          payload:
+            username: "Dane"
+
+    LoginResult:
+      name: user.loginResult
+      description: Returns an approved user identity or a rejection.
+      payload:
+        $ref: '#/components/schemas/LoginResult'
+
+      examples:
+        - name: "loggedIn"
+          summary: "Same shape for new and existing users"
+          payload:
+            outcome: "LOGGED_IN"
+            user:
+              userId: "00000000-0000-4000-8000-000000000004"
+              username: "Dane"
+        - name: "invalidUsername"
+          summary: "Empty or overlong username"
+          payload:
+            outcome: "INVALID_USERNAME"
+
+    JoinGame:
+      name: game.join
+      description: |
+        Joins the configured game or reconnects the logged-in user to their existing
+        membership. New membership is rejected after the first program is accepted.
+      payload:
+        $ref: '#/components/schemas/JoinGame'
+
+      examples:
+        - name: "join"
+          summary: "Configured shared game"
+          payload:
+            gameId: "00000000-0000-4000-8000-000000000001"
+
+    JoinResult:
+      name: game.joinResult
+      description: >-
+        Returns the player's assignment, game state, private hand, and submission
+        status, or a rejection.
+      payload:
+        $ref: '#/components/schemas/JoinResult'
+
+      examples:
+        - name: joined
+          summary: One-tile illustrative board; normal initial hand
+          payload:
+            outcome: JOINED
+            assignment:
+              gameId: 00000000-0000-4000-8000-000000000001
+              playerId: 00000000-0000-4000-8000-000000000002
+              robotId: 00000000-0000-4000-8000-000000000003
+            state:
+              gameId: 00000000-0000-4000-8000-000000000001
+              board:
+                width: 1
+                height: 1
+                tiles:
+                  - position:
+                      x: 0
+                      y: 0
+                    type: EMPTY
+              robots:
+                - robotId: 00000000-0000-4000-8000-000000000003
+                  playerId: 00000000-0000-4000-8000-000000000002
+                  position:
+                    coordinate:
+                      x: 0
+                      y: 0
+                    orientation: NORTH
+              phase: PROGRAMMING
+              antenna:
+                x: 0
+                y: 0
+                angle: 1.5707963267948966
+              players:
+                - playerId: 00000000-0000-4000-8000-000000000002
+                  username: Dane
+                  programSubmitted: false
+                  connected: true
+              paused: false
+            hand:
+              - id: 00000000-0000-4000-8000-000000000101
+                instruction: MOVE_1
+              - id: 00000000-0000-4000-8000-000000000102
+                instruction: TURN_LEFT
+              - id: 00000000-0000-4000-8000-000000000103
+                instruction: MOVE_1
+              - id: 00000000-0000-4000-8000-000000000104
+                instruction: TURN_LEFT
+              - id: 00000000-0000-4000-8000-000000000105
+                instruction: MOVE_1
+              - id: 00000000-0000-4000-8000-000000000106
+                instruction: TURN_LEFT
+              - id: 00000000-0000-4000-8000-000000000107
+                instruction: MOVE_1
+              - id: 00000000-0000-4000-8000-000000000108
+                instruction: TURN_LEFT
+              - id: 00000000-0000-4000-8000-000000000109
+                instruction: MOVE_1
+            programSubmitted: false
+        - name: duplicateUser
+          summary: Another connection already owns membership
+          payload:
+            outcome: USER_ALREADY_IN_GAME
+        - name: spawnUnavailable
+          summary: No partial membership was created
+          payload:
+            outcome: NO_SPAWN_AVAILABLE
+        - name: gameAlreadyStarted
+          summary: A new player attempts to join after the first accepted program
+          payload:
+            outcome: GAME_ALREADY_STARTED
+
+    PlayerJoined:
+      name: game.playerJoined
+      description: Announces a new player and robot to existing game participants.
+      payload:
+        $ref: '#/components/schemas/PlayerJoined'
+
+    GetPublicGameState:
+      name: game.getPublicGameState
+      payload:
+        type: object
+        additionalProperties: false
+        required: [ gameId ]
+        properties:
+          gameId:
+            $ref: '#/components/schemas/GameId'
+      description: >-
+        Requests the public state of the game joined by this connection.
+
+    PublicGameStateResult:
+      name: game.publicGameStateResult
+      description: Returns the public game state or GAME_NOT_FOUND.
+      payload:
+        oneOf:
+          - $ref: '#/components/schemas/PublicGameStateFound'
+          - $ref: '#/components/schemas/PublicGameStateNotFound'
+      examples:
+        - name: nonmember
+          payload:
+            outcome: GAME_NOT_FOUND
+
     SubmitProgram:
       name: program.submit
       payload:
         type: object
         additionalProperties: false
-        required: [gameId, playerId, cardIds]
+        required:
+          - gameId
+          - playerId
+          - cardIds
         properties:
           gameId:
-            $ref: '#/components/schemas/GameId'
+            $ref: "#/components/schemas/GameId"
           playerId:
-            $ref: '#/components/schemas/PlayerId'
+            $ref: "#/components/schemas/PlayerId"
           cardIds:
             type: array
             description: Card instance IDs in register order.
@@ -130,61 +334,67 @@ components:
             maxItems: 5
             uniqueItems: true
             items:
-              $ref: '#/components/schemas/CardId'
-
-      description: |
-        Submit once per round during PROGRAMMING. The service checks the assigned
-        player and current programming phase before resolving five distinct cards from that
-        player's hand. Rejection leaves accepted programs unchanged.
-    CardsDealt:
-      name: cards.dealt
-      payload:
-        type: object
-        required: [gameId, playerId, cards]
-        properties:
-          gameId:
-            $ref: '#/components/schemas/GameId'
-          playerId:
-            $ref: '#/components/schemas/PlayerId'
-          cards:
-            type: array
-            items:
-              $ref: '#/components/schemas/Card'
+              $ref: "#/components/schemas/CardId"
+      description: >-
+        Submits five cards in register order for the connection-owned player.
+      examples:
+        - name: submit
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            cardIds:
+              - 00000000-0000-4000-8000-000000000101
+              - 00000000-0000-4000-8000-000000000102
+              - 00000000-0000-4000-8000-000000000103
+              - 00000000-0000-4000-8000-000000000104
+              - 00000000-0000-4000-8000-000000000105
 
     ProgramResult:
       name: program.result
       payload:
         type: object
-        required: [outcome]
+        required: [ outcome ]
         properties:
           outcome:
             type: string
             enum:
               - ACCEPTED
               - INVALID_PROGRAM
+              - INTERNAL_ERROR
+              - GAME_PAUSED
+      description: >-
+        ACCEPTED confirms the program was stored. INVALID_PROGRAM rejects the
+        submission without changing game state. INTERNAL_ERROR means the service
+        failed before accepting it. GAME_PAUSED rejects a submission because the game is paused.
+        No acknowledgement means the outcome is unknown.
 
     ProgramSubmitted:
       name: program.submitted
-      description: |
-        After ACCEPTED, broadcast readiness to every game connection, including
-        the submitter. Never disclose cards. This event does not start activation.
+      description: >-
+        Event signaling another player has submitted their program.
       payload:
         type: object
-        required: [gameId, playerId]
+        required:
+          - playerId
+          - gameId
         properties:
-          gameId:
-            $ref: '#/components/schemas/GameId'
           playerId:
-            $ref: '#/components/schemas/PlayerId'
+            $ref: "#/components/schemas/PlayerId"
+          gameId:
+            $ref: "#/components/schemas/GameId"
+      examples:
+        - name: ready
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
 
     PhaseChanged:
       name: game.phaseChanged
       description: |
         Broadcast once per transition. EXECUTING follows the final submission
         notification and precedes all actions. PROGRAMMING follows the last
-        action, increments the round, and precedes private cards.dealt events.
-        Clients finish queued playback before displaying programming or clearing
-        registers, and wait for the matching hand before enabling input.
+        action and precedes private cards.dealt events. Clients finish queued
+        playback and wait for the next hand before enabling programming.
       payload:
         type: object
         additionalProperties: false
@@ -197,74 +407,356 @@ components:
 
     RobotActionResolved:
       name: robot.actionResolved
-      description: |
-        One result per robot per register, including blocked moves. Send in
-        register order, recalculating antenna priority after each robot acts.
-        Clients preserve every result in playback; no animation acknowledgement
-        or programming timer controls server progression.
       payload:
         type: object
         required:
-          - gameId
-          - registerIndex
           - robotId
           - instruction
           - position
+          - gameId
+          - registerIndex
         properties:
+          robotId:
+            $ref: "#/components/schemas/RobotId"
+          instruction:
+            $ref: "#/components/schemas/Instruction"
+          position:
+            $ref: "#/components/schemas/Position"
           gameId:
-            $ref: '#/components/schemas/GameId'
+            $ref: "#/components/schemas/GameId"
           registerIndex:
             type: integer
             minimum: 0
             maximum: 4
-          robotId:
-            $ref: '#/components/schemas/RobotId'
-          instruction:
-            $ref: '#/components/schemas/Instruction'
-          position:
-            $ref: '#/components/schemas/Position'
+            description: Zero-based register index; display 1–5. Multiple robot actions can share one index.
+      description: >-
+        Reports the resulting robot state after one programmed instruction.
+      examples:
+        - name: firstRegister
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            registerIndex: 0
+            robotId: 00000000-0000-4000-8000-000000000003
+            instruction: MOVE_1
+            position:
+              coordinate:
+                x: 10
+                y: 6
+              orientation: NORTH
 
-    GetPublicGameState:
-      name: game.getPublicGameState
+    CardsDealt:
+      name: cards.dealt
       payload:
         type: object
-        additionalProperties: false
-        required: [gameId]
+        required:
+          - cards
+          - gameId
+          - playerId
         properties:
+          cards:
+            type: array
+            items:
+              $ref: "#/components/schemas/Card"
           gameId:
-            $ref: '#/components/schemas/GameId'
+            $ref: "#/components/schemas/GameId"
+          playerId:
+            $ref: "#/components/schemas/PlayerId"
+      description: >-
+        Private hand dealt to the named player for a programming round.
+      examples:
+        - name: nextHand
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            cards:
+              - id: 00000000-0000-4000-8000-000000000101
+                instruction: MOVE_1
+              - id: 00000000-0000-4000-8000-000000000102
+                instruction: TURN_LEFT
+              - id: 00000000-0000-4000-8000-000000000103
+                instruction: MOVE_1
+              - id: 00000000-0000-4000-8000-000000000104
+                instruction: TURN_LEFT
+              - id: 00000000-0000-4000-8000-000000000105
+                instruction: MOVE_1
+              - id: 00000000-0000-4000-8000-000000000106
+                instruction: TURN_LEFT
+              - id: 00000000-0000-4000-8000-000000000107
+                instruction: MOVE_1
+              - id: 00000000-0000-4000-8000-000000000108
+                instruction: TURN_LEFT
+              - id: 00000000-0000-4000-8000-000000000109
+                instruction: MOVE_1
 
-    PublicGameStateResult:
-      name: game.publicGameStateResult
-      description: Result returned through the game.getPublicGameState acknowledgement.
+    PlayerConnectionChanged:
+      name: game.playerConnectionChanged
+      description: >-
+        Announces an existing player's connection status and the resulting
+        game pause state.
       payload:
-        oneOf:
-          - $ref: '#/components/schemas/PublicGameStateFound'
-          - $ref: '#/components/schemas/PublicGameStateNotFound'
+        $ref: '#/components/schemas/PlayerConnectionChanged'
+      examples:
+        - name: disconnected
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            connected: false
+            paused: true
+        - name: reconnectedWhileAnotherPlayerIsDisconnected
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            connected: true
+            paused: true
+        - name: reconnectedAndGameResumed
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            connected: true
+            paused: false
 
   schemas:
 
-    GamePhase:
+    # Login
+    Username:
       type: string
-      enum: [PROGRAMMING, EXECUTING]
+      minLength: 1
+      maxLength: 30
+      description: |
+        Username length is measured in Unicode code points. Whitespace and case are preserved; no normalization is applied yet.
 
-    Antenna:
+    User:
       type: object
       additionalProperties: false
-      required: [x, y, angle]
+      required: [ userId, username ]
       properties:
-        x:
-          type: integer
-          minimum: 0
-        y:
-          type: integer
-          minimum: 0
-        angle:
-          type: number
+        userId:
+          $ref: '#/components/schemas/UserId'
+        username:
+          $ref: '#/components/schemas/Username'
+
+    Login:
+      type: object
+      additionalProperties: false
+      required: [ username ]
+      properties:
+        username:
+          $ref: '#/components/schemas/Username'
+
+    LoginResult:
+      oneOf:
+        - $ref: '#/components/schemas/LoginAccepted'
+        - $ref: '#/components/schemas/LoginRejected'
+
+    LoginAccepted:
+      type: object
+      additionalProperties: false
+      required: [ outcome, user ]
+      properties:
+        outcome:
+          type: string
+          enum: [ LOGGED_IN ]
+        user:
+          $ref: '#/components/schemas/User'
+
+    LoginRejected:
+      type: object
+      additionalProperties: false
+      required: [ outcome ]
+      properties:
+        outcome:
+          type: string
+          enum: [ INVALID_USERNAME, INVALID_REQUEST, ALREADY_LOGGED_IN, INTERNAL_ERROR ]
       description: |
-        Fixed in-board coordinates and a finite angle in radians clockwise from
-        east. The default is top centre, facing south: floor(width/2), 0, pi/2.
-        It does not reserve a tile or introduce board effects.
+        INVALID_USERNAME covers a missing/non-string username or a length outside 1–30.
+        INVALID_REQUEST covers a non-object request or additional properties.
+        ALREADY_LOGGED_IN means this connection is bound to a different username.
+        Repeating login with the same username returns LOGGED_IN with the same user.
+        INTERNAL_ERROR is an unexpected service failure; do not expose internals.
+
+    # Membership
+    JoinGame:
+      type: object
+      additionalProperties: false
+      required: [ gameId ]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+
+    PlayerAssignment:
+      type: object
+      additionalProperties: false
+      required: [ gameId, playerId, robotId ]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+        playerId:
+          $ref: '#/components/schemas/PlayerId'
+        robotId:
+          $ref: '#/components/schemas/RobotId'
+
+    JoinResult:
+      oneOf:
+        - $ref: '#/components/schemas/JoinAccepted'
+        - $ref: '#/components/schemas/JoinRejected'
+
+    JoinAccepted:
+      type: object
+      additionalProperties: false
+      required:
+        - outcome
+        - assignment
+        - state
+        - hand
+        - programSubmitted
+      properties:
+        outcome:
+          type: string
+          enum:
+            - JOINED
+        assignment:
+          $ref: "#/components/schemas/PlayerAssignment"
+        state:
+          $ref: "#/components/schemas/PublicGameState"
+        hand:
+          type: array
+          items:
+            $ref: "#/components/schemas/Card"
+          description: The player's current private hand.
+
+        programSubmitted:
+          type: boolean
+          description: Whether this player has submitted for the current round.
+      description:  Returns a new assignment or preserves the existing assignment when reconnecting.
+
+    JoinRejected:
+      type: object
+      additionalProperties: false
+      required: [ outcome ]
+      properties:
+        outcome:
+          type: string
+          enum:
+            [
+              LOGIN_REQUIRED,
+              INVALID_REQUEST,
+              GAME_NOT_FOUND,
+              NO_SPAWN_AVAILABLE,
+              USER_ALREADY_IN_GAME,
+              GAME_ALREADY_STARTED,
+              INTERNAL_ERROR
+            ]
+      description: >-
+        LOGIN_REQUIRED: no approved user. INVALID_REQUEST: malformed request.
+        GAME_NOT_FOUND: unavailable game. NO_SPAWN_AVAILABLE: no valid spawn.
+        GAME_ALREADY_STARTED: The game has already accepted its first program.
+        USER_ALREADY_IN_GAME: another connection currently owns this user's membership.
+
+    PlayerState:
+      type: object
+      additionalProperties: false
+      required:
+        - playerId
+        - username
+        - programSubmitted
+        - connected
+      properties:
+        playerId:
+          $ref: "#/components/schemas/PlayerId"
+        username:
+          $ref: "#/components/schemas/Username"
+        programSubmitted:
+          type: boolean
+        connected:
+          type: boolean
+      description: >-
+        Public participation and submission status; never contains cards.
+
+    PlayerJoined:
+      type: object
+      additionalProperties: false
+      required:
+        - gameId
+        - player
+        - robot
+      properties:
+        gameId:
+          $ref: "#/components/schemas/GameId"
+        player:
+          $ref: "#/components/schemas/PlayerState"
+        robot:
+          $ref: "#/components/schemas/Robot"
+      description: >-
+        player.playerId must equal robot.playerId.
+
+    PublicGameState:
+      description: >-
+        Public board, robot, player, phase, and antenna state for a game.
+      type: object
+      required:
+        - gameId
+        - board
+        - antenna
+        - players
+        - robots
+        - phase
+        - paused
+      properties:
+        gameId:
+          $ref: "#/components/schemas/GameId"
+        board:
+          $ref: "#/components/schemas/Board"
+        robots:
+          type: array
+          items:
+            $ref: "#/components/schemas/Robot"
+        phase:
+          $ref: "#/components/schemas/GamePhase"
+        antenna:
+          $ref: "#/components/schemas/Antenna"
+        players:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlayerState"
+        paused:
+          type: boolean
+          description: Whether gameplay is paused because a game member is disconnected.
+
+    PublicGameStateFound:
+      type: object
+      additionalProperties: false
+      required: [ outcome, state ]
+      properties:
+        outcome:
+          type: string
+          enum: [ GAME_FOUND ]
+        state:
+          $ref: '#/components/schemas/PublicGameState'
+
+    PublicGameStateNotFound:
+      type: object
+      additionalProperties: false
+      required: [ outcome ]
+      properties:
+        outcome:
+          type: string
+          enum: [ GAME_NOT_FOUND ]
+      description: >-
+        No accessible game: the game is unknown, the connection is not a member, or the request is
+        malformed. Do not return state or reveal whether an inaccessible game exists.
+
+    GamePhase:
+      type: string
+      enum:
+        - PROGRAMMING
+        - EXECUTING
+      description: EXECUTING means domain activation. No lobby/WAITING phase.
+
+    # Shared types
+    UserId:
+      type: string
+      format: uuid
+      description: Opaque service-issued user identifier.
 
     GameId:
       type: string
@@ -284,26 +776,26 @@ components:
 
     Instruction:
       type: string
-      enum: [MOVE_1, TURN_LEFT]
+      enum: [ MOVE_1, TURN_LEFT ]
 
     Card:
       type: object
-      required: [id, instruction]
+      required: [ id, instruction ]
       properties:
         id:
           $ref: '#/components/schemas/CardId'
           description: Unique card instance ID
         instruction:
           $ref: '#/components/schemas/Instruction'
-      
+
     Orientation:
       type: string
-      enum: [NORTH, EAST, SOUTH, WEST]
+      enum: [ NORTH, EAST, SOUTH, WEST ]
 
     Coordinate:
       type: object
       description: A board location without a facing direction.
-      required: [x, y]
+      required: [ x, y ]
       properties:
         x:
           type: integer
@@ -314,16 +806,16 @@ components:
 
     Position:
       type: object
-      required: [coordinate, orientation]
+      required: [ coordinate, orientation ]
       properties:
         coordinate:
           $ref: '#/components/schemas/Coordinate'
         orientation:
           $ref: '#/components/schemas/Orientation'
-    
+
     Robot:
       type: object
-      required: [robotId, playerId, position]
+      required: [ robotId, playerId, position ]
       properties:
         robotId:
           $ref: '#/components/schemas/RobotId'
@@ -332,46 +824,9 @@ components:
         position:
           $ref: '#/components/schemas/Position'
 
-    PublicGameState:
-      type: object
-      required: [gameId, antenna, board, robots, phase]
-      properties:
-        gameId:
-          $ref: '#/components/schemas/GameId'
-        antenna:
-          $ref: '#/components/schemas/Antenna'
-        board:
-          $ref: '#/components/schemas/Board'
-        robots:
-          type: array
-          items:
-            $ref: '#/components/schemas/Robot'
-        phase:
-          $ref: '#/components/schemas/GamePhase'
-
-    PublicGameStateFound:
-      type: object
-      additionalProperties: false
-      required: [outcome, state]
-      properties:
-        outcome:
-          type: string
-          enum: [GAME_FOUND]
-        state:
-          $ref: '#/components/schemas/PublicGameState'
-
-    PublicGameStateNotFound:
-      type: object
-      additionalProperties: false
-      required: [outcome]
-      properties:
-        outcome:
-          type: string
-          enum: [GAME_NOT_FOUND]
-
     Board:
       type: object
-      required: [width, height, tiles]
+      required: [ width, height, tiles ]
       properties:
         width:
           type: integer
@@ -386,15 +841,56 @@ components:
 
     Tile:
       type: object
-      required: [position, type]
+      required: [ position, type ]
       properties:
         position:
           $ref: '#/components/schemas/Coordinate'
         type:
           type: string
-          enum: [EMPTY]
+          enum: [ EMPTY ]
         walls:
           type: array
           uniqueItems: true
           items:
             $ref: '#/components/schemas/Orientation'
+    Antenna:
+      type: object
+      additionalProperties: false
+      required:
+        - x
+        - y
+        - angle
+      properties:
+        x:
+          type: integer
+          minimum: 0
+        y:
+          type: integer
+          minimum: 0
+        angle:
+          type: number
+      description: >-
+        Fixed game configuration. Coordinates must be on the board. Angle is radians clockwise from
+        east (south is pi/2), matching the documented priority algorithm. Does not occupy a robot
+        slot or add board effects. The current 21×15 test board uses x=10, y=0, angle=pi/2 (south).
+        For other widths use floor(width/2), y=0, facing south; keep configuration fixed per game.
+
+    PlayerConnectionChanged:
+      type: object
+      additionalProperties: false
+      required:
+        - gameId
+        - playerId
+        - connected
+        - paused
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+        playerId:
+          $ref: '#/components/schemas/PlayerId'
+        connected:
+          type: boolean
+          description: The player's connection status after this change.
+        paused:
+          type: boolean
+          description: Whether any game member remains disconnected after this change.

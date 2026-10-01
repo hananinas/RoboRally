@@ -5,6 +5,9 @@ import {
   EmptyTile,
   Move1,
   TurnLeft,
+  Move2,
+  Move3,
+  TurnRight,UTurn,BackUp,
   createSinglePlayerGame,
 } from './index.js'
 
@@ -32,15 +35,15 @@ describe('single-player game', () => {
     expect(player.hand).toHaveLength(9)
     expect(new Set(cardIds).size).toBe(9)
     expect(player.hand.map((card) => card.constructor)).toEqual([
-      Move1,
+      Move1, 
+      Move2, 
+      Move3, 
+      BackUp, 
+      TurnLeft, 
+      TurnRight, 
+      UTurn, 
+      Move1, 
       TurnLeft,
-      Move1,
-      TurnLeft,
-      Move1,
-      TurnLeft,
-      Move1,
-      TurnLeft,
-      Move1,
     ])
     expect(parseSubmitProgram({
       gameId,

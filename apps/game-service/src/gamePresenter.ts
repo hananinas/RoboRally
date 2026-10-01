@@ -14,6 +14,11 @@ import {
   EmptyTile,
   Move1,
   TurnLeft,
+  TurnRight,
+  Move2,
+  Move3,
+  UTurn,
+  BackUp,
   type Card,
   type Game,
   type GameId,
@@ -37,6 +42,11 @@ const phases: Record<GamePhase, GamePhasePayload> = {
 function instructionFor(card: Card): Instruction {
   if (card instanceof Move1) return 'MOVE_1'
   if (card instanceof TurnLeft) return 'TURN_LEFT'
+  if (card instanceof Move2) return 'MOVE_2'
+  if (card instanceof Move3) return 'MOVE_3'
+  if (card instanceof BackUp) return 'BACK_UP'
+  if (card instanceof TurnRight) return 'TURN_RIGHT'
+  if (card instanceof UTurn) return 'U_TURN'
   throw new Error(`Unsupported card ${card.id}`)
 }
 

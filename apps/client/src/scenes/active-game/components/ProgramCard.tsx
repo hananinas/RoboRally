@@ -1,11 +1,9 @@
 import type { ButtonHTMLAttributes } from 'react'
 import type {
-  Card,
-  Instruction,
+  Card
 } from '@robo-rally/game-events'
 
-import arrowLeft from './svg/arrow-left.svg'
-import arrowUp1 from './svg/arrow-up-1.svg'
+import { instructionIcons, instructionLabel } from './cardInstructions.ts'
 
 type ProgramCardProps =
   ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -16,18 +14,7 @@ type ProgramCardProps =
     label?: string
   }
 
-function instructionLabel(instruction: Instruction): string {
-  switch (instruction) {
-    case 'MOVE_1':
-      return 'Move 1'
-    case 'TURN_LEFT':
-      return 'Turn Left'
-  }
-}
-const icons : Record <Instruction, string> ={
-  MOVE_1: arrowUp1,
-  TURN_LEFT: arrowLeft,
-}
+
 
 // Renders a programming card.
 function ProgramCard({
@@ -58,7 +45,7 @@ function ProgramCard({
       }
     >
       <img
-        src={icons[card.instruction]}
+        src={instructionIcons[card.instruction]}
         alt=""
         className="program-card__icon"
         draggable={false}

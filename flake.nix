@@ -12,7 +12,7 @@
         "aarch64-darwin"
       ];
 
-      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
+    forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
     in {
       devShells = forAllSystems (system:
         import ./nix/dev {
