@@ -17,6 +17,7 @@ function ActiveGame() {
     overlayRef,
   } = useOverlayLayout(state.handVersion)
   const disabled = !canProgram(state)
+  const handleRemove = (registerIndex: number) => dispatch({ type: 'remove', registerIndex })
   const hasHand = state.handVersion > 0
   const phase = state.playback.active ? 'EXECUTING' : state.phase
   const phaseLabel = phase === 'PROGRAMMING' ? 'Programming'
@@ -46,7 +47,7 @@ function ActiveGame() {
               submission={state.submission}
               status={status}
               error={state.error}
-              onRemove={(registerIndex) => dispatch({ type: 'remove', registerIndex })}
+              onRemove={handleRemove}
               onConfirm={submit}
             />
           </div>
@@ -62,6 +63,7 @@ function ActiveGame() {
               type: 'place', cardId: card.id, registerIndex: state.registers.indexOf(null),
             })}
             onPlaceCard={(card, registerIndex) => dispatch({ type: 'place', cardId: card.id, registerIndex })}
+            onRemoveCard={handleRemove}
           />
         )}
       </div>

@@ -21,6 +21,7 @@ type ProgrammingHandProps = {
   disabled: boolean
   onSelect: (card: Card) => void
   onPlaceCard: (card: Card, registerIndex: number) => void
+  onRemoveCard: (registerIndex: number) => void
 }
 
 const dragThreshold = 4
@@ -42,9 +43,10 @@ function ProgrammingHand({
   disabled,
   onSelect,
   onPlaceCard,
+  onRemoveCard,
 }: ProgrammingHandProps) {
   const [drag, setDrag] = useState<CardDrag | null>(null)
-  const [highlightedIndex, highlightCard] = useGameKeybinds(cards, registeredCardIds, disabled, onPlaceCard)
+  const [highlightedIndex, highlightCard] = useGameKeybinds(cards, registeredCardIds, disabled, onPlaceCard, onRemoveCard)
 
   // Starts pointer tracking.
   function startDrag(card: Card, event: PointerEvent<HTMLButtonElement>) {

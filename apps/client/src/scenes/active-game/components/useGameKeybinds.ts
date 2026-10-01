@@ -6,9 +6,11 @@ export default function useGameKeybinds(
   registeredCardIds: ReadonlySet<string>,
   disabled: boolean,
   onPlaceCard: (card: ProgramCard, registerIndex: number) => void,
+  onRemoveCard: (registerIndex: number) => void,
 ) : [number, (cardIndex: number) => void]  {
 
     const [highlightedCardIndex, setHighlightedCardIndex] = useState(0)
+    const [pendingDelete, setPendingDelete] = useState(false)
 
     function highlightCard(cardIndex: number) {
       if (cards.length === 0) return
@@ -30,6 +32,21 @@ export default function useGameKeybinds(
 
       // browser shortcuts and text composition alone.
       if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) {
+        return
+      }
+
+      if (pendingDelete) {
+        setPendingDelete(false)
+
+        if (/^[1-5]$/.test(event.key)) {
+          onRemoveCard(Number(event.key) - 1)
+        }
+
+        return
+      }
+
+      if (event.key === 'd') {
+        setPendingDelete(true)
         return
       }
 

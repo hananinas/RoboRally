@@ -76,6 +76,7 @@ export default function BoardHarness() {
           disabled={confirmed}
           onSelect={(card) => setRegisters((current) => placeCard(current, card, current.indexOf(null)))}
           onPlaceCard={(card, index) => setRegisters((current) => placeCard(current, card, index))}
+          onRemoveCard={(index) => setRegisters((current) => removeCard(current, index))}
         />
       </div>
     </div>
