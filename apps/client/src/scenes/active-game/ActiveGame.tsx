@@ -21,6 +21,7 @@ function ActiveGame() {
   const handleRemove = (registerIndex: number) => dispatch({ type: 'remove', registerIndex })
   const handlePlaceCard = (card: ProgramCard, registerIndex: number) =>
     dispatch({ type: 'place', cardId: card.id, registerIndex })
+  const handleClearRegisters = () => dispatch({ type: 'clear' })
   const handleUndo = () => dispatch({ type: 'undo' })
   const handleRedo = () => dispatch({ type: 'redo' })
   const hasHand = state.handVersion > 0
@@ -34,7 +35,8 @@ function ActiveGame() {
     state.registers.flatMap((card) => (card ? [card.id] : [])),
   )
   const [highlightedIndex, highlightCard, pendingDelete] = useGameKeybinds(
-    state.hand, registeredCardIds, disabled, handlePlaceCard, handleRemove, handleUndo, handleRedo,
+    state.hand, registeredCardIds, disabled, handlePlaceCard, handleRemove,
+    handleClearRegisters, handleUndo, handleRedo,
   )
   const overlayClassName = [
     'game-overlay',

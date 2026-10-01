@@ -62,6 +62,12 @@ export default function BoardHarness() {
     setRegistersFuture([])
     setRegisters(next)
   }
+  const handleClearRegisters = () => {
+    if (registers.every((card) => card === null)) return
+    setRegistersPast((past) => [...past, registers])
+    setRegistersFuture([])
+    setRegisters(Array(5).fill(null))
+  }
   const handleUndo = () => {
     if (registersPast.length === 0) return
     const previous = registersPast[registersPast.length - 1]
@@ -77,7 +83,8 @@ export default function BoardHarness() {
     setRegisters(next)
   }
   const [highlightedIndex, highlightCard, pendingDelete] = useGameKeybinds(
-    hand, registeredCardIds, confirmed, handlePlaceCard, handleRemove, handleUndo, handleRedo,
+    hand, registeredCardIds, confirmed, handlePlaceCard, handleRemove,
+    handleClearRegisters, handleUndo, handleRedo,
   )
   const overlayClassName = [
     'game-overlay',

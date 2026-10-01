@@ -5,6 +5,7 @@ export const KEYBINDS: readonly { keys: string; description: string }[] = [
   { keys: 'h / l', description: 'Move the highlight to the previous / next card' },
   { keys: '1-5', description: 'Place the highlighted card in the matching register' },
   { keys: 'd, then 1-5', description: 'Remove the card from the matching register' },
+  { keys: 'dd', description: 'Clear all registers' },
   { keys: 'u', description: 'Undo the last register change' },
   { keys: 'Ctrl+R', description: 'Redo the last undone change' },
 ]
@@ -15,6 +16,7 @@ export default function useGameKeybinds(
   disabled: boolean,
   onPlaceCard: (card: ProgramCard, registerIndex: number) => void,
   onRemoveCard: (registerIndex: number) => void,
+  onClearRegisters: () => void,
   onUndo: () => void,
   onRedo: () => void,
 ) : [number, (cardIndex: number) => void, boolean]  {
@@ -55,7 +57,9 @@ export default function useGameKeybinds(
       if (pendingDelete) {
         setPendingDelete(false)
 
-        if (/^[1-5]$/.test(event.key)) {
+        if (event.key === 'd') {
+          onClearRegisters()
+        } else if (/^[1-5]$/.test(event.key)) {
           onRemoveCard(Number(event.key) - 1)
         }
 

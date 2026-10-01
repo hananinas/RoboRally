@@ -46,6 +46,7 @@ export type GameStateEvent =
   | { type: 'complete' }
   | { type: 'place'; cardId: string; registerIndex: number }
   | { type: 'remove'; registerIndex: number }
+  | { type: 'clear' }
   | { type: 'undo' }
   | { type: 'redo' }
   | { type: 'submit' }
@@ -179,6 +180,15 @@ export function gameStateReducer(
       return registers === state.registers ? state : {
         ...state,
         registers,
+        registersPast: [...state.registersPast, state.registers],
+        registersFuture: [],
+      }
+    }
+    case 'clear': {
+      if (!canProgram(state) || state.registers.every((card) => card === null)) return state
+      return {
+        ...state,
+        registers: emptyRegisters(),
         registersPast: [...state.registersPast, state.registers],
         registersFuture: [],
       }
