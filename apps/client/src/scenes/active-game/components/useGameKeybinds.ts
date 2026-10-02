@@ -30,7 +30,7 @@ export default function useGameKeybinds(
     const [pendingDelete, setPendingDelete] = useState(false)
     const [pendingSubmit, setPendingSubmit] = useState<'none' | 'colon' | 'colon-w'>('none')
 
-    function highlightFrom(startIndex: number, direction: number) {
+    function highlightNextUnregistered(startIndex: number, direction: number) {
       if (cards.length === 0) return
 
       let wrappedIndex = ((startIndex % cards.length) + cards.length) % cards.length
@@ -46,7 +46,7 @@ export default function useGameKeybinds(
 
     function highlightCard(cardIndex: number) {
       const direction = Math.sign(cardIndex - (highlightedCardIndex ?? 0)) || 1
-      highlightFrom(cardIndex, direction)
+      highlightNextUnregistered(cardIndex, direction)
     }
 
     const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
@@ -131,11 +131,11 @@ export default function useGameKeybinds(
       }
 
       if (event.key === '0') {
-        highlightFrom(0, 1)
+        highlightNextUnregistered(0, 1)
       }
 
       if (event.key === '$') {
-        highlightFrom(cards.length - 1, -1)
+        highlightNextUnregistered(cards.length - 1, -1)
       }
 
       if (/^[1-5]$/.test(event.key)) {
