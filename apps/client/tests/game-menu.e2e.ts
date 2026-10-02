@@ -1,9 +1,7 @@
-import { expect, test } from './game-fixture.ts'
+import { expect, openGame, test } from './game-fixture.ts'
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Player 1', exact: true })).toBeVisible()
-  await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button')).toHaveCount(9)
+  await openGame(page)
 })
 
 test('supports Enter, Space, and Escape without losing trigger focus', async ({ page }) => {
