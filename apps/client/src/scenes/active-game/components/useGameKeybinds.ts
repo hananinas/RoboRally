@@ -50,6 +50,13 @@ export default function useGameKeybinds(
     }
 
     const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.matches('input, textarea, select, [contenteditable]')
+      ) {
+        return
+      }
+
       if (event.key === '?') {
         const popover = document.querySelector<HTMLElement>('.game-menu__popover')
         popover?.togglePopover()
