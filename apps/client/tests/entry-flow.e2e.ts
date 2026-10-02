@@ -211,9 +211,19 @@ for (const outcome of ['INVALID_REQUEST', 'GAME_NOT_FOUND', 'NO_SPAWN_AVAILABLE'
     await game.control({ type: 'join', outcome, deferred: false })
     await submitUsername(page)
     await expect(page.getByRole('alert')).toBeVisible()
+    if (outcome === 'GAME_ALREADY_STARTED') {
+      await expect(page.getByRole('alert')).toHaveText(
+        'The game has already started and is no longer accepting new players.',
+      )
+    }
     await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
+    await expect(page.getByRole('region', { name: 'Programming hand' })).toHaveCount(0)
     await expect(page.getByRole('textbox', { name: 'Username' })).toHaveValue(username)
     await expect(page.getByRole('textbox', { name: 'Username' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Retry joining' })).toBeEnabled()
+    expect((await game.snapshot()).entryRequests.map((request) => request.event))
+      .toEqual(['user.login', 'game.join'])
+    expect((await game.snapshot()).submissions).toEqual([])
     await game.control({ type: 'join', outcome: 'JOINED', deferred: false })
     await page.getByRole('button', { name: 'Retry joining' }).click()
     await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()

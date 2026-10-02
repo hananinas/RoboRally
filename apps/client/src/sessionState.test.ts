@@ -100,11 +100,12 @@ describe('sessionReducer', () => {
     })
   })
 
-  it('retries a failed join without returning to login', () => {
+  it.each(['GAME_NOT_FOUND', 'GAME_ALREADY_STARTED'] as const)('retries %s without returning to login', (outcome) => {
     let state = sessionReducer(joiningState(), {
       type: 'join-result',
-      result: { outcome: 'GAME_NOT_FOUND' },
+      result: { outcome },
     })
+    expect(state).toEqual({ status: 'join-failed', user, error: outcome })
     state = sessionReducer(state, { type: 'join-retried' })
 
     expect(state).toEqual({ status: 'joining', user })
