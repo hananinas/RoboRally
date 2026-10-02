@@ -62,16 +62,26 @@ export type Board = Readonly<{
   tiles: readonly Tile[]
 }>
 
-export type GamePhase = 'WAITING' | 'PROGRAMMING' | 'EXECUTING'
+export type GamePhase = 'PROGRAMMING' | 'EXECUTING'
+
+export type Antenna = Readonly<Coordinate & { angle: number }>
+
+export type PhaseChanged = Readonly<{
+  gameId: GameId
+  phase: GamePhase
+}>
 
 export type PublicGameState = Readonly<{
   gameId: GameId
+  antenna: Antenna
   board: Board
   robots: readonly Robot[]
   phase: GamePhase
 }>
 
 export type CardsDealt = Readonly<{
+  gameId: GameId
+  playerId: PlayerId
   cards: readonly Card[]
 }>
 
@@ -82,10 +92,13 @@ export type ProgramResult = Readonly<{
 }>
 
 export type ProgramSubmitted = Readonly<{
+  gameId: GameId
   playerId: PlayerId
 }>
 
 export type RobotActionResolved = Readonly<{
+  gameId: GameId
+  registerIndex: number
   robotId: RobotId
   instruction: Instruction
   position: Position

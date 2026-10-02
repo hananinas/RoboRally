@@ -85,8 +85,8 @@ describe('game presenter', () => {
   })
 
   it('presents all dealt card instruction types without exposing domain objects', () => {
-    const { player } = createSinglePlayerGame()
-    const dealt = presentCardsDealt(player)
+    const { gameId, game, player } = createSinglePlayerGame()
+    const dealt = presentCardsDealt(gameId, player)
 
     expectTypeOf(dealt).toEqualTypeOf<CardsDealt>()
     expect(dealt.cards).toHaveLength(9)
@@ -121,10 +121,12 @@ describe('game presenter', () => {
       direction: Direction.SOUTH,
     }
 
-    const resolved = presentRobotActionResolved(action)
+    const resolved = presentRobotActionResolved('game', { registerIndex: 4, action })
 
     expectTypeOf(resolved).toEqualTypeOf<RobotActionResolved>()
     expect(resolved).toEqual({
+      gameId: 'game',
+      registerIndex: 4,
       robotId: player.robot.id,
       instruction,
       position: {

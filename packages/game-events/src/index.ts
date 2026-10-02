@@ -6,6 +6,7 @@ export type {
   ServerToClientEvents,
 } from './events.js'
 export type {
+  Antenna,
   Board,
   Card,
   CardId,
@@ -17,6 +18,7 @@ export type {
   Instruction,
   LoginResult,
   Orientation,
+  PhaseChanged,
   PlayerId,
   Position,
   ProgramResult,
