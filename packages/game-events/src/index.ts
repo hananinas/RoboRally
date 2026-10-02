@@ -18,7 +18,6 @@ export type {
   Instruction,
   LoginResult,
   Orientation,
-  PhaseChanged,
   PlayerId,
   Position,
   ProgramResult,

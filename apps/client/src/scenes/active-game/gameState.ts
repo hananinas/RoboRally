@@ -3,7 +3,6 @@ import type {
   CardsDealt,
   GameId,
   GamePhase,
-  PhaseChanged,
   PlayerId,
   ProgramResult,
   PublicGameState,
@@ -44,7 +43,6 @@ export type GameStateEvent =
   | { type: 'error'; message: string }
   | { type: 'initial-state'; state: PublicGameState }
   | { type: 'dealt'; hand: CardsDealt }
-  | { type: 'phase'; phase: PhaseChanged }
   | { type: 'action'; action: RobotActionResolved }
   | { type: 'complete' }
   | { type: 'place'; cardId: string; registerIndex: number }
@@ -103,10 +101,11 @@ function isHandEligible(state: ClientGameState, hand: CardsDealt): boolean {
     (state.playerId === null || hand.playerId === state.playerId)
 }
 
-// A hand can arrive before its phase or while the previous round is still playing.
+// Keep the next hand pending until the previous round has finished playing.
 function activateHand(state: ClientGameState): ClientGameState {
   const hand = state.pendingHand
-  if (!hand || !isHandEligible(state, hand)) return state
+  if (!hand) return state
+  if (!isHandEligible(state, hand)) return { ...state, pendingHand: null }
   if (state.phase !== 'PROGRAMMING' || state.playback.active) {
     return state.playerId === null ? { ...state, playerId: hand.playerId } : state
   }
@@ -167,27 +166,23 @@ export function gameStateReducer(
     case 'dealt': {
       const hand = event.hand
       if (state.gameId === null) return { ...state, pendingHand: hand }
-      if (!isHandEligible(state, hand) || (state.phase === 'PROGRAMMING' && state.handReady && !state.pendingHand)) return state
-      return activateHand({ ...state, pendingHand: hand })
-    }
-    case 'phase': {
-      const phase = event.phase
-      if (phase.gameId !== state.gameId) return state
-      const executing = phase.phase === 'EXECUTING' && state.phase === 'PROGRAMMING'
-      const nextRound = phase.phase === 'PROGRAMMING' && state.phase === 'EXECUTING'
-      if (!executing && !nextRound) return state
+      if (!isHandEligible(state, hand) ||
+        (state.phase === 'PROGRAMMING' && (state.handReady || state.pendingHand))) return state
       return activateHand({
         ...state,
-        phase: phase.phase,
-        handReady: nextRound ? false : state.handReady,
+        phase: 'PROGRAMMING',
+        handReady: false,
+        pendingHand: hand,
       })
     }
     case 'action':
       if (event.action.gameId !== state.gameId ||
-        state.phase !== 'EXECUTING' ||
         !state.playback.robots.some((robot) => robot.robotId === event.action.robotId)) return state
       return {
         ...state,
+        phase: 'EXECUTING',
+        handReady: false,
+        pendingHand: null,
         playback: robotPlaybackReducer(state.playback, { type: 'enqueue', action: event.action }),
       }
     case 'complete':

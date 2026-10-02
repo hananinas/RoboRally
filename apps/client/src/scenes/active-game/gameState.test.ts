@@ -74,10 +74,6 @@ const actions: readonly RobotActionResolved[] = [
 ]
 const hand = { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, cards }
 
-function changePhase(state: ClientGameState, phase: 'PROGRAMMING' | 'EXECUTING') {
-  return gameStateReducer(state, { type: 'phase', phase: { gameId: publicState.gameId, phase } })
-}
-
 function programmingState(): ClientGameState {
   let state = gameStateReducer(createClientGameState(), { type: 'connected' })
   state = gameStateReducer(state, { type: 'initial-state', state: publicState })
@@ -164,7 +160,7 @@ describe('client game state', () => {
     expect(canProgram(state)).toBe(true)
   })
 
-  it('requires a dealt hand and disables editing when execution starts', () => {
+  it('requires a dealt hand and disables editing on the first valid action', () => {
     let state = gameStateReducer(createClientGameState(), { type: 'connected' })
     state = gameStateReducer(state, { type: 'initial-state', state: publicState })
     expect(canProgram(state)).toBe(false)
@@ -172,7 +168,16 @@ describe('client game state', () => {
     state = gameStateReducer(state, { type: 'dealt', hand })
     state = selectProgram(state)
     const registers = state.registers
-    state = changePhase(state, 'EXECUTING')
+    for (const invalidAction of [
+      { ...actions[0], gameId: 'another-game' },
+      { ...actions[0], robotId: 'unknown-robot' },
+    ]) {
+      state = gameStateReducer(state, { type: 'action', action: invalidAction })
+      expect(canProgram(state)).toBe(true)
+      expect(state.playback.active).toBeNull()
+      expect(state.registers).toEqual(registers)
+    }
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
 
     expect(canProgram(state)).toBe(false)
     expect(createSubmission(state)).toBeNull()
@@ -289,8 +294,8 @@ describe('client game state', () => {
     let state = selectProgram()
     const previousVersion = state.handVersion
     state = gameStateReducer(state, { type: 'submit' })
-    state = changePhase(state, 'EXECUTING')
-    state = changePhase(state, 'PROGRAMMING')
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, { type: 'complete' })
     state = gameStateReducer(state, { type: 'dealt', hand })
 
     expect(state.registers).toEqual(emptyRegisters)
@@ -335,13 +340,11 @@ describe('client game state', () => {
     expect(state.playback.robots.find((robot) => robot.robotId === robotId)?.position)
       .toEqual(publicState.robots[0].position)
     state = gameStateReducer(state, { type: 'submit' })
-    state = changePhase(state, 'EXECUTING')
     const registers = state.registers
     for (const action of actions) {
       state = gameStateReducer(state, { type: 'action', action })
     }
 
-    state = changePhase(state, 'PROGRAMMING')
     state = gameStateReducer(state, { type: 'dealt', hand })
     expect(state.registers).toEqual(registers)
 
@@ -377,10 +380,9 @@ describe('client game state', () => {
     let state = selectProgram()
     const previousRegisters = state.registers
 
-    state = changePhase(state, 'EXECUTING')
     state = gameStateReducer(state, { type: 'action', action: actions[0] })
     state = gameStateReducer(state, { type: 'dealt', hand: { ...hand, cards: nextCards } })
-    state = changePhase(state, 'PROGRAMMING')
+    state = gameStateReducer(state, { type: 'dealt', hand })
 
     expect(state.registers).toEqual(previousRegisters)
     expect(canProgram(state)).toBe(false)
@@ -397,13 +399,15 @@ describe('client game state', () => {
       state = gameStateReducer(state, { type: 'place', cardId: card.id, registerIndex })
     }
     expect(state.registers.slice(0, 5)).toEqual(nextCards.slice(0, 5))
+    state = gameStateReducer(state, { type: 'dealt', hand: { ...hand, cards: nextCards } })
+    expect(state.registers.slice(0, 5)).toEqual(nextCards.slice(0, 5))
     expect(createSubmission(state)?.cardIds).toEqual(nextCards.slice(0, 5).map((card) => card.id))
   })
 
-  it('requires the matching private hand after the new programming phase', () => {
+  it('requires the matching private hand after playback finishes', () => {
     let state = selectProgram()
-    state = changePhase(state, 'EXECUTING')
-    state = changePhase(state, 'PROGRAMMING')
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, { type: 'complete' })
     expect(canProgram(state)).toBe(false)
     expect(createSubmission(state)).toBeNull()
     for (const invalidHand of [
@@ -416,14 +420,9 @@ describe('client game state', () => {
     expect(canProgram(state)).toBe(true)
     expect(state.registers).toEqual(emptyRegisters)
     expect(gameStateReducer(state, { type: 'dealt', hand })).toBe(state)
-    expect(gameStateReducer(state, { type: 'action', action: actions[0] })).toBe(state)
-    expect(changePhase(state, 'PROGRAMMING')).toBe(state)
-    expect(gameStateReducer(state, {
-      type: 'phase', phase: { gameId: 'another-game', phase: 'EXECUTING' },
-    })).toBe(state)
   })
 
-  it('buffers a next hand until its phase and preserves both robots in the same register', () => {
+  it('buffers the next hand until both robots in the same register have played', () => {
     let state = selectProgram()
     const registers = state.registers
     const first = actions[0]
@@ -431,20 +430,18 @@ describe('client game state', () => {
       ...first, robotId: stationaryRobotId,
       position: { coordinate: { x: 3, y: 4 }, orientation: 'WEST' },
     }
-    state = changePhase(state, 'EXECUTING')
     state = gameStateReducer(state, { type: 'action', action: first })
     state = gameStateReducer(state, { type: 'action', action: second })
     state = gameStateReducer(state, { type: 'dealt', hand })
-    expect(state.pendingHand).toEqual(hand)
+    expect(canProgram(state)).toBe(false)
     expect(state.registers).toEqual(registers)
     state = gameStateReducer(state, { type: 'complete' })
     expect(state.playback.active).toEqual(second)
     expect(state.playback.robots[0].position).toEqual(first.position)
     expect(state.playback.robots[1].position).toEqual(second.position)
-    state = gameStateReducer(state, { type: 'complete' })
     expect(canProgram(state)).toBe(false)
     expect(state.registers).toEqual(registers)
-    state = changePhase(state, 'PROGRAMMING')
+    state = gameStateReducer(state, { type: 'complete' })
     expect(canProgram(state)).toBe(true)
     expect(state.registers).toEqual(emptyRegisters)
   })

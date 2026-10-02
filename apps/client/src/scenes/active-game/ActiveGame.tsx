@@ -31,6 +31,7 @@ function ActiveGame() {
   const disabled = !canProgram(state)
   const hasHand = state.handVersion > 0
   const status = getGameStatus(state)
+  const playerNumber = state.playerIds.findIndex((id) => id === state.playerId) + 1
   const registeredCardIds = new Set(
     state.registers.flatMap((card) => (card ? [card.id] : [])),
   )
@@ -46,7 +47,7 @@ function ActiveGame() {
       <div ref={overlayRef} className={overlayClassName}>
         <aside className="game-hud" aria-label="Game controls">
           <div ref={hudContentRef} className="game-hud__content">
-            <PlayerPanel player={{ name: 'Player 1' }} />
+            <PlayerPanel player={{ name: playerNumber > 0 ? `Player ${playerNumber}` : 'Player' }} />
             <RegisterPanel
               registers={state.registers}
               disabled={disabled}

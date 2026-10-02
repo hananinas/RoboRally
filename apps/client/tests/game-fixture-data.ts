@@ -1,7 +1,6 @@
 import type {
   Card,
   CardsDealt,
-  PhaseChanged,
   ProgramResultOutcome,
   ProgramSubmitted,
   PublicGameState,
@@ -57,7 +56,6 @@ export type FixtureControl =
   | { type: 'respond-state' }
   | { type: 'round'; actions: readonly RobotActionResolved[]; deferHand?: boolean }
   | { type: 'deal' }
-  | { type: 'phase'; phase: PhaseChanged }
   | { type: 'hand'; hand: CardsDealt }
   | { type: 'submitted'; submission: ProgramSubmitted }
 

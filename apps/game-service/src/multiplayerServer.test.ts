@@ -48,10 +48,13 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
       }))
       expect(await clients[0].timeout(1000).emitWithAck('program.submit', submissions[0]))
         .toEqual({ outcome: 'ACCEPTED' })
-      // Reading after submission fences delivery without relying on a sleep.
-      const waiting = await clients[0].timeout(1000).emitWithAck('game.getPublicGameState', { gameId })
-      expect(waiting).toMatchObject({ outcome: 'GAME_FOUND', state: { phase: 'PROGRAMMING' } })
-      expect(events[0]).toEqual([{
+      // State acknowledgements fence each connection's earlier deliveries.
+      for (const socket of clients) {
+        const waiting = await socket.timeout(1000).emitWithAck('game.getPublicGameState', { gameId })
+        expect(waiting).toMatchObject({ outcome: 'GAME_FOUND', state: { phase: 'PROGRAMMING' } })
+      }
+      expect(events[0]).toEqual([])
+      expect(events[1]).toEqual([{
         name: 'program.submitted', payload: { gameId, playerId: players[0].id },
       }])
       expect(await clients[0].timeout(1000).emitWithAck('program.submit', submissions[0]))
@@ -67,12 +70,11 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
       for (let index = 0; index < clients.length; index++) {
         expect(hands[index]).toMatchObject({ gameId, playerId: players[index].id })
         expect(events[index].map((event) => event.name)).toEqual([
-          'program.submitted', 'program.submitted', 'game.phaseChanged',
+          'program.submitted',
           ...Array.from({ length: 10 }, () => 'robot.actionResolved'),
-          'game.phaseChanged', 'cards.dealt',
+          'cards.dealt',
         ])
-        expect(events[index][2].payload).toEqual({ gameId, phase: 'EXECUTING' })
-        expect(events[index][13].payload).toEqual({ gameId, phase: 'PROGRAMMING' })
+        expect(events[index][0].payload).toEqual({ gameId, playerId: players[1 - index].id })
         const actions = events[index].filter((event) => event.name === 'robot.actionResolved')
         expect(actions.map((event) => event.payload)).toEqual(
           Array.from({ length: 5 }, (_, registerIndex) => [1, 0].map((playerIndex) => ({

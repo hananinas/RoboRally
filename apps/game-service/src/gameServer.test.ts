@@ -300,7 +300,6 @@ describe('game Socket.IO connection', () => {
       gameId: singlePlayerGame.gameId,
       playerId: singlePlayerGame.player.id,
     })
-    expect(submittedToPlayer).toHaveBeenCalledExactlyOnceWith(await submitted)
     const resolvedActions = await actions
     expect(resolvedActions.map((action) => action.instruction)).toEqual([
       'MOVE_1',
@@ -312,6 +311,7 @@ describe('game Socket.IO connection', () => {
     expect(await nextHand).toEqual(
       presentCardsDealt(singlePlayerGame.gameId, singlePlayerGame.player),
     )
+    expect(submittedToPlayer).not.toHaveBeenCalled()
     expect(singlePlayerGame.game.phase).toBe('programming')
     expect(singlePlayerGame.game.currentRegister).toBe(0)
     expect(singlePlayerGame.player.robot.program).toEqual([])
@@ -331,7 +331,20 @@ describe('game Socket.IO connection', () => {
   })
 
   it('rejects malformed, unknown, and unavailable programs atomically', async () => {
+    const initialHand = new Promise<
+      Parameters<ServerToClientEvents['cards.dealt']>[0]
+    >((resolve) => client.once('cards.dealt', resolve))
     await connect()
+    await initialHand
+    const observer = createClient()
+    const observerHand = new Promise<
+      Parameters<ServerToClientEvents['cards.dealt']>[0]
+    >((resolve) => observer.once('cards.dealt', resolve))
+    await connect(observer)
+    await observerHand
+    const received = vi.fn()
+    client.onAny(received)
+    observer.onAny(received)
     const cardIds = singlePlayerGame.player.hand
       .slice(0, 5)
       .map((card) => card.id)
@@ -367,6 +380,13 @@ describe('game Socket.IO connection', () => {
         outcome: 'INVALID_PROGRAM',
       })
     }
+    for (const socket of [client, observer]) {
+      await socket.timeout(1_000).emitWithAck(
+        'game.getPublicGameState',
+        { gameId: singlePlayerGame.gameId },
+      )
+    }
+    expect(received).not.toHaveBeenCalled()
 
     expect(singlePlayerGame.game.phase).toBe('programming')
     expect(singlePlayerGame.game.currentRegister).toBe(0)

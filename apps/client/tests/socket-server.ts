@@ -56,12 +56,14 @@ function snapshot(fixture: Fixture): FixtureSnapshot {
 
 function acknowledgeProgram(
   fixture: Fixture,
+  sender: GameSocket,
   acknowledge: ProgramResultAcknowledgement,
   outcome: ProgramResultOutcome,
 ) {
   acknowledge({ outcome })
   if (outcome === 'ACCEPTED') {
     for (const observer of fixture.sockets) {
+      if (observer === sender) continue
       observer.emit('program.submitted', {
         gameId: GAME_ID, playerId: PLAYER_ID,
       })
@@ -71,9 +73,6 @@ function acknowledgeProgram(
 
 function controlFixture(fixture: Fixture, control: FixtureControl) {
   switch (control.type) {
-    case 'phase':
-      for (const socket of fixture.sockets) socket.emit('game.phaseChanged', control.phase)
-      break
     case 'hand':
       for (const socket of fixture.sockets) socket.emit('cards.dealt', control.hand)
       break
@@ -102,7 +101,7 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
       break
     case 'acknowledge':
       for (const pending of fixture.pending.splice(0)) {
-        acknowledgeProgram(fixture, pending.acknowledge, control.outcome)
+        acknowledgeProgram(fixture, pending.socket, pending.acknowledge, control.outcome)
       }
       break
     case 'round': {
@@ -115,9 +114,7 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
       fixture.state = { ...fixture.state, phase: 'PROGRAMMING', robots }
       fixture.cards = dealCards()
       for (const socket of fixture.sockets) {
-        socket.emit('game.phaseChanged', { gameId: GAME_ID, phase: 'EXECUTING' })
         for (const action of control.actions) socket.emit('robot.actionResolved', action)
-        socket.emit('game.phaseChanged', { gameId: GAME_ID, phase: 'PROGRAMMING' })
         if (!control.deferHand) socket.emit('cards.dealt', {
           gameId: GAME_ID, playerId: PLAYER_ID, cards: fixture.cards,
         })
@@ -219,7 +216,7 @@ io.on('connection', (socket) => {
     } else if (fixture.deferred) {
       fixture.pending.push({ socket, acknowledge })
     } else {
-      acknowledgeProgram(fixture, acknowledge, fixture.outcome)
+      acknowledgeProgram(fixture, socket, acknowledge, fixture.outcome)
     }
   })
 

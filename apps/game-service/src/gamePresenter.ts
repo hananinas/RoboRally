@@ -4,7 +4,6 @@ import type {
   GamePhase as GamePhasePayload,
   Instruction,
   Orientation,
-  PhaseChanged,
   PublicGameState,
   RobotActionResolved,
   Tile as TilePayload,
@@ -94,10 +93,6 @@ export function presentPublicGameState(
     })),
     phase: phases[game.phase],
   }
-}
-
-export function presentPhaseChanged(gameId: GameId, game: Game): PhaseChanged {
-  return { gameId, phase: phases[game.phase] }
 }
 
 export function presentCardsDealt(

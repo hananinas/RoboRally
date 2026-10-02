@@ -18,7 +18,6 @@ import {
 } from './game/index.js'
 import {
   presentCardsDealt,
-  presentPhaseChanged,
   presentPublicGameState,
   presentRobotActionResolved,
 } from './gamePresenter.js'
@@ -75,17 +74,22 @@ export function createGameSocketServer(
   const io = new Server<ClientToServerEvents, ServerToClientEvents, {}, GameSocketData>(httpServer)
   const users = createUserRegistry()
   const { gameId, game, playerForConnection } = session
-  let publishedPhase = game.phase
   let scheduledAction: NodeJS.Immediate | undefined
   let closed = false
 
-  // Submission and future membership handlers share this progression path.
-  function advanceGame(): void {
-    if (closed) return
-    if (publishedPhase !== game.phase) {
-      publishedPhase = game.phase
-      io.to(publicRoom(gameId)).emit('game.phaseChanged', presentPhaseChanged(gameId, game))
-      if (game.phase === 'programming') {
+  function scheduleNextAction(): void {
+    if (closed || game.phase !== 'activation' || scheduledAction) return
+    scheduledAction = setImmediate(() => {
+      scheduledAction = undefined
+      if (closed) return
+      const result = game.executeNextAction()
+      io.to(publicRoom(gameId)).emit(
+        'robot.actionResolved',
+        presentRobotActionResolved(gameId, result),
+      )
+      if (game.phase === 'activation') {
+        scheduleNextAction()
+      } else {
         for (const player of game.players) {
           io.to(playerRoom(gameId, player.id)).emit(
             'cards.dealt',
@@ -93,19 +97,6 @@ export function createGameSocketServer(
           )
         }
       }
-    }
-    if (game.phase !== 'activation' || scheduledAction) return
-    scheduledAction = setImmediate(() => {
-      scheduledAction = undefined
-      if (closed) return
-      if (game.phase === 'activation') {
-        const result = game.executeNextAction()
-        io.to(publicRoom(gameId)).emit(
-          'robot.actionResolved',
-          presentRobotActionResolved(gameId, result),
-        )
-      }
-      advanceGame()
     })
   }
 
@@ -193,12 +184,12 @@ export function createGameSocketServer(
       }
 
       acknowledge({ outcome: 'ACCEPTED' })
-      io.to(publicRoom(gameId)).emit('program.submitted', {
+      socket.to(publicRoom(gameId)).emit('program.submitted', {
         gameId,
         playerId: player.id,
       })
 
-      advanceGame()
+      scheduleNextAction()
     })
 
     socket.emit('cards.dealt', presentCardsDealt(gameId, player))

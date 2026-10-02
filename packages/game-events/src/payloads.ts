@@ -66,11 +66,6 @@ export type GamePhase = 'PROGRAMMING' | 'EXECUTING'
 
 export type Antenna = Readonly<Coordinate & { angle: number }>
 
-export type PhaseChanged = Readonly<{
-  gameId: GameId
-  phase: GamePhase
-}>
-
 export type PublicGameState = Readonly<{
   gameId: GameId
   antenna: Antenna

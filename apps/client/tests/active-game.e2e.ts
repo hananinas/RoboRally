@@ -6,7 +6,7 @@ import { GAME_ID, OTHER_PLAYER_ID, OTHER_ROBOT_ID, PLAYER_ID, ROBOT_ID, ROUND_AC
 async function openGame(page: Page, width = 1280, height = 720, waitForHand = true) {
   await page.setViewportSize({ width, height })
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Player 1', exact: true })).toBeVisible()
+  await expect(page.getByRole('complementary', { name: 'Game controls' })).toBeVisible()
   if (waitForHand) await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button')).toHaveCount(9)
 }
 
@@ -36,6 +36,23 @@ test('waits for the initial snapshot when the hand arrives first', async ({ page
   await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
   await expect(page.locator(`[data-robot-id="${ROBOT_ID}"]`).first()).toHaveAttribute('data-board-tile', '5,5')
   await expect(cards.first()).toBeEnabled()
+})
+
+test('labels the HUD from the assigned player rather than the first robot', async ({ page, game }) => {
+  await game.control({ type: 'state-requests', deferred: true })
+  await openGame(page, 1280, 720, false)
+  await expect.poll(async () => (await game.snapshot()).pendingStateRequests).toBe(1)
+
+  await game.control({
+    type: 'hand',
+    hand: { gameId: GAME_ID, playerId: OTHER_PLAYER_ID, cards: game.initial.cards },
+  })
+  await game.control({ type: 'respond-state' })
+
+  const controls = page.getByRole('complementary', { name: 'Game controls' })
+  await expect(controls.getByRole('heading', { name: 'Player 2', exact: true })).toBeVisible()
+  await expect(controls.getByRole('heading', { name: 'Player 1', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button').first()).toBeEnabled()
 })
 
 test('retains reload guidance when disconnected during initial loading', async ({ page, game }) => {
@@ -82,7 +99,7 @@ test('collapses player details from the keyboard', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Health' })).toBeVisible()
 })
 
-test('programs, removes, and confirms cards', async ({ page }) => {
+test('programs, removes, and confirms cards without resetting on a duplicate hand', async ({ page, game }) => {
   await openGame(page)
 
   const controls = page.getByRole('complementary', { name: 'Game controls' })
@@ -98,6 +115,9 @@ test('programs, removes, and confirms cards', async ({ page }) => {
   const registerCards = controls.getByRole('button', {
     name: /remove from register/,
   })
+  await expect(registerCards).toHaveCount(5)
+  await expect(done).toBeEnabled()
+  await game.control({ type: 'deal' })
   await expect(registerCards).toHaveCount(5)
   await expect(done).toBeEnabled()
 
@@ -420,6 +440,7 @@ test('plays both robots in every register before accepting the next hand', async
   const hand = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
   const otherRobot = page.locator(`[data-robot-id="${OTHER_ROBOT_ID}"]`).first()
   await expect(otherRobot).toHaveAttribute('data-board-tile', '7,5')
+  await game.control({ type: 'deal' })
   for (const action of actions) {
     await expect(page.locator(`[data-robot-id="${action.robotId}"]`).first()).toHaveAttribute(
       'data-board-tile', `${action.position.coordinate.x},${action.position.coordinate.y}`,
@@ -449,7 +470,7 @@ test('waits for its next hand after playback and ignores foreign hands', async (
     )
     await page.clock.runFor(action.instruction === 'TURN_LEFT' ? 300 : 600)
   }
-  await expect(page.getByRole('status')).toHaveText('Waiting for cards…')
+  await expect(page.getByRole('status')).toHaveText('Executing')
   const hand = { gameId: GAME_ID, playerId: PLAYER_ID, cards: nextRound.cards }
   await game.control({ type: 'hand', hand: { ...hand, playerId: OTHER_PLAYER_ID } })
   await game.control({ type: 'hand', hand: { ...hand, gameId: 'another-game' } })
@@ -498,9 +519,11 @@ test('does not resend a program after its acknowledgement times out', async ({ p
     cardIds: game.initial.cards.slice(0, 5).map((card) => card.id),
   }])
 
-  // Socket.IO discards acknowledgements after timeout. Public readiness cannot
-  // replace the local acknowledgement or make an uncertain program resendable.
+  // Socket.IO discards acknowledgements after timeout. A late acceptance cannot
+  // make an uncertain program resendable; the next hand still waits for playback.
   await game.control({ type: 'acknowledge', outcome: 'ACCEPTED' })
+  await expect(page.getByRole('button', { name: 'Awaiting server' })).toBeDisabled()
+  await expect(registered).toHaveCount(5)
   const nextRound = await game.control({ type: 'round', actions: ROUND_ACTIONS })
   const hand = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
   const robot = page.locator(`[data-robot-id="${ROBOT_ID}"]`).first()

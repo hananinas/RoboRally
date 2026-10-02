@@ -64,9 +64,6 @@ export default function useGameConnection() {
     socket.on('cards.dealt', (hand) => {
       if (hand.gameId === gameId) dispatch({ type: 'dealt', hand })
     })
-    socket.on('game.phaseChanged', (phase) => {
-      if (phase.gameId === gameId) dispatch({ type: 'phase', phase })
-    })
     socket.on('robot.actionResolved', (action) => {
       if (action.gameId === gameId) dispatch({ type: 'action', action })
     })
