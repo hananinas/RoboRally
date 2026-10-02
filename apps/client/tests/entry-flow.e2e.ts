@@ -206,7 +206,7 @@ test('keeps the login form and error recovery reachable on short screens', async
   await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
 })
 
-for (const outcome of ['INVALID_REQUEST', 'GAME_NOT_FOUND', 'NO_SPAWN_AVAILABLE', 'USER_ALREADY_IN_GAME', 'ALREADY_IN_GAME', 'INTERNAL_ERROR'] as const) {
+for (const outcome of ['INVALID_REQUEST', 'GAME_NOT_FOUND', 'NO_SPAWN_AVAILABLE', 'USER_ALREADY_IN_GAME', 'GAME_ALREADY_STARTED', 'INTERNAL_ERROR'] as const) {
   test(`retries join rejection ${outcome} without logging in again`, async ({ page, game }) => {
     await game.control({ type: 'join', outcome, deferred: false })
     await submitUsername(page)

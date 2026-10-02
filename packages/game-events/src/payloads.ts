@@ -127,6 +127,6 @@ export type JoinResult =
         | 'GAME_NOT_FOUND'
         | 'NO_SPAWN_AVAILABLE'
         | 'USER_ALREADY_IN_GAME'
-        | 'ALREADY_IN_GAME'
+        | 'GAME_ALREADY_STARTED'
         | 'INTERNAL_ERROR'
     }>

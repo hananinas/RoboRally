@@ -24,7 +24,7 @@ const joinErrors: Record<JoinError, string> = {
   GAME_NOT_FOUND: 'The configured game could not be found.',
   NO_SPAWN_AVAILABLE: 'The game has no available spawn position.',
   USER_ALREADY_IN_GAME: 'This username is already participating from another connection.',
-  ALREADY_IN_GAME: 'This connection has already joined a different game.',
+  GAME_ALREADY_STARTED: 'The game has already started and is no longer accepting new players.',
   INTERNAL_ERROR: 'The Game Service could not join the game. Please try again.',
   CONNECTION_ERROR: 'Connection lost before the game could be joined.',
   GAME_ID_MISSING: 'Set VITE_GAME_ID to the shared game ID and restart the client.',
