@@ -376,7 +376,11 @@
 }
 
 /* Interaction states */
-.program-card:focus-visible,
+.program-card:focus-visible {
+  outline: 3px solid orange;
+  outline-offset: 3px;
+}
+
 .game-menu__trigger:focus-visible,
 .game-menu__option-summary:focus-visible,
 .player-panel__toggle:focus-visible,

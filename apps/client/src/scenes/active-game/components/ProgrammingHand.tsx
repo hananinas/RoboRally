@@ -1,4 +1,4 @@
-import { useState, type PointerEvent, type Ref } from 'react'
+import { useEffect, useRef, useState, type PointerEvent, type Ref } from 'react'
 import type { ProgramCard as Card } from '../gameState.ts'
 import ProgramCard from './ProgramCard.tsx'
 
@@ -47,6 +47,11 @@ function ProgrammingHand({
   onPlaceCard,
 }: ProgrammingHandProps) {
   const [drag, setDrag] = useState<CardDrag | null>(null)
+  const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
+
+  useEffect(() => {
+    cardRefs.current[highlightedIndex]?.focus()
+  }, [highlightedIndex])
 
   // Starts pointer tracking.
   function startDrag(card: Card, event: PointerEvent<HTMLButtonElement>) {
@@ -127,6 +132,7 @@ function ProgrammingHand({
         return (
           <ProgramCard
             key={card.id}
+            ref={(node) => { cardRefs.current[index] = node }}
             card={card}
             size="hand"
             selected={selected}
@@ -141,10 +147,7 @@ function ProgrammingHand({
             onPointerCancel={cancelDrag}
             onLostPointerCapture={cancelDrag}
             onMouseEnter={() => onHighlightCard(index)}
-            style={{
-              outline: index === highlightedIndex ? '3px solid orange' : undefined,
-              outlineOffset: '3px',
-            }}
+            onFocus={() => onHighlightCard(index)}
           />
         )
       })}
