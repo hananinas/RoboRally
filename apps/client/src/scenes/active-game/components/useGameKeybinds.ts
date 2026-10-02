@@ -47,7 +47,9 @@ export default function useGameKeybinds(
 
     const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
       if (event.key === '?') {
-        document.querySelector<HTMLElement>('.game-menu__popover')?.togglePopover()
+        const popover = document.querySelector<HTMLElement>('.game-menu__popover')
+        popover?.togglePopover()
+        popover?.querySelector<HTMLElement>('summary')?.focus()
         return
       }
 
