@@ -10,6 +10,7 @@ export const KEYBINDS: readonly { keys: string; description: string }[] = [
   { keys: 'u', description: 'Undo the last register change' },
   { keys: 'Ctrl+R', description: 'Redo the last undone change' },
   { keys: '?', description: 'Toggle this keybinds menu' },
+  { keys: ':w Enter', description: 'Submit the program, after confirming' },
 ]
 
 export default function useGameKeybinds(
@@ -21,10 +22,12 @@ export default function useGameKeybinds(
   onClearRegisters: () => void,
   onUndo: () => void,
   onRedo: () => void,
+  onSubmit: () => void,
 ) : [number, (cardIndex: number) => void, boolean]  {
 
     const [highlightedCardIndex, setHighlightedCardIndex] = useState(0)
     const [pendingDelete, setPendingDelete] = useState(false)
+    const [pendingSubmit, setPendingSubmit] = useState<'none' | 'colon' | 'colon-w'>('none')
 
     function highlightFrom(startIndex: number, direction: number) {
       if (cards.length === 0) return
@@ -58,12 +61,34 @@ export default function useGameKeybinds(
       if (event.ctrlKey && event.key === 'r') {
         event.preventDefault()
         setPendingDelete(false)
+        setPendingSubmit('none')
         onRedo()
         return
       }
 
       // browser shortcuts and text composition alone.
       if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) {
+        return
+      }
+
+      if (pendingSubmit !== 'none') {
+        if (pendingSubmit === 'colon' && event.key === 'w') {
+          setPendingSubmit('colon-w')
+        } else if (pendingSubmit === 'colon-w' && event.key === 'Enter') {
+          setPendingSubmit('none')
+          if (window.confirm('Submit your program?')) {
+            onSubmit()
+          }
+        } else {
+          setPendingSubmit('none')
+        }
+
+        return
+      }
+
+      if (event.key === ':') {
+        setPendingDelete(false)
+        setPendingSubmit('colon')
         return
       }
 

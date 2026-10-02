@@ -82,9 +82,10 @@ export default function BoardHarness() {
     setRegistersPast((past) => [...past, registers])
     setRegisters(next)
   }
+  const handleSubmit = () => setConfirmed(true)
   const [highlightedIndex, highlightCard, pendingDelete] = useGameKeybinds(
     hand, registeredCardIds, confirmed, handlePlaceCard, handleRemove,
-    handleClearRegisters, handleUndo, handleRedo,
+    handleClearRegisters, handleUndo, handleRedo, handleSubmit,
   )
   const overlayClassName = [
     'game-overlay',
@@ -107,7 +108,7 @@ export default function BoardHarness() {
               status="Programming"
               error={null}
               onRemove={handleRemove}
-              onConfirm={() => setConfirmed(true)}
+              onConfirm={handleSubmit}
             />
           </div>
         </aside>

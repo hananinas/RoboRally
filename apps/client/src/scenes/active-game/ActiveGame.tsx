@@ -36,7 +36,7 @@ function ActiveGame() {
   )
   const [highlightedIndex, highlightCard, pendingDelete] = useGameKeybinds(
     state.hand, registeredCardIds, disabled, handlePlaceCard, handleRemove,
-    handleClearRegisters, handleUndo, handleRedo,
+    handleClearRegisters, handleUndo, handleRedo, submit,
   )
   const overlayClassName = [
     'game-overlay',
