@@ -129,6 +129,49 @@ describe('removeCard', () => {
   })
 })
 
+describe('undo, redo, and clear', () => {
+  it('undoes and redoes a placement', () => {
+    const empty = programmingState()
+    const placed = gameStateReducer(empty, { type: 'place', cardId: firstCard.id, registerIndex: 0 })
+
+    expect(placed.registers[0]).toBe(firstCard)
+
+    const undone = gameStateReducer(placed, { type: 'undo' })
+    expect(undone.registers).toEqual(empty.registers)
+
+    const redone = gameStateReducer(undone, { type: 'redo' })
+    expect(redone.registers).toEqual(placed.registers)
+  })
+
+  it('does nothing when there is no history to undo or redo', () => {
+    const state = programmingState()
+
+    expect(gameStateReducer(state, { type: 'undo' })).toBe(state)
+    expect(gameStateReducer(state, { type: 'redo' })).toBe(state)
+  })
+
+  it('clears the redo history once a new action follows an undo', () => {
+    let state = programmingState()
+    state = gameStateReducer(state, { type: 'place', cardId: firstCard.id, registerIndex: 0 })
+    state = gameStateReducer(state, { type: 'undo' })
+    state = gameStateReducer(state, { type: 'place', cardId: secondCard.id, registerIndex: 1 })
+
+    expect(gameStateReducer(state, { type: 'redo' })).toBe(state)
+  })
+
+  it('clears every register at once, and the clear can be undone', () => {
+    let state = programmingState()
+    state = gameStateReducer(state, { type: 'place', cardId: firstCard.id, registerIndex: 0 })
+    state = gameStateReducer(state, { type: 'place', cardId: secondCard.id, registerIndex: 1 })
+    const filled = state
+
+    const cleared = gameStateReducer(state, { type: 'clear' })
+    expect(cleared.registers).toEqual(emptyRegisters)
+    expect(gameStateReducer(cleared, { type: 'undo' }).registers).toEqual(filled.registers)
+    expect(gameStateReducer(cleared, { type: 'clear' })).toBe(cleared)
+  })
+})
+
 describe('client game state', () => {
   it('keeps an early hand locked and initializes robots from the first snapshot', () => {
     let state = gameStateReducer(createClientGameState(), { type: 'connected' })

@@ -50,7 +50,8 @@ function ProgrammingHand({
   const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
 
   useEffect(() => {
-    cardRefs.current[highlightedIndex]?.focus()
+    const card = cardRefs.current[highlightedIndex]
+    if (card && document.activeElement !== card) card.focus()
   }, [highlightedIndex])
 
   // Starts pointer tracking.

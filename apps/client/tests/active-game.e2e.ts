@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import type { Dialog, Page } from '@playwright/test'
 import { expect, test } from './game-fixture.ts'
 import { GAME_ID, ROBOT_ID, ROUND_ACTIONS } from './game-fixture-data.ts'
 
@@ -185,6 +185,74 @@ test('drags a card into a register and ignores outside drops', async ({
   await page.mouse.up()
 
   await expect(registeredCards).toHaveCount(1)
+})
+
+test('navigates the hand with h/l, wrapping around and skipping registered cards', async ({ page }) => {
+  await openGame(page)
+  const handCards = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
+
+  await handCards.nth(1).click()
+  await expect(handCards.nth(1)).toBeDisabled()
+  await page.mouse.move(0, 0)
+
+  await handCards.nth(0).focus()
+  await page.keyboard.press('l')
+  await expect(handCards.nth(2)).toBeFocused()
+
+  await page.keyboard.press('h')
+  await expect(handCards.nth(0)).toBeFocused()
+
+  await page.keyboard.press('h')
+  await expect(handCards.nth(8)).toBeFocused()
+})
+
+test('d then a digit removes one register, and dd clears all of them', async ({ page }) => {
+  await openGame(page)
+  await fillProgram(page)
+  const registerCards = page.getByRole('complementary', { name: 'Game controls' })
+    .getByRole('button', { name: /remove from register/ })
+  await expect(registerCards).toHaveCount(5)
+
+  await page.keyboard.press('d')
+  await page.keyboard.press('1')
+  await expect(registerCards).toHaveCount(4)
+
+  await page.keyboard.press('d')
+  await page.keyboard.press('d')
+  await expect(registerCards).toHaveCount(0)
+
+  await page.keyboard.press('u')
+  await expect(registerCards).toHaveCount(4)
+})
+
+test(':w then Enter submits after confirming, only once the program is complete', async ({ page }) => {
+  await openGame(page)
+  const controls = page.getByRole('complementary', { name: 'Game controls' })
+  const done = controls.getByRole('button', { name: 'Done' })
+
+  await fillProgram(page, [0, 1, 2])
+  await expect(done).toBeDisabled()
+
+  let dialogShown = false
+  const onUnexpectedDialog = (dialog: Dialog) => {
+    dialogShown = true
+    dialog.dismiss()
+  }
+  page.on('dialog', onUnexpectedDialog)
+  await page.keyboard.press(':')
+  await page.keyboard.press('w')
+  await page.keyboard.press('Enter')
+  await expect(done).toBeDisabled()
+  expect(dialogShown).toBe(false)
+  page.off('dialog', onUnexpectedDialog)
+
+  await fillProgram(page, [3, 4])
+  await expect(done).toBeEnabled()
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.keyboard.press(':')
+  await page.keyboard.press('w')
+  await page.keyboard.press('Enter')
+  await expect(controls.getByRole('button', { name: 'Confirmed' })).toBeDisabled()
 })
 
 test('adapts the hand and panel overflow to available space', async ({
