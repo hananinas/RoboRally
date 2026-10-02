@@ -44,12 +44,15 @@ function ProgramCard({
         draggingClassName
       }
     >
-      <img
+      
+      
+          <img
         src={instructionIcons[card.instruction]}
         alt=""
         className="program-card__icon"
         draggable={false}
       />
+
       <span className="program-card__label">
         {instructionLabel(card.instruction)}
       </span>

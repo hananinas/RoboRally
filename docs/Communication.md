@@ -4,25 +4,6 @@ Client requests receive acknowledgement callbacks. Game state changes and gamepl
 
 This document describes the v0.5 communication flow. [AsyncAPI](asyncapi.yaml) defines the exact payloads and rejection codes, with a [rendered reference](asyncapi.html).
 
-## Implementation status
-
-PR #83 implements multiplayer programming and activation with a fixed roster.
-Login is implemented, but #66 and #69 still need to integrate joining,
-membership, disconnect handling, and reconnection with game progression.
-The membership flows below describe the target contract, not completed behavior.
-
-The current entry path requests `game.getPublicGameState` and receives the
-initial hand through `cards.dealt`. Private hands can arrive before the snapshot
-and must be buffered. `Game.recheckProgrammingPhase()` and the service's shared
-`advanceGame()` path are integration hooks. They do not implement membership
-changes on their own. #69 must update eligibility, publish membership changes,
-and recheck progression when programming-time membership changes occur.
-
-Every gameplay update includes `gameId`. Action results also include a
-zero-based `registerIndex`. The contract has no round number. A delayed
-submission using the same card IDs as a later fixed-deck hand cannot be
-distinguished by its payload.
-
 
 ## Login and joining
 The client logs in with a username and receives a user ID.
@@ -117,7 +98,7 @@ A successful submission receives:
 
 The server then emits:
 
-`program.submitted {gameId, playerId}`
+`program.submitted {playerId}`
 
 to the game's public room.
 
@@ -138,11 +119,6 @@ If the client receives no acknowledgement, the outcome is unknown. The client mu
 ### Activation
 
 Once all players have submitted, the service resolves the five registers in order. Within each register, eligible robots act according to antenna priority. Priority is recalculated after each robot action before the next robot acts.
-
-The service broadcasts `game.phaseChanged {gameId, phase: EXECUTING}` after
-the final submission notification and before the first action. Each robot
-produces one action result per register, including blocked moves. The server
-does not wait for animation acknowledgements.
 
 Each resolved action is emitted publicly as:
 
@@ -167,13 +143,9 @@ Exact priority ties are resolved using player join order. The priority algorithm
 
 After all five registers have been resolved, the service deals each player a private hand for the next programming round.
 
-The final action is followed by `game.phaseChanged {gameId, phase: PROGRAMMING}`,
-then the private hands. Clients keep registers visible until playback ends and
-enable programming only after receiving the next hand.
-
 Each player receives:
 
-`cards.dealt {gameId, playerId, cards}`
+`cards.dealt {cards}`
 
 through their private Socket.IO room.
 
@@ -203,9 +175,6 @@ sequenceDiagram
         Server-->>B: Acknowledgement: ACCEPTED
         Server->>Public: program.submitted {playerId: B}
         Public-->>A: program.submitted
-        Server->>Public: game.phaseChanged {gameId, phase: EXECUTING}
-        Public-->>A: game.phaseChanged
-        Public-->>B: game.phaseChanged
         loop Registers 1 through 5
             loop Eligible robots in antenna order
                 Note over Server: Execute next instruction
@@ -215,9 +184,6 @@ sequenceDiagram
             end
         end
 
-        Server->>Public: game.phaseChanged {gameId, phase: PROGRAMMING}
-        Public-->>A: game.phaseChanged
-        Public-->>B: game.phaseChanged
         Server->>PrivateA: cards.dealt {cards}
         PrivateA-->>A: cards.dealt {cards}
         Server->>PrivateB: cards.dealt {cards}
@@ -337,3 +303,4 @@ sequenceDiagram
 
 ### Resuming the game
 The game remains paused while any remaining player is disconnected. Once all remaining players are connected, the server announces that the game has resumed before continuing gameplay from the preserved game state.
+

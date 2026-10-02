@@ -34,10 +34,7 @@ describe('game Socket.IO connection', () => {
   beforeEach(async () => {
     singlePlayerGame = createSinglePlayerGame()
     httpServer = createServer()
-    io = createGameSocketServer(httpServer, {
-      ...singlePlayerGame,
-      playerForConnection: () => singlePlayerGame.player,
-    })
+    io = createGameSocketServer(httpServer, singlePlayerGame)
     await new Promise<void>((resolve) => httpServer.listen(0, '127.0.0.1', resolve))
     const { port } = httpServer.address() as AddressInfo
     serviceUrl = `http://127.0.0.1:${port}`
@@ -130,15 +127,21 @@ describe('game Socket.IO connection', () => {
     })
   }
 
-  it('deals the assigned player hand on connection', async () => {
+  it('joins the game rooms and deals the player hand on connection', async () => {
     const dealt = new Promise<Parameters<ServerToClientEvents['cards.dealt']>[0]>(
       (resolve) => client.once('cards.dealt', resolve),
     )
 
     await connect()
 
-    expect(await dealt).toEqual(
-      presentCardsDealt(singlePlayerGame.gameId, singlePlayerGame.player),
+    expect(await dealt).toEqual(presentCardsDealt(singlePlayerGame.player))
+    const serverSocket = [...io.sockets.sockets.values()][0]
+    expect(serverSocket.rooms).toEqual(
+      new Set([
+        serverSocket.id,
+        `game:${singlePlayerGame.gameId}:public`,
+        `game:${singlePlayerGame.gameId}:player:${singlePlayerGame.player.id}`,
+      ]),
     )
   })
 
@@ -257,7 +260,6 @@ describe('game Socket.IO connection', () => {
     untypedClient.emit('game.getPublicGameState', null)
     untypedClient.emit('program.submit', {
       gameId: singlePlayerGame.gameId,
-      playerId: singlePlayerGame.player.id,
       cardIds,
     })
 
@@ -284,6 +286,7 @@ describe('game Socket.IO connection', () => {
     await connect(observer)
 
     const selectedCards = singlePlayerGame.player.hand.slice(0, 5)
+    const submitToGame = vi.spyOn(singlePlayerGame.game, 'submitProgram')
     const actions = collectResolvedActions()
     const nextHand = new Promise<
       Parameters<ServerToClientEvents['cards.dealt']>[0]
@@ -291,16 +294,16 @@ describe('game Socket.IO connection', () => {
 
     const result = await submitProgram({
       gameId: singlePlayerGame.gameId,
-      playerId: singlePlayerGame.player.id,
       cardIds: selectedCards.map((card) => card.id),
     })
 
     expect(result).toEqual({ outcome: 'ACCEPTED' })
-    expect(await submitted).toEqual({
-      gameId: singlePlayerGame.gameId,
-      playerId: singlePlayerGame.player.id,
-    })
-    expect(submittedToPlayer).toHaveBeenCalledExactlyOnceWith(await submitted)
+    expect(submitToGame).toHaveBeenCalledExactlyOnceWith(
+      singlePlayerGame.player.id,
+      selectedCards,
+    )
+    expect(await submitted).toEqual({ playerId: singlePlayerGame.player.id })
+    expect(submittedToPlayer).not.toHaveBeenCalled()
     const resolvedActions = await actions
     expect(resolvedActions.map((action) => action.instruction)).toEqual([
       'MOVE_1',
@@ -309,9 +312,7 @@ describe('game Socket.IO connection', () => {
       'BACK_UP',
       'TURN_LEFT',
     ])
-    expect(await nextHand).toEqual(
-      presentCardsDealt(singlePlayerGame.gameId, singlePlayerGame.player),
-    )
+    expect(await nextHand).toEqual(presentCardsDealt(singlePlayerGame.player))
     expect(singlePlayerGame.game.phase).toBe('programming')
     expect(singlePlayerGame.game.currentRegister).toBe(0)
     expect(singlePlayerGame.player.robot.program).toEqual([])
@@ -335,31 +336,25 @@ describe('game Socket.IO connection', () => {
     const cardIds = singlePlayerGame.player.hand
       .slice(0, 5)
       .map((card) => card.id)
-    const valid = {
-      gameId: singlePlayerGame.gameId,
-      playerId: singlePlayerGame.player.id,
-      cardIds,
-    }
     const invalidPayloads: readonly unknown[] = [
       {},
-      { ...valid, cardIds: cardIds.slice(0, 4) },
+      { gameId: singlePlayerGame.gameId, cardIds: cardIds.slice(0, 4) },
       {
-        ...valid,
+        gameId: singlePlayerGame.gameId,
         cardIds: [cardIds[0], cardIds[0], ...cardIds.slice(2)],
       },
       {
-        ...valid,
+        gameId: singlePlayerGame.gameId,
         cardIds: [
           ...cardIds.slice(0, 4),
           '00000000-0000-4000-8000-000000000999',
         ],
       },
       {
-        ...valid,
         gameId: '00000000-0000-4000-8000-000000000999',
+        cardIds,
       },
-      { ...valid, playerId: '00000000-0000-4000-8000-000000000999' },
-      { ...valid, roundNumber: 2 },
+      { gameId: singlePlayerGame.gameId, cardIds, playerId: 'unexpected' },
     ]
 
     for (const payload of invalidPayloads) {

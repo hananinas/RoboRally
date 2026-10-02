@@ -24,7 +24,6 @@ describe('game event payload types', () => {
   it('distinguishes a public game state from an unknown game', () => {
     const state = {
       gameId: 'game',
-      antenna: { x: 0, y: 0, angle: 0 },
       board: { width: 1, height: 1, tiles: [] },
       robots: [],
       phase: 'PROGRAMMING',

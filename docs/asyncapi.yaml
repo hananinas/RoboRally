@@ -82,8 +82,6 @@ channels:
         $ref: '#/components/messages/ProgramSubmitted'
       robotActionResolved:
         $ref: '#/components/messages/RobotActionResolved'
-      phaseChanged:
-        $ref: '#/components/messages/PhaseChanged'
       playerJoined:
         $ref: '#/components/messages/PlayerJoined'
       playerConnectionChanged:
@@ -365,7 +363,7 @@ components:
       description: >-
         ACCEPTED confirms the program was stored. INVALID_PROGRAM rejects the
         submission without changing game state. INTERNAL_ERROR means the service
-        failed before accepting it. GAME_PAUSED rejects a submission because the game is paused.
+        failed before accepting it. GAME_PAUSED rejects a submission because the game is paused. 
         No acknowledgement means the outcome is unknown.
 
     ProgramSubmitted:
@@ -387,23 +385,6 @@ components:
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
             playerId: 00000000-0000-4000-8000-000000000002
-
-    PhaseChanged:
-      name: game.phaseChanged
-      description: |
-        Broadcast once per transition. EXECUTING follows the final submission
-        notification and precedes all actions. PROGRAMMING follows the last
-        action and precedes private cards.dealt events. Clients finish queued
-        playback and wait for the next hand before enabling programming.
-      payload:
-        type: object
-        additionalProperties: false
-        required: [gameId, phase]
-        properties:
-          gameId:
-            $ref: '#/components/schemas/GameId'
-          phase:
-            $ref: '#/components/schemas/GamePhase'
 
     RobotActionResolved:
       name: robot.actionResolved
@@ -492,7 +473,7 @@ components:
       name: game.playerConnectionChanged
       description: >-
         Announces an existing player's connection status and the resulting
-        game pause state.
+        game pause state. 
       payload:
         $ref: '#/components/schemas/PlayerConnectionChanged'
       examples:
@@ -650,7 +631,7 @@ components:
         LOGIN_REQUIRED: no approved user. INVALID_REQUEST: malformed request.
         GAME_NOT_FOUND: unavailable game. NO_SPAWN_AVAILABLE: no valid spawn.
         GAME_ALREADY_STARTED: The game has already accepted its first program.
-        USER_ALREADY_IN_GAME: another connection currently owns this user's membership.
+        USER_ALREADY_IN_GAME: another connection currently owns this user's membership. 
 
     PlayerState:
       type: object

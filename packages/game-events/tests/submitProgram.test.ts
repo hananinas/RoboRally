@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { parseSubmitProgram } from '../src/index.js'
 
 const gameId = '00000000-0000-4000-8000-000000000000'
-const playerId = '00000000-0000-4000-8000-000000000099'
 const cardIds = [
   '00000000-0000-4000-8000-000000000001',
   '00000000-0000-4000-8000-000000000002',
@@ -11,7 +10,7 @@ const cardIds = [
   '00000000-0000-4000-8000-000000000005',
 ] as const
 
-const validPayload = { gameId, playerId, cardIds }
+const validPayload = { gameId, cardIds }
 
 describe('parseSubmitProgram', () => {
   it('accepts five distinct card IDs in register order', () => {
@@ -23,19 +22,16 @@ describe('parseSubmitProgram', () => {
     ['an array', []],
     ['a primitive', 'program'],
     ['an empty object', {}],
-    ['a missing game ID', { ...validPayload, gameId: undefined }],
-    ['a missing player ID', { ...validPayload, playerId: undefined }],
-    ['a legacy round number', { ...validPayload, roundNumber: 1 }],
-    ['a missing card list', { ...validPayload, cardIds: undefined }],
-    ['an invalid game ID', { ...validPayload, gameId: 'game-1' }],
-    ['an invalid player ID', { ...validPayload, playerId: 'player-1' }],
-    ['a non-array card list', { ...validPayload, cardIds: 'card-ids' }],
-    ['four cards', { ...validPayload, cardIds: cardIds.slice(0, 4) }],
-    ['six cards', { ...validPayload, cardIds: [...cardIds, cardIds[0]] }],
+    ['a missing game ID', { cardIds }],
+    ['a missing card list', { gameId }],
+    ['an invalid game ID', { gameId: 'game-1', cardIds }],
+    ['a non-array card list', { gameId, cardIds: 'card-ids' }],
+    ['four cards', { gameId, cardIds: cardIds.slice(0, 4) }],
+    ['six cards', { gameId, cardIds: [...cardIds, cardIds[0]] }],
     [
       'duplicate cards',
       {
-        ...validPayload,
+        gameId,
         cardIds: [
           cardIds[0],
           cardIds[1],
@@ -48,7 +44,7 @@ describe('parseSubmitProgram', () => {
     [
       'an invalid card ID',
       {
-        ...validPayload,
+        gameId,
         cardIds: [
           cardIds[0],
           cardIds[1],
@@ -58,7 +54,7 @@ describe('parseSubmitProgram', () => {
         ],
       },
     ],
-    ['an extra property', { ...validPayload, extra: true }],
+    ['an extra property', { ...validPayload, playerId: 'player-1' }],
   ])('rejects %s', (_description, payload) => {
     expect(() => parseSubmitProgram(payload)).toThrow()
   })

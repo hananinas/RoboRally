@@ -49,7 +49,7 @@ export default function useGameConnection() {
             dispatch({ type: 'error', message: 'Could not load game state. Reload to try again.' })
           } else if (result.outcome === 'GAME_NOT_FOUND') {
             dispatch({ type: 'error', message: 'Game not found. Check VITE_GAME_ID and restart the client.' })
-          } else if (result.state.gameId === gameId) {
+          } else {
             dispatch({ type: 'initial-state', state: result.state })
           }
         },
@@ -61,15 +61,11 @@ export default function useGameConnection() {
     socket.on('disconnect', () => {
       dispatch({ type: 'disconnected' })
     })
-    socket.on('cards.dealt', (hand) => {
-      if (hand.gameId === gameId) dispatch({ type: 'dealt', hand })
+    socket.on('cards.dealt', ({ cards }) => {
+      dispatch({ type: 'dealt', cards })
     })
-    socket.on('game.phaseChanged', (phase) => {
-      if (phase.gameId === gameId) dispatch({ type: 'phase', phase })
-    })
-    socket.on('robot.actionResolved', (action) => {
-      if (action.gameId === gameId) dispatch({ type: 'action', action })
-    })
+    socket.on('program.submitted', ({ playerId }) => dispatch({ type: 'submitted', playerId }))
+    socket.on('robot.actionResolved', (action) => dispatch({ type: 'action', action }))
     socket.connect()
 
     return () => {
