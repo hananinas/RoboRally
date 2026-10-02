@@ -12,6 +12,7 @@ type RegisterPanelProps = {
   registers: Registers
   disabled: boolean
   pendingDelete: boolean
+  awaitingSubmitConfirm: boolean
   submission: ClientGameState['submission']
   status: string
   error: string | null
@@ -70,6 +71,7 @@ function RegisterPanel({
   registers,
   disabled,
   pendingDelete,
+  awaitingSubmitConfirm,
   submission,
   status,
   error,
@@ -96,7 +98,10 @@ function RegisterPanel({
         ))}
       </ol>
       <button
-        className="register-panel__done"
+        className={
+          'register-panel__done' +
+          (awaitingSubmitConfirm ? ' register-panel__done--awaiting-confirm' : '')
+        }
         type="button"
         disabled={!registersAreFilled(registers) || disabled}
         onClick={onConfirm}

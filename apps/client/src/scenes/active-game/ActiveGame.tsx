@@ -4,7 +4,7 @@ import PlayerPanel from './components/PlayerPanel.tsx'
 import ProgrammingHand from './components/ProgrammingHand.tsx'
 import RegisterPanel from './components/RegisterPanel.tsx'
 import useGameKeybinds from './components/useGameKeybinds.ts'
-import { canProgram, type ProgramCard } from './gameState.ts'
+import { canProgram, registersAreFilled, type ProgramCard } from './gameState.ts'
 import useGameConnection from './useGameConnection.ts'
 import useOverlayLayout from './useOverlayLayout.ts'
 
@@ -34,9 +34,9 @@ function ActiveGame() {
   const registeredCardIds = new Set(
     state.registers.flatMap((card) => (card ? [card.id] : [])),
   )
-  const [highlightedIndex, highlightCard, pendingDelete] = useGameKeybinds(
+  const [highlightedIndex, highlightCard, pendingDelete, awaitingSubmitConfirm] = useGameKeybinds(
     state.hand, registeredCardIds, disabled, handlePlaceCard, handleRemove,
-    handleClearRegisters, handleUndo, handleRedo, submit,
+    handleClearRegisters, handleUndo, handleRedo, submit, registersAreFilled(state.registers),
   )
   const overlayClassName = [
     'game-overlay',
@@ -58,6 +58,7 @@ function ActiveGame() {
               status={status}
               error={state.error}
               pendingDelete={pendingDelete}
+              awaitingSubmitConfirm={awaitingSubmitConfirm}
               onRemove={handleRemove}
               onConfirm={submit}
             />

@@ -286,6 +286,11 @@
   opacity: 0.45;
 }
 
+.register-panel__done--awaiting-confirm {
+  outline: 3px solid green;
+  outline-offset: 3px;
+}
+
 /* Hand and cards */
 .programming-hand {
   grid-column: 1;

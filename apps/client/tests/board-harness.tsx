@@ -14,6 +14,7 @@ import {
 } from '../src/scenes/active-game/board/robotPlayback.ts'
 import {
   placeCard,
+  registersAreFilled,
   removeCard,
   type ProgramCard,
   type Registers,
@@ -83,9 +84,9 @@ export default function BoardHarness() {
     setRegisters(next)
   }
   const handleSubmit = () => setConfirmed(true)
-  const [highlightedIndex, highlightCard, pendingDelete] = useGameKeybinds(
+  const [highlightedIndex, highlightCard, pendingDelete, awaitingSubmitConfirm] = useGameKeybinds(
     hand, registeredCardIds, confirmed, handlePlaceCard, handleRemove,
-    handleClearRegisters, handleUndo, handleRedo, handleSubmit,
+    handleClearRegisters, handleUndo, handleRedo, handleSubmit, registersAreFilled(registers),
   )
   const overlayClassName = [
     'game-overlay',
@@ -104,6 +105,7 @@ export default function BoardHarness() {
               registers={registers}
               disabled={confirmed}
               pendingDelete={pendingDelete}
+              awaitingSubmitConfirm={awaitingSubmitConfirm}
               submission={confirmed ? 'accepted' : 'idle'}
               status="Programming"
               error={null}

@@ -23,7 +23,8 @@ export default function useGameKeybinds(
   onUndo: () => void,
   onRedo: () => void,
   onSubmit: () => void,
-) : [number, (cardIndex: number) => void, boolean]  {
+  canSubmit: boolean,
+) : [number, (cardIndex: number) => void, boolean, boolean]  {
 
     const [highlightedCardIndex, setHighlightedCardIndex] = useState(0)
     const [pendingDelete, setPendingDelete] = useState(false)
@@ -76,7 +77,7 @@ export default function useGameKeybinds(
           setPendingSubmit('colon-w')
         } else if (pendingSubmit === 'colon-w' && event.key === 'Enter') {
           setPendingSubmit('none')
-          if (window.confirm('Submit your program?')) {
+          if (canSubmit && window.confirm('Submit your program?')) {
             onSubmit()
           }
         } else {
@@ -152,5 +153,5 @@ export default function useGameKeybinds(
       }
     }, [])
 
-    return [highlightedCardIndex, highlightCard, pendingDelete]
+    return [highlightedCardIndex, highlightCard, pendingDelete, canSubmit && pendingSubmit === 'colon-w']
 }
