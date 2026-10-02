@@ -1,9 +1,9 @@
 import type { FormEvent } from 'react'
-import './Lobby.css'
+import './Login.css'
 import { isValidUsername } from './username.ts'
 import type { SocketStatus } from '../../useGameSocket.ts'
 
-type LobbyProps = {
+type LoginProps = {
   connectionStatus: SocketStatus
   error: string | null
   onSubmitUsername: (username: string) => void
@@ -16,30 +16,7 @@ type LobbyProps = {
   username: string
 }
 
-function BotIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="lobby-bot-icon"
-      viewBox="0 0 24 30"
-      width="34"
-      height="42.5"
-    >
-      <rect x="7" y="9" width="10" height="15" rx="3" fill="#c94b3f" />
-      <rect x="10.5" y="2" width="3" height="8" rx="1.4" fill="#c94b3f" />
-    </svg>
-  )
-}
-
-function BoardBackground() {
-  return (
-    <div className="lobby-board-background" aria-hidden="true">
-      {Array.from({ length: 63 }, (_, index) => <div key={index} />)}
-    </div>
-  )
-}
-
-export default function Lobby({
+export default function Login({
   connectionStatus,
   error,
   onSubmitUsername,
@@ -50,7 +27,7 @@ export default function Lobby({
   requiresReconnect,
   usernameLocked,
   username,
-}: LobbyProps) {
+}: LoginProps) {
   const usernameLength = Array.from(username).length
   const usernameIsValid = isValidUsername(username)
   const connecting = connectionStatus === 'connecting'
@@ -62,19 +39,15 @@ export default function Lobby({
   }
 
   return (
-    <main className="lobby">
-      <BoardBackground />
-      <section className="lobby-panel" aria-labelledby="login-heading">
-        <div className="lobby-brand">
-          <BotIcon />
-          <h1 id="login-heading">Robo<span>Rally</span></h1>
-        </div>
-        <p className="lobby-tagline">
-          Enter a username to join the shared game.
-        </p>
+    <main className="login">
+      <div className="login-board-background" aria-hidden="true">
+        {Array.from({ length: 63 }, (_, index) => <div key={index} />)}
+      </div>
+      <section className="login-panel" aria-labelledby="login-heading">
+        <h1 id="login-heading">RoboRally</h1>
 
         <form onSubmit={handleSubmit}>
-          <label className="lobby-field">
+          <label className="login-field">
             <span>Username</span>
             <input
               aria-describedby="username-help"
@@ -88,8 +61,17 @@ export default function Lobby({
               value={username}
             />
           </label>
+          <label className="login-field">
+            <span>Password</span>
+            <input
+              autoComplete="current-password"
+              disabled={usernameLocked}
+              name="password"
+              type="password"
+            />
+          </label>
           <p
-            className={`lobby-validation${usernameLength > 30 || error ? ' lobby-validation--error' : ''}`}
+            className={`login-validation${usernameLength > 30 || error ? ' login-validation--error' : ''}`}
             id="username-help"
             role={error ? 'alert' : undefined}
           >
@@ -98,7 +80,7 @@ export default function Lobby({
               : 'Use 1–30 characters.')}
           </p>
           <button
-            className="lobby-primary-button"
+            className="login-primary-button"
             disabled={!usernameIsValid || pending || connecting}
             type="submit"
           >
@@ -106,7 +88,7 @@ export default function Lobby({
               : connecting ? 'Connecting…'
                 : requiresReconnect ? 'Retry connection'
                 : retryingJoin && connectionStatus === 'connected' ? 'Retry joining'
-                : connectionStatus === 'connected' ? 'Continue' : 'Retry connection'}
+                : connectionStatus === 'connected' ? 'Log in' : 'Retry connection'}
           </button>
         </form>
       </section>

@@ -1,7 +1,7 @@
 import ActiveGame from './scenes/active-game/ActiveGame.tsx'
 import useGameConnection from './scenes/active-game/useGameConnection.ts'
 import { useEffect, useReducer, useRef } from 'react'
-import Lobby from './scenes/lobby/Lobby.tsx'
+import Login from './scenes/login/Login.tsx'
 import {
   createSessionState,
   sessionReducer,
@@ -140,7 +140,7 @@ function App() {
   }
 
   return (
-    <Lobby
+    <Login
       connectionStatus={connection.status}
       error={sessionError ?? connection.error}
       onSubmitUsername={submitUsername}

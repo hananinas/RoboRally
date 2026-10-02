@@ -1,4 +1,4 @@
-.lobby {
+.login {
   position: relative;
   isolation: isolate;
   display: flex;
@@ -12,7 +12,7 @@
   font-family: system-ui, sans-serif;
 }
 
-.lobby-board-background {
+.login-board-background {
   position: fixed;
   pointer-events: none;
   inset: 0;
@@ -24,12 +24,12 @@
   padding: 10px;
 }
 
-.lobby-board-background div {
+.login-board-background div {
   border-radius: 10px;
   background: #3a424c;
 }
 
-.lobby-panel {
+.login-panel {
   margin-block: auto;
   width: min(100% - 48px, 420px);
   padding: 32px 28px;
@@ -39,36 +39,17 @@
   box-shadow: 0 20px 60px rgb(0 0 0 / 35%);
 }
 
-.lobby-brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 6px;
-}
-
-.lobby-brand h1 {
-  margin: 0;
+.login-panel h1 {
+  margin: 0 0 24px;
   font-size: 22px;
-  letter-spacing: 0.5px;
 }
 
-.lobby-brand h1 span {
-  color: #e0bb1f;
-}
-
-.lobby-tagline {
-  margin: 0 0 26px;
-  color: #9aa4b0;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.lobby-field {
+.login-field {
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 12px;
 }
 
-.lobby-field span {
+.login-field span {
   display: block;
   margin-bottom: 6px;
   color: #9aa4b0;
@@ -76,7 +57,7 @@
   font-weight: 600;
 }
 
-.lobby-field input {
+.login-field input {
   box-sizing: border-box;
   width: 100%;
   padding: 11px 12px;
@@ -89,22 +70,22 @@
   font-size: 14px;
 }
 
-.lobby-field input:focus-visible {
+.login-field input:focus-visible {
   border-color: #e0bb1f;
 }
 
-.lobby-validation {
+.login-validation {
   min-height: 18px;
   margin: 0 0 8px;
   color: #9aa4b0;
   font-size: 12px;
 }
 
-.lobby-validation--error {
+.login-validation--error {
   color: #e8786e;
 }
 
-.lobby-primary-button {
+.login-primary-button {
   width: 100%;
   margin-top: 6px;
   padding: 12px 0;
@@ -118,7 +99,7 @@
   cursor: pointer;
 }
 
-.lobby-primary-button:disabled {
+.login-primary-button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
