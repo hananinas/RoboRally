@@ -24,7 +24,7 @@ import {
   type GamePhase,
   type NextActionResult,
   type Player,
-} from './game/index.js'
+} from '@/game/index'
 
 const orientations: Record<Direction, Orientation> = {
   [Direction.NORTH]: 'NORTH',

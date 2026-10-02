@@ -15,13 +15,13 @@ import {
   type Card,
   type Game,
   type Player,
-} from './game/index.js'
+} from '@/game/index'
 import {
   presentCardsDealt,
   presentPublicGameState,
   presentRobotActionResolved,
-} from './gamePresenter.js'
-import { createUserRegistry } from './userRegistry.js'
+} from '@/gamePresenter'
+import { createUserRegistry } from '@/userRegistry'
 
 export type GameSocketData = { user?: User }
 

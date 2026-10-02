@@ -9,7 +9,7 @@ import {
   Move3,
   TurnRight,UTurn,BackUp,
   createSinglePlayerGame,
-} from '@/game/index.js'
+} from '@/game/index.ts'
 
 describe('single-player game', () => {
   it('creates the fixed board, player, and robot', () => {

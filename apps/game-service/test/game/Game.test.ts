@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { BackUp, Board, Direction, EmptyTile, Game, Move1, Move2, Move3, Player, Robot, TurnLeft, TurnRight, UTurn } from '@/game/index.js'
-import type { Card } from '@/game/index.js'
+import { BackUp, Board, Direction, EmptyTile, Game, Move1, Move2, Move3, Player, Robot, TurnLeft, TurnRight, UTurn } from '@/game/index.ts'
+import type { Card } from '@/game/index.ts'
 
 function createGame() {
   const board = new Board([[new EmptyTile(), new EmptyTile()]])

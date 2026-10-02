@@ -16,12 +16,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createSinglePlayerGame,
   type SinglePlayerGame,
-} from '@/game/index.js'
-import { createGameSocketServer, type GameSocketServer } from '@/gameServer.js'
+} from '@/game/index.ts'
+import { createGameSocketServer, type GameSocketServer } from '@/gameServer.ts'
 import {
   presentCardsDealt,
   presentPublicGameState,
-} from '@/gamePresenter.js'
+} from '@/gamePresenter.ts'
 
 describe('game Socket.IO connection', () => {
   let httpServer: HttpServer

@@ -3,8 +3,8 @@ import type { AddressInfo } from 'node:net'
 import type { CardsDealt, ClientToServerEvents, ServerToClientEvents, SubmitProgram } from '@robo-rally/game-events'
 import { io as connectSocket, type Socket } from 'socket.io-client'
 import { expect, it } from 'vitest'
-import { Board, Direction, EmptyTile, Game, Player, Robot, TurnLeft } from '@/game/index.js'
-import { createGameSocketServer } from '@/gameServer.js'
+import { Board, Direction, EmptyTile, Game, Player, Robot, TurnLeft } from '@/game/index.ts'
+import { createGameSocketServer } from '@/gameServer.ts'
 
 it('waits for the roster, broadcasts register-major actions, and deals two private next rounds', async () => {
   const gameId = '00000000-0000-4000-8000-000000000001'

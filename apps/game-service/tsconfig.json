@@ -4,8 +4,9 @@
     "lib": ["ES2023"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "allowImportingTsExtensions": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*", "./src/*.ts"]
     },
     "rootDir": ".",
     "outDir": "dist",

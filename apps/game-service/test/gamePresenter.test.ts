@@ -14,12 +14,12 @@ import {
   Robot,
   TurnLeft,
   createSinglePlayerGame,
-} from '@/game/index.js'
+} from '@/game/index.ts'
 import {
   presentCardsDealt,
   presentPublicGameState,
   presentRobotActionResolved,
-} from '@/gamePresenter.js'
+} from '@/gamePresenter.ts'
 
 describe('game presenter', () => {
   it('presents a complete public programming state in row-major order', () => {

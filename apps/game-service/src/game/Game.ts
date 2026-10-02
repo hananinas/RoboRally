@@ -1,4 +1,4 @@
-import type { Board } from './Board.js'
+import type { Board } from '@/game/Board'
 import {
   Move1,
   Move2,
@@ -8,11 +8,11 @@ import {
   UTurn,
   BackUp,
   type Card,
-} from './Card.js'
-import type { PlayerId, RobotId } from './ids.js'
-import type { Player } from './Player.js'
-import type { Robot } from './Robot.js'
-import { opposite, type Direction, type Position } from './spatial.js'
+} from '@/game/Card'
+import type { PlayerId, RobotId } from '@/game/ids'
+import type { Player } from '@/game/Player'
+import type { Robot } from '@/game/Robot'
+import { opposite, type Direction, type Position } from '@/game/spatial'
 
 export type GamePhase = 'programming' | 'activation'
 
