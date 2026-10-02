@@ -4,12 +4,12 @@ import PlayerPanel from './components/PlayerPanel.tsx'
 import ProgrammingHand from './components/ProgrammingHand.tsx'
 import RegisterPanel from './components/RegisterPanel.tsx'
 import { canProgram, type ClientGameState } from './gameState.ts'
-import useGameConnection from './useGameConnection.ts'
+import type useGameConnection from './useGameConnection.ts'
 import useOverlayLayout from './useOverlayLayout.ts'
 
 function getGameStatus(state: ClientGameState): string {
   if (!state.connected) return 'Not connected'
-  if (state.gameId === null) return 'Loading game…'
+  if (state.assignment === null) return 'Loading game…'
   if (state.playback.active || state.phase === 'EXECUTING') return 'Executing'
   if (state.phase === 'PROGRAMMING') {
     if (!state.handReady) return 'Waiting for cards…'
@@ -19,8 +19,11 @@ function getGameStatus(state: ClientGameState): string {
   return 'Waiting'
 }
 
-function ActiveGame() {
-  const { state, dispatch, submit } = useGameConnection()
+function ActiveGame({ game, username }: {
+  game: ReturnType<typeof useGameConnection>
+  username: string
+}) {
+  const { state, dispatch, submit } = game
   const {
     handBelowHud,
     handRef,
@@ -31,7 +34,6 @@ function ActiveGame() {
   const disabled = !canProgram(state)
   const hasHand = state.handVersion > 0
   const status = getGameStatus(state)
-  const playerNumber = state.playerIds.findIndex((id) => id === state.playerId) + 1
   const registeredCardIds = new Set(
     state.registers.flatMap((card) => (card ? [card.id] : [])),
   )
@@ -47,7 +49,7 @@ function ActiveGame() {
       <div ref={overlayRef} className={overlayClassName}>
         <aside className="game-hud" aria-label="Game controls">
           <div ref={hudContentRef} className="game-hud__content">
-            <PlayerPanel player={{ name: playerNumber > 0 ? `Player ${playerNumber}` : 'Player' }} />
+            <PlayerPanel player={{ name: username }} />
             <RegisterPanel
               registers={state.registers}
               disabled={disabled}

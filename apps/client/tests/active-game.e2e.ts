@@ -1,15 +1,6 @@
 import type { Page } from '@playwright/test'
-import { expect, test } from './game-fixture.ts'
+import { expect, openGame, test } from './game-fixture.ts'
 import { GAME_ID, OTHER_PLAYER_ID, OTHER_ROBOT_ID, PLAYER_ID, ROBOT_ID, ROUND_ACTIONS } from './game-fixture-data.ts'
-
-// Opens the game at a stable viewport.
-async function openGame(page: Page, width = 1280, height = 720, waitForHand = true) {
-  await page.setViewportSize({ width, height })
-  await page.goto('/')
-  await expect(page.getByRole('complementary', { name: 'Game controls' })).toBeVisible()
-  if (waitForHand) await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button')).toHaveCount(9)
-}
-
 async function fillProgram(page: Page, indices = [0, 1, 2, 3, 4]) {
   const cards = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
   for (const index of indices) await cards.nth(index).click()
@@ -23,49 +14,6 @@ async function fillProgram(page: Page, indices = [0, 1, 2, 3, 4]) {
 async function pauseClock(page: Page) {
   await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
 }
-
-test('waits for the initial snapshot when the hand arrives first', async ({ page, game }) => {
-  await game.control({ type: 'state-requests', deferred: true })
-  await openGame(page, 1280, 720, false)
-  await expect.poll(async () => (await game.snapshot()).pendingStateRequests).toBe(1)
-  const cards = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
-  await expect(cards).toHaveCount(0)
-  await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
-
-  await game.control({ type: 'respond-state' })
-  await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
-  await expect(page.locator(`[data-robot-id="${ROBOT_ID}"]`).first()).toHaveAttribute('data-board-tile', '5,5')
-  await expect(cards.first()).toBeEnabled()
-})
-
-test('labels the HUD from the assigned player rather than the first robot', async ({ page, game }) => {
-  await game.control({ type: 'state-requests', deferred: true })
-  await openGame(page, 1280, 720, false)
-  await expect.poll(async () => (await game.snapshot()).pendingStateRequests).toBe(1)
-
-  await game.control({
-    type: 'hand',
-    hand: { gameId: GAME_ID, playerId: OTHER_PLAYER_ID, cards: game.initial.cards },
-  })
-  await game.control({ type: 'respond-state' })
-
-  const controls = page.getByRole('complementary', { name: 'Game controls' })
-  await expect(controls.getByRole('heading', { name: 'Player 2', exact: true })).toBeVisible()
-  await expect(controls.getByRole('heading', { name: 'Player 1', exact: true })).toHaveCount(0)
-  await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button').first()).toBeEnabled()
-})
-
-test('retains reload guidance when disconnected during initial loading', async ({ page, game }) => {
-  await game.control({ type: 'state-requests', deferred: true })
-  await openGame(page, 1280, 720, false)
-  await expect.poll(async () => (await game.snapshot()).pendingStateRequests).toBe(1)
-
-  await game.control({ type: 'disconnect' })
-  await expect(page.getByRole('status')).toHaveText('Not connected')
-  await expect(page.getByRole('alert')).toContainText('Connection lost. Reload')
-  await expect(page.getByRole('region', { name: 'Programming hand' })).toHaveCount(0)
-  await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
-})
 
 test('renders the programming interface', async ({ page }) => {
   await openGame(page)
@@ -404,7 +352,7 @@ test('plays every burst result and starts the next program without refreshing st
     { gameId: GAME_ID, playerId: PLAYER_ID, cardIds: game.initial.cards.slice(0, 5).map((card) => card.id) },
     { gameId: GAME_ID, playerId: PLAYER_ID, cardIds: nextRound.cards.slice(0, 5).map((card) => card.id) },
   ])
-  expect((await game.snapshot()).stateRequests).toBe(1)
+  expect((await game.snapshot()).stateRequests).toBe(0)
 })
 
 test('keeps programming editable when another player submits', async ({ page, game }) => {
@@ -482,21 +430,6 @@ test('waits for its next hand after playback and ignores foreign hands', async (
   await expect(page.getByRole('status')).toHaveText('Programming')
 })
 
-test('keeps the initial hand locked when the initial state request times out', async ({ page, game }) => {
-  await game.control({ type: 'state-requests', deferred: true })
-  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
-  await pauseClock(page)
-  await openGame(page, 1280, 720, false)
-  await expect.poll(async () => (await game.snapshot()).pendingStateRequests).toBe(1)
-  await page.clock.runFor(5000)
-
-  await expect(page.getByRole('alert')).toContainText('Could not load game state')
-  await expect(page.getByRole('region', { name: 'Programming hand' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeDisabled()
-  await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
-  expect((await game.snapshot()).submissions).toHaveLength(0)
-})
-
 test('does not resend a program after its acknowledgement times out', async ({ page, game }) => {
   await game.control({ type: 'submission', outcome: 'ACCEPTED', deferred: true })
   await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
@@ -545,23 +478,36 @@ test('does not resend a program after its acknowledgement times out', async ({ p
     { gameId: GAME_ID, playerId: PLAYER_ID, cardIds: game.initial.cards.slice(0, 5).map((card) => card.id) },
     { gameId: GAME_ID, playerId: PLAYER_ID, cardIds: nextRound.cards.slice(0, 5).map((card) => card.id) },
   ])
-  expect((await game.snapshot()).stateRequests).toBe(1)
+  expect((await game.snapshot()).stateRequests).toBe(0)
 })
 
-test('retains reload guidance and the selected program when disconnected during submission', async ({ page, game }) => {
-  await game.control({ type: 'submission', outcome: 'ACCEPTED', deferred: true })
-  await openGame(page)
-  await fillProgram(page)
-  const registered = page.getByRole('button', { name: /remove from register/ })
-  const selection = await registered.allTextContents()
-  await page.getByRole('button', { name: 'Done', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Submitting…', exact: true })).toBeDisabled()
+for (const submitting of [false, true]) {
+  test(`preserves the game and reload guidance when disconnected ${submitting ? 'during submission' : 'while programming'}`, async ({ page, game }) => {
+    await game.control({ type: 'submission', outcome: 'ACCEPTED', deferred: true })
+    await openGame(page)
+    await fillProgram(page)
+    const registered = page.getByRole('button', { name: /remove from register/ })
+    const selection = await registered.allTextContents()
+    const entryRequests = (await game.snapshot()).entryRequests
+    if (submitting) {
+      await page.getByRole('button', { name: 'Done', exact: true }).click()
+      await expect(page.getByRole('button', { name: 'Submitting…', exact: true })).toBeDisabled()
+    }
 
-  await game.control({ type: 'disconnect' })
-  await expect(page.getByRole('status')).toHaveText('Not connected')
-  await expect(registered).toHaveCount(5)
-  expect(await registered.allTextContents()).toEqual(selection)
-  await expect(registered.first()).toBeDisabled()
-  expect((await game.snapshot()).submissions).toHaveLength(1)
-  await expect(page.getByRole('alert')).toContainText('Reload')
-})
+    await game.control({ type: 'disconnect' })
+    await expect(page.getByRole('status')).toHaveText('Not connected')
+    await expect(page.getByRole('alert')).toContainText('Connection lost. Reload to connect again; your program was not resent.')
+    await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
+    await expect(page.getByRole('textbox', { name: 'Username' })).toHaveCount(0)
+    await expect(registered).toHaveCount(5)
+    expect(await registered.allTextContents()).toEqual(selection)
+    for (const card of await registered.all()) await expect(card).toBeDisabled()
+    const hand = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
+    await expect(hand).toHaveCount(9)
+    for (const card of await hand.all()) await expect(card).toBeDisabled()
+    await expect(page.getByRole('button', { name: submitting ? 'Submitting…' : 'Done', exact: true })).toBeDisabled()
+    const snapshot = await game.snapshot()
+    expect(snapshot.submissions).toHaveLength(submitting ? 1 : 0)
+    expect(snapshot.entryRequests).toEqual(entryRequests)
+  })
+}
