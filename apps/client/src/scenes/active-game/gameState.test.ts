@@ -94,11 +94,11 @@ describe('placeCard', () => {
     expect(emptyRegisters).toEqual([null, null, null, null, null])
   })
 
-  it('rejects occupied, duplicate, and invalid placements', () => {
+  it('overwrites an occupied register, and rejects duplicate and invalid placements', () => {
     const occupiedRegisters = placeCard(emptyRegisters, firstCard, 0)
 
-    expect(placeCard(occupiedRegisters, secondCard, 0)).toBe(
-      occupiedRegisters,
+    expect(placeCard(occupiedRegisters, secondCard, 0)).toEqual(
+      [secondCard, null, null, null, null],
     )
     expect(placeCard(occupiedRegisters, firstCard, 1)).toBe(
       occupiedRegisters,
