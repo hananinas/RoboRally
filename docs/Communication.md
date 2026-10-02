@@ -1,25 +1,60 @@
 # Communication
+The Client and Game Service use Socket.IO to communicate with each other. 
+Client requests receive acknowledgement callbacks. Game state changes and gameplay updates are delivered as events.
 
-The browser and Game Service use Socket.IO. Requests receive acknowledgement
-callbacks; game updates arrive as events. This guide describes the v0.5 flow.
-[AsyncAPI](asyncapi.yaml) defines the exact payloads and rejection codes, with a
-[rendered reference](asyncapi.html).
+This document describes the v0.5 communication flow. [AsyncAPI](asyncapi.yaml) defines the exact payloads and rejection codes, with a [rendered reference](asyncapi.html).
+
 
 ## Login and joining
+The client logs in with a username and receives a user ID.
 
-The client logs in with a username and receives a user ID. Login creates no
-player, robot, or game membership.
+The client first logs in with a username:
 
-The client then sends `game.join` on the same socket for the configured game.
-`JOINED` returns the player/robot assignment, public state, private hand, and
-submission status together. The client applies them before live game events. A
-future lobby can fit between login and joining.
+`user.login`
 
-Multiple connections may log in as the same user, but only one may join a given
-game. Another connection receives `USER_ALREADY_IN_GAME`. A failed join leaves the
-user logged in and may be retried. Only the connection that joined may read that
-game's snapshot through `game.getPublicGameState`; nonmembers receive
-`GAME_NOT_FOUND` without state.
+A successful login returns:
+
+`LOGGED_IN {user}`
+
+The client then sends:
+
+`game.join {gameId}`
+
+on the same socket for the configured game.
+
+A successful join returns:
+
+`JOINED {assignment, state, hand, programSubmitted}`
+
+The acknowledgement contains the player's current robot assignment, public game state, private hand, and program-submission status. The client must apply all JOINED data before processing later live game events. A future lobby may be inserted between login and joining without changing this model.
+
+### Membership
+
+New players may join a game until the server accepts the first program submission. Accepting that submission starts the game and permanently closes joining to new players. Later attempts by new players receive GAME_ALREADY_STARTED. 
+
+In case of disconnection, existing members may reconnect at any time. If the tab is left open SocketIO will automatically try to reestablish the connection. In case of a closed tab, the player can reopen the webpage in another tab to reconnect. In case multiple tabs are used, the first connection to reclaim a disconnected membership becomes its owner. A later connection cannot replace that owner, even if its Socket.IO session was successfully recovered. 
+
+When an existing member sends game.join while not being connected, the server attaches the new connection to the existing player and robot and returns their current assignment and state through JOINED.
+
+If another connection attempts to join the same game for that user, it receives:
+
+`USER_ALREADY_IN_GAME`
+
+A failed join leaves the user logged in and the client may attempt another join later.
+
+Only the connection associated with the membership may read that game's public snapshot through:
+
+`game.getPublicGameState`
+
+Other connections receive:
+
+`GAME_NOT_FOUND`
+
+without receiving game state.
+
+Reconnection behavior is described in the Reconnection section.
+
+The following diagram documents the initial join behaviour:
 
 ```mermaid
 sequenceDiagram
@@ -45,18 +80,82 @@ sequenceDiagram
     end
 ```
 
-## Programming and activation
 
-Each player submits five distinct card IDs in register order for the current round.
-The service checks ownership and waits until all current players have submitted.
-It then resolves five registers. Within each register, robots act in antenna
-priority order, recalculated after each action. Afterward, the service deals each
-player a private hand for the next round. Clients play resolved actions in event
-order before enabling the newly dealt hand.
+## Game has started
+### Programming
 
-The sequence keeps public and private Socket.IO rooms visible. Both clients have
-already joined and received their initial hand in the `JOINED` acknowledgement.
+During the programming phase, each player submits five distinct card IDs in register order for the current round.
 
+The client sends:
+
+`program.submit {gameId, playerId, cardIds}`
+
+The service verifies that the submitted cards belong to the player and that the submission is valid for the current game phase.
+
+A successful submission receives:
+
+`ACCEPTED`
+
+The server then emits:
+
+`program.submitted {playerId}`
+
+to the game's public room.
+
+This informs other players that the player has submitted their program without revealing the submitted cards. The server waits until all players have successfully submitted before beginning activation.
+
+
+### Submission failures
+
+`INVALID_PROGRAM` indicates that the submitted program is malformed, stale, contains duplicate cards, contains cards the player does not own, or was submitted during an invalid game phase.
+
+An invalid submission does not replace or modify the player's current program.
+
+`INTERNAL_ERROR` means that the service failed before accepting the program.
+
+If the client receives no acknowledgement, the outcome is unknown. The client must not automatically resend the submission because the original request may have been accepted.
+
+
+### Activation
+
+Once all players have submitted, the service resolves the five registers in order. Within each register, eligible robots act according to antenna priority. Priority is recalculated after each robot action before the next robot acts.
+
+Each resolved action is emitted publicly as:
+
+`robot.actionResolved`
+
+Clients must process resolved actions in the order in which they are received.
+
+#### Activation ordering
+
+The antenna is located at the top centre of the board and faces south.
+
+The test board uses:
+
+- position (10, 0)
+- direction Math.PI / 2
+
+The antenna does not occupy a robot tile.
+
+Exact priority ties are resolved using player join order. The priority algorithm defines the complete robot action order.
+
+### Dealing the next hand
+
+After all five registers have been resolved, the service deals each player a private hand for the next programming round.
+
+Each player receives:
+
+`cards.dealt {cards}`
+
+through their private Socket.IO room.
+
+A new hand may arrive while the client is still playing animations from the previous activation. The client should store the new hand immediately but must not enable programming until all queued resolved actions have finished playing.
+
+### Game sequence
+
+The following sequence shows one complete round while the game remains connected and unpaused.
+
+Both players have already joined and received their initial hands in their JOINED acknowledgements.
 ```mermaid
 sequenceDiagram
     participant A as Client A
@@ -92,34 +191,116 @@ sequenceDiagram
     end
 ```
 
-`INVALID_PROGRAM` rejects a malformed, stale, duplicate, unauthorized, or
-wrong-phase submission without changing the program. `INTERNAL_ERROR` means the
-service failed before accepting it. If no acknowledgement arrives, the outcome
-is unknown; the client must not resend automatically.
 
-## Membership and playback
+## Reconnection
+A player’s game membership is independent of their connection to the server. When the connection is lost, the client must indicate that it is disconnected and prevent gameplay submissions until the connection and game state have been restored.
 
-Players may join or leave at any point. A join during programming counts toward
-that round. A join during activation places the robot on the board, but it sits
-out until the next programming phase and receives `hand: []` initially. Leaving
-during programming rechecks whether all remaining players have submitted;
-leaving during activation cancels only that robot's future actions. An empty game
-stays idle. A waiting robot can still block movement; handle joins and leaves
-between robot actions. If no eligible robots remain, end activation once and
-begin the next programming round. Explicit `game.leave` keeps the user logged
-in; disconnect removes membership and requires login on a new connection.
+There are two possible reconnection paths:
 
-The antenna is at the top centre of the board, facing south. The test board uses
-`(10, 0)` and `Math.PI / 2`; exact ties use join order. It does not occupy a robot
-tile. [The priority algorithm](game_model_UML.md#robot-priority-typescript-reference-implementation)
-defines the action order.
+1. Socket.IO connection state recovery succeeds and missed events are replayed.
+2. Connection state recovery fails, so the client logs in and joins the game again to obtain a fresh authoritative snapshot.
 
-The client uses `VITE_GAME_ID` for the shared game and connects to the Game Service
-at the application's origin. It listens before joining, applies the `JOINED`
-result together, and then processes later events in order. It keeps programming
-locked during activation, after submission, without a hand, or while playback is
-running.
-A hand may arrive before playback ends; keep it until all queued actions finish.
-Queue membership changes behind earlier resolved actions.
-Login and join requests may be retried manually after a five-second timeout on
-the same socket; repeated requests reuse the existing identity or assignment.
+### Pausing on disconnection
+
+When the server detects that a player has disconnected, it pauses the game. An action already in progress completes, but no subsequent action is executed. The current game state is preserved.
+
+Connected clients are informed that the game is paused and which players are disconnected.
+
+All clients must disable gameplay while the game is paused.
+
+The server must reject gameplay submissions received while the game is paused.
+
+### Restoring the connections
+
+After an unexpected connection loss, the client attempts to reconnect automatically through Socket.IO. If Socket.IO can reestablish the connection, it will try to replay missed events through its [connection state recovery mechanism](https://socket.io/docs/v4/connection-state-recovery). 
+
+#### Successful connection state recovery 
+If recovery succeeds and the client still retains its local game state, Socket.IO replays missed events.
+
+The client applies the recovered events in order and continues using its existing player and robot assignments.
+
+```mermaid
+sequenceDiagram
+    participant A as Player A
+    participant S as Game Service
+    participant Public as game:{gameId}:public
+    participant PrivateA as game:{gameId}:player:{A}
+    participant B as Player B
+
+    Note over A: Connection lost
+    Note over A: Show disconnected status and disable gameplay
+    Note over S: Detect disconnect and pause after current action
+
+    S->>Public: game.playerConnectionChanged {gameId, playerId: A, connected: false, paused: true}
+    Public-->>B: game.playerConnectionChanged
+    Note over B: Show waiting for Player A and disable gameplay
+
+    A->>S: Socket.IO reconnection
+    Note over A,Public: Restore public room membership
+    Note over A,PrivateA: Restore private room membership
+    S-->>A: Replay missed public and private events
+
+    S->>Public: game.playerConnectionChanged {gameId, playerId: A, connected: true, paused: false}
+    Public-->>A: game.playerConnectionChanged
+    Public-->>B: game.playerConnectionChanged
+
+    Note over S: Continue gameplay from preserved state
+    Note over A,B: Unpause clients
+```
+
+#### Failed connection state recovery
+
+Once Socket.IO has reconnected, if state recovery was unsuccessful, the client performs the normal initialization flow by sending
+
+`user.login`
+
+followed by:
+
+`game.join`
+
+Because the user is already a game member, game.join restores the connection to the existing player and robot.
+
+The returned JOINED acknowledgement contains the current authoritative state.
+
+The client replaces its local game state with the returned JOINED data before processing further game events.
+
+```mermaid
+sequenceDiagram
+    participant A as Player A
+    participant S as Game Service
+    participant Public as game:{gameId}:public
+    participant PrivateA as game:{gameId}:player:{A}
+    participant B as Player B
+
+    Note over A: Connection lost
+    Note over A: Show disconnected status and disable gameplay
+    Note over S: Detect disconnect and pause after current action
+
+    S->>Public: game.playerConnectionChanged {gameId, playerId: A, connected: false, paused: true}
+    Public-->>B: game.playerConnectionChanged
+    Note over B: Show waiting for Player A and disable gameplay
+
+    A->>S: Establish Socket.IO connection
+    Note over A: socket.recovered is false
+    Note over S: Game remains paused until membership is reattached
+
+    A->>S: user.login {username}
+    S-->>A: Acknowledgement: LOGGED_IN {user}
+    A->>S: game.join {gameId}
+    Note over A,Public: Restore public room membership
+    Note over A,PrivateA: Restore private room membership
+
+    S-->>A: Acknowledgement: JOINED {assignment, state, hand, programSubmitted}
+    Note over A: Clear outdated state and apply JOINED data
+
+    S->>Public: game.playerConnectionChanged {gameId, playerId: A, connected: true, paused: false}
+    Public-->>A: game.playerConnectionChanged
+    Public-->>B: game.playerConnectionChanged
+
+    Note over S: Continue gameplay from preserved state
+    Note over A,B: Unpause game
+```
+
+### Resuming the game
+The game remains paused while any remaining player is disconnected. Once all remaining players are connected, the server announces that the game has resumed before continuing gameplay from the preserved game state.
+

@@ -13,6 +13,24 @@ describe('Robot', () => {
     expect(robot.direction).toBe(expected)
   })
 
+    it.each([
+    [Direction.NORTH, Direction.EAST], [Direction.EAST, Direction.SOUTH],
+    [Direction.SOUTH, Direction.WEST], [Direction.WEST, Direction.NORTH],
+  ])('turns right from %s to %s', (start, expected) => {
+    const robot = new Robot('robot-1', start)
+    robot.turnRight()
+    expect(robot.direction).toBe(expected)
+  })
+
+  it.each([
+    [Direction.NORTH, Direction.SOUTH], [Direction.EAST, Direction.WEST],
+    [Direction.SOUTH, Direction.NORTH], [Direction.WEST, Direction.EAST],
+  ])('makes a U-turn from %s to %s', (start, expected) => {
+    const robot = new Robot('robot-1', start)
+    robot.uTurn()
+    expect(robot.direction).toBe(expected)
+  })
+
   it('returns to its starting direction after four left turns', () => {
     const robot = new Robot('robot-1', Direction.EAST)
     for (let turn = 0; turn < 4; turn++) robot.turnLeft()

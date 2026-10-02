@@ -1,0 +1,10 @@
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+
+<!-- Uploaded to: SVG Repo, www.svgrepo.com, Transformed by: SVG Repo Mixer Tools -->
+<svg width="800px" height="800px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g transform="rotate(180 12 12)" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="4 17 7 20 10 17"/>
+    <path d="M7,4V20M17,4V20"/>
+    <polyline points="14 17 17 20 20 17"/>
+  </g>
+</svg>
