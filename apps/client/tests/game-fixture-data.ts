@@ -1,5 +1,9 @@
 import type {
   Card,
+  JoinGame,
+  JoinResult,
+  Login,
+  LoginResult,
   ProgramResultOutcome,
   PublicGameState,
   RobotActionResolved,
@@ -43,8 +47,11 @@ export type FixtureControl =
   | { type: 'submission'; outcome: ProgramResultOutcome; deferred: boolean }
   | { type: 'acknowledge'; outcome: ProgramResultOutcome }
   | { type: 'disconnect' }
-  | { type: 'state-requests'; deferred: boolean }
-  | { type: 'respond-state' }
+  | { type: 'early-hand'; cards: readonly Card[] }
+  | { type: 'login'; outcome: LoginResult['outcome']; deferred: boolean }
+  | { type: 'join'; outcome: JoinResult['outcome']; deferred: boolean }
+  | { type: 'respond-login' | 'respond-join' }
+  | { type: 'joined-state'; state: PublicGameState; hand: readonly Card[]; programSubmitted: boolean }
   | { type: 'round'; actions: readonly RobotActionResolved[] }
 
 export type FixtureSnapshot = {
@@ -53,5 +60,10 @@ export type FixtureSnapshot = {
   state: PublicGameState
   submissions: readonly SubmitProgram[]
   stateRequests: number
-  pendingStateRequests: number
+  entryRequests: readonly (
+    | { event: 'user.login'; socketId: string; payload: Login }
+    | { event: 'game.join'; socketId: string; payload: JoinGame }
+  )[]
+  pendingLogins: number
+  pendingJoins: number
 }

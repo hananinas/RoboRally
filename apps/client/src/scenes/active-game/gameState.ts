@@ -1,10 +1,10 @@
 import type {
   Card,
-  GameId,
   GamePhase,
+  JoinResult,
+  PlayerAssignment,
   PlayerId,
   ProgramResult,
-  PublicGameState,
   RobotActionResolved,
   SubmitProgram,
 } from '@robo-rally/game-events'
@@ -21,7 +21,7 @@ export type Registers = readonly (ProgramCard | null)[]
 
 export type ClientGameState = {
   connected: boolean
-  gameId: GameId | null
+  assignment: PlayerAssignment | null
   phase: GamePhase | null
   playerIds: readonly PlayerId[]
   board: BoardRenderModel | null
@@ -34,10 +34,9 @@ export type ClientGameState = {
 }
 
 export type GameStateEvent =
-  | { type: 'connected' }
+  | { type: 'joined'; result: Extract<JoinResult, { outcome: 'JOINED' }> }
   | { type: 'disconnected' }
-  | { type: 'error'; message: string }
-  | { type: 'initial-state'; state: PublicGameState }
+  | { type: 'reset' }
   | { type: 'dealt'; cards: readonly Card[] }
   | { type: 'submitted'; playerId: string }
   | { type: 'action'; action: RobotActionResolved }
@@ -57,7 +56,7 @@ function emptyRegisters(): Registers {
 export function createClientGameState(): ClientGameState {
   return {
     connected: false,
-    gameId: null,
+    assignment: null,
     phase: null,
     playerIds: [],
     board: null,
@@ -72,18 +71,20 @@ export function createClientGameState(): ClientGameState {
 
 export function canProgram(state: ClientGameState): boolean {
   return state.connected &&
+    state.assignment !== null &&
     state.phase === 'PROGRAMMING' &&
     state.handVersion > 0 &&
+    state.hand.length > 0 &&
     !state.playback.active &&
     state.submission === 'idle'
 }
 
 export function createSubmission(state: ClientGameState): SubmitProgram | null {
-  if (!canProgram(state) || state.gameId === null) return null
+  if (!canProgram(state) || state.assignment === null) return null
   const [first, second, third, fourth, fifth] = state.registers
   if (!first || !second || !third || !fourth || !fifth) return null
   return {
-    gameId: state.gameId,
+    gameId: state.assignment.gameId,
     cardIds: [first.id, second.id, third.id, fourth.id, fifth.id],
   }
 }
@@ -93,21 +94,24 @@ export function gameStateReducer(
   event: GameStateEvent,
 ): ClientGameState {
   switch (event.type) {
-    case 'connected':
-      return { ...state, connected: true, error: null }
     case 'disconnected':
       return {
         ...state,
         connected: false,
         error: 'Connection lost. Reload to connect again; your program was not resent.',
       }
-    case 'error':
-      return { ...state, error: event.message }
-    case 'initial-state': {
-      const snapshot = event.state
+    case 'reset':
+      return createClientGameState()
+    case 'joined': {
+      const { result } = event
+      const snapshot = result.state
       return {
-        ...state,
-        gameId: snapshot.gameId,
+        ...createClientGameState(),
+        connected: true,
+        assignment: result.assignment,
+        hand: result.hand,
+        handVersion: result.hand.length > 0 ? 1 : 0,
+        submission: result.programSubmitted ? 'accepted' : 'idle',
         phase: snapshot.phase,
         playerIds: snapshot.robots.map((robot) => robot.playerId),
         playback: createRobotPlaybackState(
@@ -132,7 +136,7 @@ export function gameStateReducer(
       return {
         ...state,
         hand: event.cards,
-        phase: state.gameId === null ? null : 'PROGRAMMING',
+        phase: state.assignment === null ? null : 'PROGRAMMING',
         handVersion: state.handVersion + 1,
         registers: emptyRegisters(),
         submission: 'idle',
