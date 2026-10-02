@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { Board, Direction, EmptyTile } from './index.js'
-import type { Position } from './index.js'
+import { Board, Direction, EmptyTile } from '@/game/index.js'
+import type { Position } from '@/game/index.js'
 
 function grid(width = 3, height = 3): EmptyTile[][] {
   return Array.from({ length: height }, () =>

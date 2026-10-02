@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { Board, Direction, EmptyTile, Game, Move1, Player, Robot, TurnLeft } from './index.js'
-import type { Card } from './index.js'
+import { Board, Direction, EmptyTile, Game, Move1, Player, Robot, TurnLeft } from '@/game/index.js'
+import type { Card } from '@/game/index.js'
 
 function createGame(deck: Card[]) {
   const board = new Board(Array.from({ length: 3 }, () =>

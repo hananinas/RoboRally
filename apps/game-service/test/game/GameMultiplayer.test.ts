@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { Board, Direction, EmptyTile, Game, Move1, Player, Robot, TurnLeft } from './index.js'
-import type { Antenna, Card, MovementResult, Position, RobotId } from './index.js'
+import { Board, Direction, EmptyTile, Game, Move1, Player, Robot, TurnLeft } from '@/game/index.js'
+import type { Antenna, Card, MovementResult, Position, RobotId } from '@/game/index.js'
 
 function createMultiplayerGame(
   positions: readonly Position[],

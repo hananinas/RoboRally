@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_GAME_SERVICE_PORT,
   parseGameServicePort,
-} from './config.js'
+} from '@/config.js'
 
 describe('game service configuration', () => {
   it('uses the default or a configured port', () => {

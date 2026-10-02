@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createUserRegistry } from './userRegistry.js'
+import { createUserRegistry } from '@/userRegistry.js'
 
 describe('user registry', () => {
   it('returns the same user for repeated exact usernames', () => {
