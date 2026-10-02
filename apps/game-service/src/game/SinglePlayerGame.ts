@@ -51,10 +51,14 @@ Move1,
 TurnLeft,
 ] 
 
-function createHand(): readonly Card[] {
-  return CARD_IDS.map((id, index) =>
+export function createHand(cardIds: readonly string[] = CARD_IDS): readonly Card[] {
+  return cardIds.map((id, index) =>
     new HAND_CARD_TYPES[index](id)
   )
+}
+
+export function createSharedGame(): Readonly<{ gameId: GameId; game: Game }> {
+  return { gameId: GAME_ID, game: new Game(createBoard(), [], createHand()) }
 }
 
 export function createSinglePlayerGame(): SinglePlayerGame {

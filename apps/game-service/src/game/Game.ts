@@ -29,24 +29,25 @@ export type RegisterResult = Readonly<{
 
 export class Game {
   readonly board: Board
-  readonly players: readonly Player[]
+  private readonly roster: Player[]
   private readonly deck: readonly Card[]
   private currentPhase: GamePhase = 'programming'
   private registerIndex = 0
   private readonly submittedPlayerIds = new Set<PlayerId>()
   private readonly activatedRobotIds = new Set<RobotId>()
+  private started = false
 
   constructor(board: Board, players: readonly Player[], deck: readonly Card[]) {
-    // V0 starts with one player; multi-robot coordination comes later.
-    if (players.length !== 1) {
-      throw new RangeError('V0 requires exactly one player')
+    if (new Set(players.map((player) => player.id)).size !== players.length ||
+        new Set(players.map((player) => player.robot.id)).size !== players.length) {
+      throw new RangeError('Players and robots must have unique IDs')
     }
     if (deck.length < 5 || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')
     }
 
     this.board = board
-    this.players = [...players]
+    this.roster = [...players]
     this.deck = [...deck]
     this.dealCards()
   }
@@ -57,6 +58,45 @@ export class Game {
 
   get currentRegister(): number {
     return this.registerIndex
+  }
+
+  get players(): readonly Player[] {
+    return [...this.roster]
+  }
+
+  get hasStarted(): boolean {
+    return this.started
+  }
+
+  hasSubmittedProgram(playerId: PlayerId): boolean {
+    return this.submittedPlayerIds.has(playerId)
+  }
+
+  addPlayer(player: Player): boolean {
+    if (this.started) throw new Error('Game has already started')
+    if (this.roster.some((member) => member.id === player.id || member.robot.id === player.robot.id)) {
+      throw new Error('Player or robot is already in the game')
+    }
+    const { width, height } = this.board
+    const y = Math.floor(height / 2)
+    let x = Math.floor(width / 2)
+    while (x >= 0 && this.board.occupantAt({ x, y }) !== undefined) x--
+    if (x < 0) return false
+    this.board.placeRobot(player.robot.id, { x, y })
+    if (player.hand.length === 0) player.setHand(this.deck)
+    this.roster.push(player)
+    return true
+  }
+
+  removePlayer(playerId: PlayerId): void {
+    const index = this.roster.findIndex((player) => player.id === playerId)
+    if (index < 0) return
+    const [player] = this.roster.splice(index, 1)
+    this.board.removeRobot(player.robot.id)
+    player.robot.clearProgram()
+    this.submittedPlayerIds.delete(playerId)
+    this.activatedRobotIds.delete(player.robot.id)
+    this.recheckProgrammingPhase()
   }
 
   submitProgram(playerId: PlayerId, program: readonly Card[]): void {
@@ -81,8 +121,14 @@ export class Game {
     }
 
     player.robot.setProgram(program)
+    this.started = true
     this.submittedPlayerIds.add(playerId)
-    if (this.submittedPlayerIds.size === this.players.length) {
+    this.recheckProgrammingPhase()
+  }
+
+  recheckProgrammingPhase(): void {
+    if (this.currentPhase === 'programming' && this.roster.length > 0 &&
+        this.submittedPlayerIds.size === this.roster.length) {
       this.startActivationPhase()
     }
   }
@@ -116,7 +162,9 @@ export class Game {
 
   private dealCards(): void {
     // V0 uses the supplied deck as a fixed hand, without drawing or shuffling.
-    this.players[0].setHand(this.deck)
+    for (const player of this.players) {
+      if (player.hand.length === 0) player.setHand(this.deck)
+    }
   }
 
   private startActivationPhase(): void {

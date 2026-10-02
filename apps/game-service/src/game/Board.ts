@@ -62,6 +62,10 @@ export class Board {
     return { ...position }
   }
 
+  removeRobot(robotId: RobotId): void {
+    this.robotPositions.delete(robotId)
+  }
+
   occupantAt(position: Position): RobotId | undefined {
     for (const [robotId, occupiedPosition] of this.robotPositions) {
       if (occupiedPosition.x === position.x && occupiedPosition.y === position.y) {
