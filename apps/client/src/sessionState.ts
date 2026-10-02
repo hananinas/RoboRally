@@ -16,13 +16,14 @@ export type SessionState =
   | { status: 'editing'; username: string; error: LoginError | null }
   | { status: 'logging-in'; username: string }
   | { status: 'joining'; user: User }
-  | { status: 'join-failed'; user: User; error: JoinError }
+  | { status: 'join-failed'; user: User; error: JoinError | null }
   | {
       status: 'joined'
       user: User
     }
 
 export type SessionEvent =
+  | { type: 'left' }
   | { type: 'disconnected' }
   | { type: 'username-changed'; username: string }
   | { type: 'login-submitted' }
@@ -38,6 +39,10 @@ export function createSessionState(): SessionState {
 
 export function sessionReducer(state: SessionState, event: SessionEvent): SessionState {
   switch (event.type) {
+    case 'left':
+      return state.status === 'joined'
+        ? { status: 'join-failed', user: state.user, error: null }
+        : state
     case 'disconnected':
       // Keep the entered game visible; its connection state locks interaction.
       if (state.status === 'joined') return state

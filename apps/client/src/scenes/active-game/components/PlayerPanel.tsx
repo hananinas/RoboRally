@@ -4,17 +4,19 @@ import Panel from './Panel.tsx'
 
 type PlayerPanelProps = {
   player: { name: string }
+  onLeave?: () => void
+  leaveDisabled?: boolean
 }
 
 // Shows collapsible player details.
-function PlayerPanel({ player }: PlayerPanelProps) {
+function PlayerPanel({ player, onLeave, leaveDisabled }: PlayerPanelProps) {
   const [expanded, setExpanded] = useState(true)
 
   return (
     <Panel className="player-panel">
       <header className="player-panel__header">
         <h1 className="player-panel__name">{player.name}</h1>
-        <GameMenu />
+        <GameMenu onLeave={onLeave} leaveDisabled={leaveDisabled} />
       </header>
       {expanded && (
         <div className="player-panel__details">

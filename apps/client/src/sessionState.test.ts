@@ -18,6 +18,7 @@ const joined: Extract<JoinResult, { outcome: 'JOINED' }> = {
     gameId: '00000000-0000-4000-8000-000000000002',
     board: { width: 1, height: 1, tiles: [] },
     robots: [],
+    players: [],
     phase: 'PROGRAMMING',
   },
   hand: [],

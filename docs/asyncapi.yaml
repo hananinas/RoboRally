@@ -20,6 +20,8 @@ channels:
         $ref: '#/components/messages/Login'
       joinGame:
         $ref: '#/components/messages/JoinGame'
+      leaveGame:
+        $ref: '#/components/messages/LeaveGame'
       submitProgram:
         $ref: '#/components/messages/SubmitProgram'
       getPublicGameState:
@@ -42,6 +44,13 @@ channels:
     messages:
       result:
         $ref: '#/components/messages/JoinResult'
+
+  leaveReplies:
+    address: null
+    description: Delivered through the acknowledgement of game.leave
+    messages:
+      result:
+        $ref: '#/components/messages/LeaveResult'
 
   programReplies:
     address: null
@@ -84,6 +93,8 @@ channels:
         $ref: '#/components/messages/RobotActionResolved'
       playerJoined:
         $ref: '#/components/messages/PlayerJoined'
+      playerLeft:
+        $ref: '#/components/messages/PlayerLeft'
       playerConnectionChanged:
         $ref: '#/components/messages/PlayerConnectionChanged'
 
@@ -113,6 +124,20 @@ operations:
         $ref: '#/channels/joinReplies'
       messages:
         - $ref: '#/channels/joinReplies/messages/result'
+      x-socketio:
+        acknowledgement: true
+
+  handleLeaveGame:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/leaveGame'
+    reply:
+      channel:
+        $ref: '#/channels/leaveReplies'
+      messages:
+        - $ref: '#/channels/leaveReplies/messages/result'
       x-socketio:
         acknowledgement: true
 
@@ -280,6 +305,23 @@ components:
           summary: A new player attempts to join after the first accepted program
           payload:
             outcome: GAME_ALREADY_STARTED
+
+    LeaveGame:
+      name: game.leave
+      description: Removes this connection's player and robot while retaining login. Disconnecting does not leave.
+      payload:
+        $ref: '#/components/schemas/JoinGame'
+
+    LeaveResult:
+      name: game.leaveResult
+      payload:
+        $ref: '#/components/schemas/LeaveResult'
+
+    PlayerLeft:
+      name: game.playerLeft
+      description: Announces removal to remaining members after the leaving connection loses room access.
+      payload:
+        $ref: '#/components/schemas/PlayerLeft'
 
     PlayerJoined:
       name: game.playerJoined
@@ -632,6 +674,28 @@ components:
         GAME_NOT_FOUND: unavailable game. NO_SPAWN_AVAILABLE: no valid spawn.
         GAME_ALREADY_STARTED: The game has already accepted its first program.
         USER_ALREADY_IN_GAME: another connection currently owns this user's membership. 
+
+    LeaveResult:
+      type: object
+      additionalProperties: false
+      required: [ outcome ]
+      properties:
+        outcome:
+          type: string
+          enum: [ LEFT, LOGIN_REQUIRED, INVALID_REQUEST, GAME_NOT_FOUND, INTERNAL_ERROR ]
+      description: GAME_NOT_FOUND covers an unavailable game or a connection without membership. LEFT preserves login.
+
+    PlayerLeft:
+      type: object
+      additionalProperties: false
+      required: [ gameId, playerId, robotId ]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+        playerId:
+          $ref: '#/components/schemas/PlayerId'
+        robotId:
+          $ref: '#/components/schemas/RobotId'
 
     PlayerState:
       type: object

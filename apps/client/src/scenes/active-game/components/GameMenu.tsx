@@ -1,7 +1,7 @@
 import { useId, useState } from 'react'
 
 // Uses a native popover for Escape, outside-click dismissal, and top-layer display.
-function GameMenu() {
+function GameMenu({ onLeave, leaveDisabled }: { onLeave?: () => void; leaveDisabled?: boolean }) {
   const menuId = useId()
   const [open, setOpen] = useState(false)
 
@@ -32,8 +32,8 @@ function GameMenu() {
         <h2 className="game-menu__heading">Game options</h2>
         <ul className="game-menu__options">
           <li>
-            <button className="game-menu__option" type="button" disabled>
-              No options available yet
+            <button className="game-menu__option" type="button" disabled={!onLeave || leaveDisabled} onClick={onLeave}>
+              {onLeave ? 'Leave game' : 'No options available yet'}
             </button>
           </li>
         </ul>

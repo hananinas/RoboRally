@@ -4,6 +4,8 @@ import type {
   JoinResult,
   PlayerAssignment,
   PlayerId,
+  PlayerJoined,
+  PlayerLeft,
   ProgramResult,
   RobotActionResolved,
   SubmitProgram,
@@ -35,8 +37,11 @@ export type ClientGameState = {
 
 export type GameStateEvent =
   | { type: 'joined'; result: Extract<JoinResult, { outcome: 'JOINED' }> }
+  | { type: 'player-joined'; payload: PlayerJoined }
+  | { type: 'player-left'; payload: PlayerLeft }
   | { type: 'disconnected' }
   | { type: 'reset' }
+  | { type: 'error'; message: string }
   | { type: 'dealt'; cards: readonly Card[] }
   | { type: 'submitted'; playerId: string }
   | { type: 'action'; action: RobotActionResolved }
@@ -94,6 +99,27 @@ export function gameStateReducer(
   event: GameStateEvent,
 ): ClientGameState {
   switch (event.type) {
+    case 'error':
+      return { ...state, error: event.message }
+    case 'player-joined': {
+      const { gameId, player, robot } = event.payload
+      if (gameId !== state.assignment?.gameId || player.playerId !== robot.playerId ||
+          state.playerIds.includes(player.playerId)) return state
+      return {
+        ...state,
+        playerIds: [...state.playerIds, player.playerId],
+        playback: robotPlaybackReducer(state.playback, { type: 'add', robot: { ...robot, colour: '#c74f4f' } }),
+      }
+    }
+    case 'player-left': {
+      const { gameId, playerId, robotId } = event.payload
+      if (gameId !== state.assignment?.gameId || !state.playerIds.includes(playerId)) return state
+      return {
+        ...state,
+        playerIds: state.playerIds.filter((id) => id !== playerId),
+        playback: robotPlaybackReducer(state.playback, { type: 'remove', robotId }),
+      }
+    }
     case 'disconnected':
       return {
         ...state,
@@ -113,7 +139,7 @@ export function gameStateReducer(
         handVersion: result.hand.length > 0 ? 1 : 0,
         submission: result.programSubmitted ? 'accepted' : 'idle',
         phase: snapshot.phase,
-        playerIds: snapshot.robots.map((robot) => robot.playerId),
+        playerIds: snapshot.players.map((player) => player.playerId),
         playback: createRobotPlaybackState(
           snapshot.robots.map((robot) => ({ ...robot, colour: '#c74f4f' })),
         ),
