@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import { err, ok, type Result } from 'neverthrow'
 import {
   joinGameSchema,
@@ -13,14 +12,9 @@ import {
   type PublicGameStateAcknowledgement,
   type User,
 } from '@robo-rally/game-events'
-import {
-  Player,
-  Robot,
-  Direction,
-  type Game,
-} from '@/game/index'
+import type { Game, Player } from '@/game/index'
 import { presentCardsDealt } from '@/gamePresenter'
-import { createHand } from '@/game/SinglePlayerGame'
+import { createPlayer } from '@/game/GameFactory'
 import type { ActionScheduler } from '@/actionScheduler'
 import type { GameSocket, GameSocketServer } from '@/gameServer'
 
@@ -101,8 +95,7 @@ type MembershipResolution = Result<MembershipSuccess, MembershipFailure>
 function addMembership(ctx: MembershipContext, socket: GameSocket, user: User): MembershipResolution {
   const { game, memberships } = ctx
   if (game.hasStarted) return err('GAME_ALREADY_STARTED')
-  const player = new Player(randomUUID(), new Robot(randomUUID(), Direction.NORTH),
-    createHand(Array.from({ length: 9 }, () => randomUUID())))
+  const player = createPlayer()
   try {
     if (!game.addPlayer(player)) return err('NO_SPAWN_AVAILABLE')
   } catch {

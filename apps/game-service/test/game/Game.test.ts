@@ -14,8 +14,9 @@ function createGame() {
     new Card('move-3', 'MOVE_1'),
     new Card('left-3', 'TURN_LEFT'),
   ]
-  const game = new Game(board, [player], deck)
-  return { board, robot, player, deck, game }
+  const antenna = { x: 1, y: 0, angle: Math.PI / 2 }
+  const game = new Game(board, [player], deck, antenna)
+  return { board, robot, player, deck, antenna, game }
 }
 
 describe('Game programming', () => {
@@ -33,7 +34,7 @@ describe('Game programming', () => {
       new Card('right', 'TURN_RIGHT'),
       new Card('u-turn', 'U_TURN'),
     ]
-    const game = new Game(board, [player], deck)
+    const game = new Game(board, [player], deck, { x: 7, y: 0, angle: Math.PI / 2 })
     game.submitProgram(player.id, deck)
 
     const actions = Array.from({ length: 5 }, () => game.executeNextAction())
@@ -94,11 +95,11 @@ describe('Game programming', () => {
   })
 
   it('accepts an empty roster but requires unique players and at least five distinct cards', () => {
-    const { board, player, deck } = createGame()
-    expect(new Game(board, [], deck).players).toEqual([])
-    expect(() => new Game(board, [player, player], deck)).toThrow(RangeError)
-    expect(() => new Game(board, [player], deck.slice(0, 4))).toThrow(RangeError)
-    expect(() => new Game(board, [player], [deck[0], deck[0], ...deck.slice(1, 5)])).toThrow(RangeError)
+    const { board, player, deck, antenna } = createGame()
+    expect(new Game(board, [], deck, antenna).players).toEqual([])
+    expect(() => new Game(board, [player, player], deck, antenna)).toThrow(RangeError)
+    expect(() => new Game(board, [player], deck.slice(0, 4), antenna)).toThrow(RangeError)
+    expect(() => new Game(board, [player], [deck[0], deck[0], ...deck.slice(1, 5)], antenna)).toThrow(RangeError)
   })
 
   it('starts unpaused and toggles via pause/resume', () => {

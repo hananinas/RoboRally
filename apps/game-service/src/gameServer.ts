@@ -8,7 +8,7 @@ import { Server, type Socket } from 'socket.io'
 import type { Game } from '@/game/index'
 import { presentPublicGameState } from '@/gamePresenter'
 import { createUserRegistry } from '@/userRegistry'
-import { createSharedGame } from '@/game/SinglePlayerGame'
+import { createGame } from '@/game/GameFactory'
 import { createActionScheduler } from '@/actionScheduler'
 import { handleLogin } from '@/authHandlers'
 import {
@@ -37,7 +37,7 @@ export type GameSession = Readonly<{ gameId: string; game: Game }>
 
 export function createGameSocketServer(
   httpServer: HttpServer,
-  sharedGame: GameSession = createSharedGame(),
+  sharedGame: GameSession = createGame(),
 ): GameSocketServer {
   const io = new Server<
     ClientToServerEvents,

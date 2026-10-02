@@ -16,7 +16,7 @@ function createMultiplayerGame(
     return new Player(`player-${index}`, robot)
   })
   const game = new Game(board, players, deck, antenna)
-  return { board, players, deck, game }
+  return { board, players, deck, antenna, game }
 }
 
 describe('Game fixed-roster programming', () => {
@@ -51,7 +51,7 @@ describe('Game fixed-roster programming', () => {
   })
 
   it('copies the fixed roster and keeps an empty roster idle', () => {
-    const { board, players, deck, game } = createMultiplayerGame([{ x: 4, y: 5 }])
+    const { board, players, deck, antenna, game } = createMultiplayerGame([{ x: 4, y: 5 }])
     const player = players[0]
     players.length = 0
     expect(game.players).toEqual([player])
@@ -59,7 +59,7 @@ describe('Game fixed-roster programming', () => {
     game.submitProgram(player.id, deck.slice(0, 5))
     expect(game.phase).toBe('activation')
 
-    const empty = new Game(board, [], deck)
+    const empty = new Game(board, [], deck, antenna)
     empty.recheckProgrammingPhase()
     expect(empty.phase).toBe('programming')
     expect(empty.currentRegister).toBe(0)
@@ -68,10 +68,10 @@ describe('Game fixed-roster programming', () => {
   })
 
   it('rejects duplicate player IDs, duplicate robot IDs, and unplaced robots', () => {
-    const { board, players, deck } = createMultiplayerGame([{ x: 4, y: 5 }, { x: 5, y: 4 }])
-    expect(() => new Game(board, [players[0], new Player(players[0].id, players[1].robot)], deck)).toThrow(RangeError)
-    expect(() => new Game(board, [players[0], new Player('other', new Robot(players[0].robot.id, Direction.NORTH))], deck)).toThrow(RangeError)
-    expect(() => new Game(board, [new Player('unplaced', new Robot('unplaced', Direction.NORTH))], deck)).toThrow()
+    const { board, players, deck, antenna } = createMultiplayerGame([{ x: 4, y: 5 }, { x: 5, y: 4 }])
+    expect(() => new Game(board, [players[0], new Player(players[0].id, players[1].robot)], deck, antenna)).toThrow(RangeError)
+    expect(() => new Game(board, [players[0], new Player('other', new Robot(players[0].robot.id, Direction.NORTH))], deck, antenna)).toThrow(RangeError)
+    expect(() => new Game(board, [new Player('unplaced', new Robot('unplaced', Direction.NORTH))], deck, antenna)).toThrow()
   })
 
   it('validates and freezes an independent positioned antenna', () => {
@@ -81,7 +81,6 @@ describe('Game fixed-roster programming', () => {
     antenna.angle = 0
     expect(game.antenna).toEqual({ x: 4, y: 4, angle: Math.PI / 2 })
     expect(() => Object.assign(game.antenna, { angle: 0 })).toThrow()
-    expect(new Game(board, players, deck).antenna).toEqual({ x: 4, y: 0, angle: Math.PI / 2 })
     for (const invalid of [
       { x: -1, y: 0, angle: 0 },
       { x: 0, y: board.height, angle: 0 },

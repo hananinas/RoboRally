@@ -38,7 +38,7 @@ export class Game {
     board: Board,
     players: readonly Player[],
     deck: readonly Card[],
-    antenna: Antenna = { x: Math.floor(board.width / 2), y: 0, angle: Math.PI / 2 },
+    antenna: Antenna,
   ) {
     if (deck.length < 5 || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')

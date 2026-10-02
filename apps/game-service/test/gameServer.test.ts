@@ -7,7 +7,7 @@ import type {
 import { io as createClient, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Board, EmptyTile, Game, Card } from '@/game/index.ts'
-import { createSharedGame } from '@/game/SinglePlayerGame.ts'
+import { createGame } from '@/game/GameFactory.ts'
 import { createGameSocketServer, type GameSocketServer } from '@/gameServer.ts'
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>
@@ -15,12 +15,12 @@ type Joined = Extract<JoinResult, { outcome: 'JOINED' }>
 
 describe('game membership over Socket.IO', () => {
   let server: GameSocketServer
-  let shared: ReturnType<typeof createSharedGame>
+  let shared: ReturnType<typeof createGame>
   let url: string
   let clients: Client[]
 
   beforeEach(async () => {
-    shared = createSharedGame()
+    shared = createGame('empty-map')
     clients = []
     await start()
   })
@@ -178,7 +178,8 @@ describe('game membership over Socket.IO', () => {
   it('rejects exhausted spawns without leaving a membership or room', async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()))
     shared = { gameId: shared.gameId, game: new Game(new Board([[new EmptyTile()]]), [],
-      Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))) }
+      Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1')),
+      { x: 0, y: 0, angle: Math.PI / 2 }) }
     await start()
     await join(await connect('First'))
     const second = await connect('Second')
