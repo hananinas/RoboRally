@@ -9,6 +9,7 @@ export const KEYBINDS: readonly { keys: string; description: string }[] = [
   { keys: 'dd', description: 'Clear all registers' },
   { keys: 'u', description: 'Undo the last register change' },
   { keys: 'Ctrl+R', description: 'Redo the last undone change' },
+  { keys: '?', description: 'Toggle this keybinds menu' },
 ]
 
 export default function useGameKeybinds(
@@ -45,6 +46,11 @@ export default function useGameKeybinds(
     }
 
     const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
+      if (event.key === '?') {
+        document.querySelector<HTMLElement>('.game-menu__popover')?.togglePopover()
+        return
+      }
+
       if (disabled || cards.length === 0) return
 
       if (event.ctrlKey && event.key === 'r') {

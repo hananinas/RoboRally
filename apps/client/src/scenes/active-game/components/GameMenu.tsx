@@ -4,9 +4,7 @@ import { KEYBINDS } from './useGameKeybinds.ts'
 // Uses a native popover for Escape, outside-click dismissal, and top-layer display.
 function GameMenu() {
   const menuId = useId()
-  const keybindsId = useId()
   const [open, setOpen] = useState(false)
-  const [keybindsOpen, setKeybindsOpen] = useState(false)
 
   return (
     <div className="game-menu">
@@ -35,17 +33,9 @@ function GameMenu() {
         <h2 className="game-menu__heading">Game options</h2>
         <ul className="game-menu__options">
           <li>
-            <button
-              className="game-menu__option"
-              type="button"
-              aria-expanded={keybindsOpen}
-              aria-controls={keybindsId}
-              onClick={() => setKeybindsOpen((current) => !current)}
-            >
-              Keybinds
-            </button>
-            {keybindsOpen && (
-              <dl id={keybindsId} className="game-menu__keybinds">
+            <details className="game-menu__option" open>
+              <summary className="game-menu__option-summary">Keybinds</summary>
+              <dl className="game-menu__keybinds">
                 {KEYBINDS.map(({ keys, description }) => (
                   <div className="game-menu__keybind" key={keys}>
                     <dt>{keys}</dt>
@@ -53,7 +43,7 @@ function GameMenu() {
                   </div>
                 ))}
               </dl>
-            )}
+            </details>
           </li>
         </ul>
       </section>
