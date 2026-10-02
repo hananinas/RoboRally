@@ -18,7 +18,7 @@ type ProgrammingHandProps = {
   cards: readonly Card[]
   registeredCardIds: ReadonlySet<string>
   disabled: boolean
-  highlightedIndex: number
+  highlightedIndex: number | null
   onHighlightCard: (cardIndex: number) => void
   onSelect: (card: Card) => void
   onPlaceCard: (card: Card, registerIndex: number) => void
@@ -50,6 +50,8 @@ function ProgrammingHand({
   const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
 
   useEffect(() => {
+    if (highlightedIndex === null) return
+
     const card = cardRefs.current[highlightedIndex]
     if (card && document.activeElement !== card) card.focus()
   }, [highlightedIndex])

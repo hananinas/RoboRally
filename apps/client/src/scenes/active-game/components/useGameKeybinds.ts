@@ -24,9 +24,9 @@ export default function useGameKeybinds(
   onRedo: () => void,
   onSubmit: () => void,
   canSubmit: boolean,
-) : [number, (cardIndex: number) => void, boolean, boolean]  {
+) : [number | null, (cardIndex: number) => void, boolean, boolean]  {
 
-    const [highlightedCardIndex, setHighlightedCardIndex] = useState(0)
+    const [highlightedCardIndex, setHighlightedCardIndex] = useState<number | null>(null)
     const [pendingDelete, setPendingDelete] = useState(false)
     const [pendingSubmit, setPendingSubmit] = useState<'none' | 'colon' | 'colon-w'>('none')
 
@@ -45,7 +45,7 @@ export default function useGameKeybinds(
     }
 
     function highlightCard(cardIndex: number) {
-      const direction = Math.sign(cardIndex - highlightedCardIndex) || 1
+      const direction = Math.sign(cardIndex - (highlightedCardIndex ?? 0)) || 1
       highlightFrom(cardIndex, direction)
     }
 
@@ -123,11 +123,11 @@ export default function useGameKeybinds(
       }
 
       if (event.key === 'h') {
-        highlightCard(highlightedCardIndex - 1)
+        highlightCard((highlightedCardIndex ?? 0) - 1)
       }
 
       if (event.key === 'l') {
-        highlightCard(highlightedCardIndex + 1)
+        highlightCard((highlightedCardIndex ?? 0) + 1)
       }
 
       if (event.key === '0') {
@@ -139,7 +139,7 @@ export default function useGameKeybinds(
       }
 
       if (/^[1-5]$/.test(event.key)) {
-        const card = cards[highlightedCardIndex]
+        const card = cards[highlightedCardIndex ?? 0]
         const registerIndex = Number(event.key) - 1
 
         if (card) {
