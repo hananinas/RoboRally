@@ -108,6 +108,7 @@ At minimum, you will need:
 - Node.js 24 or a compatible version
 - pnpm 10.9 or newer
 - [Process Compose](https://f1bonacc1.github.io/process-compose/)
+- [Rauthy](https://sebadob.github.io/rauthy/), the identity provider used for authentication
 - AsyncAPI tooling for writing and generating API documentation
 
 Then install the project dependencies:
@@ -123,6 +124,7 @@ process-compose
 ```
 
 The non-Nix setup is best-effort and may require additional platform-specific tooling.
+
 
 ## Structure
 

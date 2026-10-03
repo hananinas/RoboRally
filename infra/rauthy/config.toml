@@ -1,0 +1,29 @@
+[dev]
+# Bootstraps the database with dev values, including a default admin login
+# of `admin@localhost` / `123SuperSafe`. Has no effect in release builds.
+dev_mode = true
+
+[server]
+scheme = 'http'
+port_http = 8081
+pub_url = 'localhost:8081'
+
+[cluster]
+node_id = 1
+nodes = ["1 localhost:8100 localhost:8200"]
+data_dir = "rauthy/data"
+secret_raft = 'KSyRgNMttvThbegLdqnZvujHSsfABdKcPmkxhtiHLoWBQWpA'
+secret_api = 'vJZIfKnJOIZSzrHkUepMjxRBixYkxHAIhBnPmuYYAFzOHMyy'
+
+[access]
+cookie_mode = 'danger-insecure'
+
+[webauthn]
+rp_id = 'localhost'
+rp_origin = 'http://localhost:5173'
+
+[encryption]
+keys = [
+    '2026-10-03/MsBtTsCEsmsSlkMIil97GLj/euprAE4MECAVBFG01gs=',
+]
+key_active = '2026-10-03'

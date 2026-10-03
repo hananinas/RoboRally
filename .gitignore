@@ -8,6 +8,9 @@ playwright-report/
 test-results/
 *.tsbuildinfo
 
+# Rauthy local dev data
+infra/rauthy/data/
+
 # Environment files
 .env
 .env.*.local
