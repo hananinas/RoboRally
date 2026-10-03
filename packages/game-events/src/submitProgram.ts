@@ -18,6 +18,7 @@ const programCardIdsSchema = z
 export const submitProgramSchema = z
   .strictObject({
     gameId: z.uuid(),
+    playerId: z.uuid(),
     cardIds: programCardIdsSchema,
   })
   .readonly()

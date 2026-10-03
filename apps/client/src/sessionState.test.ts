@@ -16,6 +16,7 @@ const joined: Extract<JoinResult, { outcome: 'JOINED' }> = {
   },
   state: {
     gameId: '00000000-0000-4000-8000-000000000002',
+    antenna: { x: 0, y: 0, angle: Math.PI / 2 },
     board: { width: 1, height: 1, tiles: [] },
     robots: [],
     phase: 'PROGRAMMING',

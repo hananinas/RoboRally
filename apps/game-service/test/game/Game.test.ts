@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { Board, Direction, EmptyTile, Game, Move1, Player, Robot, TurnLeft } from './index.js'
-import type { Card } from './index.js'
+import { BackUp, Board, Direction, EmptyTile, Game, Move1, Move2, Move3, Player, Robot, TurnLeft, TurnRight, UTurn } from '@/game/index.ts'
+import type { Card } from '@/game/index.ts'
 
 function createGame() {
   const board = new Board([[new EmptyTile(), new EmptyTile()]])
@@ -20,6 +20,38 @@ function createGame() {
 }
 
 describe('Game programming', () => {
+  it('executes the additional card types from main in register order', () => {
+    const board = new Board(Array.from({ length: 15 }, () =>
+      Array.from({ length: 15 }, () => new EmptyTile()),
+    ))
+    const robot = new Robot('robot-1', Direction.EAST)
+    board.placeRobot(robot.id, { x: 5, y: 5 })
+    const player = new Player('player-1', robot)
+    const deck = [
+      new Move2('move-2'),
+      new Move3('move-3'),
+      new BackUp('back-up'),
+      new TurnRight('right'),
+      new UTurn('u-turn'),
+    ]
+    const game = new Game(board, [player], deck)
+    game.submitProgram(player.id, deck)
+
+    const actions = Array.from({ length: 5 }, () => game.executeNextAction())
+    expect(actions.map(({ registerIndex, action }) => ({
+      registerIndex,
+      position: action.position,
+      direction: action.direction,
+    }))).toEqual([
+      { registerIndex: 0, position: { x: 7, y: 5 }, direction: Direction.EAST },
+      { registerIndex: 1, position: { x: 10, y: 5 }, direction: Direction.EAST },
+      { registerIndex: 2, position: { x: 9, y: 5 }, direction: Direction.EAST },
+      { registerIndex: 3, position: { x: 9, y: 5 }, direction: Direction.SOUTH },
+      { registerIndex: 4, position: { x: 9, y: 5 }, direction: Direction.NORTH },
+    ])
+    expect(game.phase).toBe('programming')
+  })
+
   it('starts in programming and deals its card supply to the player', () => {
     const { board, robot, player, deck, game } = createGame()
 
@@ -62,10 +94,8 @@ describe('Game programming', () => {
     expect(game.phase).toBe('activation')
   })
 
-  it('requires one player and at least five distinct cards in V0', () => {
+  it('requires at least five distinct cards in the fixed supply', () => {
     const { board, player, deck } = createGame()
-    expect(() => new Game(board, [], deck)).toThrow(RangeError)
-    expect(() => new Game(board, [player, player], deck)).toThrow(RangeError)
     expect(() => new Game(board, [player], deck.slice(0, 4))).toThrow(RangeError)
     expect(() => new Game(board, [player], [deck[0], deck[0], ...deck.slice(1, 5)])).toThrow(RangeError)
   })

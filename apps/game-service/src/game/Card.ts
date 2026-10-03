@@ -1,4 +1,4 @@
-import type { CardId } from './ids.js'
+import type { CardId } from '@/game/ids'
 
 export abstract class Card {
   constructor(readonly id: CardId) {}
@@ -13,4 +13,3 @@ export class BackUp extends Card{}
 export class TurnRight extends Card{}
 export class TurnLeft extends Card {}
 export class UTurn extends Card {}
-

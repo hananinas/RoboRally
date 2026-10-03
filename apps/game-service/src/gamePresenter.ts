@@ -22,9 +22,9 @@ import {
   type Game,
   type GameId,
   type GamePhase,
+  type NextActionResult,
   type Player,
-  type RobotActionResult,
-} from './game/index.js'
+} from '@/game/index'
 
 const orientations: Record<Direction, Orientation> = {
   [Direction.NORTH]: 'NORTH',
@@ -77,6 +77,7 @@ export function presentPublicGameState(
 
   return {
     gameId,
+    antenna: game.antenna,
     board: {
       width: game.board.width,
       height: game.board.height,
@@ -94,14 +95,21 @@ export function presentPublicGameState(
   }
 }
 
-export function presentCardsDealt(player: Player): CardsDealt {
-  return { cards: player.hand.map(presentCard) }
+export function presentCardsDealt(
+  gameId: GameId,
+  player: Player,
+): CardsDealt {
+  return { gameId, playerId: player.id, cards: player.hand.map(presentCard) }
 }
 
 export function presentRobotActionResolved(
-  action: RobotActionResult,
+  gameId: GameId,
+  result: NextActionResult,
 ): RobotActionResolved {
+  const { action, registerIndex } = result
   return {
+    gameId,
+    registerIndex,
     robotId: action.robotId,
     instruction: instructionFor(action.card),
     position: {

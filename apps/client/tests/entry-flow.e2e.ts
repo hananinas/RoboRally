@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from './game-fixture.ts'
-import { GAME_ID, ROBOT_ID } from './game-fixture-data.ts'
+import { GAME_ID, PLAYER_ID, ROBOT_ID } from './game-fixture-data.ts'
 
 const username = ' Player 🤖 '
 
@@ -121,7 +121,7 @@ test('ignores an early hand until JOINED supplies the authoritative board and ha
   await page.getByRole('button', { name: 'Done', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()
   expect((await game.snapshot()).submissions).toEqual([
-    { gameId: GAME_ID, cardIds: game.initial.cards.slice(0, 5).map((card) => card.id) },
+    { gameId: GAME_ID, playerId: PLAYER_ID, cardIds: game.initial.cards.slice(0, 5).map((card) => card.id) },
   ])
 })
 

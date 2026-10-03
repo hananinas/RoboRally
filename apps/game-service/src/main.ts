@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
-import { parseGameServicePort } from './config.js'
-import { createGameSocketServer } from './gameServer.js'
+import { parseGameServicePort } from '@/config'
+import { createGameSocketServer } from '@/gameServer'
 
 const host = '127.0.0.1'
 const port = parseGameServicePort(process.env.PORT)

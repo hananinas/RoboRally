@@ -3,9 +3,21 @@ import BoardViewport from './components/BoardViewport.tsx'
 import PlayerPanel from './components/PlayerPanel.tsx'
 import ProgrammingHand from './components/ProgrammingHand.tsx'
 import RegisterPanel from './components/RegisterPanel.tsx'
-import { canProgram } from './gameState.ts'
+import { canProgram, type ClientGameState } from './gameState.ts'
 import type useGameConnection from './useGameConnection.ts'
 import useOverlayLayout from './useOverlayLayout.ts'
+
+function getGameStatus(state: ClientGameState): string {
+  if (!state.connected) return 'Not connected'
+  if (state.assignment === null) return 'Loading game…'
+  if (state.playback.active || state.phase === 'EXECUTING') return 'Executing'
+  if (state.phase === 'PROGRAMMING') {
+    if (!state.handReady) return 'Waiting for cards…'
+    if (state.submission === 'accepted') return 'Program accepted · Waiting for other players'
+    return 'Programming'
+  }
+  return 'Waiting'
+}
 
 function ActiveGame({ game, username }: {
   game: ReturnType<typeof useGameConnection>
@@ -21,11 +33,7 @@ function ActiveGame({ game, username }: {
   } = useOverlayLayout(state.handVersion)
   const disabled = !canProgram(state)
   const hasHand = state.handVersion > 0
-  const phase = state.playback.active ? 'EXECUTING' : state.phase
-  const phaseLabel = phase === 'PROGRAMMING' ? 'Programming'
-    : phase === 'EXECUTING' ? 'Executing' : 'Waiting'
-  const status = !state.connected ? 'Not connected'
-    : !hasHand && phase === 'PROGRAMMING' ? 'Waiting for cards…' : phaseLabel
+  const status = getGameStatus(state)
   const registeredCardIds = new Set(
     state.registers.flatMap((card) => (card ? [card.id] : [])),
   )

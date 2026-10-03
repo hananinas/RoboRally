@@ -1,7 +1,7 @@
 
-import type { Card } from './Card.js'
-import type { RobotId } from './ids.js'
-import { Direction, turnLeft, turnRight,opposite } from './spatial.js'
+import type { Card } from '@/game/Card'
+import type { RobotId } from '@/game/ids'
+import { Direction, turnLeft, turnRight,opposite } from '@/game/spatial'
 
 export class Robot {
   private currentDirection: Direction

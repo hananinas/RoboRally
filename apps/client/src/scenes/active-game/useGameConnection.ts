@@ -1,7 +1,6 @@
 import type {
   CardsDealt,
   JoinResult,
-  ProgramSubmitted,
   RobotActionResolved,
 } from '@robo-rally/game-events'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -44,21 +43,16 @@ export default function useGameConnection(socket: GameSocket) {
       generation.current += 1
       dispatch({ type: 'disconnected' })
     }
-    const handleCardsDealt = ({ cards }: CardsDealt) => receive({ type: 'dealt', cards })
-    const handleProgramSubmitted = ({ playerId }: ProgramSubmitted) => {
-      receive({ type: 'submitted', playerId })
-    }
+    const handleCardsDealt = (hand: CardsDealt) => receive({ type: 'dealt', hand })
     const handleActionResolved = (action: RobotActionResolved) => receive({ type: 'action', action })
 
     socket.on('disconnect', handleDisconnect)
     socket.on('cards.dealt', handleCardsDealt)
-    socket.on('program.submitted', handleProgramSubmitted)
     socket.on('robot.actionResolved', handleActionResolved)
     return () => {
       generation.current += 1
       socket.off('disconnect', handleDisconnect)
       socket.off('cards.dealt', handleCardsDealt)
-      socket.off('program.submitted', handleProgramSubmitted)
       socket.off('robot.actionResolved', handleActionResolved)
     }
   }, [dispatch, socket])
