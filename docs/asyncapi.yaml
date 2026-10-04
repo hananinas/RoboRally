@@ -47,7 +47,9 @@ channels:
 
   leaveReplies:
     address: null
-    description: Delivered through the acknowledgement of game.leave
+    description: |
+      Logical reply channel
+      Delivered through the acknowledgement of game.leave, not a separate event.
     messages:
       result:
         $ref: '#/components/messages/LeaveResult'
@@ -308,20 +310,67 @@ components:
 
     LeaveGame:
       name: game.leave
-      description: Removes this connection's player and robot while retaining login. Disconnecting does not leave.
+      description: >-
+        Requests explicit departure for the membership owned by this connection.
+        On success, removes the player and robot, frees the occupied tile, and
+        removes the connection from the public and private player rooms while
+        retaining login. Disconnecting retains membership and does not send
+        game.playerLeft. Leaving does not reopen a game that has already started.
       payload:
         $ref: '#/components/schemas/JoinGame'
+      examples:
+        - name: leave
+          summary: Explicitly leave the configured shared game
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
 
     LeaveResult:
       name: game.leaveResult
+      description: >-
+        Acknowledges game.leave with LEFT or a rejection. This is returned through
+        the request's acknowledgement callback, not emitted as game.leaveResult.
       payload:
         $ref: '#/components/schemas/LeaveResult'
+      examples:
+        - name: left
+          summary: Membership removed; the connection remains logged in
+          payload:
+            outcome: LEFT
+        - name: loginRequired
+          summary: The connection has not logged in
+          payload:
+            outcome: LOGIN_REQUIRED
+        - name: invalidRequest
+          summary: The request is malformed
+          payload:
+            outcome: INVALID_REQUEST
+        - name: gameNotFound
+          summary: Game unavailable or membership not owned by this connection
+          payload:
+            outcome: GAME_NOT_FOUND
+        - name: internalError
+          summary: Unexpected service failure
+          payload:
+            outcome: INTERNAL_ERROR
 
     PlayerLeft:
       name: game.playerLeft
-      description: Announces removal to remaining members after the leaving connection loses room access.
+      description: >-
+        Broadcasts the removed player and robot identifiers to remaining members
+        in game:{gameId}:public after a successful explicit leave. The leaving
+        connection loses public and private room access before LEFT is
+        acknowledged and does not receive this broadcast. Recipients remove the
+        player and robot from their public state. Disconnecting does not emit
+        this event.
       payload:
         $ref: '#/components/schemas/PlayerLeft'
+      examples:
+        - name: playerLeft
+          summary: Remove the departing player and robot from public state
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            robotId: 00000000-0000-4000-8000-000000000003
 
     PlayerJoined:
       name: game.playerJoined
@@ -683,7 +732,13 @@ components:
         outcome:
           type: string
           enum: [ LEFT, LOGIN_REQUIRED, INVALID_REQUEST, GAME_NOT_FOUND, INTERNAL_ERROR ]
-      description: GAME_NOT_FOUND covers an unavailable game or a connection without membership. LEFT preserves login.
+      description: |
+        LEFT: membership and robot removed, room access revoked, login retained.
+        LOGIN_REQUIRED: this connection has no approved user.
+        INVALID_REQUEST: malformed request, including an invalid gameId.
+        GAME_NOT_FOUND: unavailable game or membership not owned by this connection;
+        this also covers a repeated leave after a successful departure.
+        INTERNAL_ERROR: unexpected service failure; do not expose internals.
 
     PlayerLeft:
       type: object
