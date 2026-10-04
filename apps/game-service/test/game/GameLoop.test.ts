@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
-import { Board, Direction, EmptyTile, Game, Move1, Player, Robot, TurnLeft } from './index.js'
-import type { Card } from './index.js'
+import { describe, expect, it } from 'vitest'
+import { Board, Direction, EmptyTile, Game, Move1, Player, Robot, TurnLeft } from '@/game/index.ts'
+import type { Card } from '@/game/index.ts'
 
 function createGame(deck: Card[]) {
   const board = new Board(Array.from({ length: 3 }, () =>
@@ -14,10 +14,10 @@ function createGame(deck: Card[]) {
 }
 
 describe('Game activation loop', () => {
-  it('executes one register per call and returns to programming after five', () => {
+  it('executes one action per call and returns to programming after five registers', () => {
     const deck = Array.from({ length: 5 }, (_, index) => new TurnLeft(`left-${index}`))
     const { robot, player, game } = createGame(deck)
-    expect(() => game.executeCurrentRegister()).toThrow()
+    expect(() => game.executeNextAction()).toThrow()
     game.submitProgram(player.id, deck)
 
     const directions = [
@@ -28,26 +28,26 @@ describe('Game activation loop', () => {
       Direction.NORTH,
     ]
     for (let registerIndex = 0; registerIndex < 5; registerIndex++) {
-      const result = game.executeCurrentRegister()
+      const result = game.executeNextAction()
       expect(result).toEqual({
         registerIndex,
-        phase: registerIndex === 4 ? 'programming' : 'activation',
-        actions: [{
+        action: {
           robotId: robot.id,
           card: deck[registerIndex],
           position: { x: 1, y: 1 },
           direction: directions[registerIndex],
-        }],
+        },
       })
       expect(game.currentRegister).toBe(registerIndex === 4 ? 0 : registerIndex + 1)
+      expect(game.phase).toBe(registerIndex === 4 ? 'programming' : 'activation')
     }
 
     expect(robot.program).toEqual([])
     expect(player.hand).toEqual(deck)
-    expect(() => game.executeCurrentRegister()).toThrow()
+    expect(() => game.executeNextAction()).toThrow()
 
     game.submitProgram(player.id, deck)
-    expect(game.executeCurrentRegister().registerIndex).toBe(0)
+    expect(game.executeNextAction()).toMatchObject({ registerIndex: 0 })
     expect(robot.direction).toBe(Direction.WEST)
   })
 
@@ -60,16 +60,16 @@ describe('Game activation loop', () => {
       new TurnLeft('left-4'),
     ]
     const { board, player, game } = createGame(deck)
-    const move = vi.spyOn(board, 'moveRobot')
     game.submitProgram(player.id, deck)
 
-    game.executeCurrentRegister()
-    const result = game.executeCurrentRegister()
+    game.executeNextAction()
+    const result = game.executeNextAction()
 
-    expect(move).toHaveBeenCalledExactlyOnceWith('robot-1', Direction.NORTH, 1)
-    expect(result.actions[0].card).toBe(deck[1])
-    expect(result.actions[0].direction).toBe(Direction.NORTH)
-    expect(game.executeCurrentRegister().actions[0].card).toBe(deck[2])
+    expect(result.action.position).toEqual({ x: 1, y: 0 })
+    expect(board.positionOf('robot-1')).toEqual({ x: 1, y: 0 })
+    expect(result.action.card).toBe(deck[1])
+    expect(result.action.direction).toBe(Direction.NORTH)
+    expect(game.executeNextAction().action.direction).toBe(Direction.WEST)
   })
 
   it('reports the position reached by Move1', () => {
@@ -77,9 +77,9 @@ describe('Game activation loop', () => {
     const { board, player, game } = createGame(deck)
     game.submitProgram(player.id, deck)
 
-    const result = game.executeCurrentRegister()
+    const result = game.executeNextAction()
 
-    expect(result.actions[0].position).toEqual({ x: 2, y: 1 })
+    expect(result.action.position).toEqual({ x: 2, y: 1 })
     expect(board.positionOf('robot-1')).toEqual({ x: 2, y: 1 })
   })
 })

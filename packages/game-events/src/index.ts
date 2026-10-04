@@ -7,6 +7,7 @@ export type {
   ServerToClientEvents,
 } from './events.js'
 export type {
+  Antenna,
   Board,
   Card,
   CardId,

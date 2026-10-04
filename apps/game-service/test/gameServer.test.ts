@@ -4,9 +4,9 @@ import { parseSubmitProgram } from '@robo-rally/game-events'
 import type { ClientToServerEvents, JoinResult, ServerToClientEvents } from '@robo-rally/game-events'
 import { io as createClient, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Board, EmptyTile, Game, Move1 } from './game/index.js'
-import { createSharedGame } from './game/SinglePlayerGame.js'
-import { createGameSocketServer, type GameSocketServer } from './gameServer.js'
+import { Board, EmptyTile, Game, Move1 } from '@/game/index.ts'
+import { createSharedGame } from '@/game/SinglePlayerGame.ts'
+import { createGameSocketServer, type GameSocketServer } from '@/gameServer.ts'
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>
 type Joined = Extract<JoinResult, { outcome: 'JOINED' }>
@@ -61,7 +61,7 @@ describe('game membership over Socket.IO', () => {
   }
 
   function submission(joined: Joined) {
-    return parseSubmitProgram({ gameId: shared.gameId, cardIds: joined.hand.slice(0, 5).map((card) => card.id) })
+    return parseSubmitProgram({ gameId: shared.gameId, playerId: joined.assignment.playerId, cardIds: joined.hand.slice(0, 5).map((card) => card.id) })
   }
 
   it('keeps connection and login separate from rooms, hands and membership', async () => {
@@ -180,6 +180,9 @@ describe('game membership over Socket.IO', () => {
       .toEqual({ outcome: 'INVALID_PROGRAM' })
     expect(await second.timeout(1000).emitWithAck('program.submit', submission(initial)))
       .toEqual({ outcome: 'INVALID_PROGRAM' })
+    expect(await first.timeout(1000).emitWithAck('program.submit', {
+      ...submission(initial), playerId: other.assignment.playerId,
+    })).toEqual({ outcome: 'INVALID_PROGRAM' })
     expect(await first.timeout(1000).emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'ACCEPTED' })
     expect(shared.game.hasSubmittedProgram(initial.assignment.playerId)).toBe(true)
     expect((await join(first)).programSubmitted).toBe(true)
@@ -192,7 +195,6 @@ describe('game membership over Socket.IO', () => {
     expect(await raw(first, 'program.submit', { ...submission(initial), cardIds: [] })).toEqual({ outcome: 'INVALID_PROGRAM' })
     expect(shared.game.hasStarted).toBe(false)
     expect(await first.timeout(1000).emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'ACCEPTED' })
-    expect(shared.game.phase).toBe('programming')
     expect(shared.game.hasStarted).toBe(true)
     const late = await connect('Late')
     expect(await late.timeout(1000).emitWithAck('game.join', { gameId: shared.gameId }))
@@ -216,8 +218,8 @@ describe('game membership over Socket.IO', () => {
     const secondHand = new Promise((resolve) => second.once('cards.dealt', resolve))
     await first.timeout(1000).emitWithAck('program.submit', submission(initial))
     await second.timeout(1000).emitWithAck('program.submit', submission(other))
-    expect(await firstHand).toEqual({ cards: initial.hand })
-    expect(await secondHand).toEqual({ cards: other.hand })
+    expect(await firstHand).toEqual({ gameId: shared.gameId, playerId: initial.assignment.playerId, cards: initial.hand })
+    expect(await secondHand).toEqual({ gameId: shared.gameId, playerId: other.assignment.playerId, cards: other.hand })
     await outsider.timeout(1000).emitWithAck('game.getPublicGameState', { gameId: shared.gameId })
     expect(outsideEvents).not.toHaveBeenCalled()
   })
@@ -249,7 +251,7 @@ describe('game membership over Socket.IO', () => {
     await first.timeout(1000).emitWithAck('program.submit', submission(initial))
     const hand = new Promise((resolve) => first.once('cards.dealt', resolve))
     await second.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId })
-    expect(await hand).toEqual({ cards: initial.hand })
+    expect(await hand).toEqual({ gameId: shared.gameId, playerId: initial.assignment.playerId, cards: initial.hand })
     expect(shared.game.phase).toBe('programming')
   })
 
@@ -264,6 +266,27 @@ describe('game membership over Socket.IO', () => {
     const restored = await join(replacement)
     expect(restored.assignment).toEqual(initial.assignment)
     expect(restored.hand).toEqual(initial.hand)
+  })
+
+  it('deals the remaining player a hand when leaving completes the final register', async () => {
+    const first = await connect('First')
+    const initial = await join(first)
+    const second = await connect('Second')
+    await join(second)
+    for (const player of shared.game.players) {
+      shared.game.submitProgram(player.id, player.hand.slice(0, 5))
+    }
+    for (let action = 0; action < 9; action++) shared.game.executeNextAction()
+    expect(shared.game.currentRegister).toBe(4)
+    const hand = new Promise((resolve) => first.once('cards.dealt', resolve))
+
+    expect(await second.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId }))
+      .toEqual({ outcome: 'LEFT' })
+
+    expect(await hand).toEqual({
+      gameId: shared.gameId, playerId: initial.assignment.playerId, cards: initial.hand,
+    })
+    expect(shared.game.phase).toBe('programming')
   })
 
   it('ignores commands without acknowledgements without creating state', async () => {

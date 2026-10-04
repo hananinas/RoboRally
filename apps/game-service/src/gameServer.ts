@@ -12,21 +12,21 @@ import {
   type ServerToClientEvents,
   type User,
 } from '@robo-rally/game-events'
-import { Server } from 'socket.io'
+import { Server, type Socket } from 'socket.io'
 import {
   Player,
   Robot,
   Direction,
   type Card,
   type Game,
-} from './game/index.js'
+} from '@/game/index'
 import {
   presentCardsDealt,
   presentPublicGameState,
   presentRobotActionResolved,
-} from './gamePresenter.js'
-import { createUserRegistry } from './userRegistry.js'
-import { createHand, createSharedGame } from './game/SinglePlayerGame.js'
+} from '@/gamePresenter'
+import { createUserRegistry } from '@/userRegistry'
+import { createHand, createSharedGame } from '@/game/SinglePlayerGame'
 
 type GameMembership = {
   user: User
@@ -43,6 +43,10 @@ export type GameSocketServer = Server<
   GameSocketData
 >
 
+export type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents, {}, GameSocketData>
+
+export type GameSession = Readonly<{ gameId: string; game: Game }>
+
 function resolveProgram(
   player: Player,
   cardIds: ProgramCardIds,
@@ -54,7 +58,7 @@ function resolveProgram(
 
 export function createGameSocketServer(
   httpServer: HttpServer,
-  sharedGame: Readonly<{ gameId: string; game: Game }> = createSharedGame(),
+  sharedGame: GameSession = createSharedGame(),
 ): GameSocketServer {
   const io = new Server<
     ClientToServerEvents,
@@ -67,6 +71,8 @@ export function createGameSocketServer(
   const publicRoom = `game:${gameId}:public`
   const playerRoom = (playerId: string) => `game:${gameId}:player:${playerId}`
   const memberships = new Map<string, GameMembership>()
+  let scheduledAction: NodeJS.Immediate | undefined
+  let closed = false
 
   const publicState = () => presentPublicGameState(gameId, game,
     [...memberships.values()].map(({ user, player, connectionId }) => ({
@@ -86,18 +92,34 @@ export function createGameSocketServer(
     return { user }
   }
 
-  function executeActivation(): void {
-    if (game.phase !== 'activation') return
-    for (let registerIndex = 0; registerIndex < 5; registerIndex++) {
-      const result = game.executeCurrentRegister()
-      for (const action of result.actions) {
-        io.to(publicRoom).emit('robot.actionResolved', presentRobotActionResolved(action))
-      }
-    }
-    for (const member of game.players) {
-      io.to(playerRoom(member.id)).emit('cards.dealt', presentCardsDealt(member))
+  function dealHands(): void {
+    for (const player of game.players) {
+      io.to(playerRoom(player.id)).emit('cards.dealt', presentCardsDealt(gameId, player))
     }
   }
+
+  function scheduleNextAction(): void {
+    if (closed || game.phase !== 'activation' || scheduledAction) return
+    scheduledAction = setImmediate(() => {
+      scheduledAction = undefined
+      if (closed || game.phase !== 'activation') return
+      const result = game.executeNextAction()
+      io.to(publicRoom).emit(
+        'robot.actionResolved',
+        presentRobotActionResolved(gameId, result),
+      )
+      if (game.phase === 'activation') {
+        scheduleNextAction()
+      } else {
+        dealHands()
+      }
+    })
+  }
+
+  httpServer.once('close', () => {
+    closed = true
+    clearImmediate(scheduledAction)
+  })
 
   io.on('connection', (socket) => {
     const ownedMembership = () => {
@@ -144,7 +166,7 @@ export function createGameSocketServer(
           outcome: 'JOINED',
           assignment: { gameId, playerId: player.id, robotId: player.robot.id },
           state: publicState(),
-          hand: presentCardsDealt(player).cards,
+          hand: presentCardsDealt(gameId, player).cards,
           programSubmitted: game.hasSubmittedProgram(player.id),
         }
       } catch {
@@ -176,6 +198,7 @@ export function createGameSocketServer(
         return
       }
       const { player, user } = membership
+      const phaseBeforeLeave = game.phase
       game.removePlayer(player.id)
       memberships.delete(user.userId)
       socket.leave(publicRoom)
@@ -184,7 +207,8 @@ export function createGameSocketServer(
       io.to(publicRoom).emit('game.playerLeft', {
         gameId, playerId: player.id, robotId: player.robot.id,
       })
-      executeActivation()
+      if (phaseBeforeLeave === 'activation' && game.phase === 'programming') dealHands()
+      scheduleNextAction()
     })
 
     socket.on('disconnect', () => {
@@ -254,7 +278,7 @@ export function createGameSocketServer(
       try {
         const submission = parseSubmitProgram(payload)
         const program = resolveProgram(player, submission.cardIds)
-        if (submission.gameId !== gameId || !program) {
+        if (submission.gameId !== gameId || submission.playerId !== player.id || !program) {
           throw new Error('Program does not belong to this game')
         }
         game.submitProgram(player.id, program)
@@ -265,10 +289,11 @@ export function createGameSocketServer(
 
       acknowledge({ outcome: 'ACCEPTED' })
       socket.to(publicRoom).emit('program.submitted', {
+        gameId,
         playerId: player.id,
       })
 
-      executeActivation()
+      scheduleNextAction()
     })
   })
 

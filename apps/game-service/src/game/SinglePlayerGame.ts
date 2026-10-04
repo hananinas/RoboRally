@@ -1,11 +1,11 @@
-import { Board } from './Board.js'
-import { BackUp, Move1, Move2, Move3, TurnLeft, TurnRight, UTurn, type Card } from './Card.js'
-import { Game } from './Game.js'
-import type { GameId } from './ids.js'
-import { Player } from './Player.js'
-import { Robot } from './Robot.js'
-import { Direction } from './spatial.js'
-import { EmptyTile } from './Tile.js'
+import { Board } from '@/game/Board'
+import { BackUp, Move1, Move2, Move3, TurnLeft, TurnRight, UTurn, type Card } from '@/game/Card'
+import { Game } from '@/game/Game'
+import type { GameId } from '@/game/ids'
+import { Player } from '@/game/Player'
+import { Robot } from '@/game/Robot'
+import { Direction } from '@/game/spatial'
+import { EmptyTile } from '@/game/Tile'
 
 const BOARD_WIDTH = 21
 const BOARD_HEIGHT = 15
