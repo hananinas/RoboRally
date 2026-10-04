@@ -21,6 +21,14 @@ export type LoginResult =
         | 'INTERNAL_ERROR'
     }>
 
+export type JoinGame = Readonly<{ gameId: GameId }>
+
+export type PlayerAssignment = Readonly<{
+  gameId: GameId
+  playerId: PlayerId
+  robotId: RobotId
+}>
+
 export type Card = Readonly<{
   id: CardId
   instruction: Instruction
@@ -56,16 +64,21 @@ export type Board = Readonly<{
   tiles: readonly Tile[]
 }>
 
-export type GamePhase = 'WAITING' | 'PROGRAMMING' | 'EXECUTING'
+export type GamePhase = 'PROGRAMMING' | 'EXECUTING'
+
+export type Antenna = Readonly<Coordinate & { angle: number }>
 
 export type PublicGameState = Readonly<{
   gameId: GameId
+  antenna: Antenna
   board: Board
   robots: readonly Robot[]
   phase: GamePhase
 }>
 
 export type CardsDealt = Readonly<{
+  gameId: GameId
+  playerId: PlayerId
   cards: readonly Card[]
 }>
 
@@ -76,10 +89,13 @@ export type ProgramResult = Readonly<{
 }>
 
 export type ProgramSubmitted = Readonly<{
+  gameId: GameId
   playerId: PlayerId
 }>
 
 export type RobotActionResolved = Readonly<{
+  gameId: GameId
+  registerIndex: number
   robotId: RobotId
   instruction: Instruction
   position: Position
@@ -96,4 +112,23 @@ export type PublicGameStateResult =
     }>
   | Readonly<{
       outcome: 'GAME_NOT_FOUND'
+    }>
+
+export type JoinResult =
+  | Readonly<{
+      outcome: 'JOINED'
+      assignment: PlayerAssignment
+      state: PublicGameState
+      hand: readonly Card[]
+      programSubmitted: boolean
+    }>
+  | Readonly<{
+      outcome:
+        | 'LOGIN_REQUIRED'
+        | 'INVALID_REQUEST'
+        | 'GAME_NOT_FOUND'
+        | 'NO_SPAWN_AVAILABLE'
+        | 'USER_ALREADY_IN_GAME'
+        | 'GAME_ALREADY_STARTED'
+        | 'INTERNAL_ERROR'
     }>

@@ -1,6 +1,8 @@
 import type {
   CardsDealt,
   GetPublicGameState,
+  JoinGame,
+  JoinResult,
   LoginResult,
   ProgramResult,
   ProgramSubmitted,
@@ -10,6 +12,7 @@ import type {
 import type { SubmitProgram } from './submitProgram.js'
 import type { Login } from './login.js'
 
+export type JoinResultAcknowledgement = (result: JoinResult) => void
 export type ProgramResultAcknowledgement = (result: ProgramResult) => void
 export type LoginAcknowledgement = (result: LoginResult) => void
 
@@ -18,6 +21,7 @@ export type PublicGameStateAcknowledgement = (
 ) => void
 
 export interface ClientToServerEvents {
+  'game.join': (payload: JoinGame, acknowledge: JoinResultAcknowledgement) => void
   'user.login': (payload: Login, acknowledge: LoginAcknowledgement) => void
   'program.submit': (
     payload: SubmitProgram,

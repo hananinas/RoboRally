@@ -46,7 +46,6 @@ function ProgramCard({
         className="program-card__icon"
         draggable={false}
       />
-
       <span className="program-card__label">
         {cardPresentation[card.instruction].label}
       </span>

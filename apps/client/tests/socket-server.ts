@@ -3,12 +3,14 @@ import { createServer } from 'node:http'
 import type {
   Card,
   ClientToServerEvents,
+  JoinResult,
+  LoginResult,
   ProgramResultAcknowledgement,
   ProgramResultOutcome,
   PublicGameState,
-  PublicGameStateAcknowledgement,
   ServerToClientEvents,
   SubmitProgram,
+  User,
 } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
 import {
@@ -16,6 +18,7 @@ import {
   GAME_ID,
   HAND_INSTRUCTIONS,
   PLAYER_ID,
+  ROBOT_ID,
   type FixtureControl,
   type FixtureSnapshot,
 } from './game-fixture-data.ts'
@@ -30,8 +33,14 @@ type Fixture = {
   outcome: ProgramResultOutcome
   deferred: boolean
   stateRequests: number
-  deferState: boolean
-  pendingState: { socket: GameSocket; acknowledge: PublicGameStateAcknowledgement }[]
+  entryRequests: FixtureSnapshot['entryRequests'][number][]
+  loginOutcome: LoginResult['outcome']
+  joinOutcome: JoinResult['outcome']
+  deferLogin: boolean
+  deferJoin: boolean
+  programSubmitted: boolean
+  pendingLogins: { socket: GameSocket; respond: () => void }[]
+  pendingJoins: { socket: GameSocket; respond: () => void }[]
   pending: { socket: GameSocket; acknowledge: ProgramResultAcknowledgement }[]
 }
 
@@ -51,38 +60,69 @@ function snapshot(fixture: Fixture): FixtureSnapshot {
     state: fixture.state,
     submissions: fixture.submissions,
     stateRequests: fixture.stateRequests,
-    pendingStateRequests: fixture.pendingState.length,
+    entryRequests: fixture.entryRequests,
+    pendingLogins: fixture.pendingLogins.length,
+    pendingJoins: fixture.pendingJoins.length,
   }
 }
 
 function acknowledgeProgram(
   fixture: Fixture,
-  socket: GameSocket,
+  sender: GameSocket,
   acknowledge: ProgramResultAcknowledgement,
   outcome: ProgramResultOutcome,
 ) {
   acknowledge({ outcome })
   if (outcome === 'ACCEPTED') {
-    fixture.state = { ...fixture.state, phase: 'EXECUTING' }
-    // Production broadcasts acceptance to the other sockets, excluding the sender.
     for (const observer of fixture.sockets) {
-      if (observer !== socket) observer.emit('program.submitted', { playerId: PLAYER_ID })
+      if (observer === sender) continue
+      observer.emit('program.submitted', {
+        gameId: GAME_ID, playerId: PLAYER_ID,
+      })
     }
   }
 }
 
 function controlFixture(fixture: Fixture, control: FixtureControl) {
   switch (control.type) {
+    case 'hand':
+      for (const socket of fixture.sockets) socket.emit('cards.dealt', control.hand)
+      break
+    case 'submitted':
+      for (const socket of fixture.sockets) socket.emit('program.submitted', control.submission)
+      break
+    case 'deal':
+      for (const socket of fixture.sockets) socket.emit('cards.dealt', {
+        gameId: GAME_ID, playerId: PLAYER_ID, cards: fixture.cards,
+      })
+      break
+    case 'early-hand':
+      // Exercise out-of-order delivery without changing the authoritative join hand.
+      for (const socket of fixture.sockets) socket.emit('cards.dealt', {
+        gameId: GAME_ID, playerId: PLAYER_ID, cards: control.cards,
+      })
+      break
     case 'disconnect':
       for (const socket of fixture.sockets) socket.disconnect(true)
       break
-    case 'state-requests':
-      fixture.deferState = control.deferred
+    case 'login':
+      fixture.loginOutcome = control.outcome
+      fixture.deferLogin = control.deferred
       break
-    case 'respond-state':
-      for (const pending of fixture.pendingState.splice(0)) {
-        pending.acknowledge({ outcome: 'GAME_FOUND', state: fixture.state })
-      }
+    case 'join':
+      fixture.joinOutcome = control.outcome
+      fixture.deferJoin = control.deferred
+      break
+    case 'respond-login':
+      for (const pending of fixture.pendingLogins.splice(0)) pending.respond()
+      break
+    case 'respond-join':
+      for (const pending of fixture.pendingJoins.splice(0)) pending.respond()
+      break
+    case 'joined-state':
+      fixture.state = control.state
+      fixture.cards = control.hand
+      fixture.programSubmitted = control.programSubmitted
       break
     case 'submission':
       fixture.outcome = control.outcome
@@ -104,7 +144,9 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
       fixture.cards = dealCards()
       for (const socket of fixture.sockets) {
         for (const action of control.actions) socket.emit('robot.actionResolved', action)
-        socket.emit('cards.dealt', { cards: fixture.cards })
+        if (!control.deferHand) socket.emit('cards.dealt', {
+          gameId: GAME_ID, playerId: PLAYER_ID, cards: fixture.cards,
+        })
       }
       break
     }
@@ -133,8 +175,14 @@ const httpServer = createServer(async (request, response) => {
       deferred: false,
       pending: [],
       stateRequests: 0,
-      deferState: false,
-      pendingState: [],
+      entryRequests: [],
+      loginOutcome: 'LOGGED_IN',
+      joinOutcome: 'JOINED',
+      deferLogin: false,
+      deferJoin: false,
+      programSubmitted: false,
+      pendingLogins: [],
+      pendingJoins: [],
     }
     fixtures.set(fixture.id, fixture)
     send(201, snapshot(fixture))
@@ -177,6 +225,48 @@ io.on('connection', (socket) => {
     return
   }
   fixture.sockets.add(socket)
+  let user: User | undefined
+
+  socket.on('user.login', (payload, acknowledge) => {
+    fixture.entryRequests.push({ event: 'user.login', socketId: socket.id, payload })
+    let result: LoginResult
+    if (fixture.loginOutcome !== 'LOGGED_IN') {
+      result = { outcome: fixture.loginOutcome }
+    } else if (user && user.username !== payload.username) {
+      result = { outcome: 'ALREADY_LOGGED_IN' }
+    } else {
+      user ??= { userId: randomUUID(), username: payload.username }
+      result = { outcome: 'LOGGED_IN', user }
+    }
+    // Delay only delivery: a timed-out request may already have bound the identity.
+    const respond = () => acknowledge(result)
+    if (fixture.deferLogin) fixture.pendingLogins.push({ socket, respond })
+    else respond()
+  })
+
+  socket.on('game.join', (payload, acknowledge) => {
+    fixture.entryRequests.push({ event: 'game.join', socketId: socket.id, payload })
+    const respond = () => {
+      if (!user || fixture.joinOutcome === 'LOGIN_REQUIRED') {
+        user = undefined
+        acknowledge({ outcome: 'LOGIN_REQUIRED' })
+      } else if (payload.gameId !== GAME_ID) {
+        acknowledge({ outcome: 'GAME_NOT_FOUND' })
+      } else if (fixture.joinOutcome !== 'JOINED') {
+        acknowledge({ outcome: fixture.joinOutcome })
+      } else {
+        acknowledge({
+          outcome: 'JOINED',
+          assignment: { gameId: GAME_ID, playerId: PLAYER_ID, robotId: ROBOT_ID },
+          state: fixture.state,
+          hand: fixture.cards,
+          programSubmitted: fixture.programSubmitted,
+        })
+      }
+    }
+    if (fixture.deferJoin) fixture.pendingJoins.push({ socket, respond })
+    else respond()
+  })
 
   socket.on('game.getPublicGameState', ({ gameId }, acknowledge) => {
     fixture.stateRequests += 1
@@ -184,16 +274,13 @@ io.on('connection', (socket) => {
       acknowledge({ outcome: 'GAME_NOT_FOUND' })
       return
     }
-    if (fixture.deferState) {
-      fixture.pendingState.push({ socket, acknowledge })
-    } else {
-      acknowledge({ outcome: 'GAME_FOUND', state: fixture.state })
-    }
+    acknowledge({ outcome: 'GAME_FOUND', state: fixture.state })
   })
 
   socket.on('program.submit', (payload, acknowledge) => {
     fixture.submissions.push(payload)
     const valid = payload.gameId === GAME_ID
+      && payload.playerId === PLAYER_ID
       && payload.cardIds.length === 5
       && new Set(payload.cardIds).size === 5
       && payload.cardIds.every((id) => fixture.cards.some((card) => card.id === id))
@@ -209,10 +296,9 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     fixture.sockets.delete(socket)
     fixture.pending = fixture.pending.filter((pending) => pending.socket !== socket)
-    fixture.pendingState = fixture.pendingState.filter((pending) => pending.socket !== socket)
+    fixture.pendingLogins = fixture.pendingLogins.filter((pending) => pending.socket !== socket)
+    fixture.pendingJoins = fixture.pendingJoins.filter((pending) => pending.socket !== socket)
   })
-
-  socket.emit('cards.dealt', { cards: fixture.cards })
 })
 
 httpServer.listen(4174, '127.0.0.1')

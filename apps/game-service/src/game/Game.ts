@@ -1,10 +1,10 @@
-import type { Board } from './Board.js'
+import type { Board } from '@/game/Board'
 import { instructions } from '@robo-rally/game-events'
-import type { Card } from './Card.js'
-import type { PlayerId, RobotId } from './ids.js'
-import type { Player } from './Player.js'
-import type { Robot } from './Robot.js'
-import { opposite, type Direction, type Position } from './spatial.js'
+import type { Card } from '@/game/Card'
+import type { PlayerId, RobotId } from '@/game/ids'
+import type { Player } from '@/game/Player'
+import type { Robot } from '@/game/Robot'
+import { opposite, type Direction, type Position } from '@/game/spatial'
 
 export type GamePhase = 'programming' | 'activation'
 
@@ -15,32 +15,50 @@ export type RobotActionResult = Readonly<{
   direction: Direction
 }>
 
-export type RegisterResult = Readonly<{
+export type Antenna = Readonly<Position & { angle: number }>
+
+export type NextActionResult = Readonly<{
   registerIndex: number
-  phase: GamePhase
-  actions: readonly RobotActionResult[]
+  action: RobotActionResult
 }>
 
 export class Game {
   readonly board: Board
   readonly players: readonly Player[]
+  readonly antenna: Antenna
   private readonly deck: readonly Card[]
   private currentPhase: GamePhase = 'programming'
   private registerIndex = 0
   private readonly submittedPlayerIds = new Set<PlayerId>()
   private readonly activatedRobotIds = new Set<RobotId>()
 
-  constructor(board: Board, players: readonly Player[], deck: readonly Card[]) {
-    // V0 starts with one player; multi-robot coordination comes later.
-    if (players.length !== 1) {
-      throw new RangeError('V0 requires exactly one player')
-    }
+  constructor(
+    board: Board,
+    players: readonly Player[],
+    deck: readonly Card[],
+    antenna: Antenna = { x: Math.floor(board.width / 2), y: 0, angle: Math.PI / 2 },
+  ) {
     if (deck.length < 5 || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')
     }
+    if (!board.contains(antenna) || !Number.isFinite(antenna.angle)) {
+      throw new RangeError('The antenna must be on the board with a finite angle')
+    }
+
+    const playerIds = new Set<PlayerId>()
+    const robotIds = new Set<RobotId>()
+    for (const player of players) {
+      if (playerIds.has(player.id) || robotIds.has(player.robot.id)) {
+        throw new RangeError('Players and robots must have unique IDs')
+      }
+      board.positionOf(player.robot.id)
+      playerIds.add(player.id)
+      robotIds.add(player.robot.id)
+    }
 
     this.board = board
-    this.players = [...players]
+    this.players = Object.freeze([...players])
+    this.antenna = Object.freeze({ ...antenna })
     this.deck = [...deck]
     this.dealCards()
   }
@@ -51,6 +69,10 @@ export class Game {
 
   get currentRegister(): number {
     return this.registerIndex
+  }
+
+  hasSubmittedProgram(playerId: PlayerId): boolean {
+    return this.submittedPlayerIds.has(playerId)
   }
 
   submitProgram(playerId: PlayerId, program: readonly Card[]): void {
@@ -76,41 +98,48 @@ export class Game {
 
     player.robot.setProgram(program)
     this.submittedPlayerIds.add(playerId)
-    if (this.submittedPlayerIds.size === this.players.length) {
+    this.recheckProgrammingPhase()
+  }
+
+  recheckProgrammingPhase(): void {
+    if (
+      this.currentPhase === 'programming' &&
+      this.players.length > 0 &&
+      this.players.every((player) => this.submittedPlayerIds.has(player.id))
+    ) {
       this.startActivationPhase()
     }
   }
 
-  executeCurrentRegister(): RegisterResult {
+  executeNextAction(): NextActionResult {
     if (this.currentPhase !== 'activation') {
-      throw new Error('Registers can only execute during activation')
+      throw new Error('Robot actions can only execute during activation')
     }
 
-    const executedRegister = this.registerIndex
-    const actions: RobotActionResult[] = []
-    let robotId = this.nextRobotByPriority()
-    while (robotId !== undefined) {
-      const robot = this.robotById(robotId)
-      const card = robot.getProgramCard(executedRegister)
-      this.executeCard(robotId, card)
-      this.activatedRobotIds.add(robotId)
-      actions.push({
-        robotId,
-        card,
-        position: this.board.positionOf(robotId),
-        direction: robot.direction,
-      })
-      robotId = this.nextRobotByPriority()
+    const robot = this.nextRobotByPriority()
+    if (!robot) throw new Error('No robots remain to activate')
+
+    const registerIndex = this.registerIndex
+    const card = robot.getProgramCard(registerIndex)
+    this.executeCard(robot, card)
+    this.activatedRobotIds.add(robot.id)
+    const action: RobotActionResult = {
+      robotId: robot.id,
+      card,
+      position: this.board.positionOf(robot.id),
+      direction: robot.direction,
     }
 
-    this.activateBoardElements()
-    this.finishRegister()
-    return { registerIndex: executedRegister, phase: this.currentPhase, actions }
+    if (this.activatedRobotIds.size === this.players.length) {
+      this.activateBoardElements()
+      this.finishRegister()
+    }
+    return { registerIndex, action }
   }
 
   private dealCards(): void {
     // V0 uses the supplied deck as a fixed hand, without drawing or shuffling.
-    this.players[0].setHand(this.deck)
+    for (const player of this.players) player.setHand(this.deck)
   }
 
   private startActivationPhase(): void {
@@ -119,23 +148,38 @@ export class Game {
     this.activatedRobotIds.clear()
   }
 
-  private nextRobotByPriority(): RobotId | undefined {
-    // V0 has one robot, so antenna priority cannot affect the order yet.
-    return this.players.find((player) => !this.activatedRobotIds.has(player.robot.id))?.robot.id
+  private nextRobotByPriority(): Robot | undefined {
+    let nextRobot: Robot | undefined
+    let nearestDistance = Infinity
+    let smallestOffset = Infinity
+    const fullTurn = 2 * Math.PI
+    const antennaAngle = this.antenna.angle % fullTurn
+
+    // Radians start east and increase clockwise because board y increases south.
+    // Recheck current positions every action; exact ties retain roster order.
+    for (const { robot } of this.players) {
+      if (this.activatedRobotIds.has(robot.id)) continue
+      const position = this.board.positionOf(robot.id)
+      const dx = position.x - this.antenna.x
+      const dy = position.y - this.antenna.y
+      const distance = Math.abs(dx) + Math.abs(dy)
+      if (distance > nearestDistance) continue
+      const angle = Math.atan2(dy, dx)
+      const offset = ((angle - antennaAngle) % fullTurn + fullTurn) % fullTurn
+      if (distance < nearestDistance || offset < smallestOffset) {
+        nextRobot = robot
+        nearestDistance = distance
+        smallestOffset = offset
+      }
+    }
+    return nextRobot
   }
 
-  private robotById(robotId: RobotId): Robot {
-    const robot = this.players.find((player) => player.robot.id === robotId)?.robot
-    if (!robot) throw new Error(`Robot ${robotId} is not in this game`)
-    return robot
-  }
-
-  private executeCard(robotId: RobotId, card: Card): void {
-    const robot = this.robotById(robotId)
+  private executeCard(robot: Robot, card: Card): void {
     const effect = instructions[card.instruction]
     if (effect.kind === 'move') {
       const direction = effect.steps < 0 ? opposite(robot.direction) : robot.direction
-      this.board.moveRobot(robotId, direction, Math.abs(effect.steps))
+      this.board.moveRobot(robot.id, direction, Math.abs(effect.steps))
     } else {
       robot.turn(effect.quarterTurns)
     }
@@ -143,7 +187,7 @@ export class Game {
 
   private activateBoardElements(): void {
     // V0 has no board effects.
-    // Either end with lazers here or add a dedicated step after this in executeCurrentRegister()
+    // Ordered board effects run here after every robot has acted.
   }
 
   private finishRegister(): void {

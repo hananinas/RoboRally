@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Direction, Card, Player, Robot } from './index.js'
+import { Direction, Card, Player, Robot } from '@/game/index'
 
 describe('Player', () => {
   it('keeps its robot and copies assigned hands', () => {
