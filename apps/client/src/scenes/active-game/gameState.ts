@@ -29,6 +29,8 @@ export type ClientGameState = {
   playback: RobotPlaybackState
   hand: readonly ProgramCard[]
   registers: Registers
+  // Copy of the submitted program shown while its actions play back.
+  playbackProgram: Registers | null
   handVersion: number
   handReady: boolean
   pendingHand: CardsDealt | null
@@ -65,6 +67,7 @@ export function createClientGameState(): ClientGameState {
     playback: createRobotPlaybackState([]),
     hand: [],
     registers: emptyRegisters(),
+    playbackProgram: null,
     handVersion: 0,
     handReady: false,
     pendingHand: null,
@@ -182,10 +185,20 @@ export function gameStateReducer(
         phase: 'EXECUTING',
         handReady: false,
         pendingHand: null,
+        playbackProgram: state.playbackProgram ??
+          (state.registers.some((card) => card !== null) ? state.registers : null),
         playback: robotPlaybackReducer(state.playback, { type: 'enqueue', action: event.action }),
       }
-    case 'complete':
-      return activateHand({ ...state, playback: robotPlaybackReducer(state.playback, { type: 'complete' }) })
+    case 'complete': {
+      const playback = robotPlaybackReducer(state.playback, { type: 'complete' })
+      if (playback.active) return { ...state, playback }
+      return activateHand({
+        ...state,
+        playback,
+        playbackProgram: null,
+        registers: state.playbackProgram ? emptyRegisters() : state.registers,
+      })
+    }
     case 'place': {
       if (!canProgram(state)) return state
       const card = state.hand.find((candidate) => candidate.id === event.cardId)
