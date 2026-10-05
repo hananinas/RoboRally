@@ -60,6 +60,7 @@ export default function BoardHarness() {
             <PlayerPanel player={{ name: 'Board fixture player' }} />
             <RegisterPanel
               registers={registers}
+              activeRegister={null}
               disabled={confirmed}
               submission={confirmed ? 'accepted' : 'idle'}
               status="Programming"

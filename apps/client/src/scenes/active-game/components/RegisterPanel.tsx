@@ -10,6 +10,7 @@ import ProgramCard from './ProgramCard.tsx'
 
 type RegisterPanelProps = {
   registers: Registers
+  activeRegister: number | null
   disabled: boolean
   submission: ClientGameState['submission']
   status: string
@@ -21,6 +22,7 @@ type RegisterPanelProps = {
 type RegisterSlotProps = {
   card: Card | null
   index: number
+  active: boolean
   disabled: boolean
   onRemove: (registerIndex: number) => void
 }
@@ -29,6 +31,7 @@ type RegisterSlotProps = {
 function RegisterSlot({
   card,
   index,
+  active,
   disabled,
   onRemove,
 }: RegisterSlotProps) {
@@ -38,7 +41,11 @@ function RegisterSlot({
   const registerIndex = card || disabled ? undefined : index
 
   return (
-    <li className="register">
+    <li
+      className={active ? 'register register--active' : 'register'}
+      aria-current={active ? 'step' : undefined}
+      data-active={active || undefined}
+    >
       <div className={cardClassName} data-register-index={registerIndex}>
         {card && (
           <ProgramCard
@@ -58,6 +65,7 @@ function RegisterSlot({
 // Renders the program registers.
 function RegisterPanel({
   registers,
+  activeRegister,
   disabled,
   submission,
   status,
@@ -78,6 +86,7 @@ function RegisterPanel({
             key={index}
             card={card}
             index={index}
+            active={index === activeRegister}
             disabled={disabled}
             onRemove={onRemove}
           />

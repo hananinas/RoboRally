@@ -51,7 +51,8 @@ function ActiveGame({ game, username }: {
           <div ref={hudContentRef} className="game-hud__content">
             <PlayerPanel player={{ name: username }} />
             <RegisterPanel
-              registers={state.registers}
+              registers={state.playbackProgram ?? state.registers}
+              activeRegister={state.playback.active?.registerIndex ?? null}
               disabled={disabled}
               submission={state.submission}
               status={status}
