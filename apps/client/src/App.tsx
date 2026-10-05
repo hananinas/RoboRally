@@ -1,7 +1,8 @@
 import ActiveGame from './scenes/active-game/ActiveGame.tsx'
 import useGameConnection from './scenes/active-game/useGameConnection.ts'
-import { useEffect, useReducer, useRef } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import Login from './scenes/login/Login.tsx'
+import LobbyPicker from './scenes/lobby-picker/LobbyPicker.tsx'
 import {
   createSessionState,
   sessionReducer,
@@ -36,6 +37,7 @@ function App() {
   const game = useGameConnection(connection.socket)
   const { initialize } = game
   const [session, dispatch] = useReducer(sessionReducer, undefined, createSessionState)
+  const [lobbySelected, setLobbySelected] = useState(false)
   const loginPending = useRef(false)
   const loginAttempt = useRef(0)
   const joinPending = useRef(false)
@@ -60,7 +62,7 @@ function App() {
   }, [connection.socket])
 
   useEffect(() => {
-    if (session.status !== 'joining' || joinPending.current) return
+    if (session.status !== 'joining' || !lobbySelected || joinPending.current) return
     const gameId = import.meta.env.VITE_GAME_ID
     if (!gameId) {
       dispatch({ type: 'join-error', error: 'GAME_ID_MISSING' })
@@ -85,7 +87,7 @@ function App() {
           : { type: 'join-result', result })
       },
     )
-  }, [connection.socket, connection.status, session.status, initialize])
+  }, [connection.socket, connection.status, session.status, initialize, lobbySelected])
 
   const username = session.status === 'editing' || session.status === 'logging-in'
     ? session.username
@@ -128,6 +130,7 @@ function App() {
       (error, result) => {
         if (attempt !== loginAttempt.current || !connection.socket.connected) return
         loginPending.current = false
+        if (!error && result.outcome === 'LOGGED_IN') setLobbySelected(false)
         dispatch(error
           ? { type: 'login-timeout' }
           : { type: 'login-result', result })
@@ -135,8 +138,22 @@ function App() {
     )
   }
 
+  function selectLobby() {
+    setLobbySelected(true)
+  }
+
   if (session.status === 'joined') {
     return <ActiveGame game={game} username={session.user.username} />
+  }
+
+  if (session.status === 'joining') {
+    return (
+      <LobbyPicker
+        joining={lobbySelected}
+        onSelectLobby={selectLobby}
+        username={session.user.username}
+      />
+    )
   }
 
   return (
