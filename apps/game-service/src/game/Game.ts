@@ -40,6 +40,7 @@ export class Game {
   private readonly submittedPlayerIds = new Set<PlayerId>()
   private readonly activatedRobotIds = new Set<RobotId>()
   private started = false
+  private isPaused = false
 
   constructor(
     board: Board,
@@ -88,6 +89,18 @@ export class Game {
     return this.started
   }
 
+  get paused(): boolean {
+    return this.isPaused
+  }
+
+  pause(): void {
+    this.isPaused = true
+  }
+
+  resume(): void {
+    this.isPaused = false
+  }
+
   hasSubmittedProgram(playerId: PlayerId): boolean {
     return this.submittedPlayerIds.has(playerId)
   }
@@ -128,6 +141,9 @@ export class Game {
   }
 
   submitProgram(playerId: PlayerId, program: readonly Card[]): void {
+    if (this.isPaused) {
+      throw new Error('Programs cannot be submitted while the game is paused')
+    }
     if (this.currentPhase !== 'programming') {
       throw new Error('Programs can only be submitted during programming')
     }
