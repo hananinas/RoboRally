@@ -1,6 +1,9 @@
 export type {
   ClientToServerEvents,
   JoinResultAcknowledgement,
+  LobbyCreateAcknowledgement,
+  LobbyJoinAcknowledgement,
+  LobbyListAcknowledgement,
   LoginAcknowledgement,
   ProgramResultAcknowledgement,
   PublicGameStateAcknowledgement,
@@ -20,6 +23,11 @@ export type {
   JoinGame,
   JoinResult,
   LoginResult,
+  LobbyCreateResult,
+  LobbyJoinResult,
+  LobbyListResult,
+  LobbyMap,
+  LobbySummary,
   Orientation,
   PlayerAssignment,
   PlayerId,
@@ -38,6 +46,8 @@ export type {
 } from './payloads.js'
 export { loginSchema, LoginRequestError, parseLogin } from './login.js'
 export type { Login, LoginRequestRejection } from './login.js'
+export { createLobbySchema, joinLobbySchema, LobbyRequestError, parseCreateLobby, parseJoinLobby } from './lobby.js'
+export type { CreateLobby, JoinLobby } from './lobby.js'
 export {
   getPublicGameStateSchema,
   parseGetPublicGameState,

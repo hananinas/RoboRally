@@ -1,6 +1,12 @@
 import ActiveGame from './scenes/active-game/ActiveGame.tsx'
 import useGameConnection from './scenes/active-game/useGameConnection.ts'
 import { useEffect, useReducer, useRef, useState } from 'react'
+import type {
+  CreateLobby,
+  LobbyCreateResult,
+  LobbyJoinResult,
+  LobbySummary,
+} from '@robo-rally/game-events'
 import Login from './scenes/login/Login.tsx'
 import LobbyPicker from './scenes/lobby-picker/LobbyPicker.tsx'
 import {
@@ -32,11 +38,30 @@ const joinErrors: Record<JoinError, string> = {
   TIMEOUT: 'The Game Service did not respond to the join request. Please try again.',
 }
 
+const createLobbyErrors: Record<Exclude<LobbyCreateResult['outcome'], 'LOBBY_CREATED'>, string> = {
+  LOGIN_REQUIRED: 'Log in again before creating a lobby.',
+  INVALID_REQUEST: 'Enter a valid lobby name, code, and map.',
+  LOBBY_CODE_TAKEN: 'That lobby number is already in use. Generate a new one.',
+  INTERNAL_ERROR: 'The Game Service could not create the lobby.',
+}
+
+const joinLobbyErrors: Record<Exclude<LobbyJoinResult['outcome'], 'LOBBY_JOINED'>, string> = {
+  LOGIN_REQUIRED: 'Log in again before joining a lobby.',
+  INVALID_REQUEST: 'That lobby number is invalid.',
+  LOBBY_NOT_FOUND: 'No lobby has that number.',
+  LOBBY_FULL: 'That lobby is full.',
+  ALREADY_IN_LOBBY: 'You are already in a different lobby.',
+  INTERNAL_ERROR: 'The Game Service could not join the lobby.',
+}
+
 function App() {
   const connection = useGameSocket()
   const game = useGameConnection(connection.socket)
   const { initialize } = game
   const [session, dispatch] = useReducer(sessionReducer, undefined, createSessionState)
+  const [lobbies, setLobbies] = useState<readonly LobbySummary[]>([])
+  const [lobbyError, setLobbyError] = useState<string | null>(null)
+  const [lobbyPending, setLobbyPending] = useState(false)
   const [lobbySelected, setLobbySelected] = useState(false)
   const loginPending = useRef(false)
   const loginAttempt = useRef(0)
@@ -55,8 +80,10 @@ function App() {
       dispatch({ type: 'disconnected' })
     }
     connection.socket.on('disconnect', handleDisconnect)
+    connection.socket.on('lobby.listUpdated', setLobbies)
     return () => {
       connection.socket.off('disconnect', handleDisconnect)
+      connection.socket.off('lobby.listUpdated', setLobbies)
       invalidateRequests()
     }
   }, [connection.socket])
@@ -134,12 +161,62 @@ function App() {
         dispatch(error
           ? { type: 'login-timeout' }
           : { type: 'login-result', result })
+        if (error || result.outcome !== 'LOGGED_IN') return
+
+        setLobbyError(null)
+        connection.socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit(
+          'lobby.list',
+          (listError, listResult) => {
+            if (listError) {
+              setLobbyError('The Game Service did not respond while loading lobbies.')
+            } else if (listResult.outcome === 'LOBBIES_LISTED') {
+              setLobbies(listResult.lobbies)
+            } else {
+              dispatch({ type: 'disconnected' })
+            }
+          },
+        )
       },
     )
   }
 
-  function selectLobby() {
-    setLobbySelected(true)
+  function createLobby(lobby: CreateLobby) {
+    if (!connection.socket.connected) {
+      setLobbyError('Connection lost. Log in again to create a lobby.')
+      return
+    }
+    setLobbyPending(true)
+    setLobbyError(null)
+    connection.socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit('lobby.create', lobby, (error, result) => {
+      setLobbyPending(false)
+      if (error) {
+        setLobbyError('The Game Service did not respond. Try creating the lobby again.')
+      } else if (result.outcome === 'LOBBY_CREATED') {
+        setLobbies((current) => [result.lobby, ...current.filter((item) => item.lobbyId !== result.lobby.lobbyId)])
+      } else {
+        setLobbyError(createLobbyErrors[result.outcome])
+      }
+    })
+  }
+
+  function joinLobby(code: string) {
+    if (!connection.socket.connected) {
+      setLobbyError('Connection lost. Log in again to join the lobby.')
+      return
+    }
+    setLobbyPending(true)
+    setLobbyError(null)
+    connection.socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit('lobby.join', { code }, (error, result) => {
+      setLobbyPending(false)
+      if (error) {
+        setLobbyError('The Game Service did not respond. Try joining the lobby again.')
+      } else if (result.outcome === 'LOBBY_JOINED') {
+        setLobbies((current) => current.map((lobby) => lobby.lobbyId === result.lobby.lobbyId ? result.lobby : lobby))
+        setLobbySelected(true)
+      } else {
+        setLobbyError(joinLobbyErrors[result.outcome])
+      }
+    })
   }
 
   if (session.status === 'joined') {
@@ -149,8 +226,12 @@ function App() {
   if (session.status === 'joining') {
     return (
       <LobbyPicker
+        actionError={lobbyError}
+        actionPending={lobbyPending}
+        lobbies={lobbies}
+        onCreateLobby={createLobby}
+        onJoinLobby={joinLobby}
         joining={lobbySelected}
-        onSelectLobby={selectLobby}
         username={session.user.username}
       />
     )

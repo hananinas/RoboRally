@@ -5,11 +5,32 @@ Client requests receive acknowledgement callbacks. Game state changes and gamepl
 This document describes the v0.5 communication flow. [AsyncAPI](asyncapi.yaml) defines the exact payloads and rejection codes, with a [rendered reference](asyncapi.html).
 
 
+<<<<<<< HEAD
+## Login and lobby flow
+=======
 ## Login and joining
 The client logs in with a username and receives a user ID.
+>>>>>>> 8d78931b3022af99ac0088b695182c075ba10636
 
 The client first logs in with a username:
 
+<<<<<<< HEAD
+On the same authenticated socket, the client requests `lobby.list`, then creates
+a lobby with a name, selected map, and six-character code or joins one by code.
+Creating a lobby also joins its creator. The service broadcasts directory
+changes through `lobby.listUpdated` and full roster snapshots through
+`lobby.updated` in `lobby:{lobbyId}`.
+
+Lobbies hold up to six players. When the sixth player joins, the service starts a
+five-second countdown and shares its server timestamp in `lobby.updated`. If a
+player leaves during the countdown, the lobby returns to waiting. When the timer
+expires, `lobby.started` carries the game ID and every member opens the board.
+Lobby state is in memory and is lost when the Game Service restarts.
+
+The current game engine still supports one player and one board configuration;
+the lobby roster and map selection do not yet create separate robot assignments
+or map layouts.
+=======
 `user.login`
 
 A successful login returns:
@@ -55,25 +76,33 @@ without receiving game state.
 Reconnection behavior is described in the Reconnection section.
 
 The following diagram documents the initial join behaviour:
+>>>>>>> 8d78931b3022af99ac0088b695182c075ba10636
 
 ```mermaid
 sequenceDiagram
     participant Client
     participant Server as Game Service
-    participant Public as game:{gameId}:public
-    participant Others as Existing members
+    participant Directory as Lobby directory
+    participant Room as lobby:{lobbyId}
 
     Client->>Server: user.login {username}
     alt Valid username
         Server-->>Client: Acknowledgement: LOGGED_IN {user}
-        Client->>Server: game.join {gameId}
-        alt Join accepted
-            Server-->>Client: Acknowledgement: JOINED {assignment, state, hand, programSubmitted}
-            Server->>Public: game.playerJoined {player, robot}
-            Public-->>Others: game.playerJoined {player, robot}
-            Note over Client,Server: Initialize before later game events
-        else Join rejected
-            Server-->>Client: Acknowledgement: rejection outcome
+        Client->>Server: lobby.list
+        Server-->>Client: Acknowledgement: LOBBIES_LISTED {lobbies}
+        Client->>Server: lobby.create {name, code, map} or lobby.join {code}
+        Server-->>Client: Acknowledgement: LOBBY_CREATED or LOBBY_JOINED {state}
+        Server->>Directory: lobby.listUpdated
+        Server->>Room: lobby.updated {players, status: WAITING}
+        loop Until six players have joined
+            Server->>Room: lobby.updated {players, status: WAITING}
+        end
+        Server->>Room: lobby.updated {status: COUNTDOWN, countdownEndsAt}
+        alt Player leaves before countdown ends
+            Server->>Room: lobby.updated {status: WAITING}
+        else Countdown expires
+            Server->>Room: lobby.started {gameId}
+            Note over Client,Server: All members open the configured game board
         end
     else Invalid username
         Server-->>Client: Acknowledgement: INVALID_USERNAME

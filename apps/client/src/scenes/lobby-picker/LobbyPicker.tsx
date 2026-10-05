@@ -1,34 +1,24 @@
 import { useState, type FormEvent } from 'react'
+import type { CreateLobby, LobbySummary } from '@robo-rally/game-events'
 import './LobbyPicker.css'
 
-export type LobbyOption = {
-  id: string
-  name: string
-  number: string
-  players: number
-  capacity: number
-}
-
 type LobbyPickerProps = {
+  actionError: string | null
+  actionPending: boolean
+  lobbies: readonly LobbySummary[]
+  onCreateLobby: (lobby: CreateLobby) => void
+  onJoinLobby: (code: string) => void
   joining: boolean
-  onSelectLobby: (lobby: LobbyOption) => void
   username: string
 }
 
-const initialLobbies: LobbyOption[] = [
-  { id: 'lobby-0421', name: 'Foundry Floor', number: '0421', players: 2, capacity: 6 },
-  { id: 'lobby-0188', name: 'Laser Maze', number: '0188', players: 4, capacity: 6 },
-  { id: 'lobby-0927', name: 'Checkpoint Circuit', number: '0927', players: 1, capacity: 6 },
-  { id: 'lobby-0714', name: 'Gearworks', number: '0714', players: 3, capacity: 6 },
-]
-
-function generateLobbyNumber(lobbies: readonly LobbyOption[]): string {
-  let number = ''
+function generateLobbyCode(lobbies: readonly LobbySummary[]): string {
+  let code = ''
   do {
     const random = crypto.getRandomValues(new Uint32Array(1))[0] ?? 0
-    number = String(1000 + (random % 9000))
-  } while (lobbies.some((lobby) => lobby.number === number))
-  return number
+    code = String(1000 + (random % 9000))
+  } while (lobbies.some((lobby) => lobby.code === code))
+  return code
 }
 
 function BoardBackground() {
@@ -39,17 +29,28 @@ function BoardBackground() {
   )
 }
 
-export default function LobbyPicker({ joining, onSelectLobby, username }: LobbyPickerProps) {
-  const [lobbies, setLobbies] = useState(initialLobbies)
-  const [selectedLobbyId, setSelectedLobbyId] = useState<string | null>(null)
+export default function LobbyPicker({
+  actionError,
+  actionPending,
+  lobbies,
+  onCreateLobby,
+  onJoinLobby,
+  joining,
+  username,
+}: LobbyPickerProps) {
   const [creating, setCreating] = useState(false)
   const [newLobbyName, setNewLobbyName] = useState('')
-  const [newLobbyNumber, setNewLobbyNumber] = useState<string | null>(null)
+  const [newLobbyCode, setNewLobbyCode] = useState<string | null>(null)
+  const [newLobbyMap, setNewLobbyMap] = useState<'Map 1' | 'Map 2'>('Map 1')
   const [error, setError] = useState<string | null>(null)
+  const [lobbyCode, setLobbyCode] = useState('')
+  const [selectedLobbyCode, setSelectedLobbyCode] = useState<string | null>(null)
+  const [createdLobbyCode, setCreatedLobbyCode] = useState<string | null>(null)
 
   function beginCreate() {
-    setNewLobbyNumber(generateLobbyNumber(lobbies))
+    setNewLobbyCode(generateLobbyCode(lobbies))
     setNewLobbyName('')
+    setNewLobbyMap('Map 1')
     setError(null)
     setCreating(true)
   }
@@ -57,25 +58,30 @@ export default function LobbyPicker({ joining, onSelectLobby, username }: LobbyP
   function createLobby(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const name = newLobbyName.trim()
-    if (!name || !newLobbyNumber) {
+    if (!name || !newLobbyCode) {
       setError('Enter a lobby name.')
       return
     }
-    const lobby: LobbyOption = {
-      id: `lobby-${newLobbyNumber}`,
-      name,
-      number: newLobbyNumber,
-      players: 1,
-      capacity: 6,
-    }
-    setLobbies((current) => [lobby, ...current])
-    setSelectedLobbyId(lobby.id)
+    onCreateLobby({ name, code: newLobbyCode, map: newLobbyMap })
+    setCreatedLobbyCode(newLobbyCode)
+    setSelectedLobbyCode(newLobbyCode)
     setCreating(false)
-    setNewLobbyNumber(null)
+    setNewLobbyCode(null)
     setError(null)
   }
 
-  const selectedLobby = lobbies.find((lobby) => lobby.id === selectedLobbyId) ?? null
+  function findLobby(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const lobby = lobbies.find((candidate) => candidate.code === lobbyCode.trim().toUpperCase())
+    if (!lobby) {
+      setError('No lobby has that code.')
+      return
+    }
+    setSelectedLobbyCode(lobby.code)
+    setError(null)
+  }
+
+  const selectedLobby = lobbies.find((lobby) => lobby.code === selectedLobbyCode) ?? null
 
   return (
     <main className="lobby-picker-page">
@@ -105,15 +111,34 @@ export default function LobbyPicker({ joining, onSelectLobby, username }: LobbyP
               />
             </label>
             <label className="lobby-picker-label">
-              <span>Lobby number</span>
-              <input aria-label="Generated lobby number" readOnly value={newLobbyNumber ?? ''} />
+              <span>Lobby code</span>
+              <input aria-label="Generated lobby code" readOnly value={newLobbyCode ?? ''} />
             </label>
-            {error && <p className="lobby-picker-error" role="alert">{error}</p>}
+            <fieldset className="lobby-picker-map">
+              <legend>Choose a map</legend>
+              <div>
+                {(['Map 1', 'Map 2'] as const).map((map) => (
+                  <label key={map}>
+                    <input
+                      checked={newLobbyMap === map}
+                      name="lobby-map"
+                      onChange={() => setNewLobbyMap(map)}
+                      type="radio"
+                      value={map}
+                    />
+                    <span>{map}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            {(error ?? actionError) && <p className="lobby-picker-error" role="alert">{error ?? actionError}</p>}
             <div className="lobby-picker-actions">
               <button className="lobby-picker-secondary" onClick={() => setCreating(false)} type="button">
                 Cancel
               </button>
-              <button className="lobby-picker-primary" type="submit">Create lobby</button>
+              <button className="lobby-picker-primary" disabled={actionPending} type="submit">
+                {actionPending ? 'Creating…' : 'Create lobby'}
+              </button>
             </div>
           </form>
         ) : (
@@ -123,33 +148,53 @@ export default function LobbyPicker({ joining, onSelectLobby, username }: LobbyP
           </button>
         )}
 
+        <form className="lobby-picker-code-form" onSubmit={findLobby}>
+          <label className="lobby-picker-label">
+            <span>Join using a lobby code</span>
+            <input
+                  maxLength={4}
+              onChange={(event) => {
+                setLobbyCode(event.target.value.toUpperCase())
+                setError(null)
+              }}
+              placeholder="4-digit code"
+              value={lobbyCode}
+            />
+          </label>
+          <button className="lobby-picker-secondary" type="submit">Find</button>
+        </form>
+        {(error ?? actionError) && !creating && <p className="lobby-picker-error" role="alert">{error ?? actionError}</p>}
+
         <h2 className="lobby-picker-list-heading">Available lobbies</h2>
+        {createdLobbyCode && !lobbies.some((lobby) => lobby.code === createdLobbyCode) && (
+          <p className="lobby-picker-note" role="status">Creating lobby…</p>
+        )}
         <div className="lobby-picker-list" role="listbox" aria-label="Available lobbies">
           {lobbies.map((lobby) => (
             <button
-              aria-selected={selectedLobbyId === lobby.id}
+              aria-selected={selectedLobbyCode === lobby.code || createdLobbyCode === lobby.code}
               className="lobby-picker-row"
-              key={lobby.id}
-              onClick={() => setSelectedLobbyId(lobby.id)}
+              key={lobby.lobbyId}
+              onClick={() => setSelectedLobbyCode(lobby.code)}
               role="option"
               type="button"
             >
               <span className="lobby-picker-row-main">
                 <strong>{lobby.name}</strong>
-                <span>Lobby #{lobby.number}</span>
+                <span>Lobby #{lobby.code} · {lobby.map}</span>
               </span>
-              <span className="lobby-picker-row-players">{lobby.players}/{lobby.capacity} players</span>
+              <span className="lobby-picker-row-players">{lobby.playerCount}/{lobby.capacity} players</span>
             </button>
           ))}
         </div>
 
         <button
           className="lobby-picker-primary lobby-picker-join"
-          disabled={!selectedLobby || joining}
-          onClick={() => selectedLobby && onSelectLobby(selectedLobby)}
+          disabled={!selectedLobby || joining || actionPending}
+          onClick={() => selectedLobby && onJoinLobby(selectedLobby.code)}
           type="button"
         >
-          {joining ? 'Joining game…' : 'Join selected lobby'}
+          {joining ? 'Joining game…' : actionPending ? 'Joining lobby…' : 'Join selected lobby'}
         </button>
       </section>
     </main>

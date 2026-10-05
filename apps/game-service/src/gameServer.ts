@@ -1,6 +1,9 @@
 import type { Server as HttpServer } from 'node:http'
 import {
+  LobbyRequestError,
+  parseCreateLobby,
   parseGetPublicGameState,
+  parseJoinLobby,
   LoginRequestError,
   parseLogin,
   parseSubmitProgram,
@@ -22,6 +25,7 @@ import {
   presentRobotActionResolved,
 } from '@/gamePresenter'
 import { createUserRegistry } from '@/userRegistry'
+import { createLobbyRegistry } from './lobbyRegistry.js'
 
 export type GameSocketData = { user?: User }
 
@@ -39,6 +43,12 @@ export type GameSession = Readonly<{
   game: Game
   playerForConnection: (socket: GameSocket) => Player | undefined
 }>
+
+export type GameSocketServerOptions = Readonly<{
+  lobbyCapacity?: number
+}>
+
+const DEFAULT_LOBBY_CAPACITY = 6
 
 function defaultSession(): GameSession {
   const { gameId, game, player } = createSinglePlayerGame()
@@ -70,9 +80,11 @@ function resolveProgram(
 export function createGameSocketServer(
   httpServer: HttpServer,
   session: GameSession = defaultSession(),
+  options: GameSocketServerOptions = {},
 ): GameSocketServer {
   const io = new Server<ClientToServerEvents, ServerToClientEvents, {}, GameSocketData>(httpServer)
   const users = createUserRegistry()
+  const lobbies = createLobbyRegistry(options.lobbyCapacity ?? DEFAULT_LOBBY_CAPACITY)
   const { gameId, game, playerForConnection } = session
   let scheduledAction: NodeJS.Immediate | undefined
   let closed = false
@@ -98,6 +110,10 @@ export function createGameSocketServer(
         }
       }
     })
+  }
+
+  function publishLobbyList(): void {
+    io.emit('lobby.listUpdated', lobbies.list())
   }
 
   httpServer.once('close', () => {
@@ -142,6 +158,61 @@ export function createGameSocketServer(
         acknowledge({ outcome: 'LOGGED_IN', user })
       } catch {
         acknowledge({ outcome: 'INTERNAL_ERROR' })
+      }
+    })
+
+    socket.on('lobby.list', (acknowledge) => {
+      if (typeof acknowledge !== 'function') return
+      acknowledge(socket.data.user
+        ? { outcome: 'LOBBIES_LISTED', lobbies: lobbies.list() }
+        : { outcome: 'LOGIN_REQUIRED' })
+    })
+
+    socket.on('lobby.create', (payload, acknowledge) => {
+      if (typeof acknowledge !== 'function') return
+      const user = socket.data.user
+      if (!user) {
+        acknowledge({ outcome: 'LOGIN_REQUIRED' })
+        return
+      }
+
+      try {
+        const request = parseCreateLobby(payload)
+        const result = lobbies.create(user, request)
+        if ('error' in result) {
+          acknowledge({ outcome: result.error })
+          return
+        }
+        acknowledge({ outcome: 'LOBBY_CREATED', lobby: result.lobby })
+        publishLobbyList()
+      } catch (error) {
+        acknowledge({
+          outcome: error instanceof LobbyRequestError ? 'INVALID_REQUEST' : 'INTERNAL_ERROR',
+        })
+      }
+    })
+
+    socket.on('lobby.join', (payload, acknowledge) => {
+      if (typeof acknowledge !== 'function') return
+      const user = socket.data.user
+      if (!user) {
+        acknowledge({ outcome: 'LOGIN_REQUIRED' })
+        return
+      }
+
+      try {
+        const request = parseJoinLobby(payload)
+        const result = lobbies.join(user, request.code)
+        if ('error' in result) {
+          acknowledge({ outcome: result.error })
+          return
+        }
+        acknowledge({ outcome: 'LOBBY_JOINED', lobby: result.lobby })
+        publishLobbyList()
+      } catch (error) {
+        acknowledge({
+          outcome: error instanceof LobbyRequestError ? 'INVALID_REQUEST' : 'INTERNAL_ERROR',
+        })
       }
     })
 

@@ -9,6 +9,34 @@ export type User = Readonly<{
   username: string
 }>
 
+export type LobbyMap = 'Map 1' | 'Map 2'
+
+export type LobbySummary = Readonly<{
+  lobbyId: string
+  code: string
+  name: string
+  map: LobbyMap
+  playerCount: number
+  capacity: number
+}>
+
+export type LobbyListResult =
+  | Readonly<{ outcome: 'LOBBIES_LISTED'; lobbies: readonly LobbySummary[] }>
+  | Readonly<{ outcome: 'LOGIN_REQUIRED' }>
+
+export type LobbyCreateResult =
+  | Readonly<{ outcome: 'LOBBY_CREATED'; lobby: LobbySummary }>
+  | Readonly<{
+      outcome: 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'LOBBY_CODE_TAKEN' | 'INTERNAL_ERROR'
+    }>
+
+export type LobbyJoinResult =
+  | Readonly<{ outcome: 'LOBBY_JOINED'; lobby: LobbySummary }>
+  | Readonly<{
+      outcome: 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'LOBBY_NOT_FOUND' | 'LOBBY_FULL' | 'INTERNAL_ERROR'
+    }>
+    | Readonly<{ outcome: 'ALREADY_IN_LOBBY' }>
+
 export type LoginResult =
   | Readonly<{ outcome: 'LOGGED_IN'; user: User }>
   | Readonly<{

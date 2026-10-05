@@ -5,6 +5,7 @@ import type {
   ClientToServerEvents,
   JoinResult,
   LoginResult,
+  LobbySummary,
   ProgramResultAcknowledgement,
   ProgramResultOutcome,
   PublicGameState,
@@ -13,6 +14,12 @@ import type {
   User,
 } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
+import {
+  LobbyRequestError,
+  parseCreateLobby,
+  parseJoinLobby,
+  parseLogin,
+} from '@robo-rally/game-events'
 import {
   createPublicState,
   GAME_ID,
@@ -41,6 +48,8 @@ type Fixture = {
   pendingLogins: { socket: GameSocket; respond: () => void }[]
   pendingJoins: { socket: GameSocket; respond: () => void }[]
   pending: { socket: GameSocket; acknowledge: ProgramResultAcknowledgement }[]
+  lobbies: Map<string, LobbySummary>
+  usersInLobbies: Map<string, string>
 }
 
 const fixtures = new Map<string, Fixture>()
@@ -182,6 +191,13 @@ const httpServer = createServer(async (request, response) => {
       programSubmitted: false,
       pendingLogins: [],
       pendingJoins: [],
+      lobbies: new Map([
+        ['0421', { lobbyId: 'fixture-foundry', code: '0421', name: 'Foundry Floor', map: 'Map 1', playerCount: 2, capacity: 6 }],
+        ['0188', { lobbyId: 'fixture-laser', code: '0188', name: 'Laser Maze', map: 'Map 2', playerCount: 4, capacity: 6 }],
+        ['0927', { lobbyId: 'fixture-checkpoint', code: '0927', name: 'Checkpoint Circuit', map: 'Map 1', playerCount: 1, capacity: 6 }],
+        ['0714', { lobbyId: 'fixture-gearworks', code: '0714', name: 'Gearworks', map: 'Map 2', playerCount: 3, capacity: 6 }],
+      ]),
+      usersInLobbies: new Map(),
     }
     fixtures.set(fixture.id, fixture)
     send(201, snapshot(fixture))
@@ -229,13 +245,18 @@ io.on('connection', (socket) => {
   socket.on('user.login', (payload, acknowledge) => {
     fixture.entryRequests.push({ event: 'user.login', socketId: socket.id, payload })
     let result: LoginResult
-    if (fixture.loginOutcome !== 'LOGGED_IN') {
-      result = { outcome: fixture.loginOutcome }
-    } else if (user && user.username !== payload.username) {
-      result = { outcome: 'ALREADY_LOGGED_IN' }
-    } else {
-      user ??= { userId: randomUUID(), username: payload.username }
-      result = { outcome: 'LOGGED_IN', user }
+    try {
+      const login = parseLogin(payload)
+      if (fixture.loginOutcome !== 'LOGGED_IN') {
+        result = { outcome: fixture.loginOutcome }
+      } else if (user && user.username !== login.username) {
+        result = { outcome: 'ALREADY_LOGGED_IN' }
+      } else {
+        user ??= { userId: randomUUID(), username: login.username }
+        result = { outcome: 'LOGGED_IN', user }
+      }
+    } catch {
+      result = { outcome: 'INVALID_REQUEST' }
     }
     // Delay only delivery: a timed-out request may already have bound the identity.
     const respond = () => acknowledge(result)
@@ -265,6 +286,78 @@ io.on('connection', (socket) => {
     }
     if (fixture.deferJoin) fixture.pendingJoins.push({ socket, respond })
     else respond()
+  })
+
+  socket.on('lobby.list', (acknowledge) => {
+    acknowledge(user
+      ? { outcome: 'LOBBIES_LISTED', lobbies: [...fixture.lobbies.values()] }
+      : { outcome: 'LOGIN_REQUIRED' })
+  })
+
+  function publishLobbies() {
+    if (!fixture) return
+    io.emit('lobby.listUpdated', [...fixture.lobbies.values()])
+  }
+
+  socket.on('lobby.create', (payload, acknowledge) => {
+    if (!user) {
+      acknowledge({ outcome: 'LOGIN_REQUIRED' })
+      return
+    }
+    try {
+      const request = parseCreateLobby(payload)
+      if (fixture.lobbies.has(request.code)) {
+        acknowledge({ outcome: 'LOBBY_CODE_TAKEN' })
+        return
+      }
+      const lobby: LobbySummary = {
+        lobbyId: randomUUID(),
+        code: request.code,
+        name: request.name,
+        map: request.map,
+        playerCount: 1,
+        capacity: 6,
+      }
+      fixture.lobbies.set(lobby.code, lobby)
+      fixture.usersInLobbies.set(user.userId, lobby.code)
+      acknowledge({ outcome: 'LOBBY_CREATED', lobby })
+      publishLobbies()
+    } catch (error) {
+      acknowledge({ outcome: error instanceof LobbyRequestError ? 'INVALID_REQUEST' : 'INTERNAL_ERROR' })
+    }
+  })
+
+  socket.on('lobby.join', (payload, acknowledge) => {
+    if (!user) {
+      acknowledge({ outcome: 'LOGIN_REQUIRED' })
+      return
+    }
+    try {
+      const request = parseJoinLobby(payload)
+      const lobby = fixture.lobbies.get(request.code)
+      if (!lobby) {
+        acknowledge({ outcome: 'LOBBY_NOT_FOUND' })
+        return
+      }
+      if (lobby.playerCount >= lobby.capacity) {
+        acknowledge({ outcome: 'LOBBY_FULL' })
+        return
+      }
+      const existingCode = fixture.usersInLobbies.get(user.userId)
+      if (existingCode && existingCode !== request.code) {
+        acknowledge({ outcome: 'ALREADY_IN_LOBBY' })
+        return
+      }
+      const joined = existingCode === request.code
+        ? lobby
+        : { ...lobby, playerCount: lobby.playerCount + 1 }
+      fixture.usersInLobbies.set(user.userId, request.code)
+      fixture.lobbies.set(request.code, joined)
+      acknowledge({ outcome: 'LOBBY_JOINED', lobby: joined })
+      publishLobbies()
+    } catch (error) {
+      acknowledge({ outcome: error instanceof LobbyRequestError ? 'INVALID_REQUEST' : 'INTERNAL_ERROR' })
+    }
   })
 
   socket.on('game.getPublicGameState', ({ gameId }, acknowledge) => {

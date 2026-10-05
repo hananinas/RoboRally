@@ -2,6 +2,8 @@ import { createServer, type Server as HttpServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type {
   ClientToServerEvents,
+  LobbyJoinResult,
+  LobbySummary,
   LoginResult,
   ProgramResult,
   PublicGameStateResult,
@@ -203,6 +205,53 @@ describe('game Socket.IO connection', () => {
       outcome: 'INVALID_USERNAME',
     })
     expect(await login({ username: 'Dane' })).toEqual(approved)
+  })
+
+  it('publishes a created lobby and allows a second logged-in client to join by code', async () => {
+    await connect()
+    expect(await client.timeout(1_000).emitWithAck('lobby.list')).toEqual({
+      outcome: 'LOGIN_REQUIRED',
+    })
+    await login({ username: 'Host' })
+
+    const guest = createClient()
+    await connect(guest)
+    await login({ username: 'Guest' }, guest)
+
+    const hostDirectory = new Promise<readonly LobbySummary[]>((resolve) => {
+      client.once('lobby.listUpdated', resolve)
+    })
+    const guestDirectory = new Promise<readonly LobbySummary[]>((resolve) => {
+      guest.once('lobby.listUpdated', resolve)
+    })
+    const created = await client.timeout(1_000).emitWithAck('lobby.create', {
+      name: 'Workshop',
+      code: '4821',
+      map: 'Map 2',
+    })
+    expect(created.outcome).toBe('LOBBY_CREATED')
+    if (created.outcome !== 'LOBBY_CREATED') throw new Error('Lobby was not created')
+    expect(created.lobby).toMatchObject({
+      name: 'Workshop',
+      code: '4821',
+      map: 'Map 2',
+      playerCount: 1,
+      capacity: 6,
+    })
+    expect(await hostDirectory).toEqual([created.lobby])
+    expect(await guestDirectory).toEqual([created.lobby])
+    expect(await guest.timeout(1_000).emitWithAck('lobby.list')).toEqual({
+      outcome: 'LOBBIES_LISTED',
+      lobbies: [created.lobby],
+    })
+
+    const joined: LobbyJoinResult = await guest.timeout(1_000).emitWithAck('lobby.join', {
+      code: '4821',
+    })
+    expect(joined).toEqual({
+      outcome: 'LOBBY_JOINED',
+      lobby: { ...created.lobby, playerCount: 2 },
+    })
   })
 
   it('acknowledges the current public game state', async () => {

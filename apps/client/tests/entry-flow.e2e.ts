@@ -40,7 +40,7 @@ test('creates a numbered lobby row and joins only after selecting it', async ({ 
   await logIn(page)
   await page.getByRole('button', { name: 'Create a lobby' }).click()
   await page.getByLabel('Lobby name').fill('The Workshop')
-  const number = await page.getByLabel('Generated lobby number').inputValue()
+  const number = await page.getByLabel('Generated lobby code').inputValue()
   expect(number).toMatch(/^\d{4}$/)
   await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
 

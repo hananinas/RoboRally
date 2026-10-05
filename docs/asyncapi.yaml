@@ -18,6 +18,14 @@ channels:
     messages:
       login:
         $ref: '#/components/messages/Login'
+      listLobbies:
+        $ref: '#/components/messages/ListLobbies'
+      createLobby:
+        $ref: '#/components/messages/CreateLobby'
+      joinLobby:
+        $ref: '#/components/messages/JoinLobby'
+      leaveLobby:
+        $ref: '#/components/messages/LeaveLobby'
       joinGame:
         $ref: '#/components/messages/JoinGame'
       submitProgram:
@@ -33,6 +41,34 @@ channels:
     messages:
       result:
         $ref: '#/components/messages/LoginResult'
+
+  lobbyListReplies:
+    address: null
+    description: Delivered through the acknowledgement of lobby.list.
+    messages:
+      result:
+        $ref: '#/components/messages/LobbyListResult'
+
+  lobbyCreateReplies:
+    address: null
+    description: Delivered through the acknowledgement of lobby.create.
+    messages:
+      result:
+        $ref: '#/components/messages/LobbyCreateResult'
+
+  lobbyJoinReplies:
+    address: null
+    description: Delivered through the acknowledgement of lobby.join.
+    messages:
+      result:
+        $ref: '#/components/messages/LobbyJoinResult'
+
+  lobbyLeaveReplies:
+    address: null
+    description: Delivered through the acknowledgement of lobby.leave.
+    messages:
+      result:
+        $ref: '#/components/messages/LobbyLeaveResult'
 
   joinReplies:
     address: null
@@ -60,6 +96,24 @@ channels:
     messages:
       publicGameStateResult:
         $ref: '#/components/messages/PublicGameStateResult'
+
+  lobbyDirectory:
+    address: null
+    description: Global lobby directory broadcasts for connected clients.
+    messages:
+      listUpdated:
+        $ref: '#/components/messages/LobbyListUpdated'
+
+  lobby:
+    address: 'lobby:{lobbyId}'
+    parameters:
+      lobbyId:
+        description: Opaque lobby identifier.
+    messages:
+      updated:
+        $ref: '#/components/messages/LobbyUpdated'
+      started:
+        $ref: '#/components/messages/LobbyStarted'
 
   player:
     address: 'game:{gameId}:player:{playerId}'
@@ -101,6 +155,72 @@ operations:
         - $ref: '#/channels/loginReplies/messages/result'
       x-socketio:
         acknowledgement: true
+
+  handleListLobbies:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/listLobbies'
+    reply:
+      channel:
+        $ref: '#/channels/lobbyListReplies'
+      messages:
+        - $ref: '#/channels/lobbyListReplies/messages/result'
+      x-socketio:
+        acknowledgement: true
+
+  handleCreateLobby:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/createLobby'
+    reply:
+      channel:
+        $ref: '#/channels/lobbyCreateReplies'
+      messages:
+        - $ref: '#/channels/lobbyCreateReplies/messages/result'
+      x-socketio:
+        acknowledgement: true
+
+  handleJoinLobby:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/joinLobby'
+    reply:
+      channel:
+        $ref: '#/channels/lobbyJoinReplies'
+      messages:
+        - $ref: '#/channels/lobbyJoinReplies/messages/result'
+      x-socketio:
+        acknowledgement: true
+
+  handleLeaveLobby:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/leaveLobby'
+    reply:
+      channel:
+        $ref: '#/channels/lobbyLeaveReplies'
+      messages:
+        - $ref: '#/channels/lobbyLeaveReplies/messages/result'
+      x-socketio:
+        acknowledgement: true
+
+  broadcastLobbyDirectory:
+    action: send
+    channel:
+      $ref: '#/channels/lobbyDirectory'
+
+  broadcastLobbyEvents:
+    action: send
+    channel:
+      $ref: '#/channels/lobby'
 
   handleJoinGame:
     action: receive
@@ -188,6 +308,71 @@ components:
           payload:
             outcome: "INVALID_USERNAME"
 
+<<<<<<< HEAD
+    # Lobbies
+    ListLobbies:
+      name: lobby.list
+      description: Lists available lobbies for an authenticated user.
+
+    LobbyListResult:
+      name: lobby.listResult
+      payload:
+        $ref: '#/components/schemas/LobbyListResult'
+
+    CreateLobby:
+      name: lobby.create
+      description: Creates and joins a lobby using the displayed, client-generated code.
+      payload:
+        $ref: '#/components/schemas/CreateLobby'
+
+    LobbyCreateResult:
+      name: lobby.createResult
+      payload:
+        $ref: '#/components/schemas/LobbyCreateResult'
+
+    JoinLobby:
+      name: lobby.join
+      description: Joins an available lobby by code.
+      payload:
+        $ref: '#/components/schemas/JoinLobby'
+
+    LobbyJoinResult:
+      name: lobby.joinResult
+      payload:
+        $ref: '#/components/schemas/LobbyJoinResult'
+
+    LeaveLobby:
+      name: lobby.leave
+      description: Leaves the lobby associated with this connection.
+
+    LobbyLeaveResult:
+      name: lobby.leaveResult
+      payload:
+        $ref: '#/components/schemas/LobbyLeaveResult'
+
+    LobbyListUpdated:
+      name: lobby.listUpdated
+      description: Global directory snapshot broadcast after a lobby changes.
+      payload:
+        type: array
+        items:
+          $ref: '#/components/schemas/LobbySummary'
+
+    LobbyUpdated:
+      name: lobby.updated
+      description: Full player roster and countdown state for a lobby room.
+      payload:
+        $ref: '#/components/schemas/LobbyState'
+
+    LobbyStarted:
+      name: lobby.started
+      description: Sent to lobby members after the server countdown expires.
+      payload:
+        $ref: '#/components/schemas/LobbyStarted'
+
+    # Membership
+=======
+>>>>>>> 8d78931b3022af99ac0088b695182c075ba10636
     JoinGame:
       name: game.join
       description: |
@@ -497,6 +682,186 @@ components:
             paused: false
 
   schemas:
+
+    # Lobbies
+    LobbyMap:
+      type: string
+      enum: [ 'Map 1', 'Map 2' ]
+
+    LobbyCode:
+      type: string
+      pattern: '^[A-HJ-NP-Z2-9]{6}$'
+      description: Six-character code omitting visually ambiguous characters.
+
+    LobbyPlayer:
+      type: object
+      additionalProperties: false
+      required: [ userId, username ]
+      properties:
+        userId:
+          $ref: '#/components/schemas/UserId'
+        username:
+          $ref: '#/components/schemas/Username'
+
+    LobbySummary:
+      type: object
+      additionalProperties: false
+      required: [ lobbyId, code, name, map, playerCount, capacity, status, countdownEndsAt ]
+      properties:
+        lobbyId:
+          type: string
+          format: uuid
+        code:
+          $ref: '#/components/schemas/LobbyCode'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 32
+        map:
+          $ref: '#/components/schemas/LobbyMap'
+        playerCount:
+          type: integer
+          minimum: 0
+        capacity:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum: [ WAITING, COUNTDOWN, STARTED ]
+        countdownEndsAt:
+          type: [ integer, 'null' ]
+          description: Unix epoch milliseconds, or null when not counting down.
+
+    LobbyState:
+      type: object
+      additionalProperties: false
+      required: [ lobbyId, code, name, map, playerCount, capacity, status, countdownEndsAt, players ]
+      properties:
+        lobbyId:
+          type: string
+          format: uuid
+        code:
+          $ref: '#/components/schemas/LobbyCode'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 32
+        map:
+          $ref: '#/components/schemas/LobbyMap'
+        playerCount:
+          type: integer
+          minimum: 0
+        capacity:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum: [ WAITING, COUNTDOWN, STARTED ]
+        countdownEndsAt:
+          type: [ integer, 'null' ]
+        players:
+          type: array
+          items:
+            $ref: '#/components/schemas/LobbyPlayer'
+
+    CreateLobby:
+      type: object
+      additionalProperties: false
+      required: [ name, code, map ]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 32
+        code:
+          $ref: '#/components/schemas/LobbyCode'
+        map:
+          $ref: '#/components/schemas/LobbyMap'
+
+    JoinLobby:
+      type: object
+      additionalProperties: false
+      required: [ code ]
+      properties:
+        code:
+          $ref: '#/components/schemas/LobbyCode'
+
+    LobbyListResult:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [ outcome, lobbies ]
+          properties:
+            outcome:
+              const: LOBBIES_LISTED
+            lobbies:
+              type: array
+              items:
+                $ref: '#/components/schemas/LobbySummary'
+        - type: object
+          additionalProperties: false
+          required: [ outcome ]
+          properties:
+            outcome:
+              const: LOGIN_REQUIRED
+
+    LobbyCreateResult:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [ outcome, state ]
+          properties:
+            outcome:
+              const: LOBBY_CREATED
+            state:
+              $ref: '#/components/schemas/LobbyState'
+        - type: object
+          additionalProperties: false
+          required: [ outcome ]
+          properties:
+            outcome:
+              type: string
+              enum: [ LOGIN_REQUIRED, INVALID_REQUEST, INTERNAL_ERROR, ALREADY_IN_LOBBY, USER_ALREADY_IN_LOBBY, LOBBY_CODE_TAKEN ]
+
+    LobbyJoinResult:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [ outcome, state ]
+          properties:
+            outcome:
+              const: LOBBY_JOINED
+            state:
+              $ref: '#/components/schemas/LobbyState'
+        - type: object
+          additionalProperties: false
+          required: [ outcome ]
+          properties:
+            outcome:
+              type: string
+              enum: [ LOGIN_REQUIRED, INVALID_REQUEST, LOBBY_NOT_FOUND, LOBBY_FULL, ALREADY_IN_LOBBY, USER_ALREADY_IN_LOBBY, LOBBY_STARTED, INTERNAL_ERROR ]
+
+    LobbyLeaveResult:
+      type: object
+      additionalProperties: false
+      required: [ outcome ]
+      properties:
+        outcome:
+          type: string
+          enum: [ LEFT_LOBBY, NOT_IN_LOBBY ]
+
+    LobbyStarted:
+      type: object
+      additionalProperties: false
+      required: [ lobbyId, code, gameId ]
+      properties:
+        lobbyId:
+          type: string
+          format: uuid
+        code:
+          $ref: '#/components/schemas/LobbyCode'
+        gameId:
+          $ref: '#/components/schemas/GameId'
 
     # Login
     Username:
