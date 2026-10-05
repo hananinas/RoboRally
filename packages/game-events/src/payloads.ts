@@ -81,6 +81,7 @@ export type PublicGameState = Readonly<{
   robots: readonly Robot[]
   phase: GamePhase
   players: readonly PlayerState[]
+  paused: boolean
 }>
 
 export type PlayerState = Readonly<{
@@ -98,6 +99,13 @@ export type PlayerJoined = Readonly<{
 
 export type PlayerLeft = Readonly<{ gameId: GameId; playerId: PlayerId; robotId: RobotId }>
 
+export type PlayerConnectionChanged = Readonly<{
+  gameId: GameId
+  playerId: PlayerId
+  connected: boolean
+  paused: boolean
+}>
+
 export type LeaveResult = Readonly<{
   outcome: 'LEFT' | 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND' | 'INTERNAL_ERROR'
 }>
@@ -108,7 +116,7 @@ export type CardsDealt = Readonly<{
   cards: readonly Card[]
 }>
 
-export type ProgramResultOutcome = 'ACCEPTED' | 'INVALID_PROGRAM'
+export type ProgramResultOutcome = 'ACCEPTED' | 'INVALID_PROGRAM' | 'GAME_PAUSED'
 
 export type ProgramResult = Readonly<{
   outcome: ProgramResultOutcome

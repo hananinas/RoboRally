@@ -21,6 +21,7 @@ const joined: Extract<JoinResult, { outcome: 'JOINED' }> = {
     robots: [],
     players: [],
     phase: 'PROGRAMMING',
+    paused: false,
   },
   hand: [],
   programSubmitted: false,
