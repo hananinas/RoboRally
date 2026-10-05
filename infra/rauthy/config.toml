@@ -27,3 +27,6 @@ keys = [
     '2026-10-03/MsBtTsCEsmsSlkMIil97GLj/euprAE4MECAVBFG01gs=',
 ]
 key_active = '2026-10-03'
+
+[mfa]
+admin_force_mfa = false
