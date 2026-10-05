@@ -416,6 +416,8 @@ test('waits for its next hand after playback and ignores foreign hands', async (
     await expect(page.locator(`[data-robot-id="${ROBOT_ID}"]`).first()).toHaveAttribute(
       'data-board-tile', `${action.position.coordinate.x},${action.position.coordinate.y}`,
     )
+    await expect(page.locator('.register[data-active]')).toContainText(String(action.registerIndex + 1))
+    await expect(page.getByRole('button', { name: /remove from register/ })).toHaveCount(5)
     await page.clock.runFor(action.instruction === 'TURN_LEFT' ? 300 : 600)
   }
   await expect(page.getByRole('status')).toHaveText('Executing')
@@ -423,7 +425,7 @@ test('waits for its next hand after playback and ignores foreign hands', async (
   await game.control({ type: 'hand', hand: { ...hand, playerId: OTHER_PLAYER_ID } })
   await game.control({ type: 'hand', hand: { ...hand, gameId: 'another-game' } })
   await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button').last()).toBeDisabled()
-  await expect(page.getByRole('button', { name: /remove from register/ })).toHaveCount(5)
+  await expect(page.getByRole('button', { name: /remove from register/ })).toHaveCount(0)
   await game.control({ type: 'deal' })
   await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button').first()).toBeEnabled()
   await expect(page.getByRole('button', { name: /remove from register/ })).toHaveCount(0)
