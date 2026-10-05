@@ -95,7 +95,7 @@ export function presentPublicGameState(
       },
     })),
     phase: phases[game.phase],
-    paused: false,
+    paused: game.paused,
   }
 }
 

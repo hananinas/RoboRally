@@ -83,6 +83,9 @@ export function createGameSocketServer(
     })),
   )
 
+  const anyDisconnected = () =>
+    [...memberships.values()].some((membership) => membership.connectionId === null)
+
   function membershipRequest(payload: unknown, user: User | undefined):
     { user: User } | { outcome: 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND' } {
     if (!user) return { outcome: 'LOGIN_REQUIRED' }
@@ -99,7 +102,7 @@ export function createGameSocketServer(
   }
 
   function scheduleNextAction(): void {
-    if (closed || game.phase !== 'activation' || scheduledAction) return
+    if (closed || game.phase !== 'activation' || scheduledAction || game.paused) return
     scheduledAction = setImmediate(() => {
       scheduledAction = undefined
       if (closed || game.phase !== 'activation') return
@@ -159,6 +162,8 @@ export function createGameSocketServer(
       }
       const previousConnectionId = membership.connectionId
       membership.connectionId = socket.id
+      const reconnected = !isNew && previousConnectionId === null
+      if (reconnected && !anyDisconnected()) game.resume()
       const { player } = membership
       let result: Extract<JoinResult, { outcome: 'JOINED' }>
       try {
@@ -181,11 +186,18 @@ export function createGameSocketServer(
       }
       socket.join([publicRoom, playerRoom(player.id)])
       acknowledge(result)
-      if (isNew) socket.to(publicRoom).emit('game.playerJoined', {
-        gameId,
-        player: result.state.players.find((candidate) => candidate.playerId === player.id)!,
-        robot: result.state.robots.find((robot) => robot.robotId === player.robot.id)!,
-      })
+      if (isNew) {
+        socket.to(publicRoom).emit('game.playerJoined', {
+          gameId,
+          player: result.state.players.find((candidate) => candidate.playerId === player.id)!,
+          robot: result.state.robots.find((robot) => robot.robotId === player.robot.id)!,
+        })
+      } else if (reconnected) {
+        io.to(publicRoom).emit('game.playerConnectionChanged', {
+          gameId, playerId: player.id, connected: true, paused: game.paused,
+        })
+        scheduleNextAction()
+      }
     })
 
     socket.on('game.leave', (payload, acknowledge) => {
@@ -213,7 +225,12 @@ export function createGameSocketServer(
 
     socket.on('disconnect', () => {
       const membership = ownedMembership()
-      if (membership) membership.connectionId = null
+      if (!membership) return
+      membership.connectionId = null
+      game.pause()
+      io.to(publicRoom).emit('game.playerConnectionChanged', {
+        gameId, playerId: membership.player.id, connected: false, paused: game.paused,
+      })
     })
 
     socket.on('user.login', (payload, acknowledge) => {
@@ -272,6 +289,10 @@ export function createGameSocketServer(
       const player = ownedMembership()?.player
       if (!player) {
         acknowledge({ outcome: 'INVALID_PROGRAM' })
+        return
+      }
+      if (game.paused) {
+        acknowledge({ outcome: 'GAME_PAUSED' })
         return
       }
 
