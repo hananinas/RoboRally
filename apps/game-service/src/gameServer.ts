@@ -3,6 +3,7 @@ import {
   LobbyRequestError,
   parseCreateLobby,
   parseGetPublicGameState,
+  parseJoinGame,
   parseJoinLobby,
   LoginRequestError,
   parseLogin,
@@ -46,9 +47,11 @@ export type GameSession = Readonly<{
 
 export type GameSocketServerOptions = Readonly<{
   lobbyCapacity?: number
+  lobbyCountdownMs?: number
 }>
 
 const DEFAULT_LOBBY_CAPACITY = 6
+const DEFAULT_LOBBY_COUNTDOWN_MS = 5_000
 
 function defaultSession(): GameSession {
   const { gameId, game, player } = createSinglePlayerGame()
@@ -84,7 +87,10 @@ export function createGameSocketServer(
 ): GameSocketServer {
   const io = new Server<ClientToServerEvents, ServerToClientEvents, {}, GameSocketData>(httpServer)
   const users = createUserRegistry()
-  const lobbies = createLobbyRegistry(options.lobbyCapacity ?? DEFAULT_LOBBY_CAPACITY)
+  const lobbies = createLobbyRegistry(
+    options.lobbyCapacity ?? DEFAULT_LOBBY_CAPACITY,
+    options.lobbyCountdownMs ?? DEFAULT_LOBBY_COUNTDOWN_MS,
+  )
   const { gameId, game, playerForConnection } = session
   let scheduledAction: NodeJS.Immediate | undefined
   let closed = false
@@ -128,6 +134,38 @@ export function createGameSocketServer(
       return
     }
     socket.join([publicRoom(gameId), playerRoom(gameId, player.id)])
+
+    socket.on('game.join', (payload, acknowledge) => {
+      if (typeof acknowledge !== 'function') return
+      if (!socket.data.user) {
+        acknowledge({ outcome: 'LOGIN_REQUIRED' })
+        return
+      }
+
+      let request: ReturnType<typeof parseJoinGame>
+      try {
+        request = parseJoinGame(payload)
+      } catch {
+        acknowledge({ outcome: 'INVALID_REQUEST' })
+        return
+      }
+      if (request.gameId !== gameId) {
+        acknowledge({ outcome: 'GAME_NOT_FOUND' })
+        return
+      }
+      if (game.phase === 'activation') {
+        acknowledge({ outcome: 'GAME_ALREADY_STARTED' })
+        return
+      }
+
+      acknowledge({
+        outcome: 'JOINED',
+        assignment: { gameId, playerId: player.id, robotId: player.robot.id },
+        state: presentPublicGameState(gameId, game),
+        hand: presentCardsDealt(gameId, player).cards,
+        programSubmitted: game.hasSubmittedProgram(player.id),
+      })
+    })
 
     socket.on('user.login', (payload, acknowledge) => {
       if (typeof acknowledge !== 'function') return

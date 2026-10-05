@@ -44,14 +44,26 @@ test('creates a numbered lobby row and joins only after selecting it', async ({ 
   expect(number).toMatch(/^\d{4}$/)
   await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
 
-  const picker = page.getByRole('dialog', { name: 'Choose a lobby' })
-  const created = picker.getByRole('option', { name: new RegExp(`The Workshop.*Lobby #${number}`) })
-  await expect(created).toHaveAttribute('aria-selected', 'true')
+  const waiting = page.getByRole('dialog', { name: 'Waiting for players' })
+  await expect(waiting).toBeVisible()
+  await expect(waiting.getByText(number, { exact: true })).toBeVisible()
+  await expect(waiting.getByText('Game starts when the lobby is full.')).toBeVisible()
   expect((await game.snapshot()).entryRequests.map((request) => request.event)).toEqual(['user.login'])
 
-  await picker.getByRole('button', { name: 'Join selected lobby' }).click()
+  const guestPage = await page.context().newPage()
+  await guestPage.setExtraHTTPHeaders({ 'x-fixture-id': game.initial.id })
+  await logIn(guestPage, 'Guest')
+  const guestPicker = guestPage.getByRole('dialog', { name: 'Choose a lobby' })
+  await guestPicker.getByPlaceholder('4-digit code').fill(number)
+  await guestPicker.getByRole('button', { name: 'Find' }).click()
+  await guestPicker.getByRole('button', { name: 'Join selected lobby' }).click()
+  await expect(page.getByRole('dialog', { name: 'Waiting for players' })).toContainText('Guest')
+  await expect(guestPage.getByRole('dialog', { name: 'Waiting for players' })).toContainText('CircuitBreaker')
   await expect(page.getByRole('heading', { name: 'CircuitBreaker', exact: true })).toBeVisible()
-  expect((await game.snapshot()).entryRequests.map((request) => request.event)).toEqual(['user.login', 'game.join'])
+  await expect(guestPage.getByRole('heading', { name: 'Guest', exact: true })).toBeVisible()
+  expect((await game.snapshot()).entryRequests.map((request) => request.event)).toEqual([
+    'user.login', 'user.login', 'game.join', 'game.join',
+  ])
 })
 
 test('returns to the picker when canceling a local lobby draft', async ({ page }) => {
@@ -73,6 +85,8 @@ test('selects an existing numbered lobby before joining the configured game', as
   await expect(foundry).toHaveAttribute('aria-selected', 'true')
   expect((await game.snapshot()).entryRequests.map((request) => request.event)).toEqual(['user.login'])
   await picker.getByRole('button', { name: 'Join selected lobby' }).click()
+  await expect(page.getByRole('dialog', { name: 'Waiting for players' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'CircuitBreaker', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'CircuitBreaker', exact: true })).toBeVisible()
 })
 
@@ -169,7 +183,7 @@ test('waits for login then JOINED on the same socket, blocking duplicate request
   await expect(page.getByRole('dialog', { name: 'Choose a lobby' })).toBeVisible()
   await joinDefaultLobby(page)
   await expect.poll(async () => (await game.snapshot()).pendingJoins).toBe(1)
-  await expect(page.getByRole('button', { name: 'Joining game…' })).toBeDisabled()
+  await expect(page.getByRole('dialog', { name: 'Waiting for players' })).toBeVisible()
   await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
   await expect(page.getByRole('region', { name: 'Programming hand' })).toHaveCount(0)
 
@@ -193,7 +207,7 @@ test('ignores an early hand until JOINED supplies the authoritative board and ha
     type: 'early-hand',
     cards: [{ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', instruction: 'TURN_LEFT' }],
   })
-  await expect(page.getByRole('button', { name: 'Joining game…' })).toBeDisabled()
+  await expect(page.getByRole('dialog', { name: 'Waiting for players' })).toBeVisible()
   await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
   await expect(page.getByRole('region', { name: 'Programming hand' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Done', exact: true })).toHaveCount(0)
@@ -361,6 +375,7 @@ for (const stage of ['login', 'join'] as const) {
 
     if (stage === 'login') await game.control({ type: 'login', outcome: 'LOGGED_IN', deferred: false })
     else await game.control({ type: 'join', outcome: 'JOINED', deferred: false })
+    await page.clock.resume()
     await page.getByRole('button', { name: stage === 'login' ? 'Log in' : 'Retry joining', exact: true }).click()
     if (stage === 'login') {
       await expect(page.getByRole('dialog', { name: 'Choose a lobby' })).toBeVisible()

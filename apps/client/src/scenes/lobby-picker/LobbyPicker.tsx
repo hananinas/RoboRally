@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import type { CreateLobby, LobbySummary } from '@robo-rally/game-events'
 import './LobbyPicker.css'
 
@@ -8,8 +8,57 @@ type LobbyPickerProps = {
   lobbies: readonly LobbySummary[]
   onCreateLobby: (lobby: CreateLobby) => void
   onJoinLobby: (code: string) => void
-  joining: boolean
+  waitingLobby: LobbySummary | null
   username: string
+}
+
+function LobbyWaiting({ lobby, username }: { lobby: LobbySummary; username: string }) {
+  const [now, setNow] = useState(0)
+  const countdown = lobby.countdownEndsAt === null || now === 0
+    ? null
+    : Math.max(0, Math.ceil((lobby.countdownEndsAt - now) / 1000))
+
+  useEffect(() => {
+    if (lobby.countdownEndsAt === null) return
+    const timer = window.setInterval(() => setNow(Date.now()), 100)
+    return () => window.clearInterval(timer)
+  }, [lobby.countdownEndsAt])
+
+  return (
+    <main className="lobby-picker-page">
+      <BoardBackground />
+      <section className="lobby-picker-dialog lobby-waiting-dialog" role="dialog" aria-modal="true" aria-labelledby="lobby-picker-heading">
+        <header className="lobby-picker-header">
+          <span className="lobby-picker-brand-mark" aria-hidden="true">R</span>
+          <div>
+            <p>Signed in as <strong>{username}</strong></p>
+            <h1 id="lobby-picker-heading">Waiting for players</h1>
+          </div>
+        </header>
+        <div className="lobby-waiting-details">
+          <strong>{lobby.name}</strong>
+          <span>Lobby #{lobby.code} · {lobby.map}</span>
+        </div>
+        <div className="lobby-waiting-code">
+          <span>Share this lobby code</span>
+          <strong>{lobby.code}</strong>
+        </div>
+        <h2 className="lobby-picker-list-heading">Players · {lobby.playerCount}/{lobby.capacity}</h2>
+        <ul className="lobby-waiting-players" aria-live="polite">
+          {lobby.players.map((player) => <li key={player}>{player}</li>)}
+          {Array.from({ length: Math.max(0, lobby.capacity - lobby.playerCount) }, (_, index) => (
+            <li className="lobby-waiting-empty" key={`empty-${index}`}>Waiting for player…</li>
+          ))}
+        </ul>
+        <p className="lobby-waiting-status" role="status" aria-live="polite">
+          {lobby.countdownEndsAt === null
+            ? 'The game starts when the lobby is full.'
+            : countdown === null ? 'Starting countdown…'
+            : countdown === 0 ? 'Starting game…' : `Game starts in ${countdown}…`}
+        </p>
+      </section>
+    </main>
+  )
 }
 
 function generateLobbyCode(lobbies: readonly LobbySummary[]): string {
@@ -35,7 +84,7 @@ export default function LobbyPicker({
   lobbies,
   onCreateLobby,
   onJoinLobby,
-  joining,
+  waitingLobby,
   username,
 }: LobbyPickerProps) {
   const [creating, setCreating] = useState(false)
@@ -82,6 +131,8 @@ export default function LobbyPicker({
   }
 
   const selectedLobby = lobbies.find((lobby) => lobby.code === selectedLobbyCode) ?? null
+
+  if (waitingLobby) return <LobbyWaiting lobby={waitingLobby} username={username} />
 
   return (
     <main className="lobby-picker-page">
@@ -190,11 +241,11 @@ export default function LobbyPicker({
 
         <button
           className="lobby-picker-primary lobby-picker-join"
-          disabled={!selectedLobby || joining || actionPending}
+          disabled={!selectedLobby || actionPending}
           onClick={() => selectedLobby && onJoinLobby(selectedLobby.code)}
           type="button"
         >
-          {joining ? 'Joining game…' : actionPending ? 'Joining lobby…' : 'Join selected lobby'}
+          {actionPending ? 'Joining lobby…' : 'Join selected lobby'}
         </button>
       </section>
     </main>

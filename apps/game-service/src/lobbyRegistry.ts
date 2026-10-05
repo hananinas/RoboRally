@@ -13,6 +13,7 @@ type LobbyRecord = {
   map: LobbyMap
   capacity: number
   players: Map<string, User>
+  countdownEndsAt: number | null
 }
 
 type CreateResult =
@@ -23,7 +24,7 @@ type JoinResult =
   | { lobby: LobbySummary }
   | { error: 'LOBBY_NOT_FOUND' | 'LOBBY_FULL' | 'ALREADY_IN_LOBBY' }
 
-export function createLobbyRegistry(capacity: number) {
+export function createLobbyRegistry(capacity: number, countdownDurationMs: number) {
   const lobbiesByCode = new Map<string, LobbyRecord>()
   const lobbyCodeByUser = new Map<string, string>()
 
@@ -33,8 +34,16 @@ export function createLobbyRegistry(capacity: number) {
       code: lobby.code,
       name: lobby.name,
       map: lobby.map,
+      players: [...lobby.players.values()].map((player) => player.username),
       playerCount: lobby.players.size,
       capacity: lobby.capacity,
+      countdownEndsAt: lobby.countdownEndsAt,
+    }
+  }
+
+  function startCountdownWhenFull(lobby: LobbyRecord): void {
+    if (lobby.players.size >= lobby.capacity && lobby.countdownEndsAt === null) {
+      lobby.countdownEndsAt = Date.now() + countdownDurationMs
     }
   }
 
@@ -47,7 +56,9 @@ export function createLobbyRegistry(capacity: number) {
       map: request.map,
       capacity,
       players: new Map([[user.userId, user]]),
+      countdownEndsAt: null,
     }
+    startCountdownWhenFull(lobby)
     lobbiesByCode.set(lobby.code, lobby)
     lobbyCodeByUser.set(user.userId, lobby.code)
     return { lobby: summarize(lobby) }
@@ -65,6 +76,7 @@ export function createLobbyRegistry(capacity: number) {
     if (lobby.players.size >= lobby.capacity) return { error: 'LOBBY_FULL' }
     lobby.players.set(user.userId, user)
     lobbyCodeByUser.set(user.userId, code)
+    startCountdownWhenFull(lobby)
     return { lobby: summarize(lobby) }
   }
 

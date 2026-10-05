@@ -60,9 +60,9 @@ function App() {
   const { initialize } = game
   const [session, dispatch] = useReducer(sessionReducer, undefined, createSessionState)
   const [lobbies, setLobbies] = useState<readonly LobbySummary[]>([])
+  const [joinedLobby, setJoinedLobby] = useState<LobbySummary | null>(null)
   const [lobbyError, setLobbyError] = useState<string | null>(null)
   const [lobbyPending, setLobbyPending] = useState(false)
-  const [lobbySelected, setLobbySelected] = useState(false)
   const loginPending = useRef(false)
   const loginAttempt = useRef(0)
   const joinPending = useRef(false)
@@ -77,44 +77,57 @@ function App() {
     }
     const handleDisconnect = () => {
       invalidateRequests()
+      setJoinedLobby(null)
       dispatch({ type: 'disconnected' })
     }
+    const handleLobbyListUpdated = (nextLobbies: readonly LobbySummary[]) => {
+      setLobbies(nextLobbies)
+      setJoinedLobby((current) => current
+        ? nextLobbies.find((lobby) => lobby.lobbyId === current.lobbyId) ?? current
+        : null)
+    }
     connection.socket.on('disconnect', handleDisconnect)
-    connection.socket.on('lobby.listUpdated', setLobbies)
+    connection.socket.on('lobby.listUpdated', handleLobbyListUpdated)
     return () => {
       connection.socket.off('disconnect', handleDisconnect)
-      connection.socket.off('lobby.listUpdated', setLobbies)
+      connection.socket.off('lobby.listUpdated', handleLobbyListUpdated)
       invalidateRequests()
     }
   }, [connection.socket])
 
   useEffect(() => {
-    if (session.status !== 'joining' || !lobbySelected || joinPending.current) return
+    const countdownEndsAt = joinedLobby?.countdownEndsAt
+    if (session.status !== 'joining' || !countdownEndsAt || joinPending.current) return
     const gameId = import.meta.env.VITE_GAME_ID
-    if (!gameId) {
-      dispatch({ type: 'join-error', error: 'GAME_ID_MISSING' })
-      return
-    }
-    if (!connection.socket.connected) {
-      dispatch({ type: 'join-error', error: 'CONNECTION_ERROR' })
-      return
-    }
+    const timer = window.setTimeout(() => {
+      if (!gameId) {
+        dispatch({ type: 'join-error', error: 'GAME_ID_MISSING' })
+        return
+      }
+      if (!connection.socket.connected) {
+        dispatch({ type: 'join-error', error: 'CONNECTION_ERROR' })
+        return
+      }
 
-    joinPending.current = true
-    const attempt = ++joinAttempt.current
-    connection.socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit(
-      'game.join',
-      { gameId },
-      (error, result) => {
-        if (attempt !== joinAttempt.current || !connection.socket.connected) return
-        joinPending.current = false
-        if (!error && result.outcome === 'JOINED') initialize(result)
-        dispatch(error
-          ? { type: 'join-error', error: 'TIMEOUT' }
-          : { type: 'join-result', result })
-      },
-    )
-  }, [connection.socket, connection.status, session.status, initialize, lobbySelected])
+      joinPending.current = true
+      const attempt = ++joinAttempt.current
+      connection.socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit(
+        'game.join',
+        { gameId },
+        (error, result) => {
+          if (attempt !== joinAttempt.current || !connection.socket.connected) return
+          joinPending.current = false
+          if (!error && result.outcome === 'JOINED') initialize(result)
+          if (!error && result.outcome === 'LOGIN_REQUIRED') setJoinedLobby(null)
+          dispatch(error
+            ? { type: 'join-error', error: 'TIMEOUT' }
+            : { type: 'join-result', result })
+        },
+      )
+    }, Math.max(0, countdownEndsAt - Date.now()))
+
+    return () => window.clearTimeout(timer)
+  }, [connection.socket, connection.status, session.status, initialize, joinedLobby?.countdownEndsAt])
 
   const username = session.status === 'editing' || session.status === 'logging-in'
     ? session.username
@@ -157,7 +170,6 @@ function App() {
       (error, result) => {
         if (attempt !== loginAttempt.current || !connection.socket.connected) return
         loginPending.current = false
-        if (!error && result.outcome === 'LOGGED_IN') setLobbySelected(false)
         dispatch(error
           ? { type: 'login-timeout' }
           : { type: 'login-result', result })
@@ -193,6 +205,7 @@ function App() {
         setLobbyError('The Game Service did not respond. Try creating the lobby again.')
       } else if (result.outcome === 'LOBBY_CREATED') {
         setLobbies((current) => [result.lobby, ...current.filter((item) => item.lobbyId !== result.lobby.lobbyId)])
+        setJoinedLobby(result.lobby)
       } else {
         setLobbyError(createLobbyErrors[result.outcome])
       }
@@ -212,7 +225,7 @@ function App() {
         setLobbyError('The Game Service did not respond. Try joining the lobby again.')
       } else if (result.outcome === 'LOBBY_JOINED') {
         setLobbies((current) => current.map((lobby) => lobby.lobbyId === result.lobby.lobbyId ? result.lobby : lobby))
-        setLobbySelected(true)
+        setJoinedLobby(result.lobby)
       } else {
         setLobbyError(joinLobbyErrors[result.outcome])
       }
@@ -231,7 +244,7 @@ function App() {
         lobbies={lobbies}
         onCreateLobby={createLobby}
         onJoinLobby={joinLobby}
-        joining={lobbySelected}
+        waitingLobby={joinedLobby}
         username={session.user.username}
       />
     )

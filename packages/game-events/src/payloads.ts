@@ -16,8 +16,10 @@ export type LobbySummary = Readonly<{
   code: string
   name: string
   map: LobbyMap
+  players: readonly string[]
   playerCount: number
   capacity: number
+  countdownEndsAt: number | null
 }>
 
 export type LobbyListResult =

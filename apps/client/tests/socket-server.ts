@@ -50,6 +50,7 @@ type Fixture = {
   pending: { socket: GameSocket; acknowledge: ProgramResultAcknowledgement }[]
   lobbies: Map<string, LobbySummary>
   usersInLobbies: Map<string, string>
+  usersByUsername: Map<string, User>
 }
 
 const fixtures = new Map<string, Fixture>()
@@ -192,12 +193,13 @@ const httpServer = createServer(async (request, response) => {
       pendingLogins: [],
       pendingJoins: [],
       lobbies: new Map([
-        ['0421', { lobbyId: 'fixture-foundry', code: '0421', name: 'Foundry Floor', map: 'Map 1', playerCount: 2, capacity: 6 }],
-        ['0188', { lobbyId: 'fixture-laser', code: '0188', name: 'Laser Maze', map: 'Map 2', playerCount: 4, capacity: 6 }],
-        ['0927', { lobbyId: 'fixture-checkpoint', code: '0927', name: 'Checkpoint Circuit', map: 'Map 1', playerCount: 1, capacity: 6 }],
-        ['0714', { lobbyId: 'fixture-gearworks', code: '0714', name: 'Gearworks', map: 'Map 2', playerCount: 3, capacity: 6 }],
+        ['0421', { lobbyId: 'fixture-foundry', code: '0421', name: 'Foundry Floor', map: 'Map 1', players: ['Player A', 'Player B'], playerCount: 2, capacity: 3, countdownEndsAt: null }],
+        ['0188', { lobbyId: 'fixture-laser', code: '0188', name: 'Laser Maze', map: 'Map 2', players: ['Player A', 'Player B', 'Player C', 'Player D'], playerCount: 4, capacity: 5, countdownEndsAt: null }],
+        ['0927', { lobbyId: 'fixture-checkpoint', code: '0927', name: 'Checkpoint Circuit', map: 'Map 1', players: ['Player A'], playerCount: 1, capacity: 2, countdownEndsAt: null }],
+        ['0714', { lobbyId: 'fixture-gearworks', code: '0714', name: 'Gearworks', map: 'Map 2', players: ['Player A', 'Player B', 'Player C'], playerCount: 3, capacity: 4, countdownEndsAt: null }],
       ]),
       usersInLobbies: new Map(),
+      usersByUsername: new Map(),
     }
     fixtures.set(fixture.id, fixture)
     send(201, snapshot(fixture))
@@ -252,7 +254,9 @@ io.on('connection', (socket) => {
       } else if (user && user.username !== login.username) {
         result = { outcome: 'ALREADY_LOGGED_IN' }
       } else {
-        user ??= { userId: randomUUID(), username: login.username }
+        user ??= fixture.usersByUsername.get(login.username)
+          ?? { userId: randomUUID(), username: login.username }
+        fixture.usersByUsername.set(login.username, user)
         result = { outcome: 'LOGGED_IN', user }
       }
     } catch {
@@ -315,8 +319,10 @@ io.on('connection', (socket) => {
         code: request.code,
         name: request.name,
         map: request.map,
+        players: [user.username],
         playerCount: 1,
-        capacity: 6,
+        capacity: 2,
+        countdownEndsAt: null,
       }
       fixture.lobbies.set(lobby.code, lobby)
       fixture.usersInLobbies.set(user.userId, lobby.code)
@@ -339,18 +345,25 @@ io.on('connection', (socket) => {
         acknowledge({ outcome: 'LOBBY_NOT_FOUND' })
         return
       }
-      if (lobby.playerCount >= lobby.capacity) {
-        acknowledge({ outcome: 'LOBBY_FULL' })
-        return
-      }
       const existingCode = fixture.usersInLobbies.get(user.userId)
       if (existingCode && existingCode !== request.code) {
         acknowledge({ outcome: 'ALREADY_IN_LOBBY' })
         return
       }
+      if (!existingCode && lobby.playerCount >= lobby.capacity) {
+        acknowledge({ outcome: 'LOBBY_FULL' })
+        return
+      }
       const joined = existingCode === request.code
         ? lobby
-        : { ...lobby, playerCount: lobby.playerCount + 1 }
+        : {
+            ...lobby,
+            players: [...lobby.players, user.username],
+            playerCount: lobby.playerCount + 1,
+            countdownEndsAt: lobby.playerCount + 1 >= lobby.capacity
+              ? Date.now() + 1_500
+              : lobby.countdownEndsAt,
+          }
       fixture.usersInLobbies.set(user.userId, request.code)
       fixture.lobbies.set(request.code, joined)
       acknowledge({ outcome: 'LOBBY_JOINED', lobby: joined })

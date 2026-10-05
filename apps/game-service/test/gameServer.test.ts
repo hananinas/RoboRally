@@ -2,6 +2,7 @@ import { createServer, type Server as HttpServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type {
   ClientToServerEvents,
+  JoinResult,
   LobbyJoinResult,
   LobbySummary,
   LoginResult,
@@ -39,7 +40,7 @@ describe('game Socket.IO connection', () => {
     io = createGameSocketServer(httpServer, {
       ...singlePlayerGame,
       playerForConnection: () => singlePlayerGame.player,
-    })
+    }, { lobbyCapacity: 2, lobbyCountdownMs: 1_000 })
     await new Promise<void>((resolve) => httpServer.listen(0, '127.0.0.1', resolve))
     const { port } = httpServer.address() as AddressInfo
     serviceUrl = `http://127.0.0.1:${port}`
@@ -118,6 +119,17 @@ describe('game Socket.IO connection', () => {
     )
   }
 
+  function joinGame(payload: unknown): Promise<JoinResult> {
+    const untypedClient = client as unknown as {
+      emit: (
+        event: 'game.join',
+        request: unknown,
+        acknowledge: (result: JoinResult) => void,
+      ) => void
+    }
+    return new Promise((resolve) => untypedClient.emit('game.join', payload, resolve))
+  }
+
   function collectResolvedActions(): Promise<readonly RobotActionResolved[]> {
     return new Promise((resolve) => {
       const actions: RobotActionResolved[] = []
@@ -156,6 +168,36 @@ describe('game Socket.IO connection', () => {
     expect([...io.sockets.sockets.values()][0].data.user).toEqual(
       result.outcome === 'LOGGED_IN' ? result.user : undefined,
     )
+  })
+
+  it('acknowledges game entry after login with assignment, state, and hand', async () => {
+    await connect()
+
+    expect(await client.timeout(1_000).emitWithAck('game.join', {
+      gameId: singlePlayerGame.gameId,
+    })).toEqual({ outcome: 'LOGIN_REQUIRED' })
+
+    await login({ username: 'Dane' })
+    expect(await joinGame(null)).toEqual({
+      outcome: 'INVALID_REQUEST',
+    })
+    expect(await client.timeout(1_000).emitWithAck('game.join', {
+      gameId: '00000000-0000-4000-8000-000000000999',
+    })).toEqual({ outcome: 'GAME_NOT_FOUND' })
+
+    expect(await client.timeout(1_000).emitWithAck('game.join', {
+      gameId: singlePlayerGame.gameId,
+    })).toEqual({
+      outcome: 'JOINED',
+      assignment: {
+        gameId: singlePlayerGame.gameId,
+        playerId: singlePlayerGame.player.id,
+        robotId: singlePlayerGame.player.robot.id,
+      },
+      state: presentPublicGameState(singlePlayerGame.gameId, singlePlayerGame.game),
+      hand: presentCardsDealt(singlePlayerGame.gameId, singlePlayerGame.player).cards,
+      programSubmitted: false,
+    })
   })
 
   it('shares a user across connections but keeps each socket independently logged in', async () => {
@@ -236,7 +278,9 @@ describe('game Socket.IO connection', () => {
       code: '4821',
       map: 'Map 2',
       playerCount: 1,
-      capacity: 6,
+      capacity: 2,
+      players: ['Host'],
+      countdownEndsAt: null,
     })
     expect(await hostDirectory).toEqual([created.lobby])
     expect(await guestDirectory).toEqual([created.lobby])
@@ -245,13 +289,27 @@ describe('game Socket.IO connection', () => {
       lobbies: [created.lobby],
     })
 
+    const fullLobbyUpdate = new Promise<readonly LobbySummary[]>((resolve) => {
+      client.once('lobby.listUpdated', resolve)
+    })
     const joined: LobbyJoinResult = await guest.timeout(1_000).emitWithAck('lobby.join', {
       code: '4821',
     })
-    expect(joined).toEqual({
-      outcome: 'LOBBY_JOINED',
-      lobby: { ...created.lobby, playerCount: 2 },
+    expect(joined.outcome).toBe('LOBBY_JOINED')
+    if (joined.outcome !== 'LOBBY_JOINED') throw new Error('Guest did not join lobby')
+    expect(joined.lobby).toMatchObject({
+      ...created.lobby,
+      players: ['Host', 'Guest'],
+      playerCount: 2,
+      countdownEndsAt: expect.any(Number),
     })
+    expect(joined.lobby.countdownEndsAt).toBeGreaterThan(Date.now())
+    expect(await fullLobbyUpdate).toEqual([joined.lobby])
+
+    const rejoined: LobbyJoinResult = await guest.timeout(1_000).emitWithAck('lobby.join', {
+      code: '4821',
+    })
+    expect(rejoined).toEqual(joined)
   })
 
   it('acknowledges the current public game state', async () => {

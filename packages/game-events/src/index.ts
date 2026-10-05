@@ -45,6 +45,7 @@ export type {
   UserId,
 } from './payloads.js'
 export { loginSchema, LoginRequestError, parseLogin } from './login.js'
+export { joinGameSchema, parseJoinGame } from './joinGame.js'
 export type { Login, LoginRequestRejection } from './login.js'
 export { createLobbySchema, joinLobbySchema, LobbyRequestError, parseCreateLobby, parseJoinLobby } from './lobby.js'
 export type { CreateLobby, JoinLobby } from './lobby.js'
