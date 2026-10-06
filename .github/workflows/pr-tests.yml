@@ -7,53 +7,29 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  build-and-test:
-    name: Build and test
-    runs-on: ubuntu-latest
+  checks:
+    name: ${{ matrix.check }}
+    runs-on: [self-hosted]
     timeout-minutes: 15
     env:
       CI: true
+
+    concurrency:
+      group: ${{ github.workflow }}-${{ matrix.check }}-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
+
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [typecheck, lint, build, test]
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Install Chromium and system dependencies
-        run: pnpm --dir apps/client exec playwright install --with-deps chromium
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Build
-        run: pnpm build
-
-      - name: Run unit and browser tests
-        run: pnpm test
-
-      - name: Upload browser test failure artifacts
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: browser-test-results
-          path: |
-            apps/client/test-results/
-            apps/client/playwright-report/
-          if-no-files-found: ignore
-          retention-days: 7
+      - name: Run ${{ matrix.check }}
+        run: |
+          nix build ".#checks.x86_64-linux.${{ matrix.check }}" \
+            --no-update-lock-file \
+            --print-build-logs
