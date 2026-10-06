@@ -29,8 +29,7 @@ export default function useGameKeybinds(
     const [highlightedCardIndex, setHighlightedCardIndex] = useState<number | null>(null)
     const [pendingSequence, setPendingSequence] = useState<'none' | 'delete' | 'colon' | 'colon-w'>('none')
 
-    // Clear a dangling multi-key sequence when programming ends or a new hand arrives,
-    // so a sequence left incomplete (e.g. submitting by mouse mid-"dd") can't bleed into the next round.
+    // Clear a dangling multi-key sequence when programming ends or a new hand arrives
     useEffect(() => {
       setPendingSequence('none')
     }, [disabled, cards])
