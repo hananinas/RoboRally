@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "options": {
+    "typeAware": true
+  },
+  "plugins": ["eslint", "typescript", "unicorn", "react"],
+  "categories": {
+    "correctness": "error"
+  },
+  "env": {
+    "browser": true
+  },
+  "overrides": [
+    {
+      "files": ["playwright.config.ts", "tests/**/*.ts"],
+      "env": {
+        "browser": false,
+        "node": true
+      }
+    }
+  ],
+  "ignorePatterns": ["dist", "playwright-report", "test-results"]
+}

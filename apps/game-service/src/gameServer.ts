@@ -179,7 +179,7 @@ export function createGameSocketServer(
         acknowledge({ outcome: 'INTERNAL_ERROR' })
         return
       }
-      socket.join([publicRoom, playerRoom(player.id)])
+      void socket.join([publicRoom, playerRoom(player.id)])
       acknowledge(result)
       if (isNew) socket.to(publicRoom).emit('game.playerJoined', {
         gameId,
@@ -201,8 +201,8 @@ export function createGameSocketServer(
       const phaseBeforeLeave = game.phase
       game.removePlayer(player.id)
       memberships.delete(user.userId)
-      socket.leave(publicRoom)
-      socket.leave(playerRoom(player.id))
+      void socket.leave(publicRoom)
+      void socket.leave(playerRoom(player.id))
       acknowledge({ outcome: 'LEFT' })
       io.to(publicRoom).emit('game.playerLeft', {
         gameId, playerId: player.id, robotId: player.robot.id,
