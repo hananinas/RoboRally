@@ -1,11 +1,11 @@
-import { Board } from './Board.js'
-import { BackUp, Move1, Move2, Move3, TurnLeft, TurnRight, UTurn, type Card } from './Card.js'
-import { Game } from './Game.js'
-import type { GameId } from './ids.js'
-import { Player } from './Player.js'
-import { Robot } from './Robot.js'
-import { Direction } from './spatial.js'
-import { EmptyTile } from './Tile.js'
+import { Board } from '@/game/Board'
+import { Card } from '@/game/Card'
+import { Game } from '@/game/Game'
+import type { GameId } from '@/game/ids'
+import { Player } from '@/game/Player'
+import { Robot } from '@/game/Robot'
+import { Direction } from '@/game/spatial'
+import { EmptyTile } from '@/game/Tile'
 
 const BOARD_WIDTH = 21
 const BOARD_HEIGHT = 15
@@ -39,22 +39,18 @@ function createBoard(): Board {
     ),
   )
 }
-const HAND_CARD_TYPES =[
-Move1,
-Move2,
-Move3, 
-BackUp,
-TurnLeft,
-TurnRight, 
-UTurn,
-Move1,
-TurnLeft,
-] 
 
-function createHand(): readonly Card[] {
-  return CARD_IDS.map((id, index) =>
-    new HAND_CARD_TYPES[index](id)
-  )
+const HAND_INSTRUCTIONS = [
+  'MOVE_1', 'MOVE_2', 'MOVE_3', 'BACK_UP', 'TURN_LEFT',
+  'TURN_RIGHT', 'U_TURN', 'MOVE_1', 'TURN_LEFT',
+] as const
+
+export function createHand(cardIds: readonly string[] = CARD_IDS): readonly Card[] {
+  return cardIds.map((id, index) => new Card(id, HAND_INSTRUCTIONS[index]))
+}
+
+export function createSharedGame(): Readonly<{ gameId: GameId; game: Game }> {
+  return { gameId: GAME_ID, game: new Game(createBoard(), [], createHand()) }
 }
 
 export function createSinglePlayerGame(): SinglePlayerGame {

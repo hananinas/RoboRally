@@ -44,6 +44,11 @@ const stationaryRobotId = '30000000-0000-4000-8000-000000000002'
 const publicState: PublicGameState = {
   gameId: '40000000-0000-4000-8000-000000000001',
   phase: 'PROGRAMMING',
+  players: [
+    { playerId: '50000000-0000-4000-8000-000000000001', username: 'First', connected: true, programSubmitted: false },
+    { playerId: '50000000-0000-4000-8000-000000000002', username: 'Second', connected: true, programSubmitted: false },
+  ],
+  antenna: { x: 2, y: 0, angle: Math.PI / 2 },
   board: {
     width: 5,
     height: 5,
@@ -66,12 +71,13 @@ const publicState: PublicGameState = {
   ],
 }
 const actions: readonly RobotActionResolved[] = [
-  { robotId, instruction: 'MOVE_1', position: { coordinate: { x: 2, y: 2 }, orientation: 'NORTH' } },
-  { robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 2, y: 2 }, orientation: 'WEST' } },
-  { robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 2 }, orientation: 'WEST' } },
-  { robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 1, y: 2 }, orientation: 'SOUTH' } },
-  { robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 3 }, orientation: 'SOUTH' } },
+  { gameId: publicState.gameId, registerIndex: 0, robotId, instruction: 'MOVE_1', position: { coordinate: { x: 2, y: 2 }, orientation: 'NORTH' } },
+  { gameId: publicState.gameId, registerIndex: 1, robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 2, y: 2 }, orientation: 'WEST' } },
+  { gameId: publicState.gameId, registerIndex: 2, robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 2 }, orientation: 'WEST' } },
+  { gameId: publicState.gameId, registerIndex: 3, robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 1, y: 2 }, orientation: 'SOUTH' } },
+  { gameId: publicState.gameId, registerIndex: 4, robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 3 }, orientation: 'SOUTH' } },
 ]
+const hand = { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, cards }
 
 const result: Extract<JoinResult, { outcome: 'JOINED' }> = {
   outcome: 'JOINED',
@@ -212,6 +218,11 @@ describe('undo, redo, and clear', () => {
 })
 
 describe('client game state', () => {
+  it('ignores private hands before joining', () => {
+    const state = createClientGameState()
+    expect(gameStateReducer(state, { type: 'dealt', hand })).toBe(state)
+  })
+
   it('keeps programming locked until joined', () => {
     let state = createClientGameState()
     expect(state.assignment).toBeNull()
@@ -231,7 +242,7 @@ describe('client game state', () => {
     const state = { ...selectProgram(), assignment: null }
     expect(canProgram(state)).toBe(false)
     expect(createSubmission(state)).toBeNull()
-    expect(gameStateReducer(state, { type: 'dealt', cards }).phase).toBeNull()
+    expect(gameStateReducer(state, { type: 'dealt', hand })).toBe(state)
   })
 
   it('uses the assignment game identity for submission', () => {
@@ -241,6 +252,7 @@ describe('client game state', () => {
     }))
     expect(createSubmission(state)).toEqual({
       gameId: assignment.gameId,
+      playerId: assignment.playerId,
       cardIds: selectedCardIds,
     })
   })
@@ -251,14 +263,19 @@ describe('client game state', () => {
     })
     expect(canProgram(state)).toBe(false)
 
-    state = gameStateReducer(state, { type: 'dealt', cards })
+    state = gameStateReducer(state, { type: 'dealt', hand })
     state = selectProgram(state)
     const registers = state.registers
-    expect(gameStateReducer(state, { type: 'submitted', playerId: 'unknown-player' })).toBe(state)
-    state = gameStateReducer(state, {
-      type: 'submitted',
-      playerId: publicState.robots[0].playerId,
-    })
+    for (const invalidAction of [
+      { ...actions[0], gameId: 'another-game' },
+      { ...actions[0], robotId: 'unknown-robot' },
+    ]) {
+      state = gameStateReducer(state, { type: 'action', action: invalidAction })
+      expect(canProgram(state)).toBe(true)
+      expect(state.playback.active).toBeNull()
+      expect(state.registers).toEqual(registers)
+    }
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
 
     expect(canProgram(state)).toBe(false)
     expect(createSubmission(state)).toBeNull()
@@ -282,6 +299,7 @@ describe('client game state', () => {
     }
     expect(createSubmission(state)).toEqual({
       gameId: publicState.gameId,
+      playerId: hand.playerId,
       cardIds: selectedCardIds,
     })
 
@@ -295,6 +313,19 @@ describe('client game state', () => {
       selectedCardIds[3],
       selectedCardIds[4],
     ])
+  })
+
+  it('does not erase a selected program when the same hand is dealt again', () => {
+    const state = selectProgram()
+    const submission = createSubmission(state)
+
+    const duplicate = gameStateReducer(state, {
+      type: 'dealt',
+      hand,
+    })
+
+    expect(duplicate.registers).toEqual(state.registers)
+    expect(createSubmission(duplicate)).toEqual(submission)
   })
 
   it('freezes edits and duplicate submissions from send through acceptance', () => {
@@ -346,6 +377,7 @@ describe('client game state', () => {
       type: 'submission-unknown',
       handVersion: state.handVersion,
     })
+    expect(state.submission).toBe('uncertain')
 
     expect(canProgram(state)).toBe(false)
     expect(createSubmission(state)).toBeNull()
@@ -360,7 +392,9 @@ describe('client game state', () => {
     let state = selectProgram()
     const previousVersion = state.handVersion
     state = gameStateReducer(state, { type: 'submit' })
-    state = gameStateReducer(state, { type: 'dealt', cards })
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, { type: 'complete' })
+    state = gameStateReducer(state, { type: 'dealt', hand })
 
     expect(state.registers).toEqual(emptyRegisters)
     expect(canProgram(state)).toBe(true)
@@ -379,6 +413,7 @@ describe('client game state', () => {
     const submission = createSubmission(state)
     expect(submission).toEqual({
       gameId: publicState.gameId,
+      playerId: hand.playerId,
       cardIds: selectedCardIds,
     })
     state = gameStateReducer(state, { type: 'submit' })
@@ -403,12 +438,13 @@ describe('client game state', () => {
     expect(state.playback.robots.find((robot) => robot.robotId === robotId)?.position)
       .toEqual(publicState.robots[0].position)
     state = gameStateReducer(state, { type: 'submit' })
+    const registers = state.registers
     for (const action of actions) {
       state = gameStateReducer(state, { type: 'action', action })
     }
 
-    state = gameStateReducer(state, { type: 'dealt', cards })
-    expect(state.registers).toEqual(emptyRegisters)
+    state = gameStateReducer(state, { type: 'dealt', hand })
+    expect(state.registers).toEqual(registers)
 
     const displayedAngles = [0, -90, -90, -180, -180]
     for (const [index, action] of actions.entries()) {
@@ -419,7 +455,7 @@ describe('client game state', () => {
       expect(canProgram(state)).toBe(false)
       expect(createSubmission(state)).toBeNull()
       state = gameStateReducer(state, { type: 'place', cardId: cards[0].id, registerIndex: 0 })
-      expect(state.registers).toEqual(emptyRegisters)
+      expect(state.registers).toEqual(registers)
       state = gameStateReducer(state, { type: 'complete' })
     }
 
@@ -427,10 +463,85 @@ describe('client game state', () => {
     state = selectProgram(state)
     expect(createSubmission(state)).toEqual({
       gameId: publicState.gameId,
+      playerId: hand.playerId,
       cardIds: selectedCardIds,
     })
     expect(state.playback.robots.find((robot) => robot.robotId === robotId)?.position)
       .toEqual(actions[4].position)
+  })
+
+  it('replaces old cards with the next hand only after playback finishes', () => {
+    const nextCards: readonly Card[] = cards.map((card) => ({
+      id: card.id.replace('10000000', '20000000'),
+      instruction: card.instruction === 'MOVE_1' ? 'TURN_LEFT' : 'MOVE_1',
+    }))
+    let state = selectProgram()
+    const previousRegisters = state.registers
+
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, { type: 'dealt', hand: { ...hand, cards: nextCards } })
+    state = gameStateReducer(state, { type: 'dealt', hand })
+
+    expect(state.registers).toEqual(previousRegisters)
+    expect(canProgram(state)).toBe(false)
+
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(state.hand).toEqual(nextCards)
+    expect(state.registers).toEqual(emptyRegisters)
+    expect(canProgram(state)).toBe(true)
+
+    state = gameStateReducer(state, { type: 'place', cardId: cards[0].id, registerIndex: 0 })
+    expect(state.registers).toEqual(emptyRegisters)
+
+    for (const [registerIndex, card] of nextCards.slice(0, 5).entries()) {
+      state = gameStateReducer(state, { type: 'place', cardId: card.id, registerIndex })
+    }
+    expect(state.registers.slice(0, 5)).toEqual(nextCards.slice(0, 5))
+    state = gameStateReducer(state, { type: 'dealt', hand: { ...hand, cards: nextCards } })
+    expect(state.registers.slice(0, 5)).toEqual(nextCards.slice(0, 5))
+    expect(createSubmission(state)?.cardIds).toEqual(nextCards.slice(0, 5).map((card) => card.id))
+  })
+
+  it('requires the matching private hand after playback finishes', () => {
+    let state = selectProgram()
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(canProgram(state)).toBe(false)
+    expect(createSubmission(state)).toBeNull()
+    for (const invalidHand of [
+      { ...hand, playerId: publicState.robots[1].playerId },
+      { ...hand, gameId: 'another-game' },
+    ]) {
+      expect(gameStateReducer(state, { type: 'dealt', hand: invalidHand })).toBe(state)
+    }
+    state = gameStateReducer(state, { type: 'dealt', hand })
+    expect(canProgram(state)).toBe(true)
+    expect(state.registers).toEqual(emptyRegisters)
+    expect(gameStateReducer(state, { type: 'dealt', hand })).toBe(state)
+  })
+
+  it('buffers the next hand until both robots in the same register have played', () => {
+    let state = selectProgram()
+    const registers = state.registers
+    const first = actions[0]
+    const second: RobotActionResolved = {
+      ...first, robotId: stationaryRobotId,
+      position: { coordinate: { x: 3, y: 4 }, orientation: 'WEST' },
+    }
+    state = gameStateReducer(state, { type: 'action', action: first })
+    state = gameStateReducer(state, { type: 'action', action: second })
+    state = gameStateReducer(state, { type: 'dealt', hand })
+    expect(canProgram(state)).toBe(false)
+    expect(state.registers).toEqual(registers)
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(state.playback.active).toEqual(second)
+    expect(state.playback.robots[0].position).toEqual(first.position)
+    expect(state.playback.robots[1].position).toEqual(second.position)
+    expect(canProgram(state)).toBe(false)
+    expect(state.registers).toEqual(registers)
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(canProgram(state)).toBe(true)
+    expect(state.registers).toEqual(emptyRegisters)
   })
 
   it.each(['idle', 'pending'] as const)('preserves the game and locks editing on connection loss with submission %s', (submission) => {
@@ -463,5 +574,50 @@ describe('client game state', () => {
     expect(state.error).toBeNull()
     expect(state.registers).toEqual(emptyRegisters)
     expect(canProgram(state)).toBe(true)
+  })
+})
+
+describe('membership updates', () => {
+  const newcomer = {
+    gameId: publicState.gameId,
+    player: { playerId: 'new-player', username: 'New', connected: true, programSubmitted: false },
+    robot: { robotId: 'new-robot', playerId: 'new-player', position: { coordinate: { x: 1, y: 3 }, orientation: 'NORTH' as const } },
+  }
+
+  it('adds a joined robot while preserving playback and ignoring duplicate or unrelated joins', () => {
+    let state = programmingState()
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    const updated = gameStateReducer(state, { type: 'player-joined', payload: newcomer })
+    expect(updated.playerIds).toContain('new-player')
+    expect(updated.playback.robots.at(-1)?.robotId).toBe('new-robot')
+    expect(updated.playback.active).toBe(state.playback.active)
+    expect(gameStateReducer(updated, { type: 'player-joined', payload: newcomer })).toBe(updated)
+    expect(gameStateReducer(state, { type: 'player-joined', payload: { ...newcomer, gameId: 'other' } })).toBe(state)
+  })
+
+  it('removes a departed robot and its queued actions without disturbing another robot', () => {
+    let state = gameStateReducer(programmingState(), { type: 'player-joined', payload: newcomer })
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, { type: 'action', action: { ...actions[0], robotId: 'new-robot' } })
+    const payload = { gameId: publicState.gameId, playerId: 'new-player', robotId: 'new-robot' }
+    const updated = gameStateReducer(state, { type: 'player-left', payload })
+    expect(updated.playerIds).not.toContain('new-player')
+    expect(updated.playback.robots.some((robot) => robot.robotId === 'new-robot')).toBe(false)
+    expect(updated.playback.pending).toEqual([])
+    expect(updated.playback.active).toBe(state.playback.active)
+    expect(gameStateReducer(updated, { type: 'player-left', payload })).toBe(updated)
+    expect(gameStateReducer(state, { type: 'player-left', payload: { ...payload, gameId: 'other' } })).toBe(state)
+  })
+
+  it('continues with the next queued action when the active robot leaves', () => {
+    let state = programmingState()
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    const next = { ...actions[0], robotId: stationaryRobotId }
+    state = gameStateReducer(state, { type: 'action', action: next })
+    const updated = gameStateReducer(state, { type: 'player-left', payload: {
+      gameId: publicState.gameId, playerId: result.assignment.playerId, robotId,
+    } })
+    expect(updated.playback.active).toBe(next)
+    expect(updated.playback.robots.some((robot) => robot.robotId === robotId)).toBe(false)
   })
 })

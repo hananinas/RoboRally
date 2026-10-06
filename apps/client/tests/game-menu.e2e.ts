@@ -4,6 +4,24 @@ test.beforeEach(async ({ page }) => {
   await openGame(page)
 })
 
+test('toggles game options with a leave action', async ({ page }) => {
+  const trigger = page.getByRole('button', { name: 'Game options', exact: true })
+  const options = page.getByRole('region', { name: 'Game options' })
+
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  await expect(options).toBeHidden()
+  await trigger.click()
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true')
+  await expect(options).toBeVisible()
+  await expect(options.getByRole('button', {
+    name: 'Leave game',
+  })).toBeEnabled()
+
+  await trigger.click()
+  await expect(options).toBeHidden()
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+})
+
 test('supports Enter, Space, and Escape without losing trigger focus', async ({ page }) => {
   const trigger = page.getByRole('button', { name: 'Game options', exact: true })
   const options = page.getByRole('region', { name: 'Game options' })
@@ -94,6 +112,32 @@ test('keeps an open popover on screen after resizing', async ({ page }) => {
   }
 })
 
+test('includes the leave action without trapping keyboard focus', async ({ page }) => {
+  const trigger = page.getByRole('button', { name: 'Game options', exact: true })
+  const options = page.getByRole('region', { name: 'Game options' })
+  const collapse = page.getByRole('button', { name: 'Collapse player details' })
+  const keybindsSummary = options.getByText('Keybinds', { exact: true })
+
+  await page.keyboard.press('Tab')
+  await expect(trigger).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(options).toBeVisible()
+  await page.keyboard.press('Tab')
+  await expect(options.getByRole('button', { name: 'Leave game' })).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(keybindsSummary).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(collapse).toBeFocused()
+  await page.keyboard.press('Shift+Tab')
+  await expect(keybindsSummary).toBeFocused()
+  await page.keyboard.press('Shift+Tab')
+  await expect(options.getByRole('button', { name: 'Leave game' })).toBeFocused()
+  await page.keyboard.press('Shift+Tab')
+  await expect(trigger).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(options).toBeHidden()
+})
+
 test('preserves the program and allows card selection when dismissing the menu', async ({ page }) => {
   const trigger = page.getByRole('button', { name: 'Game options', exact: true })
   const options = page.getByRole('region', { name: 'Game options' })
@@ -113,7 +157,7 @@ test('preserves the program and allows card selection when dismissing the menu',
   await expect(trigger).toHaveAttribute('aria-expanded', 'false')
   await expect(registerCards).toHaveCount(2)
   await expect(controls.getByRole('button', { name: 'Move 1, remove from register 1', exact: true })).toBeVisible()
-  await expect(controls.getByRole('button', { name: 'Turn Left, remove from register 2', exact: true })).toBeVisible()
+  await expect(controls.getByRole('button', { name: 'Move 2, remove from register 2', exact: true })).toBeVisible()
   await expect(controls.getByRole('button', { name: 'Done', exact: true })).toBeDisabled()
 
   await trigger.click()
@@ -131,6 +175,7 @@ test.describe('touch interaction', () => {
 
     await trigger.tap()
     await expect(options).toBeVisible()
+    await expect(options.getByRole('button', { name: 'Leave game' })).toBeEnabled()
 
     await page.getByRole('heading', { name: 'Health', exact: true }).tap()
     await expect(options).toBeHidden()

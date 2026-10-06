@@ -16,6 +16,7 @@ import { Server, type Socket } from 'socket.io'
 import {
   createPublicState,
   GAME_ID,
+  HAND_INSTRUCTIONS,
   PLAYER_ID,
   ROBOT_ID,
   type FixtureControl,
@@ -48,7 +49,7 @@ const fixtures = new Map<string, Fixture>()
 function dealCards(): readonly Card[] {
   return Array.from({ length: 9 }, (_, index) => ({
     id: randomUUID(),
-    instruction: index % 2 === 0 ? 'MOVE_1' : 'TURN_LEFT',
+    instruction: HAND_INSTRUCTIONS[index],
   }))
 }
 
@@ -67,25 +68,39 @@ function snapshot(fixture: Fixture): FixtureSnapshot {
 
 function acknowledgeProgram(
   fixture: Fixture,
-  socket: GameSocket,
+  sender: GameSocket,
   acknowledge: ProgramResultAcknowledgement,
   outcome: ProgramResultOutcome,
 ) {
   acknowledge({ outcome })
   if (outcome === 'ACCEPTED') {
-    fixture.state = { ...fixture.state, phase: 'EXECUTING' }
-    // Production broadcasts acceptance to the other sockets, excluding the sender.
     for (const observer of fixture.sockets) {
-      if (observer !== socket) observer.emit('program.submitted', { playerId: PLAYER_ID })
+      if (observer === sender) continue
+      observer.emit('program.submitted', {
+        gameId: GAME_ID, playerId: PLAYER_ID,
+      })
     }
   }
 }
 
 function controlFixture(fixture: Fixture, control: FixtureControl) {
   switch (control.type) {
+    case 'hand':
+      for (const socket of fixture.sockets) socket.emit('cards.dealt', control.hand)
+      break
+    case 'submitted':
+      for (const socket of fixture.sockets) socket.emit('program.submitted', control.submission)
+      break
+    case 'deal':
+      for (const socket of fixture.sockets) socket.emit('cards.dealt', {
+        gameId: GAME_ID, playerId: PLAYER_ID, cards: fixture.cards,
+      })
+      break
     case 'early-hand':
       // Exercise out-of-order delivery without changing the authoritative join hand.
-      for (const socket of fixture.sockets) socket.emit('cards.dealt', { cards: control.cards })
+      for (const socket of fixture.sockets) socket.emit('cards.dealt', {
+        gameId: GAME_ID, playerId: PLAYER_ID, cards: control.cards,
+      })
       break
     case 'disconnect':
       for (const socket of fixture.sockets) socket.disconnect(true)
@@ -129,7 +144,9 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
       fixture.cards = dealCards()
       for (const socket of fixture.sockets) {
         for (const action of control.actions) socket.emit('robot.actionResolved', action)
-        socket.emit('cards.dealt', { cards: fixture.cards })
+        if (!control.deferHand) socket.emit('cards.dealt', {
+          gameId: GAME_ID, playerId: PLAYER_ID, cards: fixture.cards,
+        })
       }
       break
     }
@@ -263,6 +280,7 @@ io.on('connection', (socket) => {
   socket.on('program.submit', (payload, acknowledge) => {
     fixture.submissions.push(payload)
     const valid = payload.gameId === GAME_ID
+      && payload.playerId === PLAYER_ID
       && payload.cardIds.length === 5
       && new Set(payload.cardIds).size === 5
       && payload.cardIds.every((id) => fixture.cards.some((card) => card.id === id))

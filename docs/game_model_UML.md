@@ -45,6 +45,7 @@ Will update with a more conceptual domain diagram which will be used for present
         +program: Card[5] ordered
         +setProgram(Card[5] program)
         +getProgramCard(int registerIndex) Card
+        +turn(int quarterTurns)
         }
 
         class Direction {
@@ -56,11 +57,9 @@ Will update with a more conceptual domain diagram which will be used for present
         }
 
         class Card {
-            <<abstract>>
+            +id: CardId
+            +instruction: Instruction
         }
-
-        class Move1
-        class TurnLeft
 
         Game "1" *--> "1" Board
         Game *--> "1..*" Player
@@ -75,8 +74,6 @@ Will update with a more conceptual domain diagram which will be used for present
         Player "1" --> "*" Card : hand
         Robot "1" --> "5" Card : program
 
-        Card <|-- Move1
-        Card <|-- TurnLeft
 ```
 
 # Game
@@ -109,7 +106,9 @@ Has an assigned Robot and an unordered hand of cards. A five-card program is sub
 
 # Cards
 
-Abstract class that gets extended with each card type. `Move1` and `TurnLeft` are the V0 examples. Cards describe actions; Game interprets them instead of each card executing itself.
+Each Card has an instance ID and an Instruction. The shared instruction catalog defines movement distances and quarter turns, and its keys define the Instruction type. Game interprets these effects through Board and Robot. Cards describe actions rather than executing themselves.
+
+The client keeps labels and icons in one presentation map and uses the shared effect kind to choose animation timing.
 
 A Player's hand and Game's deck are unordered Card collections. A Robot's program is an ordered list of five Cards. These are properties, not separate classes.
 

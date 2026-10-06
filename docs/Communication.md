@@ -52,6 +52,8 @@ Other connections receive:
 
 without receiving game state.
 
+An explicit `game.leave {gameId}` removes the owning connection's player and robot, frees the occupied tile, and revokes its public/private room access. `LEFT` retains login. Remaining members receive `game.playerLeft {gameId, playerId, robotId}`. A disconnected player remains a member; disconnecting is not leaving. Leaving does not reopen a game that has already started.
+
 Reconnection behavior is described in the Reconnection section.
 
 The following diagram documents the initial join behaviour:

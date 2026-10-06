@@ -1,4 +1,4 @@
-import type { Direction } from './spatial.js'
+import type { Direction } from '@/game/spatial'
 
 export abstract class Tile {
   private readonly wallDirections: Set<Direction>

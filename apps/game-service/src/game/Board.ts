@@ -1,6 +1,6 @@
-import { type Direction, type Position, neighbour, opposite } from './spatial.js'
-import type { RobotId } from './ids.js'
-import type { Tile } from './Tile.js'
+import { type Direction, type Position, neighbour, opposite } from '@/game/spatial'
+import type { RobotId } from '@/game/ids'
+import type { Tile } from '@/game/Tile'
 
 export type MovementResult = Readonly<{
   position: Position
@@ -60,6 +60,10 @@ export class Board {
       throw new Error(`Robot ${robotId} is not on the board`)
     }
     return { ...position }
+  }
+
+  removeRobot(robotId: RobotId): void {
+    this.robotPositions.delete(robotId)
   }
 
   occupantAt(position: Position): RobotId | undefined {

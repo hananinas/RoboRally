@@ -5,7 +5,7 @@ import {
   type Registers,
 } from '../gameState.ts'
 import Panel from './Panel.tsx'
-import { instructionLabel } from './cardInstructions.ts'
+import { cardPresentation } from './cardInstructions.ts'
 import ProgramCard from './ProgramCard.tsx'
 
 type RegisterPanelProps = {
@@ -55,7 +55,7 @@ function RegisterSlot({
           <ProgramCard
                   card={card}
                   size="register"
-                  label={`${instructionLabel(card.instruction)}, remove from register ${index + 1}`}
+                  label={`${cardPresentation[card.instruction].label}, remove from register ${index + 1}`}
                   disabled={disabled}
                   onClick={() => onRemove(index)}
                 />

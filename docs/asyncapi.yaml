@@ -20,6 +20,8 @@ channels:
         $ref: '#/components/messages/Login'
       joinGame:
         $ref: '#/components/messages/JoinGame'
+      leaveGame:
+        $ref: '#/components/messages/LeaveGame'
       submitProgram:
         $ref: '#/components/messages/SubmitProgram'
       getPublicGameState:
@@ -42,6 +44,15 @@ channels:
     messages:
       result:
         $ref: '#/components/messages/JoinResult'
+
+  leaveReplies:
+    address: null
+    description: |
+      Logical reply channel
+      Delivered through the acknowledgement of game.leave, not a separate event.
+    messages:
+      result:
+        $ref: '#/components/messages/LeaveResult'
 
   programReplies:
     address: null
@@ -84,6 +95,8 @@ channels:
         $ref: '#/components/messages/RobotActionResolved'
       playerJoined:
         $ref: '#/components/messages/PlayerJoined'
+      playerLeft:
+        $ref: '#/components/messages/PlayerLeft'
       playerConnectionChanged:
         $ref: '#/components/messages/PlayerConnectionChanged'
 
@@ -113,6 +126,20 @@ operations:
         $ref: '#/channels/joinReplies'
       messages:
         - $ref: '#/channels/joinReplies/messages/result'
+      x-socketio:
+        acknowledgement: true
+
+  handleLeaveGame:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/leaveGame'
+    reply:
+      channel:
+        $ref: '#/channels/leaveReplies'
+      messages:
+        - $ref: '#/channels/leaveReplies/messages/result'
       x-socketio:
         acknowledgement: true
 
@@ -252,21 +279,21 @@ components:
               - id: 00000000-0000-4000-8000-000000000101
                 instruction: MOVE_1
               - id: 00000000-0000-4000-8000-000000000102
-                instruction: TURN_LEFT
+                instruction: MOVE_2
               - id: 00000000-0000-4000-8000-000000000103
-                instruction: MOVE_1
+                instruction: MOVE_3
               - id: 00000000-0000-4000-8000-000000000104
-                instruction: TURN_LEFT
+                instruction: BACK_UP
               - id: 00000000-0000-4000-8000-000000000105
-                instruction: MOVE_1
+                instruction: TURN_LEFT
               - id: 00000000-0000-4000-8000-000000000106
-                instruction: TURN_LEFT
+                instruction: TURN_RIGHT
               - id: 00000000-0000-4000-8000-000000000107
-                instruction: MOVE_1
+                instruction: U_TURN
               - id: 00000000-0000-4000-8000-000000000108
-                instruction: TURN_LEFT
-              - id: 00000000-0000-4000-8000-000000000109
                 instruction: MOVE_1
+              - id: 00000000-0000-4000-8000-000000000109
+                instruction: TURN_LEFT
             programSubmitted: false
         - name: duplicateUser
           summary: Another connection already owns membership
@@ -280,6 +307,70 @@ components:
           summary: A new player attempts to join after the first accepted program
           payload:
             outcome: GAME_ALREADY_STARTED
+
+    LeaveGame:
+      name: game.leave
+      description: >-
+        Requests explicit departure for the membership owned by this connection.
+        On success, removes the player and robot, frees the occupied tile, and
+        removes the connection from the public and private player rooms while
+        retaining login. Disconnecting retains membership and does not send
+        game.playerLeft. Leaving does not reopen a game that has already started.
+      payload:
+        $ref: '#/components/schemas/JoinGame'
+      examples:
+        - name: leave
+          summary: Explicitly leave the configured shared game
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+
+    LeaveResult:
+      name: game.leaveResult
+      description: >-
+        Acknowledges game.leave with LEFT or a rejection. This is returned through
+        the request's acknowledgement callback, not emitted as game.leaveResult.
+      payload:
+        $ref: '#/components/schemas/LeaveResult'
+      examples:
+        - name: left
+          summary: Membership removed; the connection remains logged in
+          payload:
+            outcome: LEFT
+        - name: loginRequired
+          summary: The connection has not logged in
+          payload:
+            outcome: LOGIN_REQUIRED
+        - name: invalidRequest
+          summary: The request is malformed
+          payload:
+            outcome: INVALID_REQUEST
+        - name: gameNotFound
+          summary: Game unavailable or membership not owned by this connection
+          payload:
+            outcome: GAME_NOT_FOUND
+        - name: internalError
+          summary: Unexpected service failure
+          payload:
+            outcome: INTERNAL_ERROR
+
+    PlayerLeft:
+      name: game.playerLeft
+      description: >-
+        Broadcasts the removed player and robot identifiers to remaining members
+        in game:{gameId}:public after a successful explicit leave. The leaving
+        connection loses public and private room access before LEFT is
+        acknowledged and does not receive this broadcast. Recipients remove the
+        player and robot from their public state. Disconnecting does not emit
+        this event.
+      payload:
+        $ref: '#/components/schemas/PlayerLeft'
+      examples:
+        - name: playerLeft
+          summary: Remove the departing player and robot from public state
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            robotId: 00000000-0000-4000-8000-000000000003
 
     PlayerJoined:
       name: game.playerJoined
@@ -453,21 +544,21 @@ components:
               - id: 00000000-0000-4000-8000-000000000101
                 instruction: MOVE_1
               - id: 00000000-0000-4000-8000-000000000102
-                instruction: TURN_LEFT
+                instruction: MOVE_2
               - id: 00000000-0000-4000-8000-000000000103
-                instruction: MOVE_1
+                instruction: MOVE_3
               - id: 00000000-0000-4000-8000-000000000104
-                instruction: TURN_LEFT
+                instruction: BACK_UP
               - id: 00000000-0000-4000-8000-000000000105
-                instruction: MOVE_1
+                instruction: TURN_LEFT
               - id: 00000000-0000-4000-8000-000000000106
-                instruction: TURN_LEFT
+                instruction: TURN_RIGHT
               - id: 00000000-0000-4000-8000-000000000107
-                instruction: MOVE_1
+                instruction: U_TURN
               - id: 00000000-0000-4000-8000-000000000108
-                instruction: TURN_LEFT
-              - id: 00000000-0000-4000-8000-000000000109
                 instruction: MOVE_1
+              - id: 00000000-0000-4000-8000-000000000109
+                instruction: TURN_LEFT
 
     PlayerConnectionChanged:
       name: game.playerConnectionChanged
@@ -633,6 +724,34 @@ components:
         GAME_ALREADY_STARTED: The game has already accepted its first program.
         USER_ALREADY_IN_GAME: another connection currently owns this user's membership. 
 
+    LeaveResult:
+      type: object
+      additionalProperties: false
+      required: [ outcome ]
+      properties:
+        outcome:
+          type: string
+          enum: [ LEFT, LOGIN_REQUIRED, INVALID_REQUEST, GAME_NOT_FOUND, INTERNAL_ERROR ]
+      description: |
+        LEFT: membership and robot removed, room access revoked, login retained.
+        LOGIN_REQUIRED: this connection has no approved user.
+        INVALID_REQUEST: malformed request, including an invalid gameId.
+        GAME_NOT_FOUND: unavailable game or membership not owned by this connection;
+        this also covers a repeated leave after a successful departure.
+        INTERNAL_ERROR: unexpected service failure; do not expose internals.
+
+    PlayerLeft:
+      type: object
+      additionalProperties: false
+      required: [ gameId, playerId, robotId ]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+        playerId:
+          $ref: '#/components/schemas/PlayerId'
+        robotId:
+          $ref: '#/components/schemas/RobotId'
+
     PlayerState:
       type: object
       additionalProperties: false
@@ -757,7 +876,7 @@ components:
 
     Instruction:
       type: string
-      enum: [ MOVE_1, TURN_LEFT ]
+      enum: [ MOVE_1, MOVE_2, MOVE_3, BACK_UP, TURN_LEFT, TURN_RIGHT, U_TURN ]
 
     Card:
       type: object
