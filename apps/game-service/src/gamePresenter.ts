@@ -6,6 +6,7 @@ import type {
   Orientation,
   PublicGameState,
   RobotActionResolved,
+  PlayerState,
   Tile as TilePayload,
 } from '@robo-rally/game-events'
 import {
@@ -70,6 +71,7 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
 export function presentPublicGameState(
   gameId: GameId,
   game: Game,
+  players: readonly PlayerState[] = [],
 ): PublicGameState {
   const tiles = Array.from({ length: game.board.height }, (_, y) =>
     Array.from({ length: game.board.width }, (_, x) => presentTile(game, x, y)),
@@ -77,6 +79,7 @@ export function presentPublicGameState(
 
   return {
     gameId,
+    players,
     antenna: game.antenna,
     board: {
       width: game.board.width,
