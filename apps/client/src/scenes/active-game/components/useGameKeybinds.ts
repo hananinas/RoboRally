@@ -90,8 +90,11 @@ export default function useGameKeybinds(
 
       if (pendingSequence === 'colon-w') {
         setPendingSequence('none')
-        if (event.key === 'Enter' && canSubmit && window.confirm('Submit your program?')) {
-          onSubmit()
+        if (event.key === 'Enter') {
+          event.preventDefault()
+          if (canSubmit && window.confirm('Submit your program?')) {
+            onSubmit()
+          }
         }
         return
       }
