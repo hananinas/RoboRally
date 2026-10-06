@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "pnpm test:unit && pnpm test:browser",
-    "test:browser": "playwright test",
+    "test:browser": "playwright test && playwright test --config playwright.membership.config.ts",
     "test:unit": "vitest run",
     "typecheck": "tsc -b",
     "preview": "vite preview"

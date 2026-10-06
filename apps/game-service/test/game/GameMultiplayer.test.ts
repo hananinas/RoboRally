@@ -95,6 +95,30 @@ describe('Game fixed-roster programming', () => {
 })
 
 describe('Game multiplayer activation', () => {
+  it('advances the register when the only robot still waiting to act leaves', () => {
+    const { players, deck, game } = createMultiplayerGame([{ x: 4, y: 5 }, { x: 5, y: 4 }])
+    for (const player of players) game.submitProgram(player.id, deck.slice(0, 5))
+    expect(game.executeNextAction().action.robotId).toBe(players[0].robot.id)
+
+    game.removePlayer(players[1].id)
+
+    expect(game.currentRegister).toBe(1)
+    expect(game.executeNextAction().action.robotId).toBe(players[0].robot.id)
+    expect(game.currentRegister).toBe(2)
+  })
+
+  it('returns to programming when the last member leaves during activation', () => {
+    const { players, deck, game } = createMultiplayerGame([{ x: 4, y: 5 }])
+    game.submitProgram(players[0].id, deck.slice(0, 5))
+
+    game.removePlayer(players[0].id)
+
+    expect(game.phase).toBe('programming')
+    expect(game.currentRegister).toBe(0)
+    expect(game.players).toEqual([])
+    expect(game.hasStarted).toBe(true)
+  })
+
   it('executes every robot in register-major order and resets every hand and barrier for two rounds', () => {
     const { players, deck, game } = createMultiplayerGame([
       { x: 5, y: 4 },

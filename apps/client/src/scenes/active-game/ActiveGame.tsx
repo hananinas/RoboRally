@@ -19,9 +19,11 @@ function getGameStatus(state: ClientGameState): string {
   return 'Waiting'
 }
 
-function ActiveGame({ game, username }: {
+function ActiveGame({ game, username, leaving, onLeave }: {
   game: ReturnType<typeof useGameConnection>
   username: string
+  leaving: boolean
+  onLeave: () => void
 }) {
   const { state, dispatch, submit } = game
   const {
@@ -31,7 +33,7 @@ function ActiveGame({ game, username }: {
     hudFits,
     overlayRef,
   } = useOverlayLayout(state.handVersion)
-  const disabled = !canProgram(state)
+  const disabled = leaving || !canProgram(state)
   const hasHand = state.handVersion > 0
   const status = getGameStatus(state)
   const registeredCardIds = new Set(
@@ -49,7 +51,7 @@ function ActiveGame({ game, username }: {
       <div ref={overlayRef} className={overlayClassName}>
         <aside className="game-hud" aria-label="Game controls">
           <div ref={hudContentRef} className="game-hud__content">
-            <PlayerPanel player={{ name: username }} />
+            <PlayerPanel player={{ name: username }} onLeave={onLeave} leaveDisabled={leaving || !state.connected} />
             <RegisterPanel
               registers={state.registers}
               disabled={disabled}

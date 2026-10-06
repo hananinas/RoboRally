@@ -4,7 +4,7 @@ test.beforeEach(async ({ page }) => {
   await openGame(page)
 })
 
-test('toggles game options with a disabled placeholder', async ({ page }) => {
+test('toggles game options with a leave action', async ({ page }) => {
   const trigger = page.getByRole('button', { name: 'Game options', exact: true })
   const options = page.getByRole('region', { name: 'Game options' })
 
@@ -14,8 +14,8 @@ test('toggles game options with a disabled placeholder', async ({ page }) => {
   await expect(trigger).toHaveAttribute('aria-expanded', 'true')
   await expect(options).toBeVisible()
   await expect(options.getByRole('button', {
-    name: 'No options available yet',
-  })).toBeDisabled()
+    name: 'Leave game',
+  })).toBeEnabled()
 
   await trigger.click()
   await expect(options).toBeHidden()
@@ -102,7 +102,7 @@ test('keeps an open popover on screen after resizing', async ({ page }) => {
   }
 })
 
-test('skips the disabled option without trapping keyboard focus', async ({ page }) => {
+test('includes the leave action without trapping keyboard focus', async ({ page }) => {
   const trigger = page.getByRole('button', { name: 'Game options', exact: true })
   const options = page.getByRole('region', { name: 'Game options' })
   const collapse = page.getByRole('button', { name: 'Collapse player details' })
@@ -112,7 +112,11 @@ test('skips the disabled option without trapping keyboard focus', async ({ page 
   await page.keyboard.press('Enter')
   await expect(options).toBeVisible()
   await page.keyboard.press('Tab')
+  await expect(options.getByRole('button', { name: 'Leave game' })).toBeFocused()
+  await page.keyboard.press('Tab')
   await expect(collapse).toBeFocused()
+  await page.keyboard.press('Shift+Tab')
+  await expect(options.getByRole('button', { name: 'Leave game' })).toBeFocused()
   await page.keyboard.press('Shift+Tab')
   await expect(trigger).toBeFocused()
   await page.keyboard.press('Escape')
@@ -156,7 +160,7 @@ test.describe('touch interaction', () => {
 
     await trigger.tap()
     await expect(options).toBeVisible()
-    await expect(options.getByRole('button')).toBeDisabled()
+    await expect(options.getByRole('button')).toBeEnabled()
 
     await page.getByRole('heading', { name: 'Health', exact: true }).tap()
     await expect(options).toBeHidden()

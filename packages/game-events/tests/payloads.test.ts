@@ -27,6 +27,7 @@ describe('game event payload types', () => {
       antenna: { x: 0, y: 0, angle: 0 },
       board: { width: 1, height: 1, tiles: [] },
       robots: [],
+      players: [],
       phase: 'PROGRAMMING',
     } satisfies PublicGameState
     const found = {

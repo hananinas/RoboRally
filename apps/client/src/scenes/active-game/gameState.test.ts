@@ -44,6 +44,10 @@ const stationaryRobotId = '30000000-0000-4000-8000-000000000002'
 const publicState: PublicGameState = {
   gameId: '40000000-0000-4000-8000-000000000001',
   phase: 'PROGRAMMING',
+  players: [
+    { playerId: '50000000-0000-4000-8000-000000000001', username: 'First', connected: true, programSubmitted: false },
+    { playerId: '50000000-0000-4000-8000-000000000002', username: 'Second', connected: true, programSubmitted: false },
+  ],
   antenna: { x: 2, y: 0, angle: Math.PI / 2 },
   board: {
     width: 5,
@@ -527,5 +531,50 @@ describe('client game state', () => {
     expect(state.error).toBeNull()
     expect(state.registers).toEqual(emptyRegisters)
     expect(canProgram(state)).toBe(true)
+  })
+})
+
+describe('membership updates', () => {
+  const newcomer = {
+    gameId: publicState.gameId,
+    player: { playerId: 'new-player', username: 'New', connected: true, programSubmitted: false },
+    robot: { robotId: 'new-robot', playerId: 'new-player', position: { coordinate: { x: 1, y: 3 }, orientation: 'NORTH' as const } },
+  }
+
+  it('adds a joined robot while preserving playback and ignoring duplicate or unrelated joins', () => {
+    let state = programmingState()
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    const updated = gameStateReducer(state, { type: 'player-joined', payload: newcomer })
+    expect(updated.playerIds).toContain('new-player')
+    expect(updated.playback.robots.at(-1)?.robotId).toBe('new-robot')
+    expect(updated.playback.active).toBe(state.playback.active)
+    expect(gameStateReducer(updated, { type: 'player-joined', payload: newcomer })).toBe(updated)
+    expect(gameStateReducer(state, { type: 'player-joined', payload: { ...newcomer, gameId: 'other' } })).toBe(state)
+  })
+
+  it('removes a departed robot and its queued actions without disturbing another robot', () => {
+    let state = gameStateReducer(programmingState(), { type: 'player-joined', payload: newcomer })
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, { type: 'action', action: { ...actions[0], robotId: 'new-robot' } })
+    const payload = { gameId: publicState.gameId, playerId: 'new-player', robotId: 'new-robot' }
+    const updated = gameStateReducer(state, { type: 'player-left', payload })
+    expect(updated.playerIds).not.toContain('new-player')
+    expect(updated.playback.robots.some((robot) => robot.robotId === 'new-robot')).toBe(false)
+    expect(updated.playback.pending).toEqual([])
+    expect(updated.playback.active).toBe(state.playback.active)
+    expect(gameStateReducer(updated, { type: 'player-left', payload })).toBe(updated)
+    expect(gameStateReducer(state, { type: 'player-left', payload: { ...payload, gameId: 'other' } })).toBe(state)
+  })
+
+  it('continues with the next queued action when the active robot leaves', () => {
+    let state = programmingState()
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    const next = { ...actions[0], robotId: stationaryRobotId }
+    state = gameStateReducer(state, { type: 'action', action: next })
+    const updated = gameStateReducer(state, { type: 'player-left', payload: {
+      gameId: publicState.gameId, playerId: result.assignment.playerId, robotId,
+    } })
+    expect(updated.playback.active).toBe(next)
+    expect(updated.playback.robots.some((robot) => robot.robotId === robotId)).toBe(false)
   })
 })

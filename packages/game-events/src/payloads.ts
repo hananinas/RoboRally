@@ -74,6 +74,26 @@ export type PublicGameState = Readonly<{
   board: Board
   robots: readonly Robot[]
   phase: GamePhase
+  players: readonly PlayerState[]
+}>
+
+export type PlayerState = Readonly<{
+  playerId: PlayerId
+  username: string
+  programSubmitted: boolean
+  connected: boolean
+}>
+
+export type PlayerJoined = Readonly<{
+  gameId: GameId
+  player: PlayerState
+  robot: Robot
+}>
+
+export type PlayerLeft = Readonly<{ gameId: GameId; playerId: PlayerId; robotId: RobotId }>
+
+export type LeaveResult = Readonly<{
+  outcome: 'LEFT' | 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND' | 'INTERNAL_ERROR'
 }>
 
 export type CardsDealt = Readonly<{

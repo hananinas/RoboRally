@@ -1,6 +1,6 @@
 import ActiveGame from './scenes/active-game/ActiveGame.tsx'
 import useGameConnection from './scenes/active-game/useGameConnection.ts'
-import { useEffect, useReducer, useRef } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import Login from './scenes/login/Login.tsx'
 import {
   createSessionState,
@@ -40,6 +40,7 @@ function App() {
   const loginAttempt = useRef(0)
   const joinPending = useRef(false)
   const joinAttempt = useRef(0)
+  const [leaving, setLeaving] = useState(false)
 
   useEffect(() => {
     const invalidateRequests = () => {
@@ -95,7 +96,7 @@ function App() {
     || session.status === 'joined'
   const sessionError = session.status === 'editing' && session.error
     ? loginErrors[session.error]
-    : session.status === 'join-failed' ? joinErrors[session.error] : null
+    : session.status === 'join-failed' && session.error ? joinErrors[session.error] : null
   const requiresReconnect = session.status === 'editing' && session.error === 'ALREADY_LOGGED_IN'
 
   function submitUsername(submittedUsername: string) {
@@ -135,8 +136,24 @@ function App() {
     )
   }
 
+  function leaveGame() {
+    if (leaving || !connection.socket.connected || !game.state.assignment) return
+    setLeaving(true)
+    connection.socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit(
+      'game.leave', { gameId: game.state.assignment.gameId }, (error, result) => {
+        if (!error && (result.outcome === 'LEFT' || result.outcome === 'GAME_NOT_FOUND')) {
+          game.dispatch({ type: 'reset' })
+          dispatch({ type: 'left' })
+          setLeaving(false)
+        } else {
+          game.dispatch({ type: 'error', message: 'Could not confirm leaving the game. Reload to continue.' })
+        }
+      },
+    )
+  }
+
   if (session.status === 'joined') {
-    return <ActiveGame game={game} username={session.user.username} />
+    return <ActiveGame game={game} username={session.user.username} leaving={leaving} onLeave={leaveGame} />
   }
 
   return (

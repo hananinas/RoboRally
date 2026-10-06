@@ -19,6 +19,7 @@ const joined: Extract<JoinResult, { outcome: 'JOINED' }> = {
     antenna: { x: 0, y: 0, angle: Math.PI / 2 },
     board: { width: 1, height: 1, tiles: [] },
     robots: [],
+    players: [],
     phase: 'PROGRAMMING',
   },
   hand: [],

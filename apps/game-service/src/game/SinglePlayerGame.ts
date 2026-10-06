@@ -45,8 +45,12 @@ const HAND_INSTRUCTIONS = [
   'TURN_RIGHT', 'U_TURN', 'MOVE_1', 'TURN_LEFT',
 ] as const
 
-function createHand(): readonly Card[] {
-  return CARD_IDS.map((id, index) => new Card(id, HAND_INSTRUCTIONS[index]))
+export function createHand(cardIds: readonly string[] = CARD_IDS): readonly Card[] {
+  return cardIds.map((id, index) => new Card(id, HAND_INSTRUCTIONS[index]))
+}
+
+export function createSharedGame(): Readonly<{ gameId: GameId; game: Game }> {
+  return { gameId: GAME_ID, game: new Game(createBoard(), [], createHand()) }
 }
 
 export function createSinglePlayerGame(): SinglePlayerGame {

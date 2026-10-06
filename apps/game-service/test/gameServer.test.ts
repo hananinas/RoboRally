@@ -1,395 +1,304 @@
-import { createServer, type Server as HttpServer } from 'node:http'
+import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import type {
-  ClientToServerEvents,
-  LoginResult,
-  ProgramResult,
-  PublicGameStateResult,
-  RobotActionResolved,
-  ServerToClientEvents,
-} from '@robo-rally/game-events'
-import {
-  io as createSocketClient,
-  type Socket as ClientSocket,
-} from 'socket.io-client'
+import { parseSubmitProgram } from '@robo-rally/game-events'
+import type { ClientToServerEvents, JoinResult, ServerToClientEvents } from '@robo-rally/game-events'
+import { io as createClient, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  createSinglePlayerGame,
-  type SinglePlayerGame,
-} from '@/game/index.ts'
+import { Board, EmptyTile, Game, Card } from '@/game/index.ts'
+import { createSharedGame } from '@/game/SinglePlayerGame.ts'
 import { createGameSocketServer, type GameSocketServer } from '@/gameServer.ts'
-import {
-  presentCardsDealt,
-  presentPublicGameState,
-} from '@/gamePresenter.ts'
 
-describe('game Socket.IO connection', () => {
-  let httpServer: HttpServer
-  let io: GameSocketServer
-  let client: ClientSocket<ServerToClientEvents, ClientToServerEvents>
-  let clients: ClientSocket<ServerToClientEvents, ClientToServerEvents>[]
-  let serviceUrl: string
-  let singlePlayerGame: SinglePlayerGame
+type Client = Socket<ServerToClientEvents, ClientToServerEvents>
+type Joined = Extract<JoinResult, { outcome: 'JOINED' }>
+
+describe('game membership over Socket.IO', () => {
+  let server: GameSocketServer
+  let shared: ReturnType<typeof createSharedGame>
+  let url: string
+  let clients: Client[]
 
   beforeEach(async () => {
-    singlePlayerGame = createSinglePlayerGame()
-    httpServer = createServer()
-    io = createGameSocketServer(httpServer, {
-      ...singlePlayerGame,
-      playerForConnection: () => singlePlayerGame.player,
-    })
-    await new Promise<void>((resolve) => httpServer.listen(0, '127.0.0.1', resolve))
-    const { port } = httpServer.address() as AddressInfo
-    serviceUrl = `http://127.0.0.1:${port}`
+    shared = createSharedGame()
     clients = []
-    client = createClient()
+    await start()
   })
 
-  function createClient(): ClientSocket<
-    ServerToClientEvents,
-    ClientToServerEvents
-  > {
-    const socket = createSocketClient(serviceUrl, {
-      autoConnect: false,
-      transports: ['websocket'],
-    })
-    clients.push(socket)
-    return socket
+  async function start() {
+    const http = createServer()
+    server = createGameSocketServer(http, shared)
+    await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve))
+    url = `http://127.0.0.1:${(http.address() as AddressInfo).port}`
   }
 
   afterEach(async () => {
-    for (const socket of clients) socket.disconnect()
-    await new Promise<void>((resolve, reject) =>
-      io.close((error) => (error ? reject(error) : resolve())),
-    )
+    for (const client of clients) client.disconnect()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
   })
 
-  function connect(
-    socket: ClientSocket<ServerToClientEvents, ClientToServerEvents> = client,
-  ): Promise<void> {
-    return new Promise((resolve, reject) => {
-      socket.once('connect', resolve)
-      socket.once('connect_error', reject)
-      socket.connect()
+  async function connect(username?: string): Promise<Client> {
+    const client: Client = createClient(url, { autoConnect: false, transports: ['websocket'], reconnection: false })
+    clients.push(client)
+    await new Promise<void>((resolve, reject) => {
+      client.once('connect', resolve)
+      client.once('connect_error', reject)
+      client.connect()
     })
+    if (username !== undefined) await client.timeout(1000).emitWithAck('user.login', { username })
+    return client
   }
 
-  function submitProgram(payload: unknown): Promise<ProgramResult> {
-    const untypedClient = client as unknown as {
-      emit: (
-        event: 'program.submit',
-        submittedPayload: unknown,
-        acknowledge: (result: ProgramResult) => void,
-      ) => void
-    }
-    return new Promise((resolve) =>
-      untypedClient.emit('program.submit', payload, resolve),
-    )
+  async function join(client: Client): Promise<Joined> {
+    const result = await client.timeout(1000).emitWithAck('game.join', { gameId: shared.gameId })
+    expect(result.outcome).toBe('JOINED')
+    if (result.outcome !== 'JOINED') throw new Error(result.outcome)
+    return result
   }
 
-  function login(
-    payload: unknown,
-    socket: ClientSocket<ServerToClientEvents, ClientToServerEvents> = client,
-  ): Promise<LoginResult> {
-    const untypedClient = socket as unknown as {
-      emit: (
-        event: 'user.login',
-        request: unknown,
-        acknowledge: (result: LoginResult) => void,
-      ) => void
-    }
-    return new Promise((resolve) => untypedClient.emit('user.login', payload, resolve))
+  function raw(client: Client, event: string, payload: unknown): Promise<unknown> {
+    const emit = client.emit.bind(client) as unknown as
+      (event: string, payload: unknown, acknowledge: (result: unknown) => void) => void
+    return new Promise((resolve) => emit(event, payload, resolve))
   }
 
-  function getPublicGameState(
-    payload: unknown,
-  ): Promise<PublicGameStateResult> {
-    const untypedClient = client as unknown as {
-      emit: (
-        event: 'game.getPublicGameState',
-        request: unknown,
-        acknowledge: (result: PublicGameStateResult) => void,
-      ) => void
-    }
-    return new Promise((resolve) =>
-      untypedClient.emit('game.getPublicGameState', payload, resolve),
-    )
+  function submission(joined: Joined) {
+    return parseSubmitProgram({ gameId: shared.gameId, playerId: joined.assignment.playerId, cardIds: joined.hand.slice(0, 5).map((card) => card.id) })
   }
 
-  function collectResolvedActions(): Promise<readonly RobotActionResolved[]> {
-    return new Promise((resolve) => {
-      const actions: RobotActionResolved[] = []
-      const collect = (action: RobotActionResolved) => {
-        actions.push(action)
-        if (actions.length === 5) {
-          client.off('robot.actionResolved', collect)
-          resolve(actions)
-        }
-      }
-      client.on('robot.actionResolved', collect)
-    })
-  }
-
-  it('deals the assigned player hand on connection', async () => {
-    const dealt = new Promise<Parameters<ServerToClientEvents['cards.dealt']>[0]>(
-      (resolve) => client.once('cards.dealt', resolve),
-    )
-
-    await connect()
-
-    expect(await dealt).toEqual(
-      presentCardsDealt(singlePlayerGame.gameId, singlePlayerGame.player),
-    )
-  })
-
-  it('binds an approved user to the connection and reuses it on repeated login', async () => {
-    await connect()
-
-    const result = await login({ username: 'Dane' })
-    expect(result).toEqual({
-      outcome: 'LOGGED_IN',
-      user: { userId: expect.any(String), username: 'Dane' },
-    })
-    expect(await login({ username: 'Dane' })).toEqual(result)
-    expect([...io.sockets.sockets.values()][0].data.user).toEqual(
-      result.outcome === 'LOGGED_IN' ? result.user : undefined,
-    )
-  })
-
-  it('shares a user across connections but keeps each socket independently logged in', async () => {
-    await connect()
-    const other = createClient()
-    await connect(other)
-
-    const first = await login({ username: 'Dane' })
-    expect(await login({ username: 'Dane' }, other)).toEqual(first)
-    expect(await login({ username: 'Other' })).toEqual({
-      outcome: 'ALREADY_LOGGED_IN',
-    })
-    expect(await login({ username: 'Other' }, other)).toEqual({
-      outcome: 'ALREADY_LOGGED_IN',
-    })
-  })
-
-  it('requires a fresh login after disconnect while retaining the user', async () => {
-    await connect()
-    const first = await login({ username: 'Dane' })
-    client.disconnect()
-
-    const replacement = createClient()
-    await connect(replacement)
-    const replacementOnServer = [...io.sockets.sockets.values()].find(
-      (socket) => socket.id === replacement.id,
-    )
-    expect(replacementOnServer?.data.user).toBeUndefined()
-    expect(await login({ username: 'Dane' }, replacement)).toEqual(first)
-  })
-
-  it('rejects malformed login without changing connection identity', async () => {
-    await connect()
-
-    expect(await login(null)).toEqual({ outcome: 'INVALID_REQUEST' })
-    expect(await login({ username: 'Dane', extra: true })).toEqual({
-      outcome: 'INVALID_REQUEST',
-    })
-    expect(await login({ username: '' })).toEqual({
-      outcome: 'INVALID_USERNAME',
-    })
-    expect([...io.sockets.sockets.values()][0].data.user).toBeUndefined()
-
-    const approved = await login({ username: 'Dane' })
-    expect(approved.outcome).toBe('LOGGED_IN')
-    expect(await login({ username: '' })).toEqual({
-      outcome: 'INVALID_USERNAME',
-    })
-    expect(await login({ username: 'Dane' })).toEqual(approved)
-  })
-
-  it('acknowledges the current public game state', async () => {
-    await connect()
-
-    const state = await client.timeout(1_000).emitWithAck(
-      'game.getPublicGameState',
-      { gameId: singlePlayerGame.gameId },
-    )
-
-    expect(state).toEqual({
-      outcome: 'GAME_FOUND',
-      state: presentPublicGameState(
-        singlePlayerGame.gameId,
-        singlePlayerGame.game,
-      ),
-    })
-  })
-
-  it('acknowledges an unknown game without leaving the client waiting', async () => {
-    await connect()
-
-    const result = await client.timeout(1_000).emitWithAck(
-      'game.getPublicGameState',
-      { gameId: '00000000-0000-4000-8000-000000000999' },
-    )
-
-    expect(result).toEqual({ outcome: 'GAME_NOT_FOUND' })
-  })
-
-  it('rejects malformed state requests without terminating the service', async () => {
-    await connect()
-
-    await expect(getPublicGameState(null)).resolves.toEqual({
-      outcome: 'GAME_NOT_FOUND',
-    })
-    await expect(
-      getPublicGameState({ gameId: singlePlayerGame.gameId, extra: true }),
-    ).resolves.toEqual({ outcome: 'GAME_NOT_FOUND' })
-  })
-
-  it('ignores commands without acknowledgement callbacks', async () => {
-    await connect()
-    const cardIds = singlePlayerGame.player.hand
-      .slice(0, 5)
-      .map((card) => card.id)
-    const untypedClient = client as unknown as {
-      emit: (event: string, payload: unknown) => void
-    }
-
-    untypedClient.emit('user.login', { username: 'Dane' })
-    untypedClient.emit('game.getPublicGameState', null)
-    untypedClient.emit('program.submit', {
-      gameId: singlePlayerGame.gameId,
-      playerId: singlePlayerGame.player.id,
-      cardIds,
-    })
-
-    const state = await getPublicGameState({ gameId: singlePlayerGame.gameId })
-    expect([...io.sockets.sockets.values()][0].data.user).toBeUndefined()
-    expect(state.outcome).toBe('GAME_FOUND')
-    expect(singlePlayerGame.game.phase).toBe('programming')
-    expect(singlePlayerGame.player.robot.program).toEqual([])
-  })
-
-  it('accepts an ordered program, executes five registers, and starts the next round', async () => {
-    const initialHand = new Promise<
-      Parameters<ServerToClientEvents['cards.dealt']>[0]
-    >((resolve) => client.once('cards.dealt', resolve))
-    await connect()
-    await initialHand
-
-    const observer = createClient()
-    const submitted = new Promise<
-      Parameters<ServerToClientEvents['program.submitted']>[0]
-    >((resolve) => observer.once('program.submitted', resolve))
-    const submittedToPlayer = vi.fn()
-    client.on('program.submitted', submittedToPlayer)
-    await connect(observer)
-
-    const selectedCards = singlePlayerGame.player.hand.slice(0, 5)
-    const actions = collectResolvedActions()
-    const nextHand = new Promise<
-      Parameters<ServerToClientEvents['cards.dealt']>[0]
-    >((resolve) => client.once('cards.dealt', resolve))
-
-    const result = await submitProgram({
-      gameId: singlePlayerGame.gameId,
-      playerId: singlePlayerGame.player.id,
-      cardIds: selectedCards.map((card) => card.id),
-    })
-
-    expect(result).toEqual({ outcome: 'ACCEPTED' })
-    expect(await submitted).toEqual({
-      gameId: singlePlayerGame.gameId,
-      playerId: singlePlayerGame.player.id,
-    })
-    const resolvedActions = await actions
-    expect(resolvedActions.map((action) => action.instruction)).toEqual([
-      'MOVE_1',
-      'MOVE_2',
-      'MOVE_3',
-      'BACK_UP',
-      'TURN_LEFT',
-    ])
-    expect(await nextHand).toEqual(
-      presentCardsDealt(singlePlayerGame.gameId, singlePlayerGame.player),
-    )
-    expect(submittedToPlayer).not.toHaveBeenCalled()
-    expect(singlePlayerGame.game.phase).toBe('programming')
-    expect(singlePlayerGame.game.currentRegister).toBe(0)
-    expect(singlePlayerGame.player.robot.program).toEqual([])
-
-    const nextState = await client.timeout(1_000).emitWithAck(
-      'game.getPublicGameState',
-      { gameId: singlePlayerGame.gameId },
-    )
-    expect(nextState.outcome).toBe('GAME_FOUND')
-    if (nextState.outcome !== 'GAME_FOUND') {
-      throw new Error('Game state was not found')
-    }
-    expect(nextState.state.phase).toBe('PROGRAMMING')
-    expect(nextState.state.robots[0].position).toEqual(
-      resolvedActions.at(-1)?.position,
-    )
-  })
-
-  it('rejects malformed, unknown, and unavailable programs atomically', async () => {
-    const initialHand = new Promise<
-      Parameters<ServerToClientEvents['cards.dealt']>[0]
-    >((resolve) => client.once('cards.dealt', resolve))
-    await connect()
-    await initialHand
-    const observer = createClient()
-    const observerHand = new Promise<
-      Parameters<ServerToClientEvents['cards.dealt']>[0]
-    >((resolve) => observer.once('cards.dealt', resolve))
-    await connect(observer)
-    await observerHand
+  it('keeps connection and login separate from rooms, hands and membership', async () => {
+    const client = await connect()
     const received = vi.fn()
     client.onAny(received)
-    observer.onAny(received)
-    const cardIds = singlePlayerGame.player.hand
-      .slice(0, 5)
-      .map((card) => card.id)
-    const valid = {
-      gameId: singlePlayerGame.gameId,
-      playerId: singlePlayerGame.player.id,
-      cardIds,
-    }
-    const invalidPayloads: readonly unknown[] = [
-      {},
-      { ...valid, cardIds: cardIds.slice(0, 4) },
-      {
-        ...valid,
-        cardIds: [cardIds[0], cardIds[0], ...cardIds.slice(2)],
-      },
-      {
-        ...valid,
-        cardIds: [
-          ...cardIds.slice(0, 4),
-          '00000000-0000-4000-8000-000000000999',
-        ],
-      },
-      {
-        ...valid,
-        gameId: '00000000-0000-4000-8000-000000000999',
-      },
-      { ...valid, playerId: '00000000-0000-4000-8000-000000000999' },
-      { ...valid, roundNumber: 2 },
-    ]
-
-    for (const payload of invalidPayloads) {
-      await expect(submitProgram(payload)).resolves.toEqual({
-        outcome: 'INVALID_PROGRAM',
-      })
-    }
-    for (const socket of [client, observer]) {
-      await socket.timeout(1_000).emitWithAck(
-        'game.getPublicGameState',
-        { gameId: singlePlayerGame.gameId },
-      )
-    }
+    expect(await client.timeout(1000).emitWithAck('game.join', { gameId: shared.gameId }))
+      .toEqual({ outcome: 'LOGIN_REQUIRED' })
+    const login = await client.timeout(1000).emitWithAck('user.login', { username: 'Dane' })
+    expect(login.outcome).toBe('LOGGED_IN')
+    expect(await client.timeout(1000).emitWithAck('user.login', { username: 'Dane' })).toEqual(login)
+    expect(await client.timeout(1000).emitWithAck('user.login', { username: 'Other' }))
+      .toEqual({ outcome: 'ALREADY_LOGGED_IN' })
+    expect(await client.timeout(1000).emitWithAck('game.getPublicGameState', { gameId: shared.gameId }))
+      .toEqual({ outcome: 'GAME_NOT_FOUND' })
+    expect(shared.game.players).toEqual([])
+    expect(server.sockets.sockets.get(client.id!)?.rooms).toEqual(new Set([client.id]))
     expect(received).not.toHaveBeenCalled()
+  })
 
-    expect(singlePlayerGame.game.phase).toBe('programming')
-    expect(singlePlayerGame.game.currentRegister).toBe(0)
-    expect(singlePlayerGame.player.robot.program).toEqual([])
+  it('rejects malformed login without binding identity', async () => {
+    const client = await connect()
+    expect(await raw(client, 'user.login', null)).toEqual({ outcome: 'INVALID_REQUEST' })
+    expect(await raw(client, 'user.login', { username: '' })).toEqual({ outcome: 'INVALID_USERNAME' })
+    expect(server.sockets.sockets.get(client.id!)?.data.user).toBeUndefined()
+  })
+
+  it('assigns distinct players and private hands and notifies existing members', async () => {
+    const first = await connect('First')
+    const initial = await join(first)
+    expect(initial.hand).toHaveLength(9)
+    expect(initial.state.robots[0].position.coordinate).toEqual({ x: 10, y: 7 })
+    const second = await connect('Second')
+    const notification = new Promise((resolve) => first.once('game.playerJoined', resolve))
+    const result = await join(second)
+    expect(result.assignment.playerId).not.toBe(initial.assignment.playerId)
+    expect(result.assignment.robotId).not.toBe(initial.assignment.robotId)
+    expect(result.state.robots.map((robot) => robot.position.coordinate)).toEqual([{ x: 10, y: 7 }, { x: 9, y: 7 }])
+    expect(result.hand.every((card) => !initial.hand.some((other) => other.id === card.id))).toBe(true)
+    expect(result.state.players?.map((player) => player.username)).toEqual(['First', 'Second'])
+    expect(await notification).toEqual({ gameId: shared.gameId, player: result.state.players![1], robot: result.state.robots[1] })
+    expect(server.sockets.sockets.get(second.id!)?.rooms).toEqual(new Set([
+      second.id, `game:${shared.gameId}:public`, `game:${shared.gameId}:player:${result.assignment.playerId}`,
+    ]))
+  })
+
+  it('returns fresh state on duplicate joins without dealing or announcing another player', async () => {
+    const first = await connect('First')
+    const initial = await join(first)
+    const second = await connect('Second')
+    await join(second)
+    const announced = vi.fn()
+    second.on('game.playerJoined', announced)
+    const repeated = await join(first)
+    expect(repeated.assignment).toEqual(initial.assignment)
+    expect(repeated.hand).toEqual(initial.hand)
+    expect(repeated.state.robots).toHaveLength(2)
+    expect(shared.game.players).toHaveLength(2)
+    expect(announced).not.toHaveBeenCalled()
+  })
+
+  it('atomically accepts only one of two connections using the same user', async () => {
+    const first = await connect('Same')
+    const second = await connect('Same')
+    const results = await Promise.all([first, second].map((client) =>
+      client.timeout(1000).emitWithAck('game.join', { gameId: shared.gameId })))
+    expect(results.map((result) => result.outcome).sort()).toEqual(['JOINED', 'USER_ALREADY_IN_GAME'])
+    expect(shared.game.players).toHaveLength(1)
+    const loser = results[0].outcome === 'JOINED' ? second : first
+    expect(await loser.timeout(1000).emitWithAck('game.getPublicGameState', { gameId: shared.gameId }))
+      .toEqual({ outcome: 'GAME_NOT_FOUND' })
+    expect(server.sockets.sockets.get(loser.id!)?.rooms).toEqual(new Set([loser.id]))
+  })
+
+  it('rejects malformed and unavailable joins without partial membership', async () => {
+    const client = await connect('First')
+    expect(await raw(client, 'game.join', { gameId: shared.gameId, extra: true }))
+      .toEqual({ outcome: 'INVALID_REQUEST' })
+    expect(await client.timeout(1000).emitWithAck('game.join', { gameId: '00000000-0000-4000-8000-000000000999' }))
+      .toEqual({ outcome: 'GAME_NOT_FOUND' })
+    expect(shared.game.players).toEqual([])
+    expect(server.sockets.sockets.get(client.id!)?.rooms).toEqual(new Set([client.id]))
+  })
+
+  it('rejects exhausted spawns without leaving a membership or room', async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+    shared = { gameId: shared.gameId, game: new Game(new Board([[new EmptyTile()]]), [],
+      Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))) }
+    await start()
+    await join(await connect('First'))
+    const second = await connect('Second')
+    expect(await second.timeout(1000).emitWithAck('game.join', { gameId: shared.gameId }))
+      .toEqual({ outcome: 'NO_SPAWN_AVAILABLE' })
+    expect(shared.game.players).toHaveLength(1)
+    expect(server.sockets.sockets.get(second.id!)?.rooms).toEqual(new Set([second.id]))
+  })
+
+  it('rolls back a failed join snapshot before granting room access', async () => {
+    const client = await connect('First')
+    vi.spyOn(shared.game.board, 'getTile').mockImplementationOnce(() => { throw new Error('Presentation failed') })
+    expect(await client.timeout(1000).emitWithAck('game.join', { gameId: shared.gameId }))
+      .toEqual({ outcome: 'INTERNAL_ERROR' })
+    expect(shared.game.players).toEqual([])
+    expect(shared.game.board.occupantAt({ x: 10, y: 7 })).toBeUndefined()
+    expect(server.sockets.sockets.get(client.id!)?.rooms).toEqual(new Set([client.id]))
+    expect((await join(client)).state.robots).toHaveLength(1)
+  })
+
+  it('rejects nonmember and foreign-hand submissions and reports accepted programs', async () => {
+    const first = await connect('First')
+    const initial = await join(first)
+    const second = await connect('Second')
+    const other = await join(second)
+    const outsider = await connect('Outside')
+    expect(await outsider.timeout(1000).emitWithAck('program.submit', submission(initial)))
+      .toEqual({ outcome: 'INVALID_PROGRAM' })
+    expect(await second.timeout(1000).emitWithAck('program.submit', submission(initial)))
+      .toEqual({ outcome: 'INVALID_PROGRAM' })
+    expect(await first.timeout(1000).emitWithAck('program.submit', {
+      ...submission(initial), playerId: other.assignment.playerId,
+    })).toEqual({ outcome: 'INVALID_PROGRAM' })
+    expect(await first.timeout(1000).emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'ACCEPTED' })
+    expect(shared.game.hasSubmittedProgram(initial.assignment.playerId)).toBe(true)
+    expect((await join(first)).programSubmitted).toBe(true)
+    expect((await join(second)).hand).toEqual(other.hand)
+  })
+
+  it('closes new joins permanently on the first accepted program, not an invalid request', async () => {
+    const first = await connect('First')
+    const initial = await join(first)
+    expect(await raw(first, 'program.submit', { ...submission(initial), cardIds: [] })).toEqual({ outcome: 'INVALID_PROGRAM' })
+    expect(shared.game.hasStarted).toBe(false)
+    expect(await first.timeout(1000).emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'ACCEPTED' })
+    expect(shared.game.hasStarted).toBe(true)
+    const late = await connect('Late')
+    expect(await late.timeout(1000).emitWithAck('game.join', { gameId: shared.gameId }))
+      .toEqual({ outcome: 'GAME_ALREADY_STARTED' })
+    expect((await join(first)).assignment).toEqual(initial.assignment)
+    await first.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId })
+    expect(shared.game.players).toEqual([])
+    expect(await first.timeout(1000).emitWithAck('game.join', { gameId: shared.gameId }))
+      .toEqual({ outcome: 'GAME_ALREADY_STARTED' })
+  })
+
+  it('keeps private next-round hands away from other members and login-only sockets', async () => {
+    const first = await connect('First')
+    const initial = await join(first)
+    const second = await connect('Second')
+    const other = await join(second)
+    const outsider = await connect('Outside')
+    const outsideEvents = vi.fn()
+    outsider.onAny(outsideEvents)
+    const firstHand = new Promise((resolve) => first.once('cards.dealt', resolve))
+    const secondHand = new Promise((resolve) => second.once('cards.dealt', resolve))
+    await first.timeout(1000).emitWithAck('program.submit', submission(initial))
+    await second.timeout(1000).emitWithAck('program.submit', submission(other))
+    expect(await firstHand).toEqual({ gameId: shared.gameId, playerId: initial.assignment.playerId, cards: initial.hand })
+    expect(await secondHand).toEqual({ gameId: shared.gameId, playerId: other.assignment.playerId, cards: other.hand })
+    await outsider.timeout(1000).emitWithAck('game.getPublicGameState', { gameId: shared.gameId })
+    expect(outsideEvents).not.toHaveBeenCalled()
+  })
+
+  it('leaves without logging out, releases occupancy, and permits a fresh join before starting', async () => {
+    const first = await connect('First')
+    const initial = await join(first)
+    const second = await connect('Second')
+    await join(second)
+    const left = new Promise((resolve) => second.once('game.playerLeft', resolve))
+    expect(await first.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId })).toEqual({ outcome: 'LEFT' })
+    expect(await left).toEqual({ gameId: shared.gameId, playerId: initial.assignment.playerId, robotId: initial.assignment.robotId })
+    expect(shared.game.board.occupantAt({ x: 10, y: 7 })).toBeUndefined()
+    expect(server.sockets.sockets.get(first.id!)?.data.user?.username).toBe('First')
+    expect(server.sockets.sockets.get(first.id!)?.rooms).toEqual(new Set([first.id]))
+    expect(await first.timeout(1000).emitWithAck('game.getPublicGameState', { gameId: shared.gameId })).toEqual({ outcome: 'GAME_NOT_FOUND' })
+    expect(await first.timeout(1000).emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'INVALID_PROGRAM' })
+    expect(await first.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId })).toEqual({ outcome: 'GAME_NOT_FOUND' })
+    const fresh = await join(first)
+    expect(fresh.assignment.playerId).not.toBe(initial.assignment.playerId)
+    expect(fresh.state.robots.at(-1)?.position.coordinate).toEqual({ x: 10, y: 7 })
+  })
+
+  it('rechecks the existing submission barrier when an unsubmitted member leaves', async () => {
+    const first = await connect('First')
+    const initial = await join(first)
+    const second = await connect('Second')
+    await join(second)
+    await first.timeout(1000).emitWithAck('program.submit', submission(initial))
+    const hand = new Promise((resolve) => first.once('cards.dealt', resolve))
+    await second.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId })
+    expect(await hand).toEqual({ gameId: shared.gameId, playerId: initial.assignment.playerId, cards: initial.hand })
+    expect(shared.game.phase).toBe('programming')
+  })
+
+  it('retains disconnected membership, robot and hand for the returning user', async () => {
+    const first = await connect('First')
+    const initial = await join(first)
+    const disconnected = new Promise((resolve) => server.sockets.sockets.get(first.id!)!.once('disconnect', resolve))
+    first.disconnect()
+    await disconnected
+    expect(shared.game.players).toHaveLength(1)
+    const replacement = await connect('First')
+    const restored = await join(replacement)
+    expect(restored.assignment).toEqual(initial.assignment)
+    expect(restored.hand).toEqual(initial.hand)
+  })
+
+  it('deals the remaining player a hand when leaving completes the final register', async () => {
+    const first = await connect('First')
+    const initial = await join(first)
+    const second = await connect('Second')
+    await join(second)
+    for (const player of shared.game.players) {
+      shared.game.submitProgram(player.id, player.hand.slice(0, 5))
+    }
+    for (let action = 0; action < 9; action++) shared.game.executeNextAction()
+    expect(shared.game.currentRegister).toBe(4)
+    const hand = new Promise((resolve) => first.once('cards.dealt', resolve))
+
+    expect(await second.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId }))
+      .toEqual({ outcome: 'LEFT' })
+
+    expect(await hand).toEqual({
+      gameId: shared.gameId, playerId: initial.assignment.playerId, cards: initial.hand,
+    })
+    expect(shared.game.phase).toBe('programming')
+  })
+
+  it('ignores commands without acknowledgements without creating state', async () => {
+    const client = await connect()
+    const emit = client.emit.bind(client) as unknown as (event: string, payload: unknown) => void
+    emit('user.login', { username: 'First' })
+    emit('game.join', { gameId: shared.gameId })
+    emit('game.leave', { gameId: shared.gameId })
+    emit('program.submit', {})
+    expect(await client.timeout(1000).emitWithAck('game.getPublicGameState', { gameId: shared.gameId }))
+      .toEqual({ outcome: 'GAME_NOT_FOUND' })
+    expect(shared.game.players).toHaveLength(0)
+    expect(server.sockets.sockets.get(client.id!)?.data.user).toBeUndefined()
   })
 })
