@@ -83,6 +83,7 @@ export default function useGameKeybinds(
         if (pendingSubmit === 'colon' && event.key === 'w') {
           setPendingSubmit('colon-w')
         } else if (pendingSubmit === 'colon-w' && event.key === 'Enter') {
+          event.preventDefault()
           setPendingSubmit('none')
           if (canSubmit && window.confirm('Submit your program?')) {
             onSubmit()
