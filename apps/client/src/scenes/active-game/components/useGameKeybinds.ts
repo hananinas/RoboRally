@@ -27,8 +27,13 @@ export default function useGameKeybinds(
 ) : [number | null, (cardIndex: number) => void, boolean, boolean]  {
 
     const [highlightedCardIndex, setHighlightedCardIndex] = useState<number | null>(null)
-    const [pendingDelete, setPendingDelete] = useState(false)
-    const [pendingSubmit, setPendingSubmit] = useState<'none' | 'colon' | 'colon-w'>('none')
+    const [pendingSequence, setPendingSequence] = useState<'none' | 'delete' | 'colon' | 'colon-w'>('none')
+
+    // Clear a dangling multi-key sequence when programming ends or a new hand arrives,
+    // so a sequence left incomplete (e.g. submitting by mouse mid-"dd") can't bleed into the next round.
+    useEffect(() => {
+      setPendingSequence('none')
+    }, [disabled, cards])
 
     function highlightNextUnregistered(startIndex: number, direction: number) {
       if (cards.length === 0) return
@@ -68,8 +73,7 @@ export default function useGameKeybinds(
 
       if (event.ctrlKey && event.key === 'r') {
         event.preventDefault()
-        setPendingDelete(false)
-        setPendingSubmit('none')
+        setPendingSequence('none')
         onRedo()
         return
       }
@@ -79,29 +83,26 @@ export default function useGameKeybinds(
         return
       }
 
-      if (pendingSubmit !== 'none') {
-        if (pendingSubmit === 'colon' && event.key === 'w') {
-          setPendingSubmit('colon-w')
-        } else if (pendingSubmit === 'colon-w' && event.key === 'Enter') {
-          setPendingSubmit('none')
-          if (canSubmit && window.confirm('Submit your program?')) {
-            onSubmit()
-          }
-        } else {
-          setPendingSubmit('none')
-        }
+      if (pendingSequence === 'colon') {
+        setPendingSequence(event.key === 'w' ? 'colon-w' : 'none')
+        return
+      }
 
+      if (pendingSequence === 'colon-w') {
+        setPendingSequence('none')
+        if (event.key === 'Enter' && canSubmit && window.confirm('Submit your program?')) {
+          onSubmit()
+        }
         return
       }
 
       if (event.key === ':') {
-        setPendingDelete(false)
-        setPendingSubmit('colon')
+        setPendingSequence('colon')
         return
       }
 
-      if (pendingDelete) {
-        setPendingDelete(false)
+      if (pendingSequence === 'delete') {
+        setPendingSequence('none')
 
         if (event.key === 'd') {
           onClearRegisters()
@@ -113,7 +114,7 @@ export default function useGameKeybinds(
       }
 
       if (event.key === 'd') {
-        setPendingDelete(true)
+        setPendingSequence('delete')
         return
       }
 
@@ -160,5 +161,13 @@ export default function useGameKeybinds(
       }
     }, [])
 
-    return [highlightedCardIndex, highlightCard, pendingDelete, canSubmit && pendingSubmit === 'colon-w']
+    const pendingDelete = pendingSequence === 'delete'
+    const awaitingSubmitConfirm = canSubmit && pendingSequence === 'colon-w'
+
+    return [
+      highlightedCardIndex,
+      highlightCard,
+      pendingDelete,
+      awaitingSubmitConfirm
+    ]
 }

@@ -1,7 +1,4 @@
-import type { 
-  ComponentProps, 
-  ButtonHTMLAttributes 
-} from 'react'
+import type { ComponentProps } from 'react'
 import type {
   Card
 } from '@robo-rally/game-events'

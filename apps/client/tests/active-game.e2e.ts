@@ -193,6 +193,40 @@ test('d then a digit removes one register, and dd clears all of them', async ({ 
   await expect(registerCards).toHaveCount(4)
 })
 
+test('clears a dangling "d" instead of letting it bleed into the next round', async ({ page, game }) => {
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
+  await openGame(page)
+  await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button').first()).toBeEnabled()
+  await pauseClock(page)
+  await fillProgram(page)
+
+  const registerCards = page.getByRole('complementary', { name: 'Game controls' })
+    .getByRole('button', { name: /remove from register/ })
+  await expect(registerCards).toHaveCount(5)
+
+  // Start a delete sequence, then submit by mouse before pressing the second key.
+  await page.keyboard.press('d')
+  await page.getByRole('button', { name: 'Done', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()
+  
+  //wait for round to finish
+  await game.control({ type: 'round', actions: ROUND_ACTIONS })
+  for (const action of ROUND_ACTIONS) {
+    await page.clock.runFor(action.instruction === 'TURN_LEFT' ? 300 : 600)
+  }
+
+  await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button').first()).toBeEnabled()
+  await expect(page.getByText('Programming', { exact: true })).toBeVisible()
+  await fillProgram(page)
+  await expect(registerCards).toHaveCount(5)
+
+  // A leftover "d" from last round must not be mistaken for the second key of "dd".
+  await page.keyboard.press('d')
+  await expect(registerCards).toHaveCount(5)
+  await page.keyboard.press('1')
+  await expect(registerCards).toHaveCount(4)
+})
+
 test(':w then Enter submits after confirming, only once the program is complete', async ({ page }) => {
   await openGame(page)
   const controls = page.getByRole('complementary', { name: 'Game controls' })
