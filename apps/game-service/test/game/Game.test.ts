@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BackUp, Board, Direction, EmptyTile, Game, Move1, Move2, Move3, Player, Robot, TurnLeft, TurnRight, UTurn } from '@/game/index.ts'
-import type { Card } from '@/game/index.ts'
+import { Board, Direction, EmptyTile, Game, Card, Player, Robot } from '@/game/index'
 
 function createGame() {
   const board = new Board([[new EmptyTile(), new EmptyTile()]])
@@ -8,12 +7,12 @@ function createGame() {
   board.placeRobot(robot.id, { x: 0, y: 0 })
   const player = new Player('player-1', robot)
   const deck: Card[] = [
-    new Move1('move-1'),
-    new TurnLeft('left-1'),
-    new Move1('move-2'),
-    new TurnLeft('left-2'),
-    new Move1('move-3'),
-    new TurnLeft('left-3'),
+    new Card('move-1', 'MOVE_1'),
+    new Card('left-1', 'TURN_LEFT'),
+    new Card('move-2', 'MOVE_1'),
+    new Card('left-2', 'TURN_LEFT'),
+    new Card('move-3', 'MOVE_1'),
+    new Card('left-3', 'TURN_LEFT'),
   ]
   const game = new Game(board, [player], deck)
   return { board, robot, player, deck, game }
@@ -28,11 +27,11 @@ describe('Game programming', () => {
     board.placeRobot(robot.id, { x: 5, y: 5 })
     const player = new Player('player-1', robot)
     const deck = [
-      new Move2('move-2'),
-      new Move3('move-3'),
-      new BackUp('back-up'),
-      new TurnRight('right'),
-      new UTurn('u-turn'),
+      new Card('move-2', 'MOVE_2'),
+      new Card('move-3', 'MOVE_3'),
+      new Card('back-up', 'BACK_UP'),
+      new Card('right', 'TURN_RIGHT'),
+      new Card('u-turn', 'U_TURN'),
     ]
     const game = new Game(board, [player], deck)
     game.submitProgram(player.id, deck)
@@ -85,8 +84,8 @@ describe('Game programming', () => {
     expect(() => game.submitProgram('unknown', valid)).toThrow()
     expect(() => game.submitProgram(player.id, deck.slice(0, 4))).toThrow(RangeError)
     expect(() => game.submitProgram(player.id, [deck[0], deck[0], ...deck.slice(1, 4)])).toThrow(RangeError)
-    expect(() => game.submitProgram(player.id, [...deck.slice(0, 4), new Move1('foreign')])).toThrow()
-    expect(() => game.submitProgram(player.id, [new Move1(deck[0].id), ...deck.slice(1, 5)])).toThrow()
+    expect(() => game.submitProgram(player.id, [...deck.slice(0, 4), new Card('foreign', 'MOVE_1')])).toThrow()
+    expect(() => game.submitProgram(player.id, [new Card(deck[0].id, 'MOVE_1'), ...deck.slice(1, 5)])).toThrow()
 
     expect(game.phase).toBe('programming')
     expect(robot.program).toEqual([])

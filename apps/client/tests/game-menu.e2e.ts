@@ -142,7 +142,7 @@ test('preserves the program and allows card selection when dismissing the menu',
   await expect(trigger).toHaveAttribute('aria-expanded', 'false')
   await expect(registerCards).toHaveCount(2)
   await expect(controls.getByRole('button', { name: 'Move 1, remove from register 1', exact: true })).toBeVisible()
-  await expect(controls.getByRole('button', { name: 'Turn Left, remove from register 2', exact: true })).toBeVisible()
+  await expect(controls.getByRole('button', { name: 'Move 2, remove from register 2', exact: true })).toBeVisible()
   await expect(controls.getByRole('button', { name: 'Done', exact: true })).toBeDisabled()
 
   await trigger.click()

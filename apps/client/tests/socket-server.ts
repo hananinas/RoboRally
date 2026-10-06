@@ -16,6 +16,7 @@ import { Server, type Socket } from 'socket.io'
 import {
   createPublicState,
   GAME_ID,
+  HAND_INSTRUCTIONS,
   PLAYER_ID,
   ROBOT_ID,
   type FixtureControl,
@@ -48,7 +49,7 @@ const fixtures = new Map<string, Fixture>()
 function dealCards(): readonly Card[] {
   return Array.from({ length: 9 }, (_, index) => ({
     id: randomUUID(),
-    instruction: index % 2 === 0 ? 'MOVE_1' : 'TURN_LEFT',
+    instruction: HAND_INSTRUCTIONS[index],
   }))
 }
 

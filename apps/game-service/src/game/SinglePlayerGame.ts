@@ -1,5 +1,5 @@
 import { Board } from '@/game/Board'
-import { BackUp, Move1, Move2, Move3, TurnLeft, TurnRight, UTurn, type Card } from '@/game/Card'
+import { Card } from '@/game/Card'
 import { Game } from '@/game/Game'
 import type { GameId } from '@/game/ids'
 import { Player } from '@/game/Player'
@@ -39,22 +39,14 @@ function createBoard(): Board {
     ),
   )
 }
-const HAND_CARD_TYPES =[
-Move1,
-Move2,
-Move3, 
-BackUp,
-TurnLeft,
-TurnRight, 
-UTurn,
-Move1,
-TurnLeft,
-] 
+
+const HAND_INSTRUCTIONS = [
+  'MOVE_1', 'MOVE_2', 'MOVE_3', 'BACK_UP', 'TURN_LEFT',
+  'TURN_RIGHT', 'U_TURN', 'MOVE_1', 'TURN_LEFT',
+] as const
 
 export function createHand(cardIds: readonly string[] = CARD_IDS): readonly Card[] {
-  return cardIds.map((id, index) =>
-    new HAND_CARD_TYPES[index](id)
-  )
+  return cardIds.map((id, index) => new Card(id, HAND_INSTRUCTIONS[index]))
 }
 
 export function createSharedGame(): Readonly<{ gameId: GameId; game: Game }> {

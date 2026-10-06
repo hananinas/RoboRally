@@ -1,3 +1,5 @@
+import type { Instruction } from './instructions.js'
+
 export type GameId = string
 export type PlayerId = string
 export type RobotId = string
@@ -26,14 +28,6 @@ export type PlayerAssignment = Readonly<{
   playerId: PlayerId
   robotId: RobotId
 }>
-
-export type Instruction = | 'MOVE_1'
-  | 'MOVE_2'
-  | 'MOVE_3'
-  | 'BACK_UP'
-  | 'TURN_LEFT'
-  | 'TURN_RIGHT'
-  | 'U_TURN'
 
 export type Card = Readonly<{
   id: CardId

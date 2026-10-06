@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Direction, Move1, Robot, TurnLeft } from '@/game/index.ts'
+import { Direction, Card, Robot } from '@/game/index'
 
 describe('Robot', () => {
   it.each([
@@ -9,16 +9,16 @@ describe('Robot', () => {
     [Direction.EAST, Direction.NORTH],
   ])('turns left from %s to %s', (start, expected) => {
     const robot = new Robot('robot-1', start)
-    robot.turnLeft()
+    robot.turn(1)
     expect(robot.direction).toBe(expected)
   })
 
-    it.each([
+  it.each([
     [Direction.NORTH, Direction.EAST], [Direction.EAST, Direction.SOUTH],
     [Direction.SOUTH, Direction.WEST], [Direction.WEST, Direction.NORTH],
   ])('turns right from %s to %s', (start, expected) => {
     const robot = new Robot('robot-1', start)
-    robot.turnRight()
+    robot.turn(3)
     expect(robot.direction).toBe(expected)
   })
 
@@ -27,23 +27,23 @@ describe('Robot', () => {
     [Direction.SOUTH, Direction.NORTH], [Direction.WEST, Direction.EAST],
   ])('makes a U-turn from %s to %s', (start, expected) => {
     const robot = new Robot('robot-1', start)
-    robot.uTurn()
+    robot.turn(2)
     expect(robot.direction).toBe(expected)
   })
 
   it('returns to its starting direction after four left turns', () => {
     const robot = new Robot('robot-1', Direction.EAST)
-    for (let turn = 0; turn < 4; turn++) robot.turnLeft()
+    for (let turn = 0; turn < 4; turn++) robot.turn(1)
     expect(robot.direction).toBe(Direction.EAST)
   })
 
   it('retains an ordered five-card program independently of the input array', () => {
     const program = [
-      new Move1('move-1'),
-      new TurnLeft('left-1'),
-      new Move1('move-2'),
-      new TurnLeft('left-2'),
-      new Move1('move-3'),
+      new Card('move-1', 'MOVE_1'),
+      new Card('left-1', 'TURN_LEFT'),
+      new Card('move-2', 'MOVE_1'),
+      new Card('left-2', 'TURN_LEFT'),
+      new Card('move-3', 'MOVE_1'),
     ]
     const robot = new Robot('robot-1', Direction.NORTH)
     robot.setProgram(program)
@@ -51,23 +51,23 @@ describe('Robot', () => {
 
     expect(robot.id).toBe('robot-1')
     expect(robot.getProgramCard(0)).toBe(program[4])
-    expect(robot.getProgramCard(1)).toBeInstanceOf(TurnLeft)
+    expect(robot.getProgramCard(1)).toBeInstanceOf(Card)
     expect(robot.getProgramCard(4)).toBe(program[0])
 
-    const exposedProgram = robot.program as (Move1 | TurnLeft)[]
+    const exposedProgram = robot.program as Card[]
     exposedProgram.pop()
     expect(robot.program).toHaveLength(5)
   })
 
   it('rejects incomplete programs and invalid register reads', () => {
     const robot = new Robot('robot-1', Direction.NORTH)
-    expect(() => robot.setProgram([new Move1('only-card')])).toThrow(RangeError)
+    expect(() => robot.setProgram([new Card('only-card', 'MOVE_1')])).toThrow(RangeError)
     expect(() =>
-      robot.setProgram(Array.from({ length: 6 }, (_, index) => new Move1(`extra-${index}`))),
+      robot.setProgram(Array.from({ length: 6 }, (_, index) => new Card(`extra-${index}`, 'MOVE_1'))),
     ).toThrow(RangeError)
     expect(() => robot.getProgramCard(0)).toThrow()
 
-    robot.setProgram(Array.from({ length: 5 }, (_, index) => new Move1(`move-${index}`)))
+    robot.setProgram(Array.from({ length: 5 }, (_, index) => new Card(`move-${index}`, 'MOVE_1')))
     for (const index of [-1, 5, 1.5]) {
       expect(() => robot.getProgramCard(index)).toThrow(RangeError)
     }

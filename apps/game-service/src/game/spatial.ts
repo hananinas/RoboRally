@@ -25,13 +25,6 @@ export function opposite(direction: Direction): Direction {
   return rotateDirection(direction, 2)
 }
 
-export function turnLeft(direction: Direction): Direction {
-  return rotateDirection(direction, 1)
-}
-export function turnRight(direction:Direction) :Direction{
-  return rotateDirection(direction,3)
-}
-
 export function rotateDirection(direction: Direction, qTurns: number): Direction {
   return ((direction + qTurns) % 4) as Direction
 }
