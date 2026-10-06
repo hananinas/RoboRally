@@ -30,9 +30,12 @@ export default function useGameKeybinds(
     const [pendingSequence, setPendingSequence] = useState<'none' | 'delete' | 'colon' | 'colon-w'>('none')
 
     // Clear a dangling multi-key sequence when programming ends or a new hand arrives
-    useEffect(() => {
-      setPendingSequence('none')
-    }, [disabled, cards])
+    const [previousContext, setPreviousContext] = useState({ disabled, cards })
+
+    if (previousContext.disabled !== disabled || previousContext.cards !== cards) {
+        setPreviousContext({ disabled, cards })
+        setPendingSequence('none')
+    }
 
     function highlightNextUnregistered(startIndex: number, direction: number) {
       if (cards.length === 0) return
