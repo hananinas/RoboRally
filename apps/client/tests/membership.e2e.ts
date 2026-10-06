@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
+import { expect, test } from './real-game-fixture.ts'
 
 async function login(page: Page, username: string) {
   await page.goto('/')
