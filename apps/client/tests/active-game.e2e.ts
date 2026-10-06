@@ -238,7 +238,7 @@ test(':w then Enter submits after confirming, only once the program is complete'
   let dialogShown = false
   const onUnexpectedDialog = (dialog: Dialog) => {
     dialogShown = true
-    dialog.dismiss()
+    void dialog.dismiss()
   }
   page.on('dialog', onUnexpectedDialog)
   await page.keyboard.press(':')
