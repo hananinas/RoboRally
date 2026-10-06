@@ -84,7 +84,7 @@ describe('game presenter', () => {
   })
 
   it('presents all dealt card instruction types without exposing domain objects', () => {
-    const { gameId, game, player } = createSinglePlayerGame()
+    const { gameId, player } = createSinglePlayerGame()
     const dealt = presentCardsDealt(gameId, player)
 
     expectTypeOf(dealt).toEqualTypeOf<CardsDealt>()

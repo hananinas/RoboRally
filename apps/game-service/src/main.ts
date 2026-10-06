@@ -15,7 +15,7 @@ let shuttingDown = false
 function shutdown(): void {
   if (shuttingDown) return
   shuttingDown = true
-  io.close((error) => {
+  void io.close((error) => {
     if (!error) return
     console.error('Game Service failed to shut down cleanly', error)
     process.exitCode = 1

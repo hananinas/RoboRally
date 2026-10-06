@@ -157,7 +157,7 @@ describe('game membership over Socket.IO', () => {
     const second = await connect('Same')
     const results = await Promise.all([first, second].map((client) =>
       client.timeout(1000).emitWithAck('game.join', { gameId: shared.gameId })))
-    expect(results.map((result) => result.outcome).sort()).toEqual(['JOINED', 'USER_ALREADY_IN_GAME'])
+    expect(results.map((result) => result.outcome).sort((a, b) => a.localeCompare(b))).toEqual(['JOINED', 'USER_ALREADY_IN_GAME'])
     expect(shared.game.players).toHaveLength(1)
     const loser = results[0].outcome === 'JOINED' ? second : first
     expect(await loser.timeout(1000).emitWithAck('game.getPublicGameState', { gameId: shared.gameId }))
