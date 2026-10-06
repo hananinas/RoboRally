@@ -1,14 +1,6 @@
 import type { Board } from '@/game/Board'
-import {
-  Move1,
-  Move2,
-  Move3,
-  TurnLeft,
-  TurnRight,
-  UTurn,
-  BackUp,
-  type Card,
-} from '@/game/Card'
+import { instructions } from '@robo-rally/game-events'
+import type { Card } from '@/game/Card'
 import type { PlayerId, RobotId } from '@/game/ids'
 import type { Player } from '@/game/Player'
 import type { Robot } from '@/game/Robot'
@@ -247,23 +239,12 @@ export class Game {
   }
 
   private executeCard(robot: Robot, card: Card): void {
-    if (card instanceof Move1) {
-      this.board.moveRobot(robot.id, robot.direction, 1)
-    } else if (card instanceof Move2) {
-      this.board.moveRobot(robot.id, robot.direction, 2)
-    } else if (card instanceof Move3) {
-      this.board.moveRobot(robot.id, robot.direction, 3)
-    } else if (card instanceof BackUp) {
-      // Moves one space backwards; the robot keeps facing the same way.
-      this.board.moveRobot(robot.id, opposite(robot.direction), 1)
-    } else if (card instanceof TurnLeft) {
-      robot.turnLeft()
-    } else if (card instanceof TurnRight) {
-      robot.turnRight()
-    } else if (card instanceof UTurn) {
-      robot.uTurn()
+    const effect = instructions[card.instruction]
+    if (effect.kind === 'move') {
+      const direction = effect.steps < 0 ? opposite(robot.direction) : robot.direction
+      this.board.moveRobot(robot.id, direction, Math.abs(effect.steps))
     } else {
-      throw new Error(`Unsupported card ${card.id}`)
+      robot.turn(effect.quarterTurns)
     }
   }
 

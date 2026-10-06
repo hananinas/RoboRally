@@ -6,7 +6,7 @@ import type {
 } from '@robo-rally/game-events'
 import { io as createClient, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Board, EmptyTile, Game, Move1 } from '@/game/index.ts'
+import { Board, EmptyTile, Game, Card } from '@/game/index.ts'
 import { createSharedGame } from '@/game/SinglePlayerGame.ts'
 import { createGameSocketServer, type GameSocketServer } from '@/gameServer.ts'
 
@@ -167,7 +167,7 @@ describe('game membership over Socket.IO', () => {
   it('rejects exhausted spawns without leaving a membership or room', async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()))
     shared = { gameId: shared.gameId, game: new Game(new Board([[new EmptyTile()]]), [],
-      Array.from({ length: 5 }, (_, index) => new Move1(`card-${index}`))) }
+      Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))) }
     await start()
     await join(await connect('First'))
     const second = await connect('Second')

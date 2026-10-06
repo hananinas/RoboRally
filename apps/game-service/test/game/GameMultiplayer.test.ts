@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { Board, Direction, EmptyTile, Game, Move1, Player, Robot, TurnLeft } from '@/game/index.ts'
-import type { Antenna, Card, MovementResult, Position, RobotId } from '@/game/index.ts'
+import { Board, Card, Direction, EmptyTile, Game, Player, Robot } from '@/game/index.ts'
+import type { Antenna, MovementResult, Position, RobotId } from '@/game/index.ts'
 
 function createMultiplayerGame(
   positions: readonly Position[],
@@ -8,7 +8,7 @@ function createMultiplayerGame(
   board = new Board(Array.from({ length: 9 }, () =>
     Array.from({ length: 9 }, () => new EmptyTile()),
   )),
-  deck: readonly Card[] = Array.from({ length: 6 }, (_, index) => new TurnLeft(`left-${index}`)),
+  deck: readonly Card[] = Array.from({ length: 6 }, (_, index) => new Card(`left-${index}`, 'TURN_LEFT')),
 ) {
   const players = positions.map((position, index) => {
     const robot = new Robot(`robot-${index}`, Direction.EAST)
@@ -32,7 +32,7 @@ describe('Game fixed-roster programming', () => {
     expect(game.hasSubmittedProgram('unknown')).toBe(false)
     expect(() => game.executeNextAction()).toThrow()
     expect(() => game.submitProgram(players[0].id, secondProgram)).toThrow()
-    expect(() => game.submitProgram(players[1].id, [...deck.slice(0, 4), new Move1('foreign')])).toThrow()
+    expect(() => game.submitProgram(players[1].id, [...deck.slice(0, 4), new Card('foreign', 'MOVE_1')])).toThrow()
     expect(() => game.submitProgram(players[1].id, [deck[0], ...deck.slice(0, 4)])).toThrow()
     expect(() => game.submitProgram('unknown', secondProgram)).toThrow()
     game.recheckProgrammingPhase()
@@ -213,7 +213,7 @@ describe('Game multiplayer activation', () => {
     const board = new DisplacingBoard(Array.from({ length: 9 }, () =>
       Array.from({ length: 9 }, () => new EmptyTile()),
     ))
-    const deck = Array.from({ length: 5 }, (_, index) => new Move1(`move-${index}`))
+    const deck = Array.from({ length: 5 }, (_, index) => new Card(`move-${index}`, 'MOVE_1'))
     const { players, game } = createMultiplayerGame(
       [{ x: 4, y: 5 }, { x: 4, y: 6 }, { x: 6, y: 4 }], undefined, board, deck,
     )
@@ -226,7 +226,7 @@ describe('Game multiplayer activation', () => {
   })
 
   it('reports blocked actions and keeps earlier position snapshots independent', () => {
-    const deck = Array.from({ length: 5 }, (_, index) => new Move1(`move-${index}`))
+    const deck = Array.from({ length: 5 }, (_, index) => new Card(`move-${index}`, 'MOVE_1'))
     const { board, players, game } = createMultiplayerGame(
       [{ x: 7, y: 4 }, { x: 6, y: 4 }], { x: 8, y: 4, angle: 0 }, undefined, deck,
     )

@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net'
 import type { CardsDealt, ClientToServerEvents, ServerToClientEvents, SubmitProgram } from '@robo-rally/game-events'
 import { io as connectSocket, type Socket } from 'socket.io-client'
 import { expect, it } from 'vitest'
-import { Board, EmptyTile, Game, TurnLeft, type Player } from '@/game/index.ts'
+import { Board, Card, EmptyTile, Game, type Player } from '@/game/index.ts'
 import { createGameSocketServer } from '@/gameServer.ts'
 
 it('waits for the roster, broadcasts register-major actions, and deals two private next rounds', async () => {
@@ -12,8 +12,8 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
   const board = new Board(Array.from({ length: 3 }, () =>
     Array.from({ length: 3 }, () => new EmptyTile())))
   const deck = Array.from({ length: 5 }, (_, index) =>
-    new TurnLeft(`00000000-0000-4000-8000-00000000010${index}`))
-  const game = new Game(board, [], deck)
+    new Card(`00000000-0000-4000-8000-00000000010${index}`, 'TURN_LEFT'))
+  const game = new Game(board, players, deck)
   const httpServer = createServer()
   const server = createGameSocketServer(httpServer, { gameId, game })
   const clients: Socket<ServerToClientEvents, ClientToServerEvents>[] = []
@@ -35,8 +35,8 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
       expect(joined.outcome).toBe('JOINED')
       const player = game.players[index]
       players.push(player)
-      player.setHand(deck.map((card, cardIndex) => new TurnLeft(
-        `00000000-0000-4000-8000-00000000${index + 2}${cardIndex.toString().padStart(3, '0')}`,
+      player.setHand(deck.map((card, cardIndex) => new Card(
+        `00000000-0000-4000-8000-00000000${index + 2}${cardIndex.toString().padStart(3, '0')}`, 'TURN_LEFT',
       )))
       board.removeRobot(player.robot.id)
       board.placeRobot(player.robot.id, index === 0 ? { x: 0, y: 2 } : { x: 1, y: 1 })

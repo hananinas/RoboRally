@@ -16,7 +16,6 @@ export type {
   GameId,
   GamePhase,
   GetPublicGameState,
-  Instruction,
   JoinGame,
   JoinResult,
   LoginResult,
@@ -49,3 +48,6 @@ export {
 } from './getPublicGameState.js'
 export { parseSubmitProgram, submitProgramSchema } from './submitProgram.js'
 export type { ProgramCardIds, SubmitProgram } from './submitProgram.js'
+
+export { instructions } from './instructions.js'
+export type { Instruction } from './instructions.js'
