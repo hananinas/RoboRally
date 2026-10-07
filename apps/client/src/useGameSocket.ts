@@ -10,7 +10,6 @@ export type SocketStatus = 'connecting' | 'connected' | 'connection-error' | 'di
 export default function useGameSocket() {
   const [socket] = useState<GameSocket>(() => io({
     autoConnect: false,
-    reconnection: false,
   }))
   const [status, setStatus] = useState<SocketStatus>('connecting')
   const [error, setError] = useState<string | null>(null)
@@ -32,7 +31,7 @@ export default function useGameSocket() {
     }
     const handleDisconnect = () => {
       setStatus('disconnected')
-      setError('Connection lost. Reload or retry to connect again.')
+      setError('Connection lost. Reconnecting…')
     }
 
     socket.on('connect', handleConnect)
