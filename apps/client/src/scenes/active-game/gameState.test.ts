@@ -327,6 +327,21 @@ describe('client game state', () => {
     expect(createSubmission(state)).toBeNull()
   })
 
+  it('shows the game-paused message on a paused rejection', () => {
+    let state = selectProgram()
+    const submission = createSubmission(state)
+    state = gameStateReducer(state, { type: 'submit' })
+    state = gameStateReducer(state, {
+      type: 'result',
+      result: { outcome: 'GAME_PAUSED' },
+      handVersion: state.handVersion,
+    })
+
+    expect(state.submission).toBe('idle')
+    expect(state.error).toBe('Game paused. Your program was not submitted — try again once reconnected.')
+    expect(createSubmission(state)).toEqual(submission)
+  })
+
   it('preserves an unacknowledged selection without allowing a duplicate resend', () => {
     let state = selectProgram()
     const registers = state.registers
@@ -542,6 +557,27 @@ describe('client game state', () => {
     expect(state).toEqual({ ...before, connected: true, error: null })
     expect(canProgram(state)).toBe(false)
   })
+
+  it('locks programming while paused and unlocks once every player reconnects', () => {
+    const state = programmingState()
+    const otherPlayerId = publicState.players[1].playerId
+    expect(canProgram(state)).toBe(true)
+
+    const paused = gameStateReducer(state, {
+      type: 'player-connection-changed',
+      payload: { gameId: publicState.gameId, playerId: otherPlayerId, connected: false, paused: true },
+    })
+    expect(paused.paused).toBe(true)
+    expect(paused.players.find((player) => player.playerId === otherPlayerId)?.connected).toBe(false)
+    expect(canProgram(paused)).toBe(false)
+
+    const resumed = gameStateReducer(paused, {
+      type: 'player-connection-changed',
+      payload: { gameId: publicState.gameId, playerId: otherPlayerId, connected: true, paused: false },
+    })
+    expect(resumed.paused).toBe(false)
+    expect(canProgram(resumed)).toBe(true)
+  })
 })
 
 describe('membership updates', () => {
@@ -555,7 +591,7 @@ describe('membership updates', () => {
     let state = programmingState()
     state = gameStateReducer(state, { type: 'action', action: actions[0] })
     const updated = gameStateReducer(state, { type: 'player-joined', payload: newcomer })
-    expect(updated.playerIds).toContain('new-player')
+    expect(updated.players.map((player) => player.playerId)).toContain('new-player')
     expect(updated.playback.robots.at(-1)?.robotId).toBe('new-robot')
     expect(updated.playback.active).toBe(state.playback.active)
     expect(gameStateReducer(updated, { type: 'player-joined', payload: newcomer })).toBe(updated)
@@ -568,7 +604,7 @@ describe('membership updates', () => {
     state = gameStateReducer(state, { type: 'action', action: { ...actions[0], robotId: 'new-robot' } })
     const payload = { gameId: publicState.gameId, playerId: 'new-player', robotId: 'new-robot' }
     const updated = gameStateReducer(state, { type: 'player-left', payload })
-    expect(updated.playerIds).not.toContain('new-player')
+    expect(updated.players.map((player) => player.playerId)).not.toContain('new-player')
     expect(updated.playback.robots.some((robot) => robot.robotId === 'new-robot')).toBe(false)
     expect(updated.playback.pending).toEqual([])
     expect(updated.playback.active).toBe(state.playback.active)

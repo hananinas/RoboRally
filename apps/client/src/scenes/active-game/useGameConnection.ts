@@ -1,6 +1,7 @@
 import type {
   CardsDealt,
   JoinResult,
+  PlayerConnectionChanged,
   RobotActionResolved,
   PlayerJoined,
   PlayerLeft,
@@ -52,6 +53,8 @@ export default function useGameConnection(socket: GameSocket) {
     const handleActionResolved = (action: RobotActionResolved) => receive({ type: 'action', action })
     const handlePlayerJoined = (payload: PlayerJoined) => receive({ type: 'player-joined', payload })
     const handlePlayerLeft = (payload: PlayerLeft) => receive({ type: 'player-left', payload })
+    const handlePlayerConnectionChanged = (payload: PlayerConnectionChanged) =>
+      receive({ type: 'player-connection-changed', payload })
 
     socket.on('disconnect', handleDisconnect)
     socket.on('connect', handleConnect)
@@ -59,6 +62,7 @@ export default function useGameConnection(socket: GameSocket) {
     socket.on('robot.actionResolved', handleActionResolved)
     socket.on('game.playerJoined', handlePlayerJoined)
     socket.on('game.playerLeft', handlePlayerLeft)
+    socket.on('game.playerConnectionChanged', handlePlayerConnectionChanged)
     return () => {
       generation.current += 1
       socket.off('disconnect', handleDisconnect)
@@ -67,6 +71,7 @@ export default function useGameConnection(socket: GameSocket) {
       socket.off('robot.actionResolved', handleActionResolved)
       socket.off('game.playerJoined', handlePlayerJoined)
       socket.off('game.playerLeft', handlePlayerLeft)
+      socket.off('game.playerConnectionChanged', handlePlayerConnectionChanged)
     }
   }, [dispatch, socket])
 

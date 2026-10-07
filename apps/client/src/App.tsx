@@ -1,6 +1,6 @@
 import ActiveGame from './scenes/active-game/ActiveGame.tsx'
 import useGameConnection from './scenes/active-game/useGameConnection.ts'
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import Login from './scenes/login/Login.tsx'
 import {
   createSessionState,
@@ -42,6 +42,22 @@ function App() {
   const joinPending = useRef(false)
   const joinAttempt = useRef(0)
   const [leaving, setLeaving] = useState(false)
+
+  const sendLogin = useCallback((username: string) => {
+    loginPending.current = true
+    const attempt = ++loginAttempt.current
+    connection.socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit(
+      'user.login',
+      { username },
+      (error, result) => {
+        if (attempt !== loginAttempt.current || !connection.socket.connected) return
+        loginPending.current = false
+        dispatch(error
+          ? { type: 'login-timeout' }
+          : { type: 'login-result', result })
+      },
+    )
+  }, [connection.socket, dispatch])
 
   useEffect(() => {
     sessionRef.current = session
@@ -103,7 +119,7 @@ function App() {
   useEffect(() => {
     if (session.status !== 'resyncing' || loginPending.current) return
     sendLogin(session.user.username)
-  }, [connection.socket, session])
+  }, [connection.socket, session, sendLogin])
 
   const username = session.status === 'editing' || session.status === 'logging-in'
     ? session.username
@@ -115,22 +131,6 @@ function App() {
     ? loginErrors[session.error]
     : session.status === 'join-failed' && session.error ? joinErrors[session.error] : null
   const requiresReconnect = session.status === 'editing' && session.error === 'ALREADY_LOGGED_IN'
-
-  function sendLogin(username: string) {
-    loginPending.current = true
-    const attempt = ++loginAttempt.current
-    connection.socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit(
-      'user.login',
-      { username },
-      (error, result) => {
-        if (attempt !== loginAttempt.current || !connection.socket.connected) return
-        loginPending.current = false
-        dispatch(error
-          ? { type: 'login-timeout' }
-          : { type: 'login-result', result })
-      },
-    )
-  }
 
   function submitUsername(submittedUsername: string) {
     if (session.status === 'join-failed') {

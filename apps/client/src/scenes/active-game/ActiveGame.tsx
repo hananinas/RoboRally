@@ -10,6 +10,10 @@ import useOverlayLayout from './useOverlayLayout.ts'
 function getGameStatus(state: ClientGameState): string {
   if (!state.connected) return 'Not connected'
   if (state.assignment === null) return 'Loading game…'
+  if (state.paused) {
+    const names = state.players.filter((player) => !player.connected).map((player) => player.username)
+    return names.length > 0 ? `Game paused · Waiting for ${names.join(', ')}` : 'Game paused'
+  }
   if (state.playback.active || state.phase === 'EXECUTING') return 'Executing'
   if (state.phase === 'PROGRAMMING') {
     if (!state.handReady) return 'Waiting for cards…'
