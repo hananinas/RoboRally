@@ -1,5 +1,21 @@
 { pkgs }:
 
+# Normal Nix builds are sandboxed with no network access, so their output
+# is fully determined by their inputs. pnpm's `install` needs to reach the
+# npm registry, so Nix only allows it inside a fixed-output derivation —
+# you declare the hash the fetch must produce, and network access is
+# granted in exchange for checking that promise (see pnpmDeps in
+# game-service.nix/client.nix). That bridge is what lets contributors who
+# don't use Nix keep using plain pnpm — but it also means the declared hash
+# silently goes stale whenever dependencies change, and Nix's own error for
+# that is buried deep in build output. This script exists purely to catch
+# that specific failure and explain the fix in plain terms.
+#
+# WARNING: this is NOT how you would normally write a Nix package. A
+# package that shells out to `nix build` on other packages is unusual and
+# exists here only as a one-off diagnostic tool — do not copy this file's
+# shape as a model.
+
 pkgs.writeShellApplication {
   name = "build-production";
 
