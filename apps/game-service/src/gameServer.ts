@@ -23,10 +23,10 @@ import {
 import {
   presentCardsDealt,
   presentPublicGameState,
-  presentRobotActionResolved,
 } from '@/gamePresenter'
 import { createUserRegistry } from '@/userRegistry'
 import { createHand, createSharedGame } from '@/game/SinglePlayerGame'
+import { createActionScheduler } from '@/actionScheduler'
 
 type GameMembership = {
   user: User
@@ -75,8 +75,7 @@ export function createGameSocketServer(
   const publicRoom = `game:${gameId}:public`
   const playerRoom = (playerId: string) => `game:${gameId}:player:${playerId}`
   const memberships = new Map<string, GameMembership>()
-  let scheduledAction: NodeJS.Immediate | undefined
-  let closed = false
+  const actionScheduler = createActionScheduler({ io, game, gameId, publicRoom, playerRoom })
 
   const publicState = () => presentPublicGameState(gameId, game,
     [...memberships.values()].map(({ user, player, connectionId }) => ({
@@ -101,7 +100,7 @@ export function createGameSocketServer(
     io.to(publicRoom).emit('game.playerConnectionChanged', {
       gameId, playerId, connected: true, paused: game.paused,
     })
-    scheduleNextAction()
+    actionScheduler.scheduleNextAction()
   }
 
   function membershipRequest(payload: unknown, user: User | undefined):
@@ -113,34 +112,7 @@ export function createGameSocketServer(
     return { user }
   }
 
-  function dealHands(): void {
-    for (const player of game.players) {
-      io.to(playerRoom(player.id)).emit('cards.dealt', presentCardsDealt(gameId, player))
-    }
-  }
-
-  function scheduleNextAction(): void {
-    if (closed || game.phase !== 'activation' || scheduledAction || game.paused) return
-    scheduledAction = setImmediate(() => {
-      scheduledAction = undefined
-      if (closed || game.phase !== 'activation') return
-      const result = game.executeNextAction()
-      io.to(publicRoom).emit(
-        'robot.actionResolved',
-        presentRobotActionResolved(gameId, result),
-      )
-      if (game.phase === 'activation') {
-        scheduleNextAction()
-      } else {
-        dealHands()
-      }
-    })
-  }
-
-  httpServer.once('close', () => {
-    closed = true
-    clearImmediate(scheduledAction)
-  })
+  httpServer.once('close', actionScheduler.stop)
 
   io.use((socket, next) => {
     if (socket.recovered && socket.data.user) {
@@ -251,8 +223,8 @@ export function createGameSocketServer(
       io.to(publicRoom).emit('game.playerLeft', {
         gameId, playerId: player.id, robotId: player.robot.id,
       })
-      if (phaseBeforeLeave === 'activation' && game.phase === 'programming') dealHands()
-      scheduleNextAction()
+      if (phaseBeforeLeave === 'activation' && game.phase === 'programming') actionScheduler.dealHands()
+      actionScheduler.scheduleNextAction()
     })
 
     socket.on('disconnect', () => {
@@ -346,7 +318,7 @@ export function createGameSocketServer(
         playerId: player.id,
       })
 
-      scheduleNextAction()
+      actionScheduler.scheduleNextAction()
     })
   })
 
