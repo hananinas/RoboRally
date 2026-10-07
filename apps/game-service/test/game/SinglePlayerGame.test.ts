@@ -20,7 +20,7 @@ describe('single-player game', () => {
   })
 
   it('deals nine distinct, contract-valid cards in a fixed order', () => {
-    const { gameId, game, player } = createSinglePlayerGame()
+    const { gameId, player } = createSinglePlayerGame()
     const cardIds = player.hand.map((card) => card.id)
 
     expect(player.hand).toHaveLength(9)
