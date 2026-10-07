@@ -36,11 +36,16 @@ function App() {
   const game = useGameConnection(connection.socket)
   const { initialize } = game
   const [session, dispatch] = useReducer(sessionReducer, undefined, createSessionState)
+  const sessionRef = useRef(session)
   const loginPending = useRef(false)
   const loginAttempt = useRef(0)
   const joinPending = useRef(false)
   const joinAttempt = useRef(0)
   const [leaving, setLeaving] = useState(false)
+
+  useEffect(() => {
+    sessionRef.current = session
+  }, [session])
 
   useEffect(() => {
     const invalidateRequests = () => {
@@ -53,9 +58,16 @@ function App() {
       invalidateRequests()
       dispatch({ type: 'disconnected' })
     }
+    const handleConnect = () => {
+      if (sessionRef.current.status === 'joined' && !connection.socket.recovered) {
+        dispatch({ type: 'resync' })
+      }
+    }
     connection.socket.on('disconnect', handleDisconnect)
+    connection.socket.on('connect', handleConnect)
     return () => {
       connection.socket.off('disconnect', handleDisconnect)
+      connection.socket.off('connect', handleConnect)
       invalidateRequests()
     }
   }, [connection.socket])
@@ -88,6 +100,11 @@ function App() {
     )
   }, [connection.socket, connection.status, session.status, initialize])
 
+  useEffect(() => {
+    if (session.status !== 'resyncing' || loginPending.current) return
+    sendLogin(session.user.username)
+  }, [connection.socket, session])
+
   const username = session.status === 'editing' || session.status === 'logging-in'
     ? session.username
     : session.user.username
@@ -98,6 +115,22 @@ function App() {
     ? loginErrors[session.error]
     : session.status === 'join-failed' && session.error ? joinErrors[session.error] : null
   const requiresReconnect = session.status === 'editing' && session.error === 'ALREADY_LOGGED_IN'
+
+  function sendLogin(username: string) {
+    loginPending.current = true
+    const attempt = ++loginAttempt.current
+    connection.socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit(
+      'user.login',
+      { username },
+      (error, result) => {
+        if (attempt !== loginAttempt.current || !connection.socket.connected) return
+        loginPending.current = false
+        dispatch(error
+          ? { type: 'login-timeout' }
+          : { type: 'login-result', result })
+      },
+    )
+  }
 
   function submitUsername(submittedUsername: string) {
     if (session.status === 'join-failed') {
@@ -119,21 +152,9 @@ function App() {
       return
     }
 
-    loginPending.current = true
-    const attempt = ++loginAttempt.current
     dispatch({ type: 'username-changed', username: submittedUsername })
     dispatch({ type: 'login-submitted' })
-    connection.socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit(
-      'user.login',
-      { username: submittedUsername },
-      (error, result) => {
-        if (attempt !== loginAttempt.current || !connection.socket.connected) return
-        loginPending.current = false
-        dispatch(error
-          ? { type: 'login-timeout' }
-          : { type: 'login-result', result })
-      },
-    )
+    sendLogin(submittedUsername)
   }
 
   function leaveGame() {
@@ -152,7 +173,7 @@ function App() {
     )
   }
 
-  if (session.status === 'joined') {
+  if (session.status === 'joined' || session.status === 'resyncing') {
     return <ActiveGame game={game} username={session.user.username} leaving={leaving} onLeave={leaveGame} />
   }
 

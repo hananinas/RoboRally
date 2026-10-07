@@ -512,7 +512,7 @@ describe('client game state', () => {
     expect(state).toEqual({
       ...before,
       connected: false,
-      error: 'Connection lost. Reload to connect again; your program was not resent.',
+      error: 'Connection lost. Reconnecting… Your program was not resent.',
     })
     expect(canProgram(state)).toBe(false)
     expect(createSubmission(state)).toBeNull()
@@ -532,6 +532,15 @@ describe('client game state', () => {
     expect(state.error).toBeNull()
     expect(state.registers).toEqual(emptyRegisters)
     expect(canProgram(state)).toBe(true)
+  })
+
+  it('restores a recovered connection', () => {
+    const before = gameStateReducer(selectProgram(), { type: 'submit' })
+    const disconnected = gameStateReducer(before, { type: 'disconnected' })
+    const state = gameStateReducer(disconnected, { type: 'reconnected' })
+
+    expect(state).toEqual({ ...before, connected: true, error: null })
+    expect(canProgram(state)).toBe(false)
   })
 })
 

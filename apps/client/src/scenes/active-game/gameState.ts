@@ -43,6 +43,7 @@ export type GameStateEvent =
   | { type: 'player-joined'; payload: PlayerJoined }
   | { type: 'player-left'; payload: PlayerLeft }
   | { type: 'disconnected' }
+  | { type: 'reconnected' }
   | { type: 'dealt'; hand: CardsDealt }
   | { type: 'reset' }
   | { type: 'error'; message: string }
@@ -154,8 +155,10 @@ export function gameStateReducer(
       return {
         ...state,
         connected: false,
-        error: 'Connection lost. Reload to connect again; your program was not resent.',
+        error: 'Connection lost. Reconnecting… Your program was not resent.',
       }
+    case 'reconnected':
+      return { ...state, connected: true, error: null }
     case 'reset':
       return createClientGameState()
     case 'joined': {
