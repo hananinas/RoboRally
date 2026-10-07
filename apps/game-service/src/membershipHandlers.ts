@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto'
+import { err, ok, type Result } from 'neverthrow'
 import {
-  getPublicGameStateSchema,
+  joinGameSchema,
+  leaveGameSchema,
   parseGetPublicGameState,
   type GetPublicGameState,
   type JoinGame,
@@ -49,20 +51,27 @@ function reattachMembership(membership: GameMembership, socketId: string): boole
   return wasDisconnected
 }
 
-function reconnectMembership(ctx: MembershipContext, playerId: string): void {
+function resumeUnlessStillDisconnected(ctx: MembershipContext): void {
   if (!anyDisconnected(ctx)) ctx.game.resume()
+}
+
+function notifyReconnected(ctx: MembershipContext, playerId: string): void {
   ctx.io.to(ctx.publicRoom).emit('game.playerConnectionChanged', {
     gameId: ctx.gameId, playerId, connected: true, paused: ctx.game.paused,
   })
   ctx.actionScheduler.scheduleNextAction()
 }
 
-function membershipRequest(ctx: MembershipContext, payload: unknown, user: User | undefined):
-  { user: User } | { outcome: 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND' } {
+function validateMembershipRequest(
+  ctx: MembershipContext,
+  schema: typeof joinGameSchema | typeof leaveGameSchema,
+  payload: unknown,
+  user: User | undefined,
+): { user: User } | { outcome: 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND' } {
   if (!user) return { outcome: 'LOGIN_REQUIRED' }
-  const request = getPublicGameStateSchema.safeParse(payload)
-  if (!request.success) return { outcome: 'INVALID_REQUEST' }
-  if (request.data.gameId !== ctx.gameId) return { outcome: 'GAME_NOT_FOUND' }
+  const parsed = schema.safeParse(payload)
+  if (!parsed.success) return { outcome: 'INVALID_REQUEST' }
+  if (parsed.data.gameId !== ctx.gameId) return { outcome: 'GAME_NOT_FOUND' }
   return { user }
 }
 
@@ -75,7 +84,74 @@ export function reconnectIfRecovered(ctx: MembershipContext, socket: GameSocket)
   if (!socket.recovered || !socket.data.user) return
   const membership = ctx.memberships.get(socket.data.user.userId)
   if (membership && reattachMembership(membership, socket.id)) {
-    reconnectMembership(ctx, membership.player.id)
+    resumeUnlessStillDisconnected(ctx)
+    notifyReconnected(ctx, membership.player.id)
+  }
+}
+
+type MembershipResolution =
+  | {
+      membership: GameMembership
+      isNew: boolean
+      reconnected: boolean
+      previousConnectionId: string | null
+    }
+  | { outcome: 'USER_ALREADY_IN_GAME' | 'GAME_ALREADY_STARTED' | 'NO_SPAWN_AVAILABLE' | 'INTERNAL_ERROR' }
+
+function addMembership(ctx: MembershipContext, socket: GameSocket, user: User): MembershipResolution {
+  const { game, memberships } = ctx
+  if (game.hasStarted) return { outcome: 'GAME_ALREADY_STARTED' }
+  const player = new Player(randomUUID(), new Robot(randomUUID(), Direction.NORTH),
+    createHand(Array.from({ length: 9 }, () => randomUUID())))
+  try {
+    if (!game.addPlayer(player)) return { outcome: 'NO_SPAWN_AVAILABLE' }
+  } catch {
+    return { outcome: 'INTERNAL_ERROR' }
+  }
+  const membership = { user, player, connectionId: socket.id }
+  memberships.set(user.userId, membership)
+  return { membership, isNew: true, reconnected: false, previousConnectionId: null }
+}
+
+function reattachExistingMembership(
+  ctx: MembershipContext,
+  socket: GameSocket,
+  membership: GameMembership,
+): MembershipResolution {
+  const previousConnectionId = membership.connectionId
+  const reconnected = reattachMembership(membership, socket.id)
+  if (reconnected) resumeUnlessStillDisconnected(ctx)
+  return { membership, isNew: false, reconnected, previousConnectionId }
+}
+
+function joinOrReconnectMembership(
+  ctx: MembershipContext,
+  socket: GameSocket,
+  user: User,
+): MembershipResolution {
+  const membership = ctx.memberships.get(user.userId)
+  if (membership?.connectionId && membership.connectionId !== socket.id) {
+    return { outcome: 'USER_ALREADY_IN_GAME' }
+  }
+  return membership
+    ? reattachExistingMembership(ctx, socket, membership)
+    : addMembership(ctx, socket, user)
+}
+
+function rollbackMembership(
+  ctx: MembershipContext,
+  { membership, isNew, previousConnectionId, user }: {
+    membership: GameMembership
+    isNew: boolean
+    previousConnectionId: string | null
+    user: User
+  },
+): void {
+  if (isNew) {
+    ctx.memberships.delete(user.userId)
+    ctx.game.removePlayer(membership.player.id)
+  } else {
+    membership.connectionId = previousConnectionId
   }
 }
 
@@ -86,39 +162,16 @@ export function handleJoin(
   acknowledge: JoinResultAcknowledgement,
 ): void {
   if (typeof acknowledge !== 'function') return
-  const { game, gameId, memberships, publicRoom, playerRoom, publicState } = ctx
-  const request = membershipRequest(ctx, payload, socket.data.user)
-  if ('outcome' in request) return acknowledge(request)
-  const { user } = request
-  let membership = memberships.get(user.userId)
-  if (membership?.connectionId && membership.connectionId !== socket.id) {
-    acknowledge({ outcome: 'USER_ALREADY_IN_GAME' })
-    return
-  }
-  const isNew = membership === undefined
-  if (isNew && game.hasStarted) {
-    acknowledge({ outcome: 'GAME_ALREADY_STARTED' })
-    return
-  }
-  if (!membership) {
-    const player = new Player(randomUUID(), new Robot(randomUUID(), Direction.NORTH),
-      createHand(Array.from({ length: 9 }, () => randomUUID())))
-    try {
-      if (!game.addPlayer(player)) {
-        acknowledge({ outcome: 'NO_SPAWN_AVAILABLE' })
-        return
-      }
-    } catch {
-      acknowledge({ outcome: 'INTERNAL_ERROR' })
-      return
-    }
-    membership = { user, player, connectionId: socket.id }
-    memberships.set(user.userId, membership)
-  }
-  const previousConnectionId = membership.connectionId
-  const reconnected = !isNew && reattachMembership(membership, socket.id)
-  if (reconnected && !anyDisconnected(ctx)) game.resume()
+  const { game, gameId, publicRoom, playerRoom, publicState } = ctx
+  const verdict = validateMembershipRequest(ctx, joinGameSchema, payload, socket.data.user)
+  if ('outcome' in verdict) return acknowledge(verdict)
+  const { user } = verdict
+
+  const resolution = joinOrReconnectMembership(ctx, socket, user)
+  if ('outcome' in resolution) return acknowledge(resolution)
+  const { membership, isNew, reconnected, previousConnectionId } = resolution
   const { player } = membership
+
   let result: Extract<JoinResult, { outcome: 'JOINED' }>
   try {
     result = {
@@ -129,12 +182,7 @@ export function handleJoin(
       programSubmitted: game.hasSubmittedProgram(player.id),
     }
   } catch {
-    if (isNew) {
-      memberships.delete(user.userId)
-      game.removePlayer(player.id)
-    } else {
-      membership.connectionId = previousConnectionId
-    }
+    rollbackMembership(ctx, { membership, isNew, previousConnectionId, user })
     acknowledge({ outcome: 'INTERNAL_ERROR' })
     return
   }
@@ -147,7 +195,7 @@ export function handleJoin(
       robot: result.state.robots.find((robot) => robot.robotId === player.robot.id)!,
     })
   } else if (reconnected) {
-    reconnectMembership(ctx, player.id)
+    notifyReconnected(ctx, player.id)
   }
 }
 
@@ -159,8 +207,8 @@ export function handleLeave(
 ): void {
   if (typeof acknowledge !== 'function') return
   const { io, game, gameId, memberships, publicRoom, playerRoom, actionScheduler } = ctx
-  const request = membershipRequest(ctx, payload, socket.data.user)
-  if ('outcome' in request) return acknowledge(request)
+  const verdict = validateMembershipRequest(ctx, leaveGameSchema, payload, socket.data.user)
+  if ('outcome' in verdict) return acknowledge(verdict)
   const membership = ownedMembership(ctx, socket)
   if (!membership) {
     acknowledge({ outcome: 'GAME_NOT_FOUND' })
