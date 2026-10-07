@@ -1,37 +1,33 @@
 import type { Server as HttpServer } from 'node:http'
 import { randomUUID } from 'node:crypto'
 import {
-  parseGetPublicGameState,
-  getPublicGameStateSchema,
   parseSubmitProgram,
   type ClientToServerEvents,
   type ProgramCardIds,
-  type JoinResult,
   type ServerToClientEvents,
   type User,
 } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
 import {
-  Player,
-  Robot,
-  Direction,
   type Card,
   type Game,
+  type Player,
 } from '@/game/index'
-import {
-  presentCardsDealt,
-  presentPublicGameState,
-} from '@/gamePresenter'
+import { presentPublicGameState } from '@/gamePresenter'
 import { createUserRegistry } from '@/userRegistry'
-import { createHand, createSharedGame } from '@/game/SinglePlayerGame'
+import { createSharedGame } from '@/game/SinglePlayerGame'
 import { createActionScheduler } from '@/actionScheduler'
 import { handleLogin } from '@/authHandlers'
-
-type GameMembership = {
-  user: User
-  player: Player
-  connectionId: string | null
-}
+import {
+  handleDisconnect,
+  handleGetPublicGameState,
+  handleJoin,
+  handleLeave,
+  ownedMembership,
+  reconnectIfRecovered,
+  type GameMembership,
+  type MembershipContext,
+} from '@/membershipHandlers'
 
 export type GameSocketData = { user?: User }
 
@@ -85,30 +81,8 @@ export function createGameSocketServer(
     })),
   )
 
-  const anyDisconnected = () =>
-    [...memberships.values()].some((membership) => membership.connectionId === null)
-
-  function reattachMembership(membership: GameMembership, socketId: string): boolean {
-    const wasDisconnected = membership.connectionId === null
-    membership.connectionId = socketId
-    return wasDisconnected
-  }
-
-  function reconnectMembership(playerId: string): void {
-    if (!anyDisconnected()) game.resume()
-    io.to(publicRoom).emit('game.playerConnectionChanged', {
-      gameId, playerId, connected: true, paused: game.paused,
-    })
-    actionScheduler.scheduleNextAction()
-  }
-
-  function membershipRequest(payload: unknown, user: User | undefined):
-    { user: User } | { outcome: 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND' } {
-    if (!user) return { outcome: 'LOGIN_REQUIRED' }
-    const request = getPublicGameStateSchema.safeParse(payload)
-    if (!request.success) return { outcome: 'INVALID_REQUEST' }
-    if (request.data.gameId !== gameId) return { outcome: 'GAME_NOT_FOUND' }
-    return { user }
+  const membershipContext: MembershipContext = {
+    io, game, gameId, publicRoom, playerRoom, memberships, publicState, actionScheduler,
   }
 
   httpServer.once('close', actionScheduler.stop)
@@ -127,139 +101,17 @@ export function createGameSocketServer(
   io.on('connection', (socket) => {
     socket.on('user.login', (payload, acknowledge) => handleLogin(socket, { users }, payload, acknowledge))
 
-    if (socket.recovered && socket.data.user) {
-      const membership = memberships.get(socket.data.user.userId)
-      if (membership && reattachMembership(membership, socket.id)) {
-        reconnectMembership(membership.player.id)
-      }
-    }
+    reconnectIfRecovered(membershipContext, socket)
 
-    const ownedMembership = () => {
-      const membership = memberships.get(socket.data.user?.userId ?? '')
-      return membership?.connectionId === socket.id ? membership : undefined
-    }
-
-    socket.on('game.join', (payload, acknowledge) => {
-      if (typeof acknowledge !== 'function') return
-      const request = membershipRequest(payload, socket.data.user)
-      if ('outcome' in request) return acknowledge(request)
-      const { user } = request
-      let membership = memberships.get(user.userId)
-      if (membership?.connectionId && membership.connectionId !== socket.id) {
-        acknowledge({ outcome: 'USER_ALREADY_IN_GAME' })
-        return
-      }
-      const isNew = membership === undefined
-      if (isNew && game.hasStarted) {
-        acknowledge({ outcome: 'GAME_ALREADY_STARTED' })
-        return
-      }
-      if (!membership) {
-        const player = new Player(randomUUID(), new Robot(randomUUID(), Direction.NORTH),
-          createHand(Array.from({ length: 9 }, () => randomUUID())))
-        try {
-          if (!game.addPlayer(player)) {
-            acknowledge({ outcome: 'NO_SPAWN_AVAILABLE' })
-            return
-          }
-        } catch {
-          acknowledge({ outcome: 'INTERNAL_ERROR' })
-          return
-        }
-        membership = { user, player, connectionId: socket.id }
-        memberships.set(user.userId, membership)
-      }
-      const previousConnectionId = membership.connectionId
-      const reconnected = !isNew && reattachMembership(membership, socket.id)
-      if (reconnected && !anyDisconnected()) game.resume()
-      const { player } = membership
-      let result: Extract<JoinResult, { outcome: 'JOINED' }>
-      try {
-        result = {
-          outcome: 'JOINED',
-          assignment: { gameId, playerId: player.id, robotId: player.robot.id },
-          state: publicState(),
-          hand: presentCardsDealt(gameId, player).cards,
-          programSubmitted: game.hasSubmittedProgram(player.id),
-        }
-      } catch {
-        if (isNew) {
-          memberships.delete(user.userId)
-          game.removePlayer(player.id)
-        } else {
-          membership.connectionId = previousConnectionId
-        }
-        acknowledge({ outcome: 'INTERNAL_ERROR' })
-        return
-      }
-      void socket.join([publicRoom, playerRoom(player.id)])
-      acknowledge(result)
-      if (isNew) {
-        socket.to(publicRoom).emit('game.playerJoined', {
-          gameId,
-          player: result.state.players.find((candidate) => candidate.playerId === player.id)!,
-          robot: result.state.robots.find((robot) => robot.robotId === player.robot.id)!,
-        })
-      } else if (reconnected) {
-        reconnectMembership(player.id)
-      }
-    })
-
-    socket.on('game.leave', (payload, acknowledge) => {
-      if (typeof acknowledge !== 'function') return
-      const request = membershipRequest(payload, socket.data.user)
-      if ('outcome' in request) return acknowledge(request)
-      const membership = ownedMembership()
-      if (!membership) {
-        acknowledge({ outcome: 'GAME_NOT_FOUND' })
-        return
-      }
-      const { player, user } = membership
-      const phaseBeforeLeave = game.phase
-      game.removePlayer(player.id)
-      memberships.delete(user.userId)
-      void socket.leave(publicRoom)
-      void socket.leave(playerRoom(player.id))
-      acknowledge({ outcome: 'LEFT' })
-      io.to(publicRoom).emit('game.playerLeft', {
-        gameId, playerId: player.id, robotId: player.robot.id,
-      })
-      if (phaseBeforeLeave === 'activation' && game.phase === 'programming') actionScheduler.dealHands()
-      actionScheduler.scheduleNextAction()
-    })
-
-    socket.on('disconnect', () => {
-      const membership = ownedMembership()
-      if (!membership) return
-      membership.connectionId = null
-      game.pause()
-      io.to(publicRoom).emit('game.playerConnectionChanged', {
-        gameId, playerId: membership.player.id, connected: false, paused: game.paused,
-      })
-    })
-
-    socket.on('game.getPublicGameState', (payload, acknowledge) => {
-      if (typeof acknowledge !== 'function') return
-
-      try {
-        const request = parseGetPublicGameState(payload)
-        if (request.gameId === gameId && ownedMembership()) {
-          acknowledge({
-            outcome: 'GAME_FOUND',
-            state: publicState(),
-          })
-          return
-        }
-      } catch {
-        // Invalid requests receive the same non-disclosing result as unknown games.
-      }
-
-      acknowledge({ outcome: 'GAME_NOT_FOUND' })
-    })
+    socket.on('game.join', (payload, acknowledge) => handleJoin(membershipContext, socket, payload, acknowledge))
+    socket.on('game.leave', (payload, acknowledge) => handleLeave(membershipContext, socket, payload, acknowledge))
+    socket.on('disconnect', () => handleDisconnect(membershipContext, socket))
+    socket.on('game.getPublicGameState', (payload, acknowledge) =>
+      handleGetPublicGameState(membershipContext, socket, payload, acknowledge))
 
     socket.on('program.submit', (payload, acknowledge) => {
       if (typeof acknowledge !== 'function') return
-      const player = ownedMembership()?.player
+      const player = ownedMembership(membershipContext, socket)?.player
       if (!player) {
         acknowledge({ outcome: 'INVALID_PROGRAM' })
         return
