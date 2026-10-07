@@ -4,17 +4,18 @@ import {
   type ProgramResultAcknowledgement,
   type SubmitProgram,
 } from '@robo-rally/game-events'
+import { err, ok, type Result } from 'neverthrow'
 import type { Card, Player } from '@/game/index'
 import type { GameSocket } from '@/gameServer'
 import { ownedMembership, type MembershipContext } from '@/membershipHandlers'
 
-function resolveProgram(
+function findProgramCards(
   player: Player,
   cardIds: ProgramCardIds,
-): readonly Card[] | undefined {
+): Result<readonly Card[], 'UNKNOWN_CARD'> {
   const hand = player.hand
   const program = cardIds.map((id) => hand.find((card) => card.id === id))
-  return program.every((card) => card !== undefined) ? program : undefined
+  return program.every((card) => card !== undefined) ? ok(program) : err('UNKNOWN_CARD')
 }
 
 export function handleSubmitProgram(
@@ -36,11 +37,11 @@ export function handleSubmitProgram(
 
   try {
     const submission = parseSubmitProgram(payload)
-    const program = resolveProgram(player, submission.cardIds)
-    if (submission.gameId !== ctx.gameId || submission.playerId !== player.id || !program) {
+    const programCards = findProgramCards(player, submission.cardIds)
+    if (submission.gameId !== ctx.gameId || submission.playerId !== player.id || programCards.isErr()) {
       throw new Error('Program does not belong to this game')
     }
-    ctx.game.submitProgram(player.id, program)
+    ctx.game.submitProgram(player.id, programCards.value)
   } catch {
     acknowledge({ outcome: 'INVALID_PROGRAM' })
     return
