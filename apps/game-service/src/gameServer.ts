@@ -1,18 +1,11 @@
 import type { Server as HttpServer } from 'node:http'
-import { randomUUID } from 'node:crypto'
-import {
-  parseSubmitProgram,
-  type ClientToServerEvents,
-  type ProgramCardIds,
-  type ServerToClientEvents,
-  type User,
+import type {
+  ClientToServerEvents,
+  ServerToClientEvents,
+  User,
 } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
-import {
-  type Card,
-  type Game,
-  type Player,
-} from '@/game/index'
+import type { Game } from '@/game/index'
 import { presentPublicGameState } from '@/gamePresenter'
 import { createUserRegistry } from '@/userRegistry'
 import { createSharedGame } from '@/game/SinglePlayerGame'
@@ -23,11 +16,11 @@ import {
   handleGetPublicGameState,
   handleJoin,
   handleLeave,
-  ownedMembership,
   reconnectIfRecovered,
   type GameMembership,
   type MembershipContext,
 } from '@/membershipHandlers'
+import { handleSubmitProgram } from '@/gameplayHandlers'
 
 export type GameSocketData = { user?: User }
 
@@ -41,15 +34,6 @@ export type GameSocketServer = Server<
 export type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents, {}, GameSocketData>
 
 export type GameSession = Readonly<{ gameId: string; game: Game }>
-
-function resolveProgram(
-  player: Player,
-  cardIds: ProgramCardIds,
-): readonly Card[] | undefined {
-  const hand = player.hand
-  const program = cardIds.map((id) => hand.find((card) => card.id === id))
-  return program.every((card) => card !== undefined) ? program : undefined
-}
 
 export function createGameSocketServer(
   httpServer: HttpServer,
@@ -108,39 +92,8 @@ export function createGameSocketServer(
     socket.on('disconnect', () => handleDisconnect(membershipContext, socket))
     socket.on('game.getPublicGameState', (payload, acknowledge) =>
       handleGetPublicGameState(membershipContext, socket, payload, acknowledge))
-
-    socket.on('program.submit', (payload, acknowledge) => {
-      if (typeof acknowledge !== 'function') return
-      const player = ownedMembership(membershipContext, socket)?.player
-      if (!player) {
-        acknowledge({ outcome: 'INVALID_PROGRAM' })
-        return
-      }
-      if (game.paused) {
-        acknowledge({ outcome: 'GAME_PAUSED' })
-        return
-      }
-
-      try {
-        const submission = parseSubmitProgram(payload)
-        const program = resolveProgram(player, submission.cardIds)
-        if (submission.gameId !== gameId || submission.playerId !== player.id || !program) {
-          throw new Error('Program does not belong to this game')
-        }
-        game.submitProgram(player.id, program)
-      } catch {
-        acknowledge({ outcome: 'INVALID_PROGRAM' })
-        return
-      }
-
-      acknowledge({ outcome: 'ACCEPTED' })
-      socket.to(publicRoom).emit('program.submitted', {
-        gameId,
-        playerId: player.id,
-      })
-
-      actionScheduler.scheduleNextAction()
-    })
+    socket.on('program.submit', (payload, acknowledge) =>
+      handleSubmitProgram(membershipContext, socket, payload, acknowledge))
   })
 
   return io
