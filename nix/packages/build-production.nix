@@ -6,7 +6,7 @@
 # you declare the hash the fetch must produce, and network access is
 # granted in exchange for checking that promise (see pnpmDeps in
 # game-service.nix/client.nix). That bridge is what lets contributors who
-# don't use Nix keep using plain pnpm — but it also means the declared hash
+# don't use Nix keep using plain pnpm — but it also means the specified hash
 # silently goes stale whenever dependencies change, and Nix's own error for
 # that is buried deep in build output. This script exists purely to catch
 # that specific failure and explain the fix in plain terms.
@@ -49,8 +49,8 @@ pkgs.writeShellApplication {
     check_package() {
       local name=$1
 
-      local declared
-      declared=$(nix eval --impure --raw --expr \
+      local specified
+      specified=$(nix eval --impure --raw --expr \
         "(builtins.getFlake (toString ./.)).packages.''${system}.''${name}.pnpmDeps.outputHash" 2>/dev/null || true)
 
       echo "Checking ''${name}'s pnpm dependencies against pnpm-lock.yaml (forces a real fetch, may take a while)..." >&2
@@ -63,12 +63,12 @@ pkgs.writeShellApplication {
         in drv.overrideAttrs (_: { outputHash = \"\"; outputHashAlgo = \"sha256\"; })
       " 2>&1 | tee "$discover_log" || true
 
-      local real
-      real=$(grep -oE 'got:[[:space:]]*sha256-[A-Za-z0-9+/=]+' "$discover_log" | head -n1 | grep -oE 'sha256-[A-Za-z0-9+/=]+')
+      local got
+      got=$(grep -oE 'got:[[:space:]]*sha256-[A-Za-z0-9+/=]+' "$discover_log" | head -n1 | grep -oE 'sha256-[A-Za-z0-9+/=]+')
       rm -f "$discover_log"
 
-      if [ -n "$real" ] && [ "$real" != "$declared" ]; then
-        affected+=("$name|$declared|$real")
+      if [ -n "$got" ] && [ "$got" != "$specified" ]; then
+        affected+=("$name|$specified|$got")
       fi
     }
 
@@ -84,14 +84,14 @@ pkgs.writeShellApplication {
     echo
     echo "════════════════════════════════════════════════════════════════"
     for entry in "''${affected[@]}"; do
-      IFS='|' read -r name declared real <<< "$entry"
+      IFS='|' read -r name specified got <<< "$entry"
       echo " pnpm dependency hash mismatch — nix/packages/''${name}.nix"
       echo "════════════════════════════════════════════════════════════════"
       echo "Nix's pinned hash for this package's pnpm dependencies no longer"
       echo "matches pnpm-lock.yaml."
       echo
-      echo "  declared: $declared"
-      echo "  real:     $real"
+      echo "  specified: $specified"
+      echo "  got:       $got"
       echo
       echo "Update here: nix/packages/''${name}.nix -> pnpmDeps.hash"
       echo
