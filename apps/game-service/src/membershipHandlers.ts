@@ -67,12 +67,12 @@ function validateMembershipRequest(
   schema: typeof joinGameSchema | typeof leaveGameSchema,
   payload: unknown,
   user: User | undefined,
-): { user: User } | { outcome: 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND' } {
-  if (!user) return { outcome: 'LOGIN_REQUIRED' }
+): Result<User, 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND'> {
+  if (!user) return err('LOGIN_REQUIRED')
   const parsed = schema.safeParse(payload)
-  if (!parsed.success) return { outcome: 'INVALID_REQUEST' }
-  if (parsed.data.gameId !== ctx.gameId) return { outcome: 'GAME_NOT_FOUND' }
-  return { user }
+  if (!parsed.success) return err('INVALID_REQUEST')
+  if (parsed.data.gameId !== ctx.gameId) return err('GAME_NOT_FOUND')
+  return ok(user)
 }
 
 export function ownedMembership(ctx: MembershipContext, socket: GameSocket): GameMembership | undefined {
@@ -89,28 +89,28 @@ export function reconnectIfRecovered(ctx: MembershipContext, socket: GameSocket)
   }
 }
 
-type MembershipResolution =
-  | {
-      membership: GameMembership
-      isNew: boolean
-      reconnected: boolean
-      previousConnectionId: string | null
-    }
-  | { outcome: 'USER_ALREADY_IN_GAME' | 'GAME_ALREADY_STARTED' | 'NO_SPAWN_AVAILABLE' | 'INTERNAL_ERROR' }
+type MembershipSuccess = {
+  membership: GameMembership
+  isNew: boolean
+  reconnected: boolean
+  previousConnectionId: string | null
+}
+type MembershipFailure = 'USER_ALREADY_IN_GAME' | 'GAME_ALREADY_STARTED' | 'NO_SPAWN_AVAILABLE' | 'INTERNAL_ERROR'
+type MembershipResolution = Result<MembershipSuccess, MembershipFailure>
 
 function addMembership(ctx: MembershipContext, socket: GameSocket, user: User): MembershipResolution {
   const { game, memberships } = ctx
-  if (game.hasStarted) return { outcome: 'GAME_ALREADY_STARTED' }
+  if (game.hasStarted) return err('GAME_ALREADY_STARTED')
   const player = new Player(randomUUID(), new Robot(randomUUID(), Direction.NORTH),
     createHand(Array.from({ length: 9 }, () => randomUUID())))
   try {
-    if (!game.addPlayer(player)) return { outcome: 'NO_SPAWN_AVAILABLE' }
+    if (!game.addPlayer(player)) return err('NO_SPAWN_AVAILABLE')
   } catch {
-    return { outcome: 'INTERNAL_ERROR' }
+    return err('INTERNAL_ERROR')
   }
   const membership = { user, player, connectionId: socket.id }
   memberships.set(user.userId, membership)
-  return { membership, isNew: true, reconnected: false, previousConnectionId: null }
+  return ok({ membership, isNew: true, reconnected: false, previousConnectionId: null })
 }
 
 function reattachExistingMembership(
@@ -121,7 +121,7 @@ function reattachExistingMembership(
   const previousConnectionId = membership.connectionId
   const reconnected = reattachMembership(membership, socket.id)
   if (reconnected) resumeUnlessStillDisconnected(ctx)
-  return { membership, isNew: false, reconnected, previousConnectionId }
+  return ok({ membership, isNew: false, reconnected, previousConnectionId })
 }
 
 function joinOrReconnectMembership(
@@ -131,7 +131,7 @@ function joinOrReconnectMembership(
 ): MembershipResolution {
   const membership = ctx.memberships.get(user.userId)
   if (membership?.connectionId && membership.connectionId !== socket.id) {
-    return { outcome: 'USER_ALREADY_IN_GAME' }
+    return err('USER_ALREADY_IN_GAME')
   }
   return membership
     ? reattachExistingMembership(ctx, socket, membership)
@@ -164,12 +164,12 @@ export function handleJoin(
   if (typeof acknowledge !== 'function') return
   const { game, gameId, publicRoom, playerRoom, publicState } = ctx
   const verdict = validateMembershipRequest(ctx, joinGameSchema, payload, socket.data.user)
-  if ('outcome' in verdict) return acknowledge(verdict)
-  const { user } = verdict
+  if (verdict.isErr()) return acknowledge({ outcome: verdict.error })
+  const user = verdict.value
 
   const resolution = joinOrReconnectMembership(ctx, socket, user)
-  if ('outcome' in resolution) return acknowledge(resolution)
-  const { membership, isNew, reconnected, previousConnectionId } = resolution
+  if (resolution.isErr()) return acknowledge({ outcome: resolution.error })
+  const { membership, isNew, reconnected, previousConnectionId } = resolution.value
   const { player } = membership
 
   let result: Extract<JoinResult, { outcome: 'JOINED' }>
@@ -208,7 +208,7 @@ export function handleLeave(
   if (typeof acknowledge !== 'function') return
   const { io, game, gameId, memberships, publicRoom, playerRoom, actionScheduler } = ctx
   const verdict = validateMembershipRequest(ctx, leaveGameSchema, payload, socket.data.user)
-  if ('outcome' in verdict) return acknowledge(verdict)
+  if (verdict.isErr()) return acknowledge({ outcome: verdict.error })
   const membership = ownedMembership(ctx, socket)
   if (!membership) {
     acknowledge({ outcome: 'GAME_NOT_FOUND' })
