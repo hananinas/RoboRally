@@ -37,8 +37,13 @@ describe('game membership over Socket.IO', () => {
     await new Promise<void>((resolve) => server.close(() => resolve()))
   })
 
-  async function connect(username?: string): Promise<Client> {
-    const client: Client = createClient(url, { autoConnect: false, transports: ['websocket'], reconnection: false })
+  async function connect(
+    username?: string,
+    options?: Partial<Parameters<typeof createClient>[1]>,
+  ): Promise<Client> {
+    const client: Client = createClient(url, {
+      autoConnect: false, transports: ['websocket'], reconnection: false, ...options,
+    })
     clients.push(client)
     await new Promise<void>((resolve, reject) => {
       client.once('connect', resolve)
@@ -59,6 +64,12 @@ describe('game membership over Socket.IO', () => {
   async function disconnectClient(client: Client): Promise<void> {
     const closed = new Promise((resolve) => server.sockets.sockets.get(client.id!)!.once('disconnect', resolve))
     client.disconnect()
+    await closed
+  }
+
+  async function disconnectClientRecoverably(client: Client): Promise<void> {
+    const closed = new Promise((resolve) => server.sockets.sockets.get(client.id!)!.once('disconnect', resolve))
+    client.io.engine.close()
     await closed
   }
 
@@ -383,6 +394,29 @@ describe('game membership over Socket.IO', () => {
 
     expect(resolvedActions).toHaveLength(1)
     expect(shared.game.phase).toBe('programming')
+    expect(shared.game.paused).toBe(false)
+  })
+
+  it('automatically reattaches and resumes a recovered connection without resending game.join', async () => {
+    const disconnectingSocket = await connect('A', { reconnection: true })
+    const disconnectingPlayer = await join(disconnectingSocket)
+    const otherSocket = await connect('B')
+    const otherJoined = new Promise((resolve) => disconnectingSocket.once('game.playerJoined', resolve))
+    await join(otherSocket)
+    // Recovery needs an offset to resume from; this primes it before disconnecting.
+    await otherJoined
+
+    const connectionChanges = waitForConnectionChanges(otherSocket, 2)
+    await disconnectClientRecoverably(disconnectingSocket)
+    expect(shared.game.paused).toBe(true)
+
+    const reconnected = new Promise<void>((resolve) => disconnectingSocket.once('connect', resolve))
+    await reconnected
+
+    expect(disconnectingSocket.recovered).toBe(true)
+    expect((await connectionChanges).at(-1)).toEqual({
+      gameId: shared.gameId, playerId: disconnectingPlayer.assignment.playerId, connected: true, paused: false,
+    })
     expect(shared.game.paused).toBe(false)
   })
 

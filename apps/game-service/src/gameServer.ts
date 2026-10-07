@@ -65,7 +65,7 @@ export function createGameSocketServer(
     ServerToClientEvents,
     {},
     GameSocketData
-  >(httpServer)
+  >(httpServer, { connectionStateRecovery: {} })
   const users = createUserRegistry()
   const { gameId, game } = sharedGame
   const publicRoom = `game:${gameId}:public`
@@ -85,6 +85,20 @@ export function createGameSocketServer(
 
   const anyDisconnected = () =>
     [...memberships.values()].some((membership) => membership.connectionId === null)
+
+  function reattachMembership(membership: GameMembership, socketId: string): boolean {
+    const wasDisconnected = membership.connectionId === null
+    membership.connectionId = socketId
+    return wasDisconnected
+  }
+
+  function reconnectMembership(playerId: string): void {
+    if (!anyDisconnected()) game.resume()
+    io.to(publicRoom).emit('game.playerConnectionChanged', {
+      gameId, playerId, connected: true, paused: game.paused,
+    })
+    scheduleNextAction()
+  }
 
   function membershipRequest(payload: unknown, user: User | undefined):
     { user: User } | { outcome: 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND' } {
@@ -125,6 +139,13 @@ export function createGameSocketServer(
   })
 
   io.on('connection', (socket) => {
+    if (socket.recovered && socket.data.user) {
+      const membership = memberships.get(socket.data.user.userId)
+      if (membership && reattachMembership(membership, socket.id)) {
+        reconnectMembership(membership.player.id)
+      }
+    }
+
     const ownedMembership = () => {
       const membership = memberships.get(socket.data.user?.userId ?? '')
       return membership?.connectionId === socket.id ? membership : undefined
@@ -161,8 +182,7 @@ export function createGameSocketServer(
         memberships.set(user.userId, membership)
       }
       const previousConnectionId = membership.connectionId
-      membership.connectionId = socket.id
-      const reconnected = !isNew && previousConnectionId === null
+      const reconnected = !isNew && reattachMembership(membership, socket.id)
       if (reconnected && !anyDisconnected()) game.resume()
       const { player } = membership
       let result: Extract<JoinResult, { outcome: 'JOINED' }>
@@ -193,10 +213,7 @@ export function createGameSocketServer(
           robot: result.state.robots.find((robot) => robot.robotId === player.robot.id)!,
         })
       } else if (reconnected) {
-        io.to(publicRoom).emit('game.playerConnectionChanged', {
-          gameId, playerId: player.id, connected: true, paused: game.paused,
-        })
-        scheduleNextAction()
+        reconnectMembership(player.id)
       }
     })
 
