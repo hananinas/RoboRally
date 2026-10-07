@@ -65,7 +65,7 @@ export function createGameSocketServer(
     ServerToClientEvents,
     {},
     GameSocketData
-  >(httpServer, { connectionStateRecovery: {} })
+  >(httpServer, { connectionStateRecovery: {}, pingInterval: 1000, pingTimeout: 1000 })
   const users = createUserRegistry()
   const { gameId, game } = sharedGame
   const publicRoom = `game:${gameId}:public`
