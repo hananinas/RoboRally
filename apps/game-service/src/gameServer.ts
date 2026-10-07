@@ -3,8 +3,6 @@ import { randomUUID } from 'node:crypto'
 import {
   parseGetPublicGameState,
   getPublicGameStateSchema,
-  LoginRequestError,
-  parseLogin,
   parseSubmitProgram,
   type ClientToServerEvents,
   type ProgramCardIds,
@@ -27,6 +25,7 @@ import {
 import { createUserRegistry } from '@/userRegistry'
 import { createHand, createSharedGame } from '@/game/SinglePlayerGame'
 import { createActionScheduler } from '@/actionScheduler'
+import { handleLogin } from '@/authHandlers'
 
 type GameMembership = {
   user: User
@@ -126,6 +125,8 @@ export function createGameSocketServer(
   })
 
   io.on('connection', (socket) => {
+    socket.on('user.login', (payload, acknowledge) => handleLogin(socket, { users }, payload, acknowledge))
+
     if (socket.recovered && socket.data.user) {
       const membership = memberships.get(socket.data.user.userId)
       if (membership && reattachMembership(membership, socket.id)) {
@@ -235,38 +236,6 @@ export function createGameSocketServer(
       io.to(publicRoom).emit('game.playerConnectionChanged', {
         gameId, playerId: membership.player.id, connected: false, paused: game.paused,
       })
-    })
-
-    socket.on('user.login', (payload, acknowledge) => {
-      if (typeof acknowledge !== 'function') return
-
-      let username: string
-      try {
-        username = parseLogin(payload).username
-      } catch (error) {
-        acknowledge({
-          outcome:
-            error instanceof LoginRequestError ? error.outcome : 'INTERNAL_ERROR',
-        })
-        return
-      }
-
-      if (socket.data.user) {
-        acknowledge(
-          socket.data.user.username === username
-            ? { outcome: 'LOGGED_IN', user: socket.data.user }
-            : { outcome: 'ALREADY_LOGGED_IN' },
-        )
-        return
-      }
-
-      try {
-        const user = users.findOrCreate(username)
-        socket.data.user = user
-        acknowledge({ outcome: 'LOGGED_IN', user })
-      } catch {
-        acknowledge({ outcome: 'INTERNAL_ERROR' })
-      }
     })
 
     socket.on('game.getPublicGameState', (payload, acknowledge) => {
