@@ -5,7 +5,10 @@ const baseURL = 'http://127.0.0.1:4175'
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: 'membership.e2e.ts',
+  testMatch: ['membership.e2e.ts', 'reconnection.e2e.ts'],
+  // One real game-service process backs a single shared game for the whole run;
+  // tests must not run concurrently or their players collide in the same roster.
+  workers: 1,
   use: { baseURL, screenshot: 'only-on-failure', trace: 'retain-on-failure' },
   webServer: [
     {

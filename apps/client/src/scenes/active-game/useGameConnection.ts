@@ -40,7 +40,7 @@ export default function useGameConnection(socket: GameSocket) {
     // Installed before joining. The acknowledgement initializes state synchronously
     // before Socket.IO delivers the subsequent gameplay events.
     const receive = (event: GameStateEvent) => {
-      if (current.current.connected && current.current.assignment !== null) dispatch(event)
+      if (socket.connected && current.current.assignment !== null) dispatch(event)
     }
     const handleDisconnect = () => {
       generation.current += 1
