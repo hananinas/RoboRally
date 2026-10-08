@@ -3,7 +3,13 @@ import BoardViewport from './components/BoardViewport.tsx'
 import PlayerPanel from './components/PlayerPanel.tsx'
 import ProgrammingHand from './components/ProgrammingHand.tsx'
 import RegisterPanel from './components/RegisterPanel.tsx'
-import { canProgram, type ClientGameState } from './gameState.ts'
+import useGameKeybinds from './components/useGameKeybinds.ts'
+import { 
+  canProgram, 
+  registersAreFilled, 
+  type ClientGameState , 
+  type ProgramCard 
+} from './gameState.ts'
 import type useGameConnection from './useGameConnection.ts'
 import useOverlayLayout from './useOverlayLayout.ts'
 
@@ -38,10 +44,20 @@ function ActiveGame({ game, username, leaving, onLeave }: {
     overlayRef,
   } = useOverlayLayout(state.handVersion)
   const disabled = leaving || !canProgram(state)
+  const handleRemove = (registerIndex: number) => dispatch({ type: 'remove', registerIndex })
+  const handlePlaceCard = (card: ProgramCard, registerIndex: number) =>
+    dispatch({ type: 'place', cardId: card.id, registerIndex })
+  const handleClearRegisters = () => dispatch({ type: 'clear' })
+  const handleUndo = () => dispatch({ type: 'undo' })
+  const handleRedo = () => dispatch({ type: 'redo' })
   const hasHand = state.handVersion > 0
   const status = getGameStatus(state)
   const registeredCardIds = new Set(
     state.registers.flatMap((card) => (card ? [card.id] : [])),
+  )
+  const [highlightedIndex, highlightCard, pendingDelete, awaitingSubmitConfirm] = useGameKeybinds(
+    state.hand, registeredCardIds, disabled, handlePlaceCard, handleRemove,
+    handleClearRegisters, handleUndo, handleRedo, submit, registersAreFilled(state.registers),
   )
   const overlayClassName = [
     'game-overlay',
@@ -62,7 +78,9 @@ function ActiveGame({ game, username, leaving, onLeave }: {
               submission={state.submission}
               status={status}
               error={state.error}
-              onRemove={(registerIndex) => dispatch({ type: 'remove', registerIndex })}
+              pendingDelete={pendingDelete}
+              awaitingSubmitConfirm={awaitingSubmitConfirm}
+              onRemove={handleRemove}
               onConfirm={submit}
             />
           </div>
@@ -74,10 +92,12 @@ function ActiveGame({ game, username, leaving, onLeave }: {
             cards={state.hand}
             registeredCardIds={registeredCardIds}
             disabled={disabled}
+            highlightedIndex={highlightedIndex}
+            onHighlightCard={highlightCard}
             onSelect={(card) => dispatch({
               type: 'place', cardId: card.id, registerIndex: state.registers.indexOf(null),
             })}
-            onDrop={(card, registerIndex) => dispatch({ type: 'place', cardId: card.id, registerIndex })}
+            onPlaceCard={handlePlaceCard}
           />
         )}
       </div>

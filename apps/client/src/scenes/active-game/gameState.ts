@@ -39,6 +39,8 @@ export type ClientGameState = {
   playback: RobotPlaybackState
   hand: readonly ProgramCard[]
   registers: Registers
+  registersPast: readonly Registers[]
+  registersFuture: readonly Registers[]
   handVersion: number
   handReady: boolean
   pendingHand: CardsDealt | null
@@ -61,6 +63,9 @@ export type GameStateEvent =
   | { type: 'complete' }
   | { type: 'place'; cardId: string; registerIndex: number }
   | { type: 'remove'; registerIndex: number }
+  | { type: 'clear' }
+  | { type: 'undo' }
+  | { type: 'redo' }
   | { type: 'submit' }
   | { type: 'result'; result: ProgramResult; handVersion: number }
   | { type: 'submission-unknown'; handVersion: number }
@@ -89,6 +94,8 @@ export function createClientGameState(): ClientGameState {
     playback: createRobotPlaybackState([]),
     hand: [],
     registers: emptyRegisters(),
+    registersPast: [],
+    registersFuture: [],
     handVersion: 0,
     handReady: false,
     pendingHand: null,
@@ -139,6 +146,8 @@ function activateHand(state: ClientGameState): ClientGameState {
     handVersion: state.handVersion + 1,
     pendingHand: null,
     registers: emptyRegisters(),
+    registersPast: [],
+    registersFuture: [],
     submission: 'idle',
     error: state.connected ? null : state.error,
   }
@@ -259,12 +268,52 @@ export function gameStateReducer(
       const card = state.hand.find((candidate) => candidate.id === event.cardId)
       if (!card) return state
       const registers = placeCard(state.registers, card, event.registerIndex)
-      return registers === state.registers ? state : { ...state, registers }
+      return registers === state.registers ? state : {
+        ...state,
+        registers,
+        registersPast: [...state.registersPast, state.registers],
+        registersFuture: [],
+      }
     }
-    case 'remove':
-      return canProgram(state)
-        ? { ...state, registers: removeCard(state.registers, event.registerIndex) }
-        : state
+    case 'remove': {
+      if (!canProgram(state)) return state
+      const registers = removeCard(state.registers, event.registerIndex)
+      return registers === state.registers ? state : {
+        ...state,
+        registers,
+        registersPast: [...state.registersPast, state.registers],
+        registersFuture: [],
+      }
+    }
+    case 'clear': {
+      if (!canProgram(state) || state.registers.every((card) => card === null)) return state
+      return {
+        ...state,
+        registers: emptyRegisters(),
+        registersPast: [...state.registersPast, state.registers],
+        registersFuture: [],
+      }
+    }
+    case 'undo': {
+      if (!canProgram(state) || state.registersPast.length === 0) return state
+      const previous = state.registersPast[state.registersPast.length - 1]
+      return {
+        ...state,
+        registers: previous,
+        registersPast: state.registersPast.slice(0, -1),
+        registersFuture: [...state.registersFuture, state.registers],
+      }
+    }
+    case 'redo': {
+      if (!canProgram(state) || state.registersFuture.length === 0) return state
+      const next = state.registersFuture[state.registersFuture.length - 1]
+      return {
+        ...state,
+        registers: next,
+        registersFuture: state.registersFuture.slice(0, -1),
+        registersPast: [...state.registersPast, state.registers],
+      }
+    }
     case 'submit':
       return createSubmission(state) ? { ...state, submission: 'pending', error: null } : state
     case 'result': {
@@ -297,7 +346,6 @@ export function placeCard(
     !Number.isInteger(registerIndex) ||
     registerIndex < 0 ||
     registerIndex >= registers.length ||
-    registers[registerIndex] !== null ||
     registers.some((registeredCard) => registeredCard?.id === card.id)
 
   if (cannotPlace) return registers

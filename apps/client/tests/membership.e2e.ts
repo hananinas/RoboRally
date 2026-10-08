@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
+import { expect, test } from './real-game-fixture.ts'
 import { login, robotIds } from './browserClient.ts'
 
 async function leave(page: Page) {

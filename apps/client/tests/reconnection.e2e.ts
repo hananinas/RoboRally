@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './real-game-fixture.ts'
 import { login, robotIds } from './browserClient.ts'
 
 test('replays a player-joined event missed during a recovered disconnect', async ({ browser, page, baseURL }) => {

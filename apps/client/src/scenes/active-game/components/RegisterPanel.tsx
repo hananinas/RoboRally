@@ -11,6 +11,8 @@ import ProgramCard from './ProgramCard.tsx'
 type RegisterPanelProps = {
   registers: Registers
   disabled: boolean
+  pendingDelete: boolean
+  awaitingSubmitConfirm: boolean
   submission: ClientGameState['submission']
   status: string
   error: string | null
@@ -22,6 +24,7 @@ type RegisterSlotProps = {
   card: Card | null
   index: number
   disabled: boolean
+  pendingDelete: boolean
   onRemove: (registerIndex: number) => void
 }
 
@@ -30,16 +33,24 @@ function RegisterSlot({
   card,
   index,
   disabled,
+  pendingDelete,
   onRemove,
 }: RegisterSlotProps) {
   const cardClassName = card
     ? 'register__card register__card--filled'
     : 'register__card'
-  const registerIndex = card || disabled ? undefined : index
+  const registerIndex = disabled ? undefined : index
 
   return (
     <li className="register">
-      <div className={cardClassName} data-register-index={registerIndex}>
+      <div
+        className={cardClassName}
+        data-register-index={registerIndex}
+        style={{
+          outline: pendingDelete ? '3px solid crimson' : undefined,
+          outlineOffset: '3px',
+        }}
+      >
         {card && (
           <ProgramCard
                   card={card}
@@ -59,6 +70,8 @@ function RegisterSlot({
 function RegisterPanel({
   registers,
   disabled,
+  pendingDelete,
+  awaitingSubmitConfirm,
   submission,
   status,
   error,
@@ -79,12 +92,16 @@ function RegisterPanel({
             card={card}
             index={index}
             disabled={disabled}
+            pendingDelete={pendingDelete}
             onRemove={onRemove}
           />
         ))}
       </ol>
       <button
-        className="register-panel__done"
+        className={
+          'register-panel__done' +
+          (awaitingSubmitConfirm ? ' register-panel__done--awaiting-confirm' : '')
+        }
         type="button"
         disabled={!registersAreFilled(registers) || disabled}
         onClick={onConfirm}

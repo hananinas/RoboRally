@@ -1,10 +1,11 @@
-import type { ButtonHTMLAttributes } from 'react'
-import type { Card } from '@robo-rally/game-events'
-
+import type { ComponentProps } from 'react'
+import type {
+  Card
+} from '@robo-rally/game-events'
 import { cardPresentation } from './cardInstructions.ts'
 
 type ProgramCardProps =
-  ButtonHTMLAttributes<HTMLButtonElement> & {
+  ComponentProps<'button'> & {
     card: Card
     size: 'hand' | 'register'
     selected?: boolean
