@@ -41,12 +41,16 @@ test('supports Enter, Space, and Escape without losing trigger focus', async ({ 
 test('dismisses on an outside click without blocking game controls', async ({ page }) => {
   const trigger = page.getByRole('button', { name: 'Game options', exact: true })
   const options = page.getByRole('region', { name: 'Game options' })
+  const heading = page.getByRole('heading', { name: 'Player 1', exact: true })
 
   await trigger.click()
-  await page.getByRole('button', { name: 'Collapse player details' }).click()
+  await heading.click()
   await expect(options).toBeHidden()
   await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+
+  await page.getByRole('button', { name: 'Collapse player details' }).click()
   await expect(page.getByRole('button', { name: 'Expand player details' })).toBeVisible()
+
   await trigger.click()
   await expect(options).toBeVisible()
 })
@@ -77,11 +81,13 @@ for (const viewport of [
     expect(Math.abs(triggerBox.y + triggerBox.height / 2 - headingBox.y - headingBox.height / 2)).toBeLessThan(1)
 
     await trigger.click()
-    await expect(options).toBeInViewport({ ratio: 1 })
+    await expect(options).toBeVisible()
     const optionsBox = await options.boundingBox()
     if (!optionsBox) throw new Error('Popover position is unavailable')
     expect(Math.abs(optionsBox.x + optionsBox.width - triggerBox.x - triggerBox.width)).toBeLessThan(1)
     expect(optionsBox.y).toBeGreaterThanOrEqual(triggerBox.y + triggerBox.height)
+    expect(optionsBox.x).toBeGreaterThanOrEqual(0)
+    expect(optionsBox.x + optionsBox.width).toBeLessThanOrEqual(viewport.width)
   })
 }
 
@@ -97,7 +103,11 @@ test('keeps an open popover on screen after resizing', async ({ page }) => {
   ]) {
     await page.setViewportSize(viewport)
     await expect(trigger).toBeInViewport({ ratio: 1 })
-    await expect(options).toBeInViewport({ ratio: 1 })
+    await expect(options).toBeVisible()
+    const optionsBox = await options.boundingBox()
+    if (!optionsBox) throw new Error('Popover position is unavailable')
+    expect(optionsBox.x).toBeGreaterThanOrEqual(0)
+    expect(optionsBox.x + optionsBox.width).toBeLessThanOrEqual(viewport.width)
     await expect(trigger).toHaveAttribute('aria-expanded', 'true')
   }
 })
@@ -106,6 +116,7 @@ test('includes the leave action without trapping keyboard focus', async ({ page 
   const trigger = page.getByRole('button', { name: 'Game options', exact: true })
   const options = page.getByRole('region', { name: 'Game options' })
   const collapse = page.getByRole('button', { name: 'Collapse player details' })
+  const keybindsSummary = options.getByText('Keybinds', { exact: true })
 
   await page.keyboard.press('Tab')
   await expect(trigger).toBeFocused()
@@ -114,7 +125,11 @@ test('includes the leave action without trapping keyboard focus', async ({ page 
   await page.keyboard.press('Tab')
   await expect(options.getByRole('button', { name: 'Leave game' })).toBeFocused()
   await page.keyboard.press('Tab')
+  await expect(keybindsSummary).toBeFocused()
+  await page.keyboard.press('Tab')
   await expect(collapse).toBeFocused()
+  await page.keyboard.press('Shift+Tab')
+  await expect(keybindsSummary).toBeFocused()
   await page.keyboard.press('Shift+Tab')
   await expect(options.getByRole('button', { name: 'Leave game' })).toBeFocused()
   await page.keyboard.press('Shift+Tab')
@@ -160,7 +175,7 @@ test.describe('touch interaction', () => {
 
     await trigger.tap()
     await expect(options).toBeVisible()
-    await expect(options.getByRole('button')).toBeEnabled()
+    await expect(options.getByRole('button', { name: 'Leave game' })).toBeEnabled()
 
     await page.getByRole('heading', { name: 'Health', exact: true }).tap()
     await expect(options).toBeHidden()

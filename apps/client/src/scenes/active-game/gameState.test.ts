@@ -139,11 +139,11 @@ describe('placeCard', () => {
     expect(emptyRegisters).toEqual([null, null, null, null, null])
   })
 
-  it('rejects occupied, duplicate, and invalid placements', () => {
+  it('overwrites an occupied register, and rejects duplicate and invalid placements', () => {
     const occupiedRegisters = placeCard(emptyRegisters, firstCard, 0)
 
-    expect(placeCard(occupiedRegisters, secondCard, 0)).toBe(
-      occupiedRegisters,
+    expect(placeCard(occupiedRegisters, secondCard, 0)).toEqual(
+      [secondCard, null, null, null, null],
     )
     expect(placeCard(occupiedRegisters, firstCard, 1)).toBe(
       occupiedRegisters,
@@ -171,6 +171,49 @@ describe('removeCard', () => {
     expect(removeCard(emptyRegisters, -1)).toBe(emptyRegisters)
     expect(removeCard(emptyRegisters, REGISTER_COUNT)).toBe(emptyRegisters)
     expect(removeCard(emptyRegisters, 1.5)).toBe(emptyRegisters)
+  })
+})
+
+describe('undo, redo, and clear', () => {
+  it('undoes and redoes a placement', () => {
+    const empty = programmingState()
+    const placed = gameStateReducer(empty, { type: 'place', cardId: firstCard.id, registerIndex: 0 })
+
+    expect(placed.registers[0]).toBe(firstCard)
+
+    const undone = gameStateReducer(placed, { type: 'undo' })
+    expect(undone.registers).toEqual(empty.registers)
+
+    const redone = gameStateReducer(undone, { type: 'redo' })
+    expect(redone.registers).toEqual(placed.registers)
+  })
+
+  it('does nothing when there is no history to undo or redo', () => {
+    const state = programmingState()
+
+    expect(gameStateReducer(state, { type: 'undo' })).toBe(state)
+    expect(gameStateReducer(state, { type: 'redo' })).toBe(state)
+  })
+
+  it('clears the redo history once a new action follows an undo', () => {
+    let state = programmingState()
+    state = gameStateReducer(state, { type: 'place', cardId: firstCard.id, registerIndex: 0 })
+    state = gameStateReducer(state, { type: 'undo' })
+    state = gameStateReducer(state, { type: 'place', cardId: secondCard.id, registerIndex: 1 })
+
+    expect(gameStateReducer(state, { type: 'redo' })).toBe(state)
+  })
+
+  it('clears every register at once, and the clear can be undone', () => {
+    let state = programmingState()
+    state = gameStateReducer(state, { type: 'place', cardId: firstCard.id, registerIndex: 0 })
+    state = gameStateReducer(state, { type: 'place', cardId: secondCard.id, registerIndex: 1 })
+    const filled = state
+
+    const cleared = gameStateReducer(state, { type: 'clear' })
+    expect(cleared.registers).toEqual(emptyRegisters)
+    expect(gameStateReducer(cleared, { type: 'undo' }).registers).toEqual(filled.registers)
+    expect(gameStateReducer(cleared, { type: 'clear' })).toBe(cleared)
   })
 })
 
