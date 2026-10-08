@@ -14,6 +14,7 @@ import {
   placeCard,
   REGISTER_COUNT,
   removeCard,
+  USER_ALREADY_IN_GAME_MESSAGE,
   type ClientGameState,
   type ProgramCard,
   type Registers,
@@ -556,6 +557,24 @@ describe('client game state', () => {
 
     expect(state).toEqual({ ...before, connected: true, error: null })
     expect(canProgram(state)).toBe(false)
+  })
+
+  it('reports a recognized connect error in place of the generic disconnect message', () => {
+    const disconnected = gameStateReducer(selectProgram(), { type: 'disconnected' })
+    const state = gameStateReducer(disconnected, {
+      type: 'connect-error', message: 'USER_ALREADY_IN_GAME',
+    })
+
+    expect(state).toEqual({ ...disconnected, error: USER_ALREADY_IN_GAME_MESSAGE })
+  })
+
+  it('ignores an unrecognized connect error and reports generic disconnect message', () => {
+    const disconnected = gameStateReducer(selectProgram(), { type: 'disconnected' })
+    const state = gameStateReducer(disconnected, {
+      type: 'connect-error', message: 'transport error',
+    })
+
+    expect(state).toEqual(disconnected)
   })
 
   it('locks programming while paused and unlocks once every player reconnects', () => {

@@ -49,6 +49,11 @@ export default function useGameConnection(socket: GameSocket) {
     const handleConnect = () => {
       if (socket.recovered) dispatch({ type: 'reconnected' })
     }
+    const handleConnectError = (error: Error) => {
+      if (current.current.assignment === null) return
+      dispatch({ type: 'connect-error', message: error.message })
+      if (error.message === 'USER_ALREADY_IN_GAME') socket.disconnect()
+    }
     const handleCardsDealt = (hand: CardsDealt) => receive({ type: 'dealt', hand })
     const handleActionResolved = (action: RobotActionResolved) => receive({ type: 'action', action })
     const handlePlayerJoined = (payload: PlayerJoined) => receive({ type: 'player-joined', payload })
@@ -58,6 +63,7 @@ export default function useGameConnection(socket: GameSocket) {
 
     socket.on('disconnect', handleDisconnect)
     socket.on('connect', handleConnect)
+    socket.on('connect_error', handleConnectError)
     socket.on('cards.dealt', handleCardsDealt)
     socket.on('robot.actionResolved', handleActionResolved)
     socket.on('game.playerJoined', handlePlayerJoined)
@@ -67,6 +73,7 @@ export default function useGameConnection(socket: GameSocket) {
       generation.current += 1
       socket.off('disconnect', handleDisconnect)
       socket.off('connect', handleConnect)
+      socket.off('connect_error', handleConnectError)
       socket.off('cards.dealt', handleCardsDealt)
       socket.off('robot.actionResolved', handleActionResolved)
       socket.off('game.playerJoined', handlePlayerJoined)

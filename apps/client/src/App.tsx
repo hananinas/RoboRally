@@ -2,6 +2,7 @@ import ActiveGame from './scenes/active-game/ActiveGame.tsx'
 import useGameConnection from './scenes/active-game/useGameConnection.ts'
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import Login from './scenes/login/Login.tsx'
+import { USER_ALREADY_IN_GAME_MESSAGE } from './scenes/active-game/gameState.ts'
 import {
   createSessionState,
   sessionReducer,
@@ -23,7 +24,7 @@ const joinErrors: Record<JoinError, string> = {
   INVALID_REQUEST: 'The configured game ID is invalid.',
   GAME_NOT_FOUND: 'The configured game could not be found.',
   NO_SPAWN_AVAILABLE: 'The game has no available spawn position.',
-  USER_ALREADY_IN_GAME: 'This username is already participating from another connection.',
+  USER_ALREADY_IN_GAME: USER_ALREADY_IN_GAME_MESSAGE,
   GAME_ALREADY_STARTED: 'The game has already started and is no longer accepting new players.',
   INTERNAL_ERROR: 'The Game Service could not join the game. Please try again.',
   CONNECTION_ERROR: 'Connection lost before the game could be joined.',

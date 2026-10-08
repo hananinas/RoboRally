@@ -65,7 +65,11 @@ export function createGameSocketServer(
     ServerToClientEvents,
     {},
     GameSocketData
-  >(httpServer, { connectionStateRecovery: {}, pingInterval: 1000, pingTimeout: 1000 })
+  >(httpServer, {
+    connectionStateRecovery: { skipMiddlewares: false },
+    pingInterval: 1000,
+    pingTimeout: 1000,
+  })
   const users = createUserRegistry()
   const { gameId, game } = sharedGame
   const publicRoom = `game:${gameId}:public`
@@ -136,6 +140,17 @@ export function createGameSocketServer(
   httpServer.once('close', () => {
     closed = true
     clearImmediate(scheduledAction)
+  })
+
+  io.use((socket, next) => {
+    if (socket.recovered && socket.data.user) {
+      const membership = memberships.get(socket.data.user.userId)
+      if (membership?.connectionId && membership.connectionId !== socket.id) {
+        next(new Error('USER_ALREADY_IN_GAME'))
+        return
+      }
+    }
+    next()
   })
 
   io.on('connection', (socket) => {

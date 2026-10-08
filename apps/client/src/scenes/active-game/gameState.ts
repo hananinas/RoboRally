@@ -53,6 +53,7 @@ export type GameStateEvent =
   | { type: 'player-connection-changed'; payload: PlayerConnectionChanged }
   | { type: 'disconnected' }
   | { type: 'reconnected' }
+  | { type: 'connect-error'; message: string }
   | { type: 'dealt'; hand: CardsDealt }
   | { type: 'reset' }
   | { type: 'error'; message: string }
@@ -63,6 +64,13 @@ export type GameStateEvent =
   | { type: 'submit' }
   | { type: 'result'; result: ProgramResult; handVersion: number }
   | { type: 'submission-unknown'; handVersion: number }
+
+export const USER_ALREADY_IN_GAME_MESSAGE =
+  'This username is already participating from another connection.'
+
+const connectErrors: Record<string, string> = {
+  USER_ALREADY_IN_GAME: USER_ALREADY_IN_GAME_MESSAGE,
+}
 
 export const REGISTER_COUNT = 5
 
@@ -183,6 +191,10 @@ export function gameStateReducer(
       }
     case 'reconnected':
       return { ...state, connected: true, error: null }
+    case 'connect-error': {
+      const message = connectErrors[event.message]
+      return message ? { ...state, error: message } : state
+    }
     case 'reset':
       return createClientGameState()
     case 'joined': {

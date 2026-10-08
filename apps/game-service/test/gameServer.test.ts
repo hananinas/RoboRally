@@ -420,6 +420,28 @@ describe('game membership over Socket.IO', () => {
     expect(shared.game.paused).toBe(false)
   })
 
+  it('rejects a stale recovered connection when another connection already owns the membership', async () => {
+    const staleSocket = await connect('A', { reconnection: true })
+    const stalePlayer = await join(staleSocket)
+    const bystander = await connect('Bystander')
+    const bystanderJoined = new Promise((resolve) => staleSocket.once('game.playerJoined', resolve))
+    await join(bystander)
+    await bystanderJoined
+
+    await disconnectClientRecoverably(staleSocket)
+    expect(shared.game.paused).toBe(true)
+
+    const newSocket = await connect('A')
+    const restored = await join(newSocket)
+    expect(restored.assignment).toEqual(stalePlayer.assignment)
+
+    const staleRejected = new Promise<Error>((resolve) => staleSocket.once('connect_error', resolve))
+    expect((await staleRejected).message).toBe('USER_ALREADY_IN_GAME')
+
+    expect(await newSocket.timeout(1000).emitWithAck('game.getPublicGameState', { gameId: shared.gameId }))
+      .toMatchObject({ outcome: 'GAME_FOUND' })
+  })
+
   it('deals the remaining player a hand when leaving completes the final register', async () => {
     const first = await connect('First')
     const initial = await join(first)
