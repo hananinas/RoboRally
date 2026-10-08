@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react'
-import './Login.css'
+import EntryScreen from './EntryScreen.tsx'
 import { isValidUsername } from './username.ts'
 import type { SocketStatus } from '../../useGameSocket.ts'
 
@@ -39,13 +39,7 @@ export default function Login({
   }
 
   return (
-    <main className="login">
-      <div className="login-board-background" aria-hidden="true">
-        {Array.from({ length: 63 }, (_, index) => <div key={index} />)}
-      </div>
-      <section className="login-panel" aria-labelledby="login-heading">
-        <h1 id="login-heading">RoboRally</h1>
-
+    <EntryScreen>
         <form onSubmit={handleSubmit}>
           <label className="login-field">
             <span>Username</span>
@@ -91,7 +85,6 @@ export default function Login({
                 : connectionStatus === 'connected' ? 'Log in' : 'Retry connection'}
           </button>
         </form>
-      </section>
-    </main>
+    </EntryScreen>
   )
 }
