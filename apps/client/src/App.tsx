@@ -2,6 +2,8 @@ import ActiveGame from './scenes/active-game/ActiveGame.tsx'
 import useGameConnection from './scenes/active-game/useGameConnection.ts'
 import { useEffect, useReducer, useRef, useState } from 'react'
 import Login from './scenes/login/Login.tsx'
+import EntryScreen from './scenes/login/EntryScreen.tsx'
+import JoinGame from './scenes/login/JoinGame.tsx'
 import {
   createSessionState,
   sessionReducer,
@@ -91,23 +93,12 @@ function App() {
   const username = session.status === 'editing' || session.status === 'logging-in'
     ? session.username
     : session.user.username
-  const pending = session.status === 'logging-in'
-    || session.status === 'joining'
-    || session.status === 'joined'
   const sessionError = session.status === 'editing' && session.error
     ? loginErrors[session.error]
     : session.status === 'join-failed' && session.error ? joinErrors[session.error] : null
   const requiresReconnect = session.status === 'editing' && session.error === 'ALREADY_LOGGED_IN'
 
   function submitUsername(submittedUsername: string) {
-    if (session.status === 'join-failed') {
-      if (!connection.socket.connected) {
-        connection.connect()
-        return
-      }
-      dispatch({ type: 'join-retried' })
-      return
-    }
     if (session.status !== 'editing' || loginPending.current) return
     if (requiresReconnect) {
       connection.socket.disconnect()
@@ -136,6 +127,12 @@ function App() {
     )
   }
 
+  function joinGame() {
+    if (session.status !== 'ready-to-join' && session.status !== 'join-failed') return
+    if (!connection.socket.connected) return
+    dispatch({ type: 'join-requested' })
+  }
+
   function leaveGame() {
     if (leaving || !connection.socket.connected || !game.state.assignment) return
     setLeaving(true)
@@ -157,21 +154,29 @@ function App() {
   }
 
   return (
-    <Login
-      connectionStatus={connection.status}
-      error={sessionError ?? connection.error}
-      onSubmitUsername={submitUsername}
-      onUsernameChange={(nextUsername) => dispatch({
-        type: 'username-changed', username: nextUsername,
-      })}
-      pending={pending}
-      pendingLabel={session.status === 'logging-in' ? 'Logging in…'
-        : 'Joining game…'}
-      retryingJoin={session.status === 'join-failed'}
-      requiresReconnect={requiresReconnect}
-      usernameLocked={session.status !== 'editing'}
-      username={username}
-    />
+    <EntryScreen>
+      {session.status === 'editing' || session.status === 'logging-in' ? (
+        <Login
+          connectionStatus={connection.status}
+          error={sessionError ?? connection.error}
+          onSubmitUsername={submitUsername}
+          onUsernameChange={(nextUsername) => dispatch({
+            type: 'username-changed', username: nextUsername,
+          })}
+          pending={session.status === 'logging-in'}
+          requiresReconnect={requiresReconnect}
+          username={username}
+        />
+      ) : (
+        <JoinGame
+          username={username}
+          pending={session.status === 'joining'}
+          connected={connection.status === 'connected'}
+          error={sessionError ?? connection.error}
+          onJoin={joinGame}
+        />
+      )}
+    </EntryScreen>
   )
 }
 

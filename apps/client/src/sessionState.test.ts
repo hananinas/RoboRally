@@ -26,7 +26,7 @@ const joined: Extract<JoinResult, { outcome: 'JOINED' }> = {
   programSubmitted: false,
 }
 
-function joiningState(): SessionState {
+function readyState(): SessionState {
   let state = sessionReducer(createSessionState(), {
     type: 'username-changed',
     username: user.username,
@@ -35,17 +35,22 @@ function joiningState(): SessionState {
   return sessionReducer(state, { type: 'login-result', result: { outcome: 'LOGGED_IN', user } })
 }
 
+function joiningState(): SessionState {
+  return sessionReducer(readyState(), { type: 'join-requested' })
+}
+
 describe('sessionReducer', () => {
   const editing: SessionState = { status: 'editing', username: user.username, error: null }
   it.each([
     editing,
     sessionReducer(editing, { type: 'login-submitted' }),
+    readyState(),
     joiningState(),
     sessionReducer(joiningState(), { type: 'join-error', error: 'TIMEOUT' }),
   ])('requires fresh login after disconnect from $status', (previous) => {
     const reset = sessionReducer(previous, { type: 'disconnected' })
     expect(reset).toEqual(editing)
-    expect(sessionReducer(reset, { type: 'join-retried' })).toBe(reset)
+    expect(sessionReducer(reset, { type: 'join-requested' })).toBe(reset)
     expect(sessionReducer(reset, { type: 'join-result', result: joined })).toBe(reset)
     expect(sessionReducer(reset, {
       type: 'login-result', result: { outcome: 'LOGGED_IN', user },
@@ -60,7 +65,7 @@ describe('sessionReducer', () => {
     const disconnected = sessionReducer(entered, { type: 'disconnected' })
     expect(disconnected).toBe(entered)
     expect(sessionReducer(disconnected, { type: 'login-submitted' })).toBe(disconnected)
-    expect(sessionReducer(disconnected, { type: 'join-retried' })).toBe(disconnected)
+    expect(sessionReducer(disconnected, { type: 'join-requested' })).toBe(disconnected)
   })
 
   it('moves from editing through login and join while retaining the approved user', () => {
@@ -71,6 +76,18 @@ describe('sessionReducer', () => {
       status: 'joined',
       user,
     })
+  })
+
+  it('waits for an explicit join after login and ignores unsolicited join results', () => {
+    const ready = readyState()
+    expect(ready).toEqual({ status: 'ready-to-join', user })
+    expect(sessionReducer(ready, { type: 'join-result', result: joined })).toBe(ready)
+    expect(sessionReducer(ready, { type: 'join-requested' })).toEqual({ status: 'joining', user })
+  })
+
+  it('returns to the join step after leaving without logging out or rejoining', () => {
+    const entered = sessionReducer(joiningState(), { type: 'join-result', result: joined })
+    expect(sessionReducer(entered, { type: 'left' })).toEqual({ status: 'ready-to-join', user })
   })
 
   it('returns a rejected login to editing with the exact username', () => {
@@ -108,7 +125,7 @@ describe('sessionReducer', () => {
       result: { outcome },
     })
     expect(state).toEqual({ status: 'join-failed', user, error: outcome })
-    state = sessionReducer(state, { type: 'join-retried' })
+    state = sessionReducer(state, { type: 'join-requested' })
 
     expect(state).toEqual({ status: 'joining', user })
   })
@@ -141,6 +158,6 @@ describe('sessionReducer', () => {
       type: 'login-result',
       result: { outcome: 'LOGGED_IN', user },
     })).toBe(joining)
-    expect(sessionReducer(joining, { type: 'join-retried' })).toBe(joining)
+    expect(sessionReducer(joining, { type: 'join-requested' })).toBe(joining)
   })
 })

@@ -10,6 +10,27 @@ async function submitUsername(page: Page, value = username) {
   await page.getByRole('button', { name: 'Log in', exact: true }).click()
 }
 
+async function joinGame(page: Page) {
+  await page.getByRole('button', { name: 'Join game', exact: true }).click()
+}
+
+test('login keeps the entry shell and waits for an explicit join', async ({ page, game }) => {
+  await page.goto('/')
+  const shell = await page.locator('.login-panel').elementHandle()
+  await page.getByRole('textbox', { name: 'Username' }).fill(username)
+  await page.getByRole('button', { name: 'Log in', exact: true }).click()
+  const join = page.getByRole('button', { name: 'Join game', exact: true })
+  await expect(join).toBeFocused()
+  await expect(page.locator('input')).toHaveCount(0)
+  await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
+  expect(await shell!.evaluate((element) => element.isConnected)).toBe(true)
+  expect((await game.snapshot()).entryRequests.map((request) => request.event)).toEqual(['user.login'])
+  expect((await game.snapshot()).stateRequests).toBe(0)
+  await join.press('Enter')
+  await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
+  expect((await game.snapshot()).entryRequests.map((request) => request.event)).toEqual(['user.login', 'game.join'])
+})
+
 test('shows an initial connection error and recovers without losing the username or queuing login', async ({ page, game }) => {
   await page.route('**/socket.io/**', (route) => route.abort())
   await page.goto('/')
@@ -28,6 +49,7 @@ test('shows an initial connection error and recovers without losing the username
   expect((await game.snapshot()).entryRequests).toEqual([])
 
   await input.press('Enter')
+  await joinGame(page)
   await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
   const { entryRequests } = await game.snapshot()
   expect(entryRequests).toEqual([
@@ -58,6 +80,7 @@ test('starts with username, a UI-only password and login, validating Unicode cod
   await input.fill(exactUsername)
   await expect(submit).toBeEnabled()
   await input.press('Enter')
+  await joinGame(page)
   const heading = page.getByRole('complementary', { name: 'Game controls' }).getByRole('heading', { level: 1 })
   await expect(heading).toBeVisible()
   expect(await heading.textContent()).toBe(exactUsername)
@@ -81,9 +104,11 @@ test('waits for login then JOINED on the same socket, blocking duplicate request
   expect((await game.snapshot()).entryRequests.map((request) => request.event)).toEqual(['user.login'])
 
   await game.control({ type: 'respond-login' })
+  expect((await game.snapshot()).pendingJoins).toBe(0)
+  await joinGame(page)
   await expect.poll(async () => (await game.snapshot()).pendingJoins).toBe(1)
   await expect(page.getByRole('button', { name: 'Joining game…' })).toBeDisabled()
-  await page.locator('form').evaluate((form: HTMLFormElement) => { form.requestSubmit(); form.requestSubmit() })
+  await page.getByRole('button', { name: 'Joining game…' }).evaluate((button: HTMLButtonElement) => { button.click(); button.click() })
   await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
   await expect(page.getByRole('region', { name: 'Programming hand' })).toHaveCount(0)
 
@@ -102,6 +127,7 @@ test('waits for login then JOINED on the same socket, blocking duplicate request
 test('ignores an early hand until JOINED supplies the authoritative board and hand', async ({ page, game }) => {
   await game.control({ type: 'join', outcome: 'JOINED', deferred: true })
   await submitUsername(page)
+  await joinGame(page)
   await expect.poll(async () => (await game.snapshot()).pendingJoins).toBe(1)
   await game.control({
     type: 'early-hand',
@@ -135,6 +161,7 @@ for (const outcome of ['INVALID_USERNAME', 'INVALID_REQUEST', 'INTERNAL_ERROR'] 
     await game.control({ type: 'login', outcome: 'LOGGED_IN', deferred: false })
     await page.getByRole('textbox', { name: 'Username' }).fill('Corrected')
     await page.getByRole('button', { name: 'Log in', exact: true }).click()
+    await joinGame(page)
     await expect(page.getByRole('heading', { name: 'Corrected', exact: true })).toBeVisible()
   })
 }
@@ -171,6 +198,7 @@ test('recovers from changing the username after an accepted login times out', as
   await expect(page.getByRole('alert')).toHaveCount(0)
   expect((await game.snapshot()).entryRequests).toEqual(before)
   await input.press('Enter')
+  await joinGame(page)
   await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
   const after = (await game.snapshot()).entryRequests.slice(before.length)
   expect(after).toEqual([
@@ -182,12 +210,13 @@ test('recovers from changing the username after an accepted login times out', as
     .getByRole('heading', { level: 1 }).textContent()).toBe(username)
 })
 
-test('keeps the login form and error recovery reachable on short screens', async ({ page, game }) => {
+test('keeps the join step and error recovery reachable on short screens', async ({ page, game }) => {
   await game.control({ type: 'join', outcome: 'GAME_NOT_FOUND', deferred: false })
   await submitUsername(page)
+  await joinGame(page)
   await expect(page.getByRole('alert')).toBeVisible()
   const login = page.locator('.login')
-  const retry = page.getByRole('button', { name: 'Retry joining' })
+  const retry = page.getByRole('button', { name: 'Join game' })
   for (const viewport of [
     { width: 320, height: 568 },
     { width: 568, height: 220 },
@@ -214,6 +243,7 @@ for (const outcome of ['INVALID_REQUEST', 'GAME_NOT_FOUND', 'NO_SPAWN_AVAILABLE'
   test(`retries join rejection ${outcome} without logging in again`, async ({ page, game }) => {
     await game.control({ type: 'join', outcome, deferred: false })
     await submitUsername(page)
+    await joinGame(page)
     await expect(page.getByRole('alert')).toBeVisible()
     if (outcome === 'GAME_ALREADY_STARTED') {
       await expect(page.getByRole('alert')).toHaveText(
@@ -222,14 +252,14 @@ for (const outcome of ['INVALID_REQUEST', 'GAME_NOT_FOUND', 'NO_SPAWN_AVAILABLE'
     }
     await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
     await expect(page.getByRole('region', { name: 'Programming hand' })).toHaveCount(0)
-    await expect(page.getByRole('textbox', { name: 'Username' })).toHaveValue(username)
-    await expect(page.getByRole('textbox', { name: 'Username' })).toBeDisabled()
-    await expect(page.getByRole('button', { name: 'Retry joining' })).toBeEnabled()
+    await expect(page.getByText(username, { exact: true })).toBeVisible()
+    await expect(page.getByRole('textbox', { name: 'Username' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Join game' })).toBeEnabled()
     expect((await game.snapshot()).entryRequests.map((request) => request.event))
       .toEqual(['user.login', 'game.join'])
     expect((await game.snapshot()).submissions).toEqual([])
     await game.control({ type: 'join', outcome: 'JOINED', deferred: false })
-    await page.getByRole('button', { name: 'Retry joining' }).click()
+    await page.getByRole('button', { name: 'Join game' }).click()
     await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
     const { entryRequests } = await game.snapshot()
     expect(entryRequests.map((request) => request.event)).toEqual(['user.login', 'game.join', 'game.join'])
@@ -240,11 +270,13 @@ for (const outcome of ['INVALID_REQUEST', 'GAME_NOT_FOUND', 'NO_SPAWN_AVAILABLE'
 test('LOGIN_REQUIRED returns to editable login instead of retrying join', async ({ page, game }) => {
   await game.control({ type: 'join', outcome: 'LOGIN_REQUIRED', deferred: false })
   await submitUsername(page)
+  await joinGame(page)
   await expect(page.getByRole('alert')).toContainText('Please log in again')
   await expect(page.getByRole('textbox', { name: 'Username' })).toHaveValue(username)
   await expect(page.getByRole('textbox', { name: 'Username' })).toBeEnabled()
   await game.control({ type: 'join', outcome: 'JOINED', deferred: false })
   await page.getByRole('button', { name: 'Log in', exact: true }).click()
+  await joinGame(page)
   await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
   expect((await game.snapshot()).entryRequests.map((request) => request.event))
     .toEqual(['user.login', 'game.join', 'user.login', 'game.join'])
@@ -256,6 +288,7 @@ for (const stage of ['login', 'join'] as const) {
     else await game.control({ type: 'join', outcome: 'JOINED', deferred: true })
     await page.clock.install()
     await submitUsername(page)
+    if (stage === 'join') await joinGame(page)
     await expect.poll(async () => (await game.snapshot())[stage === 'login' ? 'pendingLogins' : 'pendingJoins']).toBe(1)
     await game.control({ type: 'early-hand', cards: game.initial.cards })
     await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100))
@@ -271,7 +304,8 @@ for (const stage of ['login', 'join'] as const) {
 
     if (stage === 'login') await game.control({ type: 'login', outcome: 'LOGGED_IN', deferred: false })
     else await game.control({ type: 'join', outcome: 'JOINED', deferred: false })
-    await page.getByRole('button', { name: stage === 'login' ? 'Log in' : 'Retry joining', exact: true }).click()
+    await page.getByRole('button', { name: stage === 'login' ? 'Log in' : 'Join game', exact: true }).click()
+    if (stage === 'login') await joinGame(page)
     await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
     expect((await game.snapshot()).entryRequests.map((request) => request.event)).toEqual(stage === 'login'
       ? ['user.login', 'user.login', 'game.join'] : ['user.login', 'game.join', 'game.join'])
@@ -285,6 +319,7 @@ for (const stage of ['login', 'join'] as const) {
     if (stage === 'login') await game.control({ type: 'login', outcome: 'LOGGED_IN', deferred: true })
     if (stage === 'join') await game.control({ type: 'join', outcome: 'JOINED', deferred: true })
     await submitUsername(page)
+    if (stage === 'join') await joinGame(page)
     await expect.poll(async () => (await game.snapshot())[stage === 'login' ? 'pendingLogins' : 'pendingJoins']).toBe(1)
     const before = (await game.snapshot()).entryRequests
     await game.control({ type: 'early-hand', cards: game.initial.cards })
@@ -306,6 +341,7 @@ for (const stage of ['login', 'join'] as const) {
     await expect(page.getByRole('button', { name: 'Log in', exact: true })).toBeEnabled()
     expect((await game.snapshot()).entryRequests).toEqual(before)
     await page.getByRole('button', { name: 'Log in', exact: true }).click()
+    await joinGame(page)
     await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
     const after = (await game.snapshot()).entryRequests.slice(before.length)
     expect(after).toEqual([
@@ -322,6 +358,7 @@ test('uses JOINED phase and submitted status even with no hand', async ({ page, 
     hand: [], programSubmitted: true,
   })
   await submitUsername(page)
+  await joinGame(page)
   await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
   await expect(page.getByRole('status')).toHaveText('Executing')
   await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()
