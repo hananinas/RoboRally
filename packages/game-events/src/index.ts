@@ -1,5 +1,6 @@
 export type {
   ClientToServerEvents,
+  GameDetailsAcknowledgement,
   JoinResultAcknowledgement,
   LoginAcknowledgement,
   ProgramResultAcknowledgement,
@@ -15,6 +16,9 @@ export type {
   Coordinate,
   GameId,
   GamePhase,
+  GameDetails,
+  GameDetailsResult,
+  GetGameDetails,
   GetPublicGameState,
   JoinGame,
   JoinResult,

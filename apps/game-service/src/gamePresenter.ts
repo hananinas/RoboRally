@@ -1,6 +1,7 @@
 import type {
   Card as CardPayload,
   CardsDealt,
+  GameDetails,
   GamePhase as GamePhasePayload,
   Orientation,
   PublicGameState,
@@ -79,6 +80,18 @@ export function presentPublicGameState(
   }
 }
 
+export function presentGameDetails(
+  gameId: GameId,
+  game: Game,
+  playerNames: readonly string[],
+): GameDetails {
+  return {
+    gameId,
+    playerNames: [...playerNames],
+    playerCount: playerNames.length,
+    phase: phases[game.phase],
+  }
+}
 export function presentCardsDealt(
   gameId: GameId,
   player: Player,

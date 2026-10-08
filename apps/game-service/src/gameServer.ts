@@ -22,6 +22,7 @@ import {
 } from '@/game/index'
 import {
   presentCardsDealt,
+  presentGameDetails,
   presentPublicGameState,
   presentRobotActionResolved,
 } from '@/gamePresenter'
@@ -243,6 +244,23 @@ export function createGameSocketServer(
         const user = users.findOrCreate(username)
         socket.data.user = user
         acknowledge({ outcome: 'LOGGED_IN', user })
+      } catch {
+        acknowledge({ outcome: 'INTERNAL_ERROR' })
+      }
+    })
+
+    // Read-only lobby summary: no membership, robot, room subscription, or private hand.
+    socket.on('game.getDetails', (payload, acknowledge) => {
+      if (typeof acknowledge !== 'function') return
+      const request = membershipRequest(payload, socket.data.user)
+      if ('outcome' in request) return acknowledge(request)
+      try {
+        
+        acknowledge({
+          outcome: 'GAME_FOUND',
+          details: presentGameDetails(gameId, game,
+            [...memberships.values()].map(({ user }) => user.username)),
+        })
       } catch {
         acknowledge({ outcome: 'INTERNAL_ERROR' })
       }

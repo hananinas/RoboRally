@@ -26,6 +26,8 @@ channels:
         $ref: '#/components/messages/SubmitProgram'
       getPublicGameState:
         $ref: '#/components/messages/GetPublicGameState'
+      getGameDetails:
+        $ref: '#/components/messages/GetGameDetails'
 
   loginReplies:
     address: null
@@ -71,6 +73,15 @@ channels:
     messages:
       publicGameStateResult:
         $ref: '#/components/messages/PublicGameStateResult'
+
+  gameDetailsReplies:
+    address: null
+    description: |
+      Logical reply channel
+      Delivered through the acknowledgement of game.getDetails
+    messages:
+      gameDetailsResult:
+        $ref: '#/components/messages/GameDetailsResult' 
 
   player:
     address: 'game:{gameId}:player:{playerId}'
@@ -178,6 +189,19 @@ operations:
         $ref: '#/channels/publicGameStateReplies'
       messages:
         - $ref: '#/channels/publicGameStateReplies/messages/publicGameStateResult'
+      x-socketio:
+        acknowledgement: true
+  handleGetGameDetails:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/getGameDetails'
+    reply:
+      channel:
+        $ref: '#/channels/gameDetailsReplies'
+      messages:
+        - $ref: '#/channels/gameDetailsReplies/messages/gameDetailsResult'
       x-socketio:
         acknowledgement: true
 
@@ -399,6 +423,47 @@ components:
           - $ref: '#/components/schemas/PublicGameStateNotFound'
       examples:
         - name: nonmember
+          payload:
+            outcome: GAME_NOT_FOUND
+    GetGameDetails:
+      name: game.getDetails
+      description: >-
+        Reads a public summary of a game before joining. Requires login but not
+        membership. Reading is side-effect free: it creates no player, robot, or
+        membership, grants no access to the public or private player rooms, and
+        never returns hands. Details reflect the server's state when the request
+        is handled; join with game.join to receive authoritative state.
+      payload:
+        $ref: '#/components/schemas/GetGameDetails'
+      examples:
+        - name: details
+          summary: Configured shared game
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+
+    GameDetailsResult:
+      name: game.detailsResult
+      description: >-
+        Returns the game's public details or a rejection. This is returned through
+        the request's acknowledgement callback, not emitted as game.detailsResult.
+      payload:
+        $ref: '#/components/schemas/GameDetailsResult'
+      examples:
+        - name: found
+          summary: Two players are in the programming phase
+          payload:
+            outcome: GAME_FOUND
+            details:
+              gameId: 00000000-0000-4000-8000-000000000001
+              playerNames: [ Dane, Abid ]
+              playerCount: 2
+              phase: PROGRAMMING
+        - name: loginRequired
+          summary: The connection has not logged in
+          payload:
+            outcome: LOGIN_REQUIRED
+        - name: gameNotFound
+          summary: The requested game is unavailable
           payload:
             outcome: GAME_NOT_FOUND
 
@@ -844,6 +909,64 @@ components:
       description: >-
         No accessible game: the game is unknown, the connection is not a member, or the request is
         malformed. Do not return state or reveal whether an inaccessible game exists.
+    GetGameDetails:
+      type: object
+      additionalProperties: false
+      required: [ gameId ]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+    GameDetails:
+      type: object
+      additionalProperties: false
+      required: [ gameId, playerNames, playerCount, phase ]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+        playerNames:
+          type: array
+          description: Usernames of current members in join order, including disconnected members.
+          items:
+            $ref: '#/components/schemas/Username'
+        playerCount:
+          type: integer
+          minimum: 0
+          description: Equals the length of playerNames.
+        phase:
+          $ref: '#/components/schemas/GamePhase'
+      description: >-
+        Public pre-join summary. Never contains cards, board, robot, or player
+        identifiers.
+
+    GameDetailsResult:
+      oneOf:
+        - $ref: '#/components/schemas/GameDetailsFound'
+        - $ref: '#/components/schemas/GameDetailsRejected'
+
+    GameDetailsFound:
+      type: object
+      additionalProperties: false
+      required: [ outcome, details ]
+      properties:
+        outcome:
+          type: string
+          enum: [ GAME_FOUND ]
+        details:
+          $ref: '#/components/schemas/GameDetails'
+
+    GameDetailsRejected:
+      type: object
+      additionalProperties: false
+      required: [ outcome ]
+      properties:
+        outcome:
+          type: string
+          enum: [ LOGIN_REQUIRED, INVALID_REQUEST, GAME_NOT_FOUND, INTERNAL_ERROR ]
+      description: |
+        LOGIN_REQUIRED: this connection has no approved user; checked before the payload.
+        INVALID_REQUEST: malformed request, including an invalid gameId or extra properties.
+        GAME_NOT_FOUND: the requested game is unavailable on this service.
+        INTERNAL_ERROR: unexpected service failure; do not expose internals.
 
     GamePhase:
       type: string

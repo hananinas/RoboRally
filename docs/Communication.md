@@ -28,6 +28,19 @@ A successful join returns:
 
 The acknowledgement contains the player's current robot assignment, public game state, private hand, and program-submission status. The client must apply all JOINED data before processing later live game events. A future lobby may be inserted between login and joining without changing this model.
 
+### Reading game details before joining
+
+After login, the client may read a public summary of a game without joining it:
+
+`game.getDetails {gameId}`
+
+which returns:
+
+`GAME_FOUND {details: {gameId, playerNames, playerCount, phase}}`
+
+The details come from the server's current state. Reading them creates no player, robot or membership, grants no room access, and never includes hands or other gameplay data. The connection receives no live updates afterwards; it must read again to refresh. A connection that has not logged in receives `LOGIN_REQUIRED`, a malformed request receives `INVALID_REQUEST`, and an unavailable game receives `GAME_NOT_FOUND`. Because the game may change between reading and joining, the client initializes the game from the JOINED response, not from the details.
+
+
 ### Membership
 
 New players may join a game until the server accepts the first program submission. Accepting that submission starts the game and permanently closes joining to new players. Later attempts by new players receive GAME_ALREADY_STARTED. 

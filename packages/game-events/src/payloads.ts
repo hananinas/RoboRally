@@ -134,6 +134,27 @@ export type PublicGameStateResult =
       outcome: 'GAME_NOT_FOUND'
     }>
 
+export type GetGameDetails = Readonly<{
+  gameId: GameId
+}>
+
+/** Public pre-join summary of a game; never contains cards, robots, or board state. */
+export type GameDetails = Readonly<{
+  gameId: GameId
+  playerNames: readonly string[]
+  playerCount: number
+  phase: GamePhase
+}>
+
+export type GameDetailsResult =
+  | Readonly<{
+      outcome: 'GAME_FOUND'
+      details: GameDetails
+    }>
+  | Readonly<{
+      outcome: 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND' | 'INTERNAL_ERROR'
+    }>
+    
 export type JoinResult =
   | Readonly<{
       outcome: 'JOINED'

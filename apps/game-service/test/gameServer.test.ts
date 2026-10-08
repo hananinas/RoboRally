@@ -301,4 +301,72 @@ describe('game membership over Socket.IO', () => {
     expect(shared.game.players).toHaveLength(0)
     expect(server.sockets.sockets.get(client.id!)?.data.user).toBeUndefined()
   })
+  describe('game.getDetails', () => {
+    const details = (client: Client, gameId = shared.gameId) =>
+      client.timeout(1000).emitWithAck('game.getDetails', { gameId })
+
+    it('rejects unauthenticated, malformed, and unavailable-game requests', async () => {
+      const anonymous = await connect()
+      expect(await details(anonymous)).toEqual({ outcome: 'LOGIN_REQUIRED' })
+      const client = await connect('Reader')
+      expect(await raw(client, 'game.getDetails', { gameId: shared.gameId, extra: true }))
+        .toEqual({ outcome: 'INVALID_REQUEST' })
+      expect(await raw(client, 'game.getDetails', null)).toEqual({ outcome: 'INVALID_REQUEST' })
+      expect(await details(client, '00000000-0000-4000-8000-000000000999'))
+        .toEqual({ outcome: 'GAME_NOT_FOUND' })
+    })
+
+    it('returns current names, count, and phase without creating membership or room access', async () => {
+      const reader = await connect('Reader')
+      const received = vi.fn()
+      reader.onAny(received)
+      expect(await details(reader)).toEqual({
+        outcome: 'GAME_FOUND',
+        details: { gameId: shared.gameId, playerNames: [], playerCount: 0, phase: 'PROGRAMMING' },
+      })
+
+      const first = await connect('First')
+      const initial = await join(first)
+      await join(await connect('Second'))
+      expect(await details(reader)).toEqual({
+        outcome: 'GAME_FOUND',
+        details: { gameId: shared.gameId, playerNames: ['First', 'Second'], playerCount: 2, phase: 'PROGRAMMING' },
+      })
+      await first.timeout(1000).emitWithAck('program.submit', submission(initial))
+      await first.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId })
+      expect(await details(reader)).toMatchObject({ details: { playerNames: ['Second'], playerCount: 1 } })
+
+      // Reading never made the reader a member: no player, robot, rooms, hand, or broadcasts.
+      expect(shared.game.players).toHaveLength(1)
+      expect(server.sockets.sockets.get(reader.id!)?.rooms).toEqual(new Set([reader.id]))
+      expect(await reader.timeout(1000).emitWithAck('game.getPublicGameState', { gameId: shared.gameId }))
+        .toEqual({ outcome: 'GAME_NOT_FOUND' })
+      expect(await reader.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId }))
+        .toEqual({ outcome: 'GAME_NOT_FOUND' })
+      expect(received).not.toHaveBeenCalled()
+    })
+        it('reports the executing phase from the current game state', async () => {
+      const reader = await connect('Reader')
+      vi.spyOn(shared.game, 'phase', 'get').mockReturnValue('activation')
+      expect(await details(reader)).toMatchObject({ details: { phase: 'EXECUTING' } })
+    })
+
+    it('leaves a later join unaffected', async () => {
+      const reader = await connect('Reader')
+      await details(reader)
+      await details(reader)
+      const joined = await join(reader)
+      expect(joined.state.players.map((player) => player.username)).toEqual(['Reader'])
+      expect(shared.game.players).toHaveLength(1)
+      expect(await details(reader)).toMatchObject({ details: { playerNames: ['Reader'], playerCount: 1 } })
+    })
+
+    it('does not reply without an acknowledgement', async () => {
+      const client = await connect('Reader')
+      const emit = client.emit.bind(client) as unknown as (event: string, payload: unknown) => void
+      emit('game.getDetails', { gameId: shared.gameId })
+      expect(await details(client)).toMatchObject({ outcome: 'GAME_FOUND' })
+      expect(shared.game.players).toHaveLength(0)
+    })
+  })
 })
