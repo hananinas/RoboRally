@@ -24,6 +24,7 @@ export type {
   PlayerId,
   PlayerJoined,
   PlayerLeft,
+  PlayerConnectionChanged,
   LeaveResult,
   PlayerState,
   Position,

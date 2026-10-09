@@ -65,7 +65,11 @@ export function createGameSocketServer(
     ServerToClientEvents,
     {},
     GameSocketData
-  >(httpServer)
+  >(httpServer, {
+    connectionStateRecovery: { skipMiddlewares: false },
+    pingInterval: 1000,
+    pingTimeout: 1000,
+  })
   const users = createUserRegistry()
   const { gameId, game } = sharedGame
   const publicRoom = `game:${gameId}:public`
@@ -83,6 +87,23 @@ export function createGameSocketServer(
     })),
   )
 
+  const anyDisconnected = () =>
+    [...memberships.values()].some((membership) => membership.connectionId === null)
+
+  function reattachMembership(membership: GameMembership, socketId: string): boolean {
+    const wasDisconnected = membership.connectionId === null
+    membership.connectionId = socketId
+    return wasDisconnected
+  }
+
+  function reconnectMembership(playerId: string): void {
+    if (!anyDisconnected()) game.resume()
+    io.to(publicRoom).emit('game.playerConnectionChanged', {
+      gameId, playerId, connected: true, paused: game.paused,
+    })
+    scheduleNextAction()
+  }
+
   function membershipRequest(payload: unknown, user: User | undefined):
     { user: User } | { outcome: 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND' } {
     if (!user) return { outcome: 'LOGIN_REQUIRED' }
@@ -99,7 +120,7 @@ export function createGameSocketServer(
   }
 
   function scheduleNextAction(): void {
-    if (closed || game.phase !== 'activation' || scheduledAction) return
+    if (closed || game.phase !== 'activation' || scheduledAction || game.paused) return
     scheduledAction = setImmediate(() => {
       scheduledAction = undefined
       if (closed || game.phase !== 'activation') return
@@ -121,7 +142,25 @@ export function createGameSocketServer(
     clearImmediate(scheduledAction)
   })
 
+  io.use((socket, next) => {
+    if (socket.recovered && socket.data.user) {
+      const membership = memberships.get(socket.data.user.userId)
+      if (membership?.connectionId && membership.connectionId !== socket.id) {
+        next(new Error('USER_ALREADY_IN_GAME'))
+        return
+      }
+    }
+    next()
+  })
+
   io.on('connection', (socket) => {
+    if (socket.recovered && socket.data.user) {
+      const membership = memberships.get(socket.data.user.userId)
+      if (membership && reattachMembership(membership, socket.id)) {
+        reconnectMembership(membership.player.id)
+      }
+    }
+
     const ownedMembership = () => {
       const membership = memberships.get(socket.data.user?.userId ?? '')
       return membership?.connectionId === socket.id ? membership : undefined
@@ -158,7 +197,8 @@ export function createGameSocketServer(
         memberships.set(user.userId, membership)
       }
       const previousConnectionId = membership.connectionId
-      membership.connectionId = socket.id
+      const reconnected = !isNew && reattachMembership(membership, socket.id)
+      if (reconnected && !anyDisconnected()) game.resume()
       const { player } = membership
       let result: Extract<JoinResult, { outcome: 'JOINED' }>
       try {
@@ -181,11 +221,15 @@ export function createGameSocketServer(
       }
       void socket.join([publicRoom, playerRoom(player.id)])
       acknowledge(result)
-      if (isNew) socket.to(publicRoom).emit('game.playerJoined', {
-        gameId,
-        player: result.state.players.find((candidate) => candidate.playerId === player.id)!,
-        robot: result.state.robots.find((robot) => robot.robotId === player.robot.id)!,
-      })
+      if (isNew) {
+        socket.to(publicRoom).emit('game.playerJoined', {
+          gameId,
+          player: result.state.players.find((candidate) => candidate.playerId === player.id)!,
+          robot: result.state.robots.find((robot) => robot.robotId === player.robot.id)!,
+        })
+      } else if (reconnected) {
+        reconnectMembership(player.id)
+      }
     })
 
     socket.on('game.leave', (payload, acknowledge) => {
@@ -213,7 +257,12 @@ export function createGameSocketServer(
 
     socket.on('disconnect', () => {
       const membership = ownedMembership()
-      if (membership) membership.connectionId = null
+      if (!membership) return
+      membership.connectionId = null
+      game.pause()
+      io.to(publicRoom).emit('game.playerConnectionChanged', {
+        gameId, playerId: membership.player.id, connected: false, paused: game.paused,
+      })
     })
 
     socket.on('user.login', (payload, acknowledge) => {
@@ -272,6 +321,10 @@ export function createGameSocketServer(
       const player = ownedMembership()?.player
       if (!player) {
         acknowledge({ outcome: 'INVALID_PROGRAM' })
+        return
+      }
+      if (game.paused) {
+        acknowledge({ outcome: 'GAME_PAUSED' })
         return
       }
 

@@ -584,7 +584,7 @@ test('does not resend a program after its acknowledgement times out', async ({ p
 })
 
 for (const submitting of [false, true]) {
-  test(`preserves the game and reload guidance when disconnected ${submitting ? 'during submission' : 'while programming'}`, async ({ page, game }) => {
+  test(`preserves the game and reconnection guidance when disconnected ${submitting ? 'during submission' : 'while programming'}`, async ({ page, game }) => {
     await game.control({ type: 'submission', outcome: 'ACCEPTED', deferred: true })
     await openGame(page)
     await fillProgram(page)
@@ -598,7 +598,7 @@ for (const submitting of [false, true]) {
 
     await game.control({ type: 'disconnect' })
     await expect(page.getByRole('status')).toHaveText('Not connected')
-    await expect(page.getByRole('alert')).toContainText('Connection lost. Reload to connect again; your program was not resent.')
+    await expect(page.getByRole('alert')).toContainText('Connection lost. Reconnecting… Your program was not resent.')
     await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
     await expect(page.getByRole('textbox', { name: 'Username' })).toHaveCount(0)
     await expect(registered).toHaveCount(5)
