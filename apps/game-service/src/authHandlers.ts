@@ -21,7 +21,7 @@ export function handleLogin(
 
   const parsed = parseLogin(payload)
   if (parsed.isErr()) {
-    logError('Rejected login request', parsed.error, { payload })
+    logError('Rejected login request', parsed.error, { command: 'user.login', payload })
     acknowledge({ outcome: parsed.error })
     return
   }
@@ -41,7 +41,7 @@ export function handleLogin(
     socket.data.user = user
     acknowledge({ outcome: 'LOGGED_IN', user })
   } catch (error) {
-    logError('Failed to find or create user', error, { username })
+    logError('Failed to find or create user', error, { command: 'user.login', payload })
     acknowledge({ outcome: 'INTERNAL_ERROR' })
   }
 }

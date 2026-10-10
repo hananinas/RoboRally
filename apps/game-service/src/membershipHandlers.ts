@@ -170,7 +170,7 @@ export function handleJoin(
       programSubmitted: game.hasSubmittedProgram(player.id),
     }
   } catch (error) {
-    logError('Failed to build join response', error, { gameId, playerId: player.id })
+    logError('Failed to build join response', error, { command: 'game.join', playerId: player.id, payload })
     rollbackMembership(ctx, { membership, isNew, previousConnectionId })
     acknowledge({ outcome: 'INTERNAL_ERROR' })
     return
@@ -238,7 +238,7 @@ export function handleGetPublicGameState(
   const parsed = getPublicGameStateSchema.safeParse(payload)
   if (!parsed.success) {
     // Invalid requests receive the same non-disclosing result as unknown games.
-    logError('Rejected public game state request', parsed.error, { gameId: ctx.gameId, payload })
+    logError('Rejected public game state request', parsed.error, { command: 'game.getPublicGameState', gameId: ctx.gameId, payload })
     acknowledge({ outcome: 'GAME_NOT_FOUND' })
     return
   }

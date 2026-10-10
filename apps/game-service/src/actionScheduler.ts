@@ -46,7 +46,12 @@ export function createActionScheduler(
           dealHands()
         }
       } catch (error) {
-        logError('Failed to execute next robot action', error, { gameId })
+        logError('Failed to execute next robot action', error, {
+          source: 'actionScheduler',
+          gameId,
+          phase: game.phase,
+          registerIndex: game.currentRegister,
+        })
         stop()
         io.to(publicRoom).emit('game.aborted', { gameId })
       }

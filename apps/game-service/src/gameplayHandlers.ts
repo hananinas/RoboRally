@@ -34,7 +34,7 @@ export function handleSubmitProgram(
 
   const parsed = submitProgramSchema.safeParse(payload)
   if (!parsed.success) {
-    logError('Rejected malformed program submission', parsed.error, { gameId: ctx.gameId, playerId: player.id })
+    logError('Rejected malformed program submission', parsed.error, { command: 'program.submit', gameId: ctx.gameId, playerId: player.id, payload })
     acknowledge({ outcome: 'INVALID_PROGRAM' })
     return
   }
