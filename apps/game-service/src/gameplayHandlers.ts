@@ -1,5 +1,5 @@
 import {
-  parseSubmitProgram,
+  submitProgramSchema,
   type ProgramCardIds,
   type ProgramResultAcknowledgement,
   type SubmitProgram,
@@ -32,14 +32,13 @@ export function handleSubmitProgram(
     return
   }
 
-  let submission: SubmitProgram
-  try {
-    submission = parseSubmitProgram(payload)
-  } catch (error) {
-    logError('Rejected malformed program submission', error, { gameId: ctx.gameId, playerId: player.id })
+  const parsed = submitProgramSchema.safeParse(payload)
+  if (!parsed.success) {
+    logError('Rejected malformed program submission', parsed.error, { gameId: ctx.gameId, playerId: player.id })
     acknowledge({ outcome: 'INVALID_PROGRAM' })
     return
   }
+  const submission = parsed.data
   if (submission.gameId !== ctx.gameId || submission.playerId !== player.id) {
     acknowledge({ outcome: 'INVALID_PROGRAM' })
     return

@@ -1,4 +1,4 @@
-import { parseSubmitProgram } from '@robo-rally/game-events'
+import { submitProgramSchema } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'
 import { Direction, EmptyTile, createSinglePlayerGame } from '@/game/index'
 import { Integer } from '@/numbers'
@@ -37,7 +37,7 @@ describe('single-player game', () => {
       'MOVE_1',
       'TURN_LEFT',
     ])
-    expect(parseSubmitProgram({
+    expect(submitProgramSchema.parse({
       gameId,
       playerId: player.id,
       cardIds: cardIds.slice(0, 5),

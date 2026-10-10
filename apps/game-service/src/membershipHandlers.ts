@@ -1,8 +1,8 @@
 import { err, ok, type Result } from 'neverthrow'
 import {
+  getPublicGameStateSchema,
   joinGameSchema,
   leaveGameSchema,
-  parseGetPublicGameState,
   type GetPublicGameState,
   type JoinGame,
   type JoinResult,
@@ -132,15 +132,14 @@ function joinOrReconnectMembership(
 
 function rollbackMembership(
   ctx: MembershipContext,
-  { membership, isNew, previousConnectionId, user }: {
+  { membership, isNew, previousConnectionId }: {
     membership: GameMembership
     isNew: boolean
     previousConnectionId: string | null
-    user: User
   },
 ): void {
   if (isNew) {
-    ctx.memberships.delete(user.userId)
+    ctx.memberships.delete(membership.user.userId)
     ctx.game.removePlayer(membership.player.id)
   } else {
     membership.connectionId = previousConnectionId
@@ -155,11 +154,8 @@ export function handleJoin(
 ): void {
   if (typeof acknowledge !== 'function') return
   const { game, gameId, publicRoom, playerRoom, publicState } = ctx
-  const verdict = validateMembershipRequest(ctx, joinGameSchema, payload, socket.data.user)
-  if (verdict.isErr()) return acknowledge({ outcome: verdict.error })
-  const user = verdict.value
-
-  const resolution = joinOrReconnectMembership(ctx, socket, user)
+  const resolution = validateMembershipRequest(ctx, joinGameSchema, payload, socket.data.user)
+    .andThen((user) => joinOrReconnectMembership(ctx, socket, user))
   if (resolution.isErr()) return acknowledge({ outcome: resolution.error })
   const { membership, isNew, reconnected, previousConnectionId } = resolution.value
   const { player } = membership
@@ -175,7 +171,7 @@ export function handleJoin(
     }
   } catch (error) {
     logError('Failed to build join response', error, { gameId, playerId: player.id })
-    rollbackMembership(ctx, { membership, isNew, previousConnectionId, user })
+    rollbackMembership(ctx, { membership, isNew, previousConnectionId })
     acknowledge({ outcome: 'INTERNAL_ERROR' })
     return
   }
@@ -239,18 +235,20 @@ export function handleGetPublicGameState(
 ): void {
   if (typeof acknowledge !== 'function') return
 
-  try {
-    const request = parseGetPublicGameState(payload)
-    if (request.gameId === ctx.gameId && ownedMembership(ctx, socket)) {
-      acknowledge({
-        outcome: 'GAME_FOUND',
-        state: ctx.publicState(),
-      })
-      return
-    }
-  } catch (error) {
+  const parsed = getPublicGameStateSchema.safeParse(payload)
+  if (!parsed.success) {
     // Invalid requests receive the same non-disclosing result as unknown games.
-    logError('Rejected public game state request', error, { gameId: ctx.gameId, payload })
+    logError('Rejected public game state request', parsed.error, { gameId: ctx.gameId, payload })
+    acknowledge({ outcome: 'GAME_NOT_FOUND' })
+    return
+  }
+
+  if (parsed.data.gameId === ctx.gameId && ownedMembership(ctx, socket)) {
+    acknowledge({
+      outcome: 'GAME_FOUND',
+      state: ctx.publicState(),
+    })
+    return
   }
 
   acknowledge({ outcome: 'GAME_NOT_FOUND' })

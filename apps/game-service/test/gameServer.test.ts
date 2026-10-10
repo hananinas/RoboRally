@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { parseSubmitProgram } from '@robo-rally/game-events'
+import { submitProgramSchema } from '@robo-rally/game-events'
 import type {
   ClientToServerEvents, JoinResult, PlayerConnectionChanged, ServerToClientEvents,
 } from '@robo-rally/game-events'
@@ -91,7 +91,7 @@ describe('game membership over Socket.IO', () => {
   }
 
   function submission(joined: Joined) {
-    return parseSubmitProgram({ gameId: shared.gameId, playerId: joined.assignment.playerId, cardIds: joined.hand.slice(0, 5).map((card) => card.id) })
+    return submitProgramSchema.parse({ gameId: shared.gameId, playerId: joined.assignment.playerId, cardIds: joined.hand.slice(0, 5).map((card) => card.id) })
   }
 
   it('keeps connection and login separate from rooms, hands and membership', async () => {

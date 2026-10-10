@@ -41,15 +41,12 @@ export type {
   User,
   UserId,
 } from './payloads.js'
-export { loginSchema, LoginRequestError, parseLogin } from './login.js'
+export { loginSchema, parseLogin } from './login.js'
 export type { Login, LoginRequestRejection } from './login.js'
-export {
-  getPublicGameStateSchema,
-  parseGetPublicGameState,
-} from './getPublicGameState.js'
+export { getPublicGameStateSchema } from './getPublicGameState.js'
 export { joinGameSchema } from './joinGame.js'
 export { leaveGameSchema } from './leaveGame.js'
-export { parseSubmitProgram, submitProgramSchema } from './submitProgram.js'
+export { submitProgramSchema } from './submitProgram.js'
 export type { ProgramCardIds, SubmitProgram } from './submitProgram.js'
 
 export { instructions } from './instructions.js'

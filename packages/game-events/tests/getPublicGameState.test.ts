@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { parseGetPublicGameState } from '../src/index.js'
+import { getPublicGameStateSchema } from '../src/index.js'
 
 const validPayload = {
   gameId: '00000000-0000-4000-8000-000000000000',
 }
 
-describe('parseGetPublicGameState', () => {
+describe('getPublicGameStateSchema', () => {
   it('accepts a game UUID', () => {
-    expect(parseGetPublicGameState(validPayload)).toEqual(validPayload)
+    expect(getPublicGameStateSchema.parse(validPayload)).toEqual(validPayload)
   })
 
   it.each([
@@ -16,6 +16,6 @@ describe('parseGetPublicGameState', () => {
     ['an invalid game ID', { gameId: 'game' }],
     ['an extra property', { ...validPayload, extra: true }],
   ])('rejects %s', (_description, payload) => {
-    expect(() => parseGetPublicGameState(payload)).toThrow()
+    expect(() => getPublicGameStateSchema.parse(payload)).toThrow()
   })
 })

@@ -1,5 +1,4 @@
 import {
-  LoginRequestError,
   parseLogin,
   type Login,
   type LoginAcknowledgement,
@@ -20,17 +19,13 @@ export function handleLogin(
 ): void {
   if (typeof acknowledge !== 'function') return
 
-  let username: string
-  try {
-    username = parseLogin(payload).username
-  } catch (error) {
-    logError('Rejected login request', error, { payload })
-    acknowledge({
-      outcome:
-        error instanceof LoginRequestError ? error.outcome : 'INTERNAL_ERROR',
-    })
+  const parsed = parseLogin(payload)
+  if (parsed.isErr()) {
+    logError('Rejected login request', parsed.error, { payload })
+    acknowledge({ outcome: parsed.error })
     return
   }
+  const { username } = parsed.value
 
   if (socket.data.user) {
     acknowledge(
