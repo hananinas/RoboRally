@@ -112,7 +112,12 @@ export type CardsDealt = Readonly<{
   cards: readonly Card[]
 }>
 
-export type ProgramResultOutcome = 'ACCEPTED' | 'INVALID_PROGRAM' | 'GAME_PAUSED'
+export type ProgramResultOutcome =
+  | 'ACCEPTED'
+  | 'INVALID_PROGRAM'
+  | 'GAME_PAUSED'
+  | 'ALREADY_SUBMITTED'
+  | 'WRONG_PHASE'
 
 export type ProgramResult = Readonly<{
   outcome: ProgramResultOutcome

@@ -68,7 +68,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
         name: 'program.submitted', payload: { gameId, playerId: players[0].id },
       }])
       expect(await clients[0].timeout(1000).emitWithAck('program.submit', submissions[0]))
-        .toEqual({ outcome: 'INVALID_PROGRAM' })
+        .toEqual({ outcome: 'ALREADY_SUBMITTED' })
       expect(await clients[0].timeout(1000).emitWithAck('program.submit', submissions[1]))
         .toEqual({ outcome: 'INVALID_PROGRAM' })
 

@@ -48,7 +48,10 @@ export function handleSubmitProgram(
     .andThen((programCards) => ctx.game.submitProgram(player.id, programCards))
 
   if (result.isErr()) {
-    acknowledge({ outcome: result.error === 'GAME_PAUSED' ? 'GAME_PAUSED' : 'INVALID_PROGRAM' })
+    const outcome = result.error === 'GAME_PAUSED' || result.error === 'ALREADY_SUBMITTED' || result.error === 'WRONG_PHASE'
+      ? result.error
+      : 'INVALID_PROGRAM'
+    acknowledge({ outcome })
     return
   }
 
