@@ -75,18 +75,18 @@ describe('Game programming', () => {
     expect(robot.program).toEqual(program)
     expect(game.phase).toBe('activation')
     expect(game.currentRegister).toBe(0)
-    expect(() => game.submitProgram(player.id, program)).toThrow()
+    expect(game.submitProgram(player.id, program)._unsafeUnwrapErr()).toBe('WRONG_PHASE')
   })
 
   it('rejects invalid submissions without changing the robot or game phase', () => {
     const { robot, player, deck, game } = createGame()
     const valid = deck.slice(0, 5)
 
-    expect(() => game.submitProgram('unknown', valid)).toThrow()
-    expect(() => game.submitProgram(player.id, deck.slice(0, 4))).toThrow(RangeError)
-    expect(() => game.submitProgram(player.id, [deck[0], deck[0], ...deck.slice(1, 4)])).toThrow(RangeError)
-    expect(() => game.submitProgram(player.id, [...deck.slice(0, 4), new Card('foreign', 'MOVE_1')])).toThrow()
-    expect(() => game.submitProgram(player.id, [new Card(deck[0].id, 'MOVE_1'), ...deck.slice(1, 5)])).toThrow()
+    expect(game.submitProgram('unknown', valid)._unsafeUnwrapErr()).toBe('PLAYER_NOT_IN_GAME')
+    expect(game.submitProgram(player.id, deck.slice(0, 4))._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
+    expect(game.submitProgram(player.id, [deck[0], deck[0], ...deck.slice(1, 4)])._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
+    expect(game.submitProgram(player.id, [...deck.slice(0, 4), new Card('foreign', 'MOVE_1')])._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
+    expect(game.submitProgram(player.id, [new Card(deck[0].id, 'MOVE_1'), ...deck.slice(1, 5)])._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
 
     expect(game.phase).toBe('programming')
     expect(robot.program).toEqual([])
@@ -116,7 +116,7 @@ describe('Game programming', () => {
     const valid = deck.slice(0, 5)
 
     game.pause()
-    expect(() => game.submitProgram(player.id, valid)).toThrow()
+    expect(game.submitProgram(player.id, valid)._unsafeUnwrapErr()).toBe('GAME_PAUSED')
     expect(game.phase).toBe('programming')
     expect(robot.program).toEqual([])
 

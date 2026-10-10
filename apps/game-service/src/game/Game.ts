@@ -27,6 +27,13 @@ export type NextActionResult = Readonly<{
 
 export type AddPlayerError = 'GAME_ALREADY_STARTED' | 'NO_SPAWN_AVAILABLE'
 
+export type SubmitProgramError =
+  | 'GAME_PAUSED'
+  | 'WRONG_PHASE'
+  | 'PLAYER_NOT_IN_GAME'
+  | 'ALREADY_SUBMITTED'
+  | 'INVALID_PROGRAM'
+
 export class Game {
   readonly board: Board
   private readonly roster: Player[]
@@ -137,34 +144,27 @@ export class Game {
     this.recheckProgrammingPhase()
   }
 
-  submitProgram(playerId: PlayerId, program: readonly Card[]): void {
-    if (this.isPaused) {
-      throw new Error('Programs cannot be submitted while the game is paused')
-    }
-    if (this.currentPhase !== 'programming') {
-      throw new Error('Programs can only be submitted during programming')
-    }
+  submitProgram(playerId: PlayerId, program: readonly Card[]): Result<void, SubmitProgramError> {
+    if (this.isPaused) return err('GAME_PAUSED')
+    if (this.currentPhase !== 'programming') return err('WRONG_PHASE')
 
     const player = this.players.find((candidate) => candidate.id === playerId)
-    if (!player) {
-      throw new Error(`Player ${playerId} is not in this game`)
-    }
-    if (this.submittedPlayerIds.has(playerId)) {
-      throw new Error(`Player ${playerId} has already submitted a program`)
-    }
-    if (program.length !== 5 || new Set(program.map((card) => card.id)).size !== 5) {
-      throw new RangeError('A program must contain five distinct cards')
-    }
+    if (!player) return err('PLAYER_NOT_IN_GAME')
+    if (this.submittedPlayerIds.has(playerId)) return err('ALREADY_SUBMITTED')
 
+    if (program.length !== 5 || new Set(program.map((card) => card.id)).size !== 5) {
+      return err('INVALID_PROGRAM')
+    }
     const hand = new Map(player.hand.map((card) => [card.id, card]))
     if (program.some((card) => hand.get(card.id) !== card)) {
-      throw new Error('Every program card must come from the player hand')
+      return err('INVALID_PROGRAM')
     }
 
     player.robot.setProgram(program)
     this.started = true
     this.submittedPlayerIds.add(playerId)
     this.recheckProgrammingPhase()
+    return ok()
   }
 
   recheckProgrammingPhase(): void {

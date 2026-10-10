@@ -32,10 +32,10 @@ describe('Game fixed-roster programming', () => {
     expect(game.hasSubmittedProgram(players[1].id)).toBe(false)
     expect(game.hasSubmittedProgram('unknown')).toBe(false)
     expect(() => game.executeNextAction()).toThrow()
-    expect(() => game.submitProgram(players[0].id, secondProgram)).toThrow()
-    expect(() => game.submitProgram(players[1].id, [...deck.slice(0, 4), new Card('foreign', 'MOVE_1')])).toThrow()
-    expect(() => game.submitProgram(players[1].id, [deck[0], ...deck.slice(0, 4)])).toThrow()
-    expect(() => game.submitProgram('unknown', secondProgram)).toThrow()
+    expect(game.submitProgram(players[0].id, secondProgram)._unsafeUnwrapErr()).toBe('ALREADY_SUBMITTED')
+    expect(game.submitProgram(players[1].id, [...deck.slice(0, 4), new Card('foreign', 'MOVE_1')])._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
+    expect(game.submitProgram(players[1].id, [deck[0], ...deck.slice(0, 4)])._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
+    expect(game.submitProgram('unknown', secondProgram)._unsafeUnwrapErr()).toBe('PLAYER_NOT_IN_GAME')
     game.recheckProgrammingPhase()
 
     expect(players[0].robot.program).toEqual(firstProgram)
@@ -65,7 +65,7 @@ describe('Game fixed-roster programming', () => {
     expect(empty.phase).toBe('programming')
     expect(empty.currentRegister).toBe(0)
     expect(() => empty.executeNextAction()).toThrow()
-    expect(() => empty.submitProgram(player.id, deck.slice(0, 5))).toThrow()
+    expect(empty.submitProgram(player.id, deck.slice(0, 5))._unsafeUnwrapErr()).toBe('PLAYER_NOT_IN_GAME')
   })
 
   it('rejects duplicate player IDs, duplicate robot IDs, and unplaced robots', () => {

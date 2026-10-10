@@ -31,21 +31,25 @@ export function handleSubmitProgram(
     acknowledge({ outcome: 'INVALID_PROGRAM' })
     return
   }
-  if (ctx.game.paused) {
-    acknowledge({ outcome: 'GAME_PAUSED' })
+
+  let submission: SubmitProgram
+  try {
+    submission = parseSubmitProgram(payload)
+  } catch (error) {
+    logError('Rejected malformed program submission', error, { gameId: ctx.gameId, playerId: player.id })
+    acknowledge({ outcome: 'INVALID_PROGRAM' })
+    return
+  }
+  if (submission.gameId !== ctx.gameId || submission.playerId !== player.id) {
+    acknowledge({ outcome: 'INVALID_PROGRAM' })
     return
   }
 
-  try {
-    const submission = parseSubmitProgram(payload)
-    const programCards = findProgramCards(player, submission.cardIds)
-    if (submission.gameId !== ctx.gameId || submission.playerId !== player.id || programCards.isErr()) {
-      throw new Error('Program does not belong to this game')
-    }
-    ctx.game.submitProgram(player.id, programCards.value)
-  } catch (error) {
-    logError('Rejected program submission', error, { gameId: ctx.gameId, playerId: player.id })
-    acknowledge({ outcome: 'INVALID_PROGRAM' })
+  const result = findProgramCards(player, submission.cardIds)
+    .andThen((programCards) => ctx.game.submitProgram(player.id, programCards))
+
+  if (result.isErr()) {
+    acknowledge({ outcome: result.error === 'GAME_PAUSED' ? 'GAME_PAUSED' : 'INVALID_PROGRAM' })
     return
   }
 
