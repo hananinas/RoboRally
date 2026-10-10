@@ -93,6 +93,8 @@ export type PlayerJoined = Readonly<{
 
 export type PlayerLeft = Readonly<{ gameId: GameId; playerId: PlayerId; robotId: RobotId }>
 
+export type GameAborted = Readonly<{ gameId: GameId }>
+
 export type PlayerConnectionChanged = Readonly<{
   gameId: GameId
   playerId: PlayerId

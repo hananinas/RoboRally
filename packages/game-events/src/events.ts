@@ -1,5 +1,6 @@
 import type {
   CardsDealt,
+  GameAborted,
   GetPublicGameState,
   JoinGame,
   JoinResult,
@@ -45,4 +46,5 @@ export interface ServerToClientEvents {
   'cards.dealt': (payload: CardsDealt) => void
   'program.submitted': (payload: ProgramSubmitted) => void
   'robot.actionResolved': (payload: RobotActionResolved) => void
+  'game.aborted': (payload: GameAborted) => void
 }

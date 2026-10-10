@@ -1,6 +1,7 @@
 import type { Game } from '@/game/index'
 import { presentCardsDealt, presentRobotActionResolved } from '@/gamePresenter'
 import type { GameSocketServer } from '@/gameServer'
+import { logError } from '@/logger'
 
 export type ActionSchedulerDeps = {
   io: GameSocketServer
@@ -33,15 +34,21 @@ export function createActionScheduler(
     scheduledAction = setImmediate(() => {
       scheduledAction = undefined
       if (closed || game.phase !== 'activation') return
-      const result = game.executeNextAction()
-      io.to(publicRoom).emit(
-        'robot.actionResolved',
-        presentRobotActionResolved(gameId, result),
-      )
-      if (game.phase === 'activation') {
-        scheduleNextAction()
-      } else {
-        dealHands()
+      try {
+        const result = game.executeNextAction()
+        io.to(publicRoom).emit(
+          'robot.actionResolved',
+          presentRobotActionResolved(gameId, result),
+        )
+        if (game.phase === 'activation') {
+          scheduleNextAction()
+        } else {
+          dealHands()
+        }
+      } catch (error) {
+        logError('Failed to execute next robot action', error, { gameId })
+        stop()
+        io.to(publicRoom).emit('game.aborted', { gameId })
       }
     })
   }

@@ -13,6 +13,7 @@ export type {
   CardId,
   CardsDealt,
   Coordinate,
+  GameAborted,
   GameId,
   GamePhase,
   GetPublicGameState,
