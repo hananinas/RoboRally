@@ -1,6 +1,7 @@
 import { parseSubmitProgram } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'
 import { Direction, EmptyTile, createSinglePlayerGame } from '@/game/index'
+import { Integer } from '@/numbers'
 
 describe('single-player game', () => {
   it('creates the fixed board, player, and robot', () => {
@@ -10,8 +11,8 @@ describe('single-player game', () => {
     expect(game.players).toEqual([player])
     expect(game.board.width).toBe(21)
     expect(game.board.height).toBe(15)
-    expect(game.board.getTile({ x: 0, y: 0 })).toBeInstanceOf(EmptyTile)
-    expect(game.board.getTile({ x: 20, y: 14 })).toBeInstanceOf(EmptyTile)
+    expect(game.board.getTile({ x: Integer(0), y: Integer(0) })).toBeInstanceOf(EmptyTile)
+    expect(game.board.getTile({ x: Integer(20), y: Integer(14) })).toBeInstanceOf(EmptyTile)
     expect(player.id).toBe('00000000-0000-4000-8000-000000000002')
     expect(player.robot.id).toBe('00000000-0000-4000-8000-000000000003')
     expect(player.robot.direction).toBe(Direction.NORTH)

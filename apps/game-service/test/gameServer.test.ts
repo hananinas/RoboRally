@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Board, EmptyTile, Game, Card } from '@/game/index.ts'
 import { createSharedGame } from '@/game/SinglePlayerGame.ts'
 import { createGameSocketServer, type GameSocketServer } from '@/gameServer.ts'
+import { Integer } from '@/numbers'
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>
 type Joined = Extract<JoinResult, { outcome: 'JOINED' }>
@@ -194,7 +195,7 @@ describe('game membership over Socket.IO', () => {
     expect(await client.timeout(1000).emitWithAck('game.join', { gameId: shared.gameId }))
       .toEqual({ outcome: 'INTERNAL_ERROR' })
     expect(shared.game.players).toEqual([])
-    expect(shared.game.board.occupantAt({ x: 10, y: 7 })).toBeUndefined()
+    expect(shared.game.board.occupantAt({ x: Integer(10), y: Integer(7) })).toBeUndefined()
     expect(server.sockets.sockets.get(client.id!)?.rooms).toEqual(new Set([client.id]))
     expect((await join(client)).state.robots).toHaveLength(1)
   })
@@ -261,7 +262,7 @@ describe('game membership over Socket.IO', () => {
     const left = new Promise((resolve) => second.once('game.playerLeft', resolve))
     expect(await first.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId })).toEqual({ outcome: 'LEFT' })
     expect(await left).toEqual({ gameId: shared.gameId, playerId: initial.assignment.playerId, robotId: initial.assignment.robotId })
-    expect(shared.game.board.occupantAt({ x: 10, y: 7 })).toBeUndefined()
+    expect(shared.game.board.occupantAt({ x: Integer(10), y: Integer(7) })).toBeUndefined()
     expect(server.sockets.sockets.get(first.id!)?.data.user?.username).toBe('First')
     expect(server.sockets.sockets.get(first.id!)?.rooms).toEqual(new Set([first.id]))
     expect(await first.timeout(1000).emitWithAck('game.getPublicGameState', { gameId: shared.gameId })).toEqual({ outcome: 'GAME_NOT_FOUND' })

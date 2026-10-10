@@ -1,13 +1,14 @@
 import type { Instruction } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'
 import { Board, Direction, EmptyTile, Game, Card, Player, Robot } from '@/game/index'
+import { Integer } from '@/numbers'
 
 function createGame(deck: Card[]) {
   const board = new Board(Array.from({ length: 3 }, () =>
     Array.from({ length: 3 }, () => new EmptyTile()),
   ))
   const robot = new Robot('robot-1', Direction.EAST)
-  board.placeRobot(robot.id, { x: 1, y: 1 })
+  board.placeRobot(robot.id, { x: Integer(1), y: Integer(1) })
   const player = new Player('player-1', robot)
   const game = new Game(board, [player], deck)
   return { board, robot, player, game }
@@ -87,7 +88,7 @@ describe('Game activation loop', () => {
 function resolveCard(instruction: Instruction, direction: Direction, tiles: EmptyTile[][]) {
   const board = new Board(tiles)
   const robot = new Robot('robot', direction)
-  board.placeRobot(robot.id, { x: 3, y: 3 })
+  board.placeRobot(robot.id, { x: Integer(3), y: Integer(3) })
   const player = new Player('player', robot)
   const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, instruction))
   const game = new Game(board, [player], cards)

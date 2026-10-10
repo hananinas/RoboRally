@@ -5,6 +5,7 @@ import { io as connectSocket, type Socket } from 'socket.io-client'
 import { expect, it } from 'vitest'
 import { Board, Card, EmptyTile, Game, type Player } from '@/game/index.ts'
 import { createGameSocketServer } from '@/gameServer.ts'
+import { Integer } from '@/numbers'
 
 it('waits for the roster, broadcasts register-major actions, and deals two private next rounds', async () => {
   const gameId = '00000000-0000-4000-8000-000000000001'
@@ -39,7 +40,9 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
         `00000000-0000-4000-8000-00000000${index + 2}${cardIndex.toString().padStart(3, '0')}`, 'TURN_LEFT',
       )))
       board.removeRobot(player.robot.id)
-      board.placeRobot(player.robot.id, index === 0 ? { x: 0, y: 2 } : { x: 1, y: 1 })
+      board.placeRobot(player.robot.id, index === 0
+        ? { x: Integer(0), y: Integer(2) }
+        : { x: Integer(1), y: Integer(1) })
     }
 
     for (const socket of clients) {

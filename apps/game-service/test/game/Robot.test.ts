@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Direction, Card, Robot } from '@/game/index'
+import { UnsignedInteger } from '@/numbers'
 
 describe('Robot', () => {
   it.each([
@@ -50,9 +51,9 @@ describe('Robot', () => {
     program.reverse()
 
     expect(robot.id).toBe('robot-1')
-    expect(robot.getProgramCard(0)).toBe(program[4])
-    expect(robot.getProgramCard(1)).toBeInstanceOf(Card)
-    expect(robot.getProgramCard(4)).toBe(program[0])
+    expect(robot.getProgramCard(UnsignedInteger(0))).toBe(program[4])
+    expect(robot.getProgramCard(UnsignedInteger(1))).toBeInstanceOf(Card)
+    expect(robot.getProgramCard(UnsignedInteger(4))).toBe(program[0])
 
     const exposedProgram = robot.program as Card[]
     exposedProgram.pop()
@@ -65,11 +66,9 @@ describe('Robot', () => {
     expect(() =>
       robot.setProgram(Array.from({ length: 6 }, (_, index) => new Card(`extra-${index}`, 'MOVE_1'))),
     ).toThrow(RangeError)
-    expect(() => robot.getProgramCard(0)).toThrow()
+    expect(() => robot.getProgramCard(UnsignedInteger(0))).toThrow()
 
     robot.setProgram(Array.from({ length: 5 }, (_, index) => new Card(`move-${index}`, 'MOVE_1')))
-    for (const index of [-1, 5, 1.5]) {
-      expect(() => robot.getProgramCard(index)).toThrow(RangeError)
-    }
+    expect(() => robot.getProgramCard(UnsignedInteger(5))).toThrow(RangeError)
   })
 })

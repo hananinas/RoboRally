@@ -6,6 +6,7 @@ import { Player } from '@/game/Player'
 import { Robot } from '@/game/Robot'
 import { Direction } from '@/game/spatial'
 import { EmptyTile } from '@/game/Tile'
+import { Integer } from '@/numbers'
 
 const BOARD_WIDTH = 21
 const BOARD_HEIGHT = 15
@@ -56,7 +57,7 @@ export function createSharedGame(): Readonly<{ gameId: GameId; game: Game }> {
 export function createSinglePlayerGame(): SinglePlayerGame {
   const board = createBoard()
   const robot = new Robot(ROBOT_ID, Direction.NORTH)
-  board.placeRobot(robot.id, { x: 10, y: 7 })
+  board.placeRobot(robot.id, { x: Integer(10), y: Integer(7) })
 
   const player = new Player(PLAYER_ID, robot)
   const game = new Game(board, [player], createHand())

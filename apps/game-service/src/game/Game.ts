@@ -7,6 +7,7 @@ import type { PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
 import { Robot } from '@/game/Robot'
 import { Direction, opposite, type Position } from '@/game/spatial'
+import { Integer, PositiveInteger, UnsignedInteger } from '@/numbers'
 
 export type GamePhase = 'programming' | 'activation'
 
@@ -42,7 +43,7 @@ export class Game {
     board: Board,
     players: readonly Player[],
     deck: readonly Card[],
-    antenna: Antenna = { x: Math.floor(board.width / 2), y: 0, angle: Math.PI / 2 },
+    antenna: Antenna = { x: Integer(Math.floor(board.width / 2)), y: Integer(0), angle: Math.PI / 2 },
   ) {
     if (deck.length < 5 || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')
@@ -106,13 +107,13 @@ export class Game {
     const { width, height } = this.board
     const y = Math.floor(height / 2)
     let x = Math.floor(width / 2)
-    while (x >= 0 && this.board.occupantAt({ x, y }) !== undefined) x--
+    while (x >= 0 && this.board.occupantAt({ x: Integer(x), y: Integer(y) }) !== undefined) x--
     if (x < 0) return err('NO_SPAWN_AVAILABLE')
 
     const robot = new Robot(randomUUID(), Direction.NORTH)
     const hand = this.deck.map((card) => new Card(randomUUID(), card.instruction))
     const player = new Player(randomUUID(), robot, hand)
-    this.board.placeRobot(robot.id, { x, y })
+    this.board.placeRobot(robot.id, { x: Integer(x), y: Integer(y) })
     this.roster.push(player)
     return ok(player)
   }
@@ -185,7 +186,7 @@ export class Game {
     if (!robot) throw new Error('No robots remain to activate')
 
     const registerIndex = this.registerIndex
-    const card = robot.getProgramCard(registerIndex)
+    const card = robot.getProgramCard(UnsignedInteger(registerIndex))
     this.executeCard(robot, card)
     this.activatedRobotIds.add(robot.id)
     const action: RobotActionResult = {
@@ -246,7 +247,7 @@ export class Game {
     const effect = instructions[card.instruction]
     if (effect.kind === 'move') {
       const direction = effect.steps < 0 ? opposite(robot.direction) : robot.direction
-      this.board.moveRobot(robot.id, direction, Math.abs(effect.steps))
+      this.board.moveRobot(robot.id, direction, PositiveInteger(Math.abs(effect.steps)))
     } else {
       robot.turn(effect.quarterTurns)
     }

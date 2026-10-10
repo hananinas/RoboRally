@@ -19,6 +19,7 @@ import {
   presentPublicGameState,
   presentRobotActionResolved,
 } from '@/gamePresenter.ts'
+import { Integer } from '@/numbers'
 
 describe('game presenter', () => {
   it('presents a complete public programming state in row-major order', () => {
@@ -60,7 +61,7 @@ describe('game presenter', () => {
       ],
     ])
     const robot = new Robot('robot', Direction.EAST)
-    board.placeRobot(robot.id, { x: 0, y: 0 })
+    board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })
     const player = new Player('player', robot)
     const cards = Array.from(
       { length: 5 },
@@ -117,7 +118,7 @@ describe('game presenter', () => {
     const action = {
       robotId: player.robot.id,
       card: player.hand[cardIndex],
-      position: { x: 4, y: 5 },
+      position: { x: Integer(4), y: Integer(5) },
       direction: Direction.SOUTH,
     }
 

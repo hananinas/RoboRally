@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { Board, Card, Direction, EmptyTile, Game, Player, Robot } from '@/game/index.ts'
 import type { Antenna, MovementResult, Position, RobotId } from '@/game/index.ts'
+import { Integer, PositiveInteger } from '@/numbers'
 
 function createMultiplayerGame(
   positions: readonly Position[],
-  antenna: Antenna = { x: 4, y: 4, angle: Math.PI / 2 },
+  antenna: Antenna = { x: Integer(4), y: Integer(4), angle: Math.PI / 2 },
   board = new Board(Array.from({ length: 9 }, () =>
     Array.from({ length: 9 }, () => new EmptyTile()),
   )),
@@ -21,7 +22,7 @@ function createMultiplayerGame(
 
 describe('Game fixed-roster programming', () => {
   it('waits for every player and preserves accepted programs after rejected submissions', () => {
-    const { players, deck, game } = createMultiplayerGame([{ x: 4, y: 5 }, { x: 5, y: 4 }])
+    const { players, deck, game } = createMultiplayerGame([{ x: Integer(4), y: Integer(5) }, { x: Integer(5), y: Integer(4) }])
     const firstProgram = deck.slice(0, 5)
     const secondProgram = deck.slice(1, 6).reverse()
     game.submitProgram(players[0].id, firstProgram)
@@ -51,7 +52,7 @@ describe('Game fixed-roster programming', () => {
   })
 
   it('copies the fixed roster and keeps an empty roster idle', () => {
-    const { board, players, deck, game } = createMultiplayerGame([{ x: 4, y: 5 }])
+    const { board, players, deck, game } = createMultiplayerGame([{ x: Integer(4), y: Integer(5) }])
     const player = players[0]
     players.length = 0
     expect(game.players).toEqual([player])
@@ -68,26 +69,25 @@ describe('Game fixed-roster programming', () => {
   })
 
   it('rejects duplicate player IDs, duplicate robot IDs, and unplaced robots', () => {
-    const { board, players, deck } = createMultiplayerGame([{ x: 4, y: 5 }, { x: 5, y: 4 }])
+    const { board, players, deck } = createMultiplayerGame([{ x: Integer(4), y: Integer(5) }, { x: Integer(5), y: Integer(4) }])
     expect(() => new Game(board, [players[0], new Player(players[0].id, players[1].robot)], deck)).toThrow(RangeError)
     expect(() => new Game(board, [players[0], new Player('other', new Robot(players[0].robot.id, Direction.NORTH))], deck)).toThrow(RangeError)
     expect(() => new Game(board, [new Player('unplaced', new Robot('unplaced', Direction.NORTH))], deck)).toThrow()
   })
 
   it('validates and freezes an independent positioned antenna', () => {
-    const antenna = { x: 4, y: 4, angle: Math.PI / 2 }
-    const { board, players, deck, game } = createMultiplayerGame([{ x: 4, y: 5 }], antenna)
-    antenna.x = 0
+    const antenna = { x: Integer(4), y: Integer(4), angle: Math.PI / 2 }
+    const { board, players, deck, game } = createMultiplayerGame([{ x: Integer(4), y: Integer(5) }], antenna)
+    antenna.x = Integer(0)
     antenna.angle = 0
     expect(game.antenna).toEqual({ x: 4, y: 4, angle: Math.PI / 2 })
     expect(() => Object.assign(game.antenna, { angle: 0 })).toThrow()
     expect(new Game(board, players, deck).antenna).toEqual({ x: 4, y: 0, angle: Math.PI / 2 })
     for (const invalid of [
-      { x: -1, y: 0, angle: 0 },
-      { x: 0, y: board.height, angle: 0 },
-      { x: 0.5, y: 0, angle: 0 },
-      { x: 0, y: 0, angle: Infinity },
-      { x: 0, y: 0, angle: NaN },
+      { x: Integer(-1), y: Integer(0), angle: 0 },
+      { x: Integer(0), y: Integer(board.height), angle: 0 },
+      { x: Integer(0), y: Integer(0), angle: Infinity },
+      { x: Integer(0), y: Integer(0), angle: NaN },
     ]) {
       expect(() => new Game(board, players, deck, invalid)).toThrow(RangeError)
     }
@@ -96,7 +96,7 @@ describe('Game fixed-roster programming', () => {
 
 describe('Game multiplayer activation', () => {
   it('advances the register when the only robot still waiting to act leaves', () => {
-    const { players, deck, game } = createMultiplayerGame([{ x: 4, y: 5 }, { x: 5, y: 4 }])
+    const { players, deck, game } = createMultiplayerGame([{ x: Integer(4), y: Integer(5) }, { x: Integer(5), y: Integer(4) }])
     for (const player of players) game.submitProgram(player.id, deck.slice(0, 5))
     expect(game.executeNextAction().action.robotId).toBe(players[0].robot.id)
 
@@ -108,7 +108,7 @@ describe('Game multiplayer activation', () => {
   })
 
   it('returns to programming when the last member leaves during activation', () => {
-    const { players, deck, game } = createMultiplayerGame([{ x: 4, y: 5 }])
+    const { players, deck, game } = createMultiplayerGame([{ x: Integer(4), y: Integer(5) }])
     game.submitProgram(players[0].id, deck.slice(0, 5))
 
     game.removePlayer(players[0].id)
@@ -121,9 +121,9 @@ describe('Game multiplayer activation', () => {
 
   it('executes every robot in register-major order and resets every hand and barrier for two rounds', () => {
     const { players, deck, game } = createMultiplayerGame([
-      { x: 5, y: 4 },
-      { x: 4, y: 5 },
-      { x: 4, y: 6 },
+      { x: Integer(5), y: Integer(4) },
+      { x: Integer(4), y: Integer(5) },
+      { x: Integer(4), y: Integer(6) },
     ])
     const expectedOrder = [players[1], players[0], players[2]]
     const programs = players.map((_, playerIndex) =>
@@ -163,13 +163,13 @@ describe('Game multiplayer activation', () => {
 
   it('ranks Manhattan distance before clockwise angle, including wraparound', () => {
     const { players, deck, game } = createMultiplayerGame([
-      { x: 5, y: 2 },
-      { x: 2, y: 2 },
-      { x: 2, y: 4 },
-      { x: 4, y: 2 },
-      { x: 5, y: 4 },
-      { x: 6, y: 4 },
-    ], { x: 4, y: 4, angle: 7 * Math.PI / 4 })
+      { x: Integer(5), y: Integer(2) },
+      { x: Integer(2), y: Integer(2) },
+      { x: Integer(2), y: Integer(4) },
+      { x: Integer(4), y: Integer(2) },
+      { x: Integer(5), y: Integer(4) },
+      { x: Integer(6), y: Integer(4) },
+    ], { x: Integer(4), y: Integer(4), angle: 7 * Math.PI / 4 })
     for (const player of players) game.submitProgram(player.id, deck.slice(0, 5))
     const order = players.map(() => game.executeNextAction().action.robotId)
     // The distance-three robot precedes the Euclidean-nearer distance-four robot.
@@ -188,14 +188,14 @@ describe('Game multiplayer activation', () => {
     class TiedPositionBoard extends Board {
       override positionOf(robotId: RobotId): Position {
         super.positionOf(robotId)
-        return { x: 4, y: 5 }
+        return { x: Integer(4), y: Integer(5) }
       }
     }
     const board = new TiedPositionBoard(Array.from({ length: 9 }, () =>
       Array.from({ length: 9 }, () => new EmptyTile()),
     ))
     const { players, deck, game } = createMultiplayerGame(
-      [{ x: 4, y: 5 }, { x: 5, y: 4 }], undefined, board,
+      [{ x: Integer(4), y: Integer(5) }, { x: Integer(5), y: Integer(4) }], undefined, board,
     )
     for (const player of [...players].reverse()) game.submitProgram(player.id, deck.slice(0, 5))
     expect(game.executeNextAction().action.robotId).toBe(players[0].robot.id)
@@ -204,9 +204,9 @@ describe('Game multiplayer activation', () => {
 
   it('recalculates pending priority from positions changed by an earlier action', () => {
     class DisplacingBoard extends Board {
-      override moveRobot(robotId: RobotId, direction: Direction, steps: number): MovementResult {
+      override moveRobot(robotId: RobotId, direction: Direction, steps: PositiveInteger): MovementResult {
         const result = super.moveRobot(robotId, direction, steps)
-        if (robotId === 'robot-0') super.moveRobot('robot-1', Direction.SOUTH, 2)
+        if (robotId === 'robot-0') super.moveRobot('robot-1', Direction.SOUTH, PositiveInteger(2))
         return result
       }
     }
@@ -215,7 +215,7 @@ describe('Game multiplayer activation', () => {
     ))
     const deck = Array.from({ length: 5 }, (_, index) => new Card(`move-${index}`, 'MOVE_1'))
     const { players, game } = createMultiplayerGame(
-      [{ x: 4, y: 5 }, { x: 4, y: 6 }, { x: 6, y: 4 }], undefined, board, deck,
+      [{ x: Integer(4), y: Integer(5) }, { x: Integer(4), y: Integer(6) }, { x: Integer(6), y: Integer(4) }], undefined, board, deck,
     )
     for (const player of players) game.submitProgram(player.id, deck)
     expect(game.executeNextAction().action.robotId).toBe(players[0].robot.id)
@@ -228,7 +228,7 @@ describe('Game multiplayer activation', () => {
   it('reports blocked actions and keeps earlier position snapshots independent', () => {
     const deck = Array.from({ length: 5 }, (_, index) => new Card(`move-${index}`, 'MOVE_1'))
     const { board, players, game } = createMultiplayerGame(
-      [{ x: 7, y: 4 }, { x: 6, y: 4 }], { x: 8, y: 4, angle: 0 }, undefined, deck,
+      [{ x: Integer(7), y: Integer(4) }, { x: Integer(6), y: Integer(4) }], { x: Integer(8), y: Integer(4), angle: 0 }, undefined, deck,
     )
     for (const player of players) game.submitProgram(player.id, deck)
     const first = game.executeNextAction()
@@ -240,7 +240,7 @@ describe('Game multiplayer activation', () => {
     expect(robotBlocked.action).toMatchObject({ robotId: players[1].robot.id, card: deck[1], position: { x: 7, y: 4 } })
     expect(game.currentRegister).toBe(2)
 
-    board.moveRobot(players[0].robot.id, Direction.NORTH, 1)
+    board.moveRobot(players[0].robot.id, Direction.NORTH, PositiveInteger(1))
     expect(board.positionOf(players[0].robot.id)).toEqual({ x: 8, y: 3 })
     expect(first.action.position).toEqual({ x: 8, y: 4 })
     expect(edgeBlocked.action.position).toEqual({ x: 8, y: 4 })

@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { Board, Direction, EmptyTile, Game, Card, Player, Robot } from '@/game/index'
+import { Integer } from '@/numbers'
 
 function createGame() {
   const board = new Board([[new EmptyTile(), new EmptyTile()]])
   const robot = new Robot('robot-1', Direction.EAST)
-  board.placeRobot(robot.id, { x: 0, y: 0 })
+  board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })
   const player = new Player('player-1', robot)
   const deck: Card[] = [
     new Card('move-1', 'MOVE_1'),
@@ -24,7 +25,7 @@ describe('Game programming', () => {
       Array.from({ length: 15 }, () => new EmptyTile()),
     ))
     const robot = new Robot('robot-1', Direction.EAST)
-    board.placeRobot(robot.id, { x: 5, y: 5 })
+    board.placeRobot(robot.id, { x: Integer(5), y: Integer(5) })
     const player = new Player('player-1', robot)
     const deck = [
       new Card('move-2', 'MOVE_2'),
