@@ -1,6 +1,15 @@
 import { createServer } from 'node:http'
 import { parseGameServicePort } from '@/config'
 import { createGameSocketServer } from '@/gameServer'
+import { logError } from '@/logger'
+
+process.on('uncaughtException', (error) => {
+  logError('Uncaught exception', error, { source: 'process' })
+})
+
+process.on('unhandledRejection', (reason) => {
+  logError('Unhandled promise rejection', reason, { source: 'process' })
+})
 
 const host = '127.0.0.1'
 const port = parseGameServicePort(process.env.PORT)
