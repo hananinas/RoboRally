@@ -134,3 +134,60 @@ describe('Game programming', () => {
   })
 
 })
+
+describe('Game.addPlayer', () => {
+  function createEmptyGame(width = 3) {
+    const board = new Board([Array.from({ length: width }, () => new EmptyTile())])
+    const deck = [
+      new Card('move-1', 'MOVE_1'),
+      new Card('left-1', 'TURN_LEFT'),
+      new Card('move-2', 'MOVE_1'),
+      new Card('left-2', 'TURN_LEFT'),
+      new Card('move-3', 'MOVE_1'),
+    ]
+    return { board, deck, game: new Game(board, [], deck) }
+  }
+
+  it('creates and places a player with a private hand drawn from the deck', () => {
+    const { board, deck, game } = createEmptyGame()
+
+    const result = game.addPlayer()
+
+    expect(result.isOk()).toBe(true)
+    const player = result._unsafeUnwrap()
+    expect(game.players).toEqual([player])
+    expect(player.robot.direction).toBe(Direction.NORTH)
+    expect(board.positionOf(player.robot.id)).toEqual({ x: 1, y: 0 })
+    expect(player.hand.map((card) => card.instruction)).toEqual(deck.map((card) => card.instruction))
+    expect(player.hand.map((card) => card.id)).not.toEqual(deck.map((card) => card.id))
+  })
+
+  it('gives each added player a hand with distinct card IDs', () => {
+    const { game } = createEmptyGame()
+
+    const first = game.addPlayer()._unsafeUnwrap()
+    const second = game.addPlayer()._unsafeUnwrap()
+
+    expect(second.hand.every((card) => !first.hand.some((other) => other.id === card.id))).toBe(true)
+  })
+
+  it('rejects adding a player once the game has started', () => {
+    const { game, player, deck } = createGame()
+    game.submitProgram(player.id, deck.slice(0, 5))
+
+    const result = game.addPlayer()
+
+    expect(result.isErr()).toBe(true)
+    expect(result._unsafeUnwrapErr()).toBe('GAME_ALREADY_STARTED')
+  })
+
+  it('rejects adding a player when no spawn tile is free', () => {
+    const { game } = createEmptyGame(1)
+    game.addPlayer()
+
+    const result = game.addPlayer()
+
+    expect(result.isErr()).toBe(true)
+    expect(result._unsafeUnwrapErr()).toBe('NO_SPAWN_AVAILABLE')
+  })
+})

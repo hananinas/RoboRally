@@ -1,10 +1,12 @@
+import { randomUUID } from 'node:crypto'
+import { err, ok, type Result } from 'neverthrow'
 import type { Board } from '@/game/Board'
 import { instructions } from '@robo-rally/game-events'
-import type { Card } from '@/game/Card'
+import { Card } from '@/game/Card'
 import type { PlayerId, RobotId } from '@/game/ids'
-import type { Player } from '@/game/Player'
-import type { Robot } from '@/game/Robot'
-import { opposite, type Direction, type Position } from '@/game/spatial'
+import { Player } from '@/game/Player'
+import { Robot } from '@/game/Robot'
+import { Direction, opposite, type Position } from '@/game/spatial'
 
 export type GamePhase = 'programming' | 'activation'
 
@@ -21,6 +23,8 @@ export type NextActionResult = Readonly<{
   registerIndex: number
   action: RobotActionResult
 }>
+
+export type AddPlayerError = 'GAME_ALREADY_STARTED' | 'NO_SPAWN_AVAILABLE'
 
 export class Game {
   readonly board: Board
@@ -97,20 +101,20 @@ export class Game {
     return this.submittedPlayerIds.has(playerId)
   }
 
-  addPlayer(player: Player): boolean {
-    if (this.started) throw new Error('Game has already started')
-    if (this.roster.some((member) => member.id === player.id || member.robot.id === player.robot.id)) {
-      throw new Error('Player or robot is already in the game')
-    }
+  addPlayer(): Result<Player, AddPlayerError> {
+    if (this.started) return err('GAME_ALREADY_STARTED')
     const { width, height } = this.board
     const y = Math.floor(height / 2)
     let x = Math.floor(width / 2)
     while (x >= 0 && this.board.occupantAt({ x, y }) !== undefined) x--
-    if (x < 0) return false
-    this.board.placeRobot(player.robot.id, { x, y })
-    if (player.hand.length === 0) player.setHand(this.deck)
+    if (x < 0) return err('NO_SPAWN_AVAILABLE')
+
+    const robot = new Robot(randomUUID(), Direction.NORTH)
+    const hand = this.deck.map((card) => new Card(randomUUID(), card.instruction))
+    const player = new Player(randomUUID(), robot, hand)
+    this.board.placeRobot(robot.id, { x, y })
     this.roster.push(player)
-    return true
+    return ok(player)
   }
 
   removePlayer(playerId: PlayerId): void {

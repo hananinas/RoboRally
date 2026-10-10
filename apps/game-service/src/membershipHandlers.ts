@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import { err, ok, type Result } from 'neverthrow'
 import {
   joinGameSchema,
@@ -14,13 +13,11 @@ import {
   type User,
 } from '@robo-rally/game-events'
 import {
-  Player,
-  Robot,
-  Direction,
+  type AddPlayerError,
   type Game,
+  type Player,
 } from '@/game/index'
 import { presentCardsDealt } from '@/gamePresenter'
-import { createHand } from '@/game/SinglePlayerGame'
 import type { ActionScheduler } from '@/actionScheduler'
 import type { GameSocket, GameSocketServer } from '@/gameServer'
 
@@ -95,22 +92,16 @@ type MembershipSuccess = {
   reconnected: boolean
   previousConnectionId: string | null
 }
-type MembershipFailure = 'USER_ALREADY_IN_GAME' | 'GAME_ALREADY_STARTED' | 'NO_SPAWN_AVAILABLE' | 'INTERNAL_ERROR'
+type MembershipFailure = 'USER_ALREADY_IN_GAME' | AddPlayerError
 type MembershipResolution = Result<MembershipSuccess, MembershipFailure>
 
 function addMembership(ctx: MembershipContext, socket: GameSocket, user: User): MembershipResolution {
   const { game, memberships } = ctx
-  if (game.hasStarted) return err('GAME_ALREADY_STARTED')
-  const player = new Player(randomUUID(), new Robot(randomUUID(), Direction.NORTH),
-    createHand(Array.from({ length: 9 }, () => randomUUID())))
-  try {
-    if (!game.addPlayer(player)) return err('NO_SPAWN_AVAILABLE')
-  } catch {
-    return err('INTERNAL_ERROR')
-  }
-  const membership = { user, player, connectionId: socket.id }
-  memberships.set(user.userId, membership)
-  return ok({ membership, isNew: true, reconnected: false, previousConnectionId: null })
+  return game.addPlayer().map((player) => {
+    const membership: GameMembership = { user, player, connectionId: socket.id }
+    memberships.set(user.userId, membership)
+    return { membership, isNew: true, reconnected: false, previousConnectionId: null }
+  })
 }
 
 function reattachExistingMembership(
