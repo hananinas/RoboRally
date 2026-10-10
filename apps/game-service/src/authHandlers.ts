@@ -5,6 +5,7 @@ import {
   type LoginAcknowledgement,
 } from '@robo-rally/game-events'
 import type { GameSocket } from '@/gameServer'
+import { logError } from '@/logger'
 import type { UserRegistry } from '@/userRegistry'
 
 export type AuthHandlerDeps = {
@@ -23,6 +24,7 @@ export function handleLogin(
   try {
     username = parseLogin(payload).username
   } catch (error) {
+    logError('Rejected login request', error, { payload })
     acknowledge({
       outcome:
         error instanceof LoginRequestError ? error.outcome : 'INTERNAL_ERROR',
@@ -43,7 +45,8 @@ export function handleLogin(
     const user = users.findOrCreate(username)
     socket.data.user = user
     acknowledge({ outcome: 'LOGGED_IN', user })
-  } catch {
+  } catch (error) {
+    logError('Failed to find or create user', error, { username })
     acknowledge({ outcome: 'INTERNAL_ERROR' })
   }
 }

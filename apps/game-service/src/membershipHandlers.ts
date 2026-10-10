@@ -18,6 +18,7 @@ import {
   type Player,
 } from '@/game/index'
 import { presentCardsDealt } from '@/gamePresenter'
+import { logError } from '@/logger'
 import type { ActionScheduler } from '@/actionScheduler'
 import type { GameSocket, GameSocketServer } from '@/gameServer'
 
@@ -172,7 +173,8 @@ export function handleJoin(
       hand: presentCardsDealt(gameId, player).cards,
       programSubmitted: game.hasSubmittedProgram(player.id),
     }
-  } catch {
+  } catch (error) {
+    logError('Failed to build join response', error, { gameId, playerId: player.id })
     rollbackMembership(ctx, { membership, isNew, previousConnectionId, user })
     acknowledge({ outcome: 'INTERNAL_ERROR' })
     return
@@ -246,8 +248,9 @@ export function handleGetPublicGameState(
       })
       return
     }
-  } catch {
+  } catch (error) {
     // Invalid requests receive the same non-disclosing result as unknown games.
+    logError('Rejected public game state request', error, { gameId: ctx.gameId, payload })
   }
 
   acknowledge({ outcome: 'GAME_NOT_FOUND' })

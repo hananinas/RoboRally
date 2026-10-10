@@ -7,6 +7,7 @@ import {
 import { err, ok, type Result } from 'neverthrow'
 import type { Card, Player } from '@/game/index'
 import type { GameSocket } from '@/gameServer'
+import { logError } from '@/logger'
 import { ownedMembership, type MembershipContext } from '@/membershipHandlers'
 
 function findProgramCards(
@@ -42,7 +43,8 @@ export function handleSubmitProgram(
       throw new Error('Program does not belong to this game')
     }
     ctx.game.submitProgram(player.id, programCards.value)
-  } catch {
+  } catch (error) {
+    logError('Rejected program submission', error, { gameId: ctx.gameId, playerId: player.id })
     acknowledge({ outcome: 'INVALID_PROGRAM' })
     return
   }
