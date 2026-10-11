@@ -154,37 +154,49 @@ export function handleJoin(
 ): void {
   if (typeof acknowledge !== 'function') return
   const { game, gameId, publicRoom, playerRoom, publicState } = ctx
-  const resolution = validateMembershipRequest(ctx, joinGameSchema, payload, socket.data.user)
-    .andThen((user) => joinOrReconnectMembership(ctx, socket, user))
-  if (resolution.isErr()) return acknowledge({ outcome: resolution.error })
-  const { membership, isNew, reconnected, previousConnectionId } = resolution.value
-  const { player } = membership
 
-  let result: Extract<JoinResult, { outcome: 'JOINED' }>
+  let membership: GameMembership | undefined
+  let isNew = false
+  let previousConnectionId: string | null = null
+  let acknowledged = false
+
   try {
-    result = {
+    const resolution = validateMembershipRequest(ctx, joinGameSchema, payload, socket.data.user)
+      .andThen((user) => joinOrReconnectMembership(ctx, socket, user))
+    if (resolution.isErr()) {
+      acknowledged = true
+      acknowledge({ outcome: resolution.error })
+      return
+    }
+    membership = resolution.value.membership
+    isNew = resolution.value.isNew
+    previousConnectionId = resolution.value.previousConnectionId
+    const { reconnected } = resolution.value
+    const { player } = membership
+
+    const result: Extract<JoinResult, { outcome: 'JOINED' }> = {
       outcome: 'JOINED',
       assignment: { gameId, playerId: player.id, robotId: player.robot.id },
       state: publicState(),
       hand: presentCardsDealt(gameId, player).cards,
       programSubmitted: game.hasSubmittedProgram(player.id),
     }
+    void socket.join([publicRoom, playerRoom(player.id)])
+    acknowledged = true
+    acknowledge(result)
+    if (isNew) {
+      socket.to(publicRoom).emit('game.playerJoined', {
+        gameId,
+        player: result.state.players.find((candidate) => candidate.playerId === player.id)!,
+        robot: result.state.robots.find((robot) => robot.robotId === player.robot.id)!,
+      })
+    } else if (reconnected) {
+      notifyReconnected(ctx, player.id)
+    }
   } catch (error) {
-    logError('Failed to build join response', error, { command: 'game.join', playerId: player.id, payload })
-    rollbackMembership(ctx, { membership, isNew, previousConnectionId })
-    acknowledge({ outcome: 'INTERNAL_ERROR' })
-    return
-  }
-  void socket.join([publicRoom, playerRoom(player.id)])
-  acknowledge(result)
-  if (isNew) {
-    socket.to(publicRoom).emit('game.playerJoined', {
-      gameId,
-      player: result.state.players.find((candidate) => candidate.playerId === player.id)!,
-      robot: result.state.robots.find((robot) => robot.robotId === player.robot.id)!,
-    })
-  } else if (reconnected) {
-    notifyReconnected(ctx, player.id)
+    logError('Failed to process game join', error, { command: 'game.join', gameId, payload })
+    if (membership && !acknowledged) rollbackMembership(ctx, { membership, isNew, previousConnectionId })
+    if (!acknowledged) acknowledge({ outcome: 'INTERNAL_ERROR' })
   }
 }
 
@@ -196,35 +208,56 @@ export function handleLeave(
 ): void {
   if (typeof acknowledge !== 'function') return
   const { io, game, gameId, memberships, publicRoom, playerRoom, actionScheduler } = ctx
-  const verdict = validateMembershipRequest(ctx, leaveGameSchema, payload, socket.data.user)
-  if (verdict.isErr()) return acknowledge({ outcome: verdict.error })
-  const membership = ownedMembership(ctx, socket)
-  if (!membership) {
-    acknowledge({ outcome: 'GAME_NOT_FOUND' })
-    return
+
+  let acknowledged = false
+  let playerId: string | undefined
+  try {
+    const verdict = validateMembershipRequest(ctx, leaveGameSchema, payload, socket.data.user)
+    if (verdict.isErr()) {
+      acknowledged = true
+      acknowledge({ outcome: verdict.error })
+      return
+    }
+    const membership = ownedMembership(ctx, socket)
+    if (!membership) {
+      acknowledged = true
+      acknowledge({ outcome: 'GAME_NOT_FOUND' })
+      return
+    }
+    const { player, user } = membership
+    playerId = player.id
+
+    const phaseBeforeLeave = game.phase
+    game.removePlayer(player.id)
+    memberships.delete(user.userId)
+    void socket.leave(publicRoom)
+    void socket.leave(playerRoom(player.id))
+    acknowledged = true
+    acknowledge({ outcome: 'LEFT' })
+    io.to(publicRoom).emit('game.playerLeft', {
+      gameId, playerId: player.id, robotId: player.robot.id,
+    })
+    if (phaseBeforeLeave === 'activation' && game.phase === 'programming') actionScheduler.dealHands()
+    actionScheduler.scheduleNextAction()
+  } catch (error) {
+    logError('Failed to process player leaving', error, { command: 'game.leave', gameId, playerId })
+    if (!acknowledged) acknowledge({ outcome: 'INTERNAL_ERROR' })
   }
-  const { player, user } = membership
-  const phaseBeforeLeave = game.phase
-  game.removePlayer(player.id)
-  memberships.delete(user.userId)
-  void socket.leave(publicRoom)
-  void socket.leave(playerRoom(player.id))
-  acknowledge({ outcome: 'LEFT' })
-  io.to(publicRoom).emit('game.playerLeft', {
-    gameId, playerId: player.id, robotId: player.robot.id,
-  })
-  if (phaseBeforeLeave === 'activation' && game.phase === 'programming') actionScheduler.dealHands()
-  actionScheduler.scheduleNextAction()
 }
 
 export function handleDisconnect(ctx: MembershipContext, socket: GameSocket): void {
   const membership = ownedMembership(ctx, socket)
   if (!membership) return
-  membership.connectionId = null
-  ctx.game.pause()
-  ctx.io.to(ctx.publicRoom).emit('game.playerConnectionChanged', {
-    gameId: ctx.gameId, playerId: membership.player.id, connected: false, paused: ctx.game.paused,
-  })
+
+  try {
+    membership.connectionId = null
+    ctx.game.pause()
+    ctx.io.to(ctx.publicRoom).emit('game.playerConnectionChanged', {
+      gameId: ctx.gameId, playerId: membership.player.id, connected: false, paused: ctx.game.paused,
+    })
+  } catch (error) {
+    logError('Failed to process player disconnect', error, { command: 'disconnect', gameId: ctx.gameId, playerId: membership.player.id })
+  }
 }
 
 export function handleGetPublicGameState(

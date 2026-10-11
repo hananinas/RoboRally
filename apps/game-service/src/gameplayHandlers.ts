@@ -26,40 +26,54 @@ export function handleSubmitProgram(
   acknowledge: ProgramResultAcknowledgement,
 ): void {
   if (typeof acknowledge !== 'function') return
-  const player = ownedMembership(ctx, socket)?.player
-  if (!player) {
-    acknowledge({ outcome: 'INVALID_PROGRAM' })
-    return
+
+  let acknowledged = false
+  let playerId: string | undefined
+  try {
+    const player = ownedMembership(ctx, socket)?.player
+    if (!player) {
+      acknowledged = true
+      acknowledge({ outcome: 'INVALID_PROGRAM' })
+      return
+    }
+    playerId = player.id
+
+    const parsed = submitProgramSchema.safeParse(payload)
+    if (!parsed.success) {
+      logError('Rejected malformed program submission', parsed.error, { command: 'program.submit', gameId: ctx.gameId, playerId: player.id, payload })
+      acknowledged = true
+      acknowledge({ outcome: 'INVALID_PROGRAM' })
+      return
+    }
+    const submission = parsed.data
+    if (submission.gameId !== ctx.gameId || submission.playerId !== player.id) {
+      acknowledged = true
+      acknowledge({ outcome: 'INVALID_PROGRAM' })
+      return
+    }
+
+    const result = findProgramCards(player, submission.cardIds)
+      .andThen((programCards) => ctx.game.submitProgram(player.id, programCards))
+
+    if (result.isErr()) {
+      const outcome = result.error === 'GAME_PAUSED' || result.error === 'ALREADY_SUBMITTED' || result.error === 'WRONG_PHASE'
+        ? result.error
+        : 'INVALID_PROGRAM'
+      acknowledged = true
+      acknowledge({ outcome })
+      return
+    }
+
+    acknowledged = true
+    acknowledge({ outcome: 'ACCEPTED' })
+    socket.to(ctx.publicRoom).emit('program.submitted', {
+      gameId: ctx.gameId,
+      playerId: player.id,
+    })
+
+    ctx.actionScheduler.scheduleNextAction()
+  } catch (error) {
+    logError('Failed to process program submission', error, { command: 'program.submit', gameId: ctx.gameId, playerId, payload })
+    if (!acknowledged) acknowledge({ outcome: 'INVALID_PROGRAM' })
   }
-
-  const parsed = submitProgramSchema.safeParse(payload)
-  if (!parsed.success) {
-    logError('Rejected malformed program submission', parsed.error, { command: 'program.submit', gameId: ctx.gameId, playerId: player.id, payload })
-    acknowledge({ outcome: 'INVALID_PROGRAM' })
-    return
-  }
-  const submission = parsed.data
-  if (submission.gameId !== ctx.gameId || submission.playerId !== player.id) {
-    acknowledge({ outcome: 'INVALID_PROGRAM' })
-    return
-  }
-
-  const result = findProgramCards(player, submission.cardIds)
-    .andThen((programCards) => ctx.game.submitProgram(player.id, programCards))
-
-  if (result.isErr()) {
-    const outcome = result.error === 'GAME_PAUSED' || result.error === 'ALREADY_SUBMITTED' || result.error === 'WRONG_PHASE'
-      ? result.error
-      : 'INVALID_PROGRAM'
-    acknowledge({ outcome })
-    return
-  }
-
-  acknowledge({ outcome: 'ACCEPTED' })
-  socket.to(ctx.publicRoom).emit('program.submitted', {
-    gameId: ctx.gameId,
-    playerId: player.id,
-  })
-
-  ctx.actionScheduler.scheduleNextAction()
 }

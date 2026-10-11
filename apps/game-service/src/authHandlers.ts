@@ -19,29 +19,33 @@ export function handleLogin(
 ): void {
   if (typeof acknowledge !== 'function') return
 
-  const parsed = parseLogin(payload)
-  if (parsed.isErr()) {
-    logError('Rejected login request', parsed.error, { command: 'user.login', payload })
-    acknowledge({ outcome: parsed.error })
-    return
-  }
-  const { username } = parsed.value
-
-  if (socket.data.user) {
-    acknowledge(
-      socket.data.user.username === username
-        ? { outcome: 'LOGGED_IN', user: socket.data.user }
-        : { outcome: 'ALREADY_LOGGED_IN' },
-    )
-    return
-  }
-
+  let acknowledged = false
   try {
+    const parsed = parseLogin(payload)
+    if (parsed.isErr()) {
+      logError('Rejected login request', parsed.error, { command: 'user.login', payload })
+      acknowledged = true
+      acknowledge({ outcome: parsed.error })
+      return
+    }
+    const { username } = parsed.value
+
+    if (socket.data.user) {
+      acknowledged = true
+      acknowledge(
+        socket.data.user.username === username
+          ? { outcome: 'LOGGED_IN', user: socket.data.user }
+          : { outcome: 'ALREADY_LOGGED_IN' },
+      )
+      return
+    }
+
     const user = users.findOrCreate(username)
     socket.data.user = user
+    acknowledged = true
     acknowledge({ outcome: 'LOGGED_IN', user })
   } catch (error) {
-    logError('Failed to find or create user', error, { command: 'user.login', payload })
-    acknowledge({ outcome: 'INTERNAL_ERROR' })
+    logError('Failed to process login', error, { command: 'user.login', payload })
+    if (!acknowledged) acknowledge({ outcome: 'INTERNAL_ERROR' })
   }
 }
