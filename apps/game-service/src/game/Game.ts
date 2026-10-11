@@ -3,7 +3,7 @@ import { err, ok, type Result } from 'neverthrow'
 import type { Board } from '@/game/Board'
 import { instructions } from '@robo-rally/game-events'
 import { Card } from '@/game/Card'
-import type { PlayerId, RobotId } from '@/game/ids'
+import type { CardId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
 import { Robot } from '@/game/Robot'
 import { Direction, opposite, type Position } from '@/game/spatial'
@@ -144,7 +144,9 @@ export class Game {
     this.recheckProgrammingPhase()
   }
 
-  submitProgram(playerId: PlayerId, program: readonly Card[]): Result<void, SubmitProgramError> {
+  checkCanSubmitProgram(
+    playerId: PlayerId,
+  ): Result<Player, 'GAME_PAUSED' | 'WRONG_PHASE' | 'PLAYER_NOT_IN_GAME' | 'ALREADY_SUBMITTED'> {
     if (this.isPaused) return err('GAME_PAUSED')
     if (this.currentPhase !== 'programming') return err('WRONG_PHASE')
 
@@ -152,19 +154,30 @@ export class Game {
     if (!player) return err('PLAYER_NOT_IN_GAME')
     if (this.submittedPlayerIds.has(playerId)) return err('ALREADY_SUBMITTED')
 
-    if (program.length !== 5 || new Set(program.map((card) => card.id)).size !== 5) {
+    return ok(player)
+  }
+
+  private checkProgram(player: Player, cardIds: readonly CardId[]): Result<readonly Card[], 'INVALID_PROGRAM'> {
+    if (cardIds.length !== 5 || new Set(cardIds).size !== 5) {
       return err('INVALID_PROGRAM')
     }
     const hand = new Map(player.hand.map((card) => [card.id, card]))
-    if (program.some((card) => hand.get(card.id) !== card)) {
+    const program = cardIds.map((id) => hand.get(id))
+    if (!program.every((card): card is Card => card !== undefined)) {
       return err('INVALID_PROGRAM')
     }
+    return ok(program)
+  }
 
-    player.robot.setProgram(program)
-    this.started = true
-    this.submittedPlayerIds.add(playerId)
-    this.recheckProgrammingPhase()
-    return ok()
+  submitProgram(playerId: PlayerId, cardIds: readonly CardId[]): Result<void, SubmitProgramError> {
+    return this.checkCanSubmitProgram(playerId).andThen((player) =>
+      this.checkProgram(player, cardIds).map((program) => {
+        player.robot.setProgram(program)
+        this.started = true
+        this.submittedPlayerIds.add(playerId)
+        this.recheckProgrammingPhase()
+      }),
+    )
   }
 
   recheckProgrammingPhase(): void {

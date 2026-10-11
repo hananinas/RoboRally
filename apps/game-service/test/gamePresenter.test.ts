@@ -68,7 +68,7 @@ describe('game presenter', () => {
       (_, index) => new Card(`card-${index}`, 'MOVE_1'),
     )
     const game = new Game(board, [player], cards)
-    game.submitProgram(player.id, cards)
+    game.submitProgram(player.id, cards.map((card) => card.id))
 
     const state = presentPublicGameState('game', game)
 

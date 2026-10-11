@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { submitProgramSchema } from '@robo-rally/game-events'
@@ -328,6 +329,25 @@ describe('game membership over Socket.IO', () => {
     expect(shared.game.hasSubmittedProgram(otherPlayer.assignment.playerId)).toBe(false)
   })
 
+  it('rejects program submissions while paused even with stale card ids', async () => {
+    const disconnectingSocket = await connect('A')
+    await join(disconnectingSocket)
+    const otherSocket = await connect('B')
+    const otherPlayer = await join(otherSocket)
+
+    await disconnectClient(disconnectingSocket)
+
+    const staleSubmission = submitProgramSchema.parse({
+      gameId: shared.gameId,
+      playerId: otherPlayer.assignment.playerId,
+      cardIds: Array.from({ length: 5 }, () => randomUUID()),
+    })
+
+    expect(await otherSocket.timeout(1000).emitWithAck('program.submit', staleSubmission))
+      .toEqual({ outcome: 'GAME_PAUSED' })
+    expect(shared.game.hasSubmittedProgram(otherPlayer.assignment.playerId)).toBe(false)
+  })
+
   it('stays paused while another member remains disconnected', async () => {
     const firstDisconnectingSocket = await connect('A')
     await join(firstDisconnectingSocket)
@@ -378,7 +398,7 @@ describe('game membership over Socket.IO', () => {
     const otherSocket = await connect('B')
     await join(otherSocket)
     for (const player of shared.game.players) {
-      shared.game.submitProgram(player.id, player.hand.slice(0, 5))
+      shared.game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
     }
     for (let action = 0; action < 9; action++) shared.game.executeNextAction()
     expect(shared.game.currentRegister).toBe(4)
@@ -449,7 +469,7 @@ describe('game membership over Socket.IO', () => {
     const second = await connect('Second')
     await join(second)
     for (const player of shared.game.players) {
-      shared.game.submitProgram(player.id, player.hand.slice(0, 5))
+      shared.game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
     }
     for (let action = 0; action < 9; action++) shared.game.executeNextAction()
     expect(shared.game.currentRegister).toBe(4)

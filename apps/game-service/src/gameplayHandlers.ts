@@ -1,23 +1,11 @@
 import {
   submitProgramSchema,
-  type ProgramCardIds,
   type ProgramResultAcknowledgement,
   type SubmitProgram,
 } from '@robo-rally/game-events'
-import { err, ok, type Result } from 'neverthrow'
-import type { Card, Player } from '@/game/index'
 import type { GameSocket } from '@/gameServer'
 import { logError } from '@/logger'
 import { ownedMembership, type MembershipContext } from '@/membershipHandlers'
-
-function findProgramCards(
-  player: Player,
-  cardIds: ProgramCardIds,
-): Result<readonly Card[], 'UNKNOWN_CARD'> {
-  const hand = player.hand
-  const program = cardIds.map((id) => hand.find((card) => card.id === id))
-  return program.every((card) => card !== undefined) ? ok(program) : err('UNKNOWN_CARD')
-}
 
 export function handleSubmitProgram(
   ctx: MembershipContext,
@@ -52,8 +40,7 @@ export function handleSubmitProgram(
       return
     }
 
-    const result = findProgramCards(player, submission.cardIds)
-      .andThen((programCards) => ctx.game.submitProgram(player.id, programCards))
+    const result = ctx.game.submitProgram(player.id, submission.cardIds)
 
     if (result.isErr()) {
       const outcome = result.error === 'GAME_PAUSED' || result.error === 'ALREADY_SUBMITTED' || result.error === 'WRONG_PHASE'

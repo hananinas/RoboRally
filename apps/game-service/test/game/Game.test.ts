@@ -35,7 +35,7 @@ describe('Game programming', () => {
       new Card('u-turn', 'U_TURN'),
     ]
     const game = new Game(board, [player], deck)
-    game.submitProgram(player.id, deck)
+    game.submitProgram(player.id, deck.map((card) => card.id))
 
     const actions = Array.from({ length: 5 }, () => game.executeNextAction())
     expect(actions.map(({ registerIndex, action }) => ({
@@ -69,28 +69,28 @@ describe('Game programming', () => {
   it('preserves the selected order and enters activation after a valid submission', () => {
     const { robot, player, deck, game } = createGame()
     const program = [deck[5], deck[0], deck[3], deck[2], deck[1]]
+    const programIds = program.map((card) => card.id)
 
-    game.submitProgram(player.id, program)
+    game.submitProgram(player.id, programIds)
 
     expect(robot.program).toEqual(program)
     expect(game.phase).toBe('activation')
     expect(game.currentRegister).toBe(0)
-    expect(game.submitProgram(player.id, program)._unsafeUnwrapErr()).toBe('WRONG_PHASE')
+    expect(game.submitProgram(player.id, programIds)._unsafeUnwrapErr()).toBe('WRONG_PHASE')
   })
 
   it('rejects invalid submissions without changing the robot or game phase', () => {
     const { robot, player, deck, game } = createGame()
-    const valid = deck.slice(0, 5)
+    const validIds = deck.slice(0, 5).map((card) => card.id)
 
-    expect(game.submitProgram('unknown', valid)._unsafeUnwrapErr()).toBe('PLAYER_NOT_IN_GAME')
-    expect(game.submitProgram(player.id, deck.slice(0, 4))._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
-    expect(game.submitProgram(player.id, [deck[0], deck[0], ...deck.slice(1, 4)])._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
-    expect(game.submitProgram(player.id, [...deck.slice(0, 4), new Card('foreign', 'MOVE_1')])._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
-    expect(game.submitProgram(player.id, [new Card(deck[0].id, 'MOVE_1'), ...deck.slice(1, 5)])._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
+    expect(game.submitProgram('unknown', validIds)._unsafeUnwrapErr()).toBe('PLAYER_NOT_IN_GAME')
+    expect(game.submitProgram(player.id, deck.slice(0, 4).map((card) => card.id))._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
+    expect(game.submitProgram(player.id, [deck[0].id, deck[0].id, ...deck.slice(1, 4).map((card) => card.id)])._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
+    expect(game.submitProgram(player.id, [...deck.slice(0, 4).map((card) => card.id), 'foreign'])._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
 
     expect(game.phase).toBe('programming')
     expect(robot.program).toEqual([])
-    game.submitProgram(player.id, valid)
+    game.submitProgram(player.id, validIds)
     expect(game.phase).toBe('activation')
   })
 
@@ -113,21 +113,21 @@ describe('Game programming', () => {
 
   it('blocks program submission while paused without changing state', () => {
     const { robot, player, deck, game } = createGame()
-    const valid = deck.slice(0, 5)
+    const validIds = deck.slice(0, 5).map((card) => card.id)
 
     game.pause()
-    expect(game.submitProgram(player.id, valid)._unsafeUnwrapErr()).toBe('GAME_PAUSED')
+    expect(game.submitProgram(player.id, validIds)._unsafeUnwrapErr()).toBe('GAME_PAUSED')
     expect(game.phase).toBe('programming')
     expect(robot.program).toEqual([])
 
     game.resume()
-    game.submitProgram(player.id, valid)
+    game.submitProgram(player.id, validIds)
     expect(game.phase).toBe('activation')
   })
 
   it('still executes an already-committed action while paused', () => {
     const { player, deck, game } = createGame()
-    game.submitProgram(player.id, deck.slice(0, 5))
+    game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
 
     game.pause()
     expect(() => game.executeNextAction()).not.toThrow()
@@ -174,7 +174,7 @@ describe('Game.addPlayer', () => {
 
   it('rejects adding a player once the game has started', () => {
     const { game, player, deck } = createGame()
-    game.submitProgram(player.id, deck.slice(0, 5))
+    game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
 
     const result = game.addPlayer()
 

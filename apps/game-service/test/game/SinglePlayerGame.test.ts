@@ -52,7 +52,7 @@ describe('single-player game', () => {
     const first = createSinglePlayerGame()
     const second = createSinglePlayerGame()
 
-    first.game.submitProgram(first.player.id, first.player.hand.slice(0, 5))
+    first.game.submitProgram(first.player.id, first.player.hand.slice(0, 5).map((card) => card.id))
 
     expect(first.game).not.toBe(second.game)
     expect(first.game.board).not.toBe(second.game.board)

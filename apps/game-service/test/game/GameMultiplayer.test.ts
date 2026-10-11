@@ -25,17 +25,19 @@ describe('Game fixed-roster programming', () => {
     const { players, deck, game } = createMultiplayerGame([{ x: Integer(4), y: Integer(5) }, { x: Integer(5), y: Integer(4) }])
     const firstProgram = deck.slice(0, 5)
     const secondProgram = deck.slice(1, 6).reverse()
-    game.submitProgram(players[0].id, firstProgram)
+    const firstProgramIds = firstProgram.map((card) => card.id)
+    const secondProgramIds = secondProgram.map((card) => card.id)
+    game.submitProgram(players[0].id, firstProgramIds)
 
     expect(game.phase).toBe('programming')
     expect(game.hasSubmittedProgram(players[0].id)).toBe(true)
     expect(game.hasSubmittedProgram(players[1].id)).toBe(false)
     expect(game.hasSubmittedProgram('unknown')).toBe(false)
     expect(() => game.executeNextAction()).toThrow()
-    expect(game.submitProgram(players[0].id, secondProgram)._unsafeUnwrapErr()).toBe('ALREADY_SUBMITTED')
-    expect(game.submitProgram(players[1].id, [...deck.slice(0, 4), new Card('foreign', 'MOVE_1')])._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
-    expect(game.submitProgram(players[1].id, [deck[0], ...deck.slice(0, 4)])._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
-    expect(game.submitProgram('unknown', secondProgram)._unsafeUnwrapErr()).toBe('PLAYER_NOT_IN_GAME')
+    expect(game.submitProgram(players[0].id, secondProgramIds)._unsafeUnwrapErr()).toBe('ALREADY_SUBMITTED')
+    expect(game.submitProgram(players[1].id, [...deck.slice(0, 4).map((card) => card.id), 'foreign'])._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
+    expect(game.submitProgram(players[1].id, [deck[0].id, ...deck.slice(0, 4).map((card) => card.id)])._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
+    expect(game.submitProgram('unknown', secondProgramIds)._unsafeUnwrapErr()).toBe('PLAYER_NOT_IN_GAME')
     game.recheckProgrammingPhase()
 
     expect(players[0].robot.program).toEqual(firstProgram)
@@ -43,7 +45,7 @@ describe('Game fixed-roster programming', () => {
     expect(game.hasSubmittedProgram(players[1].id)).toBe(false)
     expect(game.phase).toBe('programming')
 
-    game.submitProgram(players[1].id, secondProgram)
+    game.submitProgram(players[1].id, secondProgramIds)
     expect(game.phase).toBe('activation')
     expect(players[1].robot.program).toEqual(secondProgram)
     game.executeNextAction()
@@ -57,7 +59,7 @@ describe('Game fixed-roster programming', () => {
     players.length = 0
     expect(game.players).toEqual([player])
     expect(() => Object.assign(game.players, { 1: player })).toThrow()
-    game.submitProgram(player.id, deck.slice(0, 5))
+    game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
     expect(game.phase).toBe('activation')
 
     const empty = new Game(board, [], deck)
@@ -65,7 +67,7 @@ describe('Game fixed-roster programming', () => {
     expect(empty.phase).toBe('programming')
     expect(empty.currentRegister).toBe(0)
     expect(() => empty.executeNextAction()).toThrow()
-    expect(empty.submitProgram(player.id, deck.slice(0, 5))._unsafeUnwrapErr()).toBe('PLAYER_NOT_IN_GAME')
+    expect(empty.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))._unsafeUnwrapErr()).toBe('PLAYER_NOT_IN_GAME')
   })
 
   it('rejects duplicate player IDs, duplicate robot IDs, and unplaced robots', () => {
@@ -97,7 +99,7 @@ describe('Game fixed-roster programming', () => {
 describe('Game multiplayer activation', () => {
   it('advances the register when the only robot still waiting to act leaves', () => {
     const { players, deck, game } = createMultiplayerGame([{ x: Integer(4), y: Integer(5) }, { x: Integer(5), y: Integer(4) }])
-    for (const player of players) game.submitProgram(player.id, deck.slice(0, 5))
+    for (const player of players) game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
     expect(game.executeNextAction().action.robotId).toBe(players[0].robot.id)
 
     game.removePlayer(players[1].id)
@@ -109,7 +111,7 @@ describe('Game multiplayer activation', () => {
 
   it('returns to programming when the last member leaves during activation', () => {
     const { players, deck, game } = createMultiplayerGame([{ x: Integer(4), y: Integer(5) }])
-    game.submitProgram(players[0].id, deck.slice(0, 5))
+    game.submitProgram(players[0].id, deck.slice(0, 5).map((card) => card.id))
 
     game.removePlayer(players[0].id)
 
@@ -132,7 +134,7 @@ describe('Game multiplayer activation', () => {
     for (let round = 1; round <= 2; round++) {
       players.forEach((player, index) => {
         expect(player.hand).toEqual(deck)
-        game.submitProgram(player.id, programs[index])
+        game.submitProgram(player.id, programs[index].map((card) => card.id))
         expect(game.phase).toBe(index === players.length - 1 ? 'activation' : 'programming')
         player.setHand([])
       })
@@ -170,7 +172,7 @@ describe('Game multiplayer activation', () => {
       { x: Integer(5), y: Integer(4) },
       { x: Integer(6), y: Integer(4) },
     ], { x: Integer(4), y: Integer(4), angle: 7 * Math.PI / 4 })
-    for (const player of players) game.submitProgram(player.id, deck.slice(0, 5))
+    for (const player of players) game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
     const order = players.map(() => game.executeNextAction().action.robotId)
     // The distance-three robot precedes the Euclidean-nearer distance-four robot.
     // At distance two, east wraps past 2π before west and then north.
@@ -197,7 +199,7 @@ describe('Game multiplayer activation', () => {
     const { players, deck, game } = createMultiplayerGame(
       [{ x: Integer(4), y: Integer(5) }, { x: Integer(5), y: Integer(4) }], undefined, board,
     )
-    for (const player of [...players].reverse()) game.submitProgram(player.id, deck.slice(0, 5))
+    for (const player of [...players].reverse()) game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
     expect(game.executeNextAction().action.robotId).toBe(players[0].robot.id)
     expect(game.executeNextAction().action.robotId).toBe(players[1].robot.id)
   })
@@ -217,7 +219,7 @@ describe('Game multiplayer activation', () => {
     const { players, game } = createMultiplayerGame(
       [{ x: Integer(4), y: Integer(5) }, { x: Integer(4), y: Integer(6) }, { x: Integer(6), y: Integer(4) }], undefined, board, deck,
     )
-    for (const player of players) game.submitProgram(player.id, deck)
+    for (const player of players) game.submitProgram(player.id, deck.map((card) => card.id))
     expect(game.executeNextAction().action.robotId).toBe(players[0].robot.id)
     expect(board.positionOf(players[1].robot.id)).toEqual({ x: 4, y: 8 })
     expect(game.executeNextAction().action.robotId).toBe(players[2].robot.id)
@@ -230,7 +232,7 @@ describe('Game multiplayer activation', () => {
     const { board, players, game } = createMultiplayerGame(
       [{ x: Integer(7), y: Integer(4) }, { x: Integer(6), y: Integer(4) }], { x: Integer(8), y: Integer(4), angle: 0 }, undefined, deck,
     )
-    for (const player of players) game.submitProgram(player.id, deck)
+    for (const player of players) game.submitProgram(player.id, deck.map((card) => card.id))
     const first = game.executeNextAction()
     expect(first.action.position).toEqual({ x: 8, y: 4 })
     expect(game.executeNextAction().action.position).toEqual({ x: 7, y: 4 })
