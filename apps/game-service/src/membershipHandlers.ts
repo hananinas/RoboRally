@@ -212,19 +212,17 @@ export function handleLeave(
   let acknowledged = false
   let playerId: string | undefined
   try {
-    const verdict = validateMembershipRequest(ctx, leaveGameSchema, payload, socket.data.user)
-    if (verdict.isErr()) {
+    const resolved = validateMembershipRequest(ctx, leaveGameSchema, payload, socket.data.user)
+      .andThen(() => {
+        const membership = ownedMembership(ctx, socket)
+        return membership ? ok(membership) : err('GAME_NOT_FOUND' as const)
+      })
+    if (resolved.isErr()) {
       acknowledged = true
-      acknowledge({ outcome: verdict.error })
+      acknowledge({ outcome: resolved.error })
       return
     }
-    const membership = ownedMembership(ctx, socket)
-    if (!membership) {
-      acknowledged = true
-      acknowledge({ outcome: 'GAME_NOT_FOUND' })
-      return
-    }
-    const { player, user } = membership
+    const { player, user } = resolved.value
     playerId = player.id
 
     const phaseBeforeLeave = game.phase
