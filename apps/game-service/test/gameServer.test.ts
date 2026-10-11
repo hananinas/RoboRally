@@ -208,12 +208,12 @@ describe('game membership over Socket.IO', () => {
     const other = await join(second)
     const outsider = await connect('Outside')
     expect(await outsider.timeout(1000).emitWithAck('program.submit', submission(initial)))
-      .toEqual({ outcome: 'INVALID_PROGRAM' })
+      .toEqual({ outcome: 'NOT_A_MEMBER' })
     expect(await second.timeout(1000).emitWithAck('program.submit', submission(initial)))
-      .toEqual({ outcome: 'INVALID_PROGRAM' })
+      .toEqual({ outcome: 'PLAYER_ID_MISMATCH' })
     expect(await first.timeout(1000).emitWithAck('program.submit', {
       ...submission(initial), playerId: other.assignment.playerId,
-    })).toEqual({ outcome: 'INVALID_PROGRAM' })
+    })).toEqual({ outcome: 'PLAYER_ID_MISMATCH' })
     expect(await first.timeout(1000).emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'ACCEPTED' })
     expect(shared.game.hasSubmittedProgram(initial.assignment.playerId)).toBe(true)
     expect((await join(first)).programSubmitted).toBe(true)
@@ -223,7 +223,7 @@ describe('game membership over Socket.IO', () => {
   it('closes new joins permanently on the first accepted program, not an invalid request', async () => {
     const first = await connect('First')
     const initial = await join(first)
-    expect(await raw(first, 'program.submit', { ...submission(initial), cardIds: [] })).toEqual({ outcome: 'INVALID_PROGRAM' })
+    expect(await raw(first, 'program.submit', { ...submission(initial), cardIds: [] })).toEqual({ outcome: 'MALFORMED_REQUEST' })
     expect(shared.game.hasStarted).toBe(false)
     expect(await first.timeout(1000).emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'ACCEPTED' })
     expect(shared.game.hasStarted).toBe(true)
@@ -267,7 +267,7 @@ describe('game membership over Socket.IO', () => {
     expect(server.sockets.sockets.get(first.id!)?.data.user?.username).toBe('First')
     expect(server.sockets.sockets.get(first.id!)?.rooms).toEqual(new Set([first.id]))
     expect(await first.timeout(1000).emitWithAck('game.getPublicGameState', { gameId: shared.gameId })).toEqual({ outcome: 'GAME_NOT_FOUND' })
-    expect(await first.timeout(1000).emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'INVALID_PROGRAM' })
+    expect(await first.timeout(1000).emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'NOT_A_MEMBER' })
     expect(await first.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId })).toEqual({ outcome: 'GAME_NOT_FOUND' })
     const fresh = await join(first)
     expect(fresh.assignment.playerId).not.toBe(initial.assignment.playerId)

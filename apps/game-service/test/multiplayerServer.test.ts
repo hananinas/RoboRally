@@ -70,7 +70,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
       expect(await clients[0].timeout(1000).emitWithAck('program.submit', submissions[0]))
         .toEqual({ outcome: 'ALREADY_SUBMITTED' })
       expect(await clients[0].timeout(1000).emitWithAck('program.submit', submissions[1]))
-        .toEqual({ outcome: 'INVALID_PROGRAM' })
+        .toEqual({ outcome: 'PLAYER_ID_MISMATCH' })
 
       const nextHands = clients.map((socket) => new Promise<CardsDealt>((resolve) =>
         socket.once('cards.dealt', resolve)))

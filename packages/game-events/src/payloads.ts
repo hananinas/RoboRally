@@ -118,6 +118,12 @@ export type ProgramResultOutcome =
   | 'GAME_PAUSED'
   | 'ALREADY_SUBMITTED'
   | 'WRONG_PHASE'
+  | 'NOT_A_MEMBER'
+  | 'MALFORMED_REQUEST'
+  | 'GAME_ID_MISMATCH'
+  | 'PLAYER_ID_MISMATCH'
+  | 'PLAYER_NOT_IN_GAME'
+  | 'INTERNAL_ERROR'
 
 export type ProgramResult = Readonly<{
   outcome: ProgramResultOutcome
