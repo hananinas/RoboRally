@@ -4,6 +4,7 @@ import {
   type SubmitProgram,
 } from '@robo-rally/game-events'
 import { err, ok, type Result } from 'neverthrow'
+import { withAcknowledgeOnce } from '@/acknowledgeOnce'
 import type { Player } from '@/game/index'
 import type { GameSocket } from '@/gameServer'
 import { logError } from '@/logger'
@@ -38,24 +39,21 @@ export function handleSubmitProgram(
   payload: SubmitProgram,
   acknowledge: ProgramResultAcknowledgement,
 ): void {
-  if (typeof acknowledge !== 'function') return
-
-  let acknowledged = false
   let playerId: string | undefined
-  try {
+
+  withAcknowledgeOnce(acknowledge, (ack) => {
     const result = validateGameplayRequest(ctx, socket, submitProgramSchema, payload, 'program.submit')
       .andThen(({ player, data }) => {
         playerId = player.id
         return ctx.game.submitProgram(player.id, data.cardIds).map(() => player)
       })
-    
+
     if (result.isErr()) {
-      acknowledge({ outcome: result.error })
+      ack({ outcome: result.error })
       return
     }
-    
-    acknowledged = true
-    acknowledge({ outcome: 'ACCEPTED' })
+
+    ack({ outcome: 'ACCEPTED' })
 
     socket.to(ctx.publicRoom).emit('program.submitted', {
       gameId: ctx.gameId,
@@ -63,8 +61,8 @@ export function handleSubmitProgram(
     })
 
     ctx.actionScheduler.scheduleNextAction()
-  } catch (error) {
+  }, (error) => {
     logError('Failed to process program submission', error, { command: 'program.submit', gameId: ctx.gameId, playerId, payload })
-    if (!acknowledged) acknowledge({ outcome: 'INTERNAL_ERROR' })
-  }
+    return { outcome: 'INTERNAL_ERROR' } as const
+  })
 }

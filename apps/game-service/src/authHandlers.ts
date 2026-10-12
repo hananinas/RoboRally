@@ -3,6 +3,7 @@ import {
   type Login,
   type LoginAcknowledgement,
 } from '@robo-rally/game-events'
+import { withAcknowledgeOnce } from '@/acknowledgeOnce'
 import type { GameSocket } from '@/gameServer'
 import { logError } from '@/logger'
 import type { UserRegistry } from '@/userRegistry'
@@ -17,22 +18,17 @@ export function handleLogin(
   payload: Login,
   acknowledge: LoginAcknowledgement,
 ): void {
-  if (typeof acknowledge !== 'function') return
-
-  let acknowledged = false
-  try {
+  withAcknowledgeOnce(acknowledge, (ack) => {
     const parsed = parseLogin(payload)
     if (parsed.isErr()) {
       logError('Rejected login request', parsed.error, { command: 'user.login', payload })
-      acknowledged = true
-      acknowledge({ outcome: parsed.error })
+      ack({ outcome: parsed.error })
       return
     }
     const { username } = parsed.value
 
     if (socket.data.user) {
-      acknowledged = true
-      acknowledge(
+      ack(
         socket.data.user.username === username
           ? { outcome: 'LOGGED_IN', user: socket.data.user }
           : { outcome: 'ALREADY_LOGGED_IN' },
@@ -42,10 +38,9 @@ export function handleLogin(
 
     const user = users.findOrCreate(username)
     socket.data.user = user
-    acknowledged = true
-    acknowledge({ outcome: 'LOGGED_IN', user })
-  } catch (error) {
+    ack({ outcome: 'LOGGED_IN', user })
+  }, (error) => {
     logError('Failed to process login', error, { command: 'user.login', payload })
-    if (!acknowledged) acknowledge({ outcome: 'INTERNAL_ERROR' })
-  }
+    return { outcome: 'INTERNAL_ERROR' } as const
+  })
 }

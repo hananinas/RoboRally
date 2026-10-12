@@ -1,4 +1,5 @@
 import { err, ok, type Result } from 'neverthrow'
+import { withAcknowledgeOnce } from '@/acknowledgeOnce'
 import {
   joinGameSchema,
   leaveGameSchema,
@@ -149,26 +150,18 @@ export function handleJoin(
   payload: JoinGame,
   acknowledge: JoinResultAcknowledgement,
 ): void {
-  if (typeof acknowledge !== 'function') return
   const { game, gameId, publicRoom, playerRoom, publicState } = ctx
+  let rollback: MembershipSuccess | undefined
 
-  let membership: GameMembership | undefined
-  let isNew = false
-  let previousConnectionId: string | null = null
-  let acknowledged = false
-
-  try {
+  withAcknowledgeOnce(acknowledge, (ack) => {
     const resolution = validateMembershipRequest(ctx, joinGameSchema, payload, socket.data.user)
       .andThen((user) => joinOrReconnectMembership(ctx, socket, user))
     if (resolution.isErr()) {
-      acknowledged = true
-      acknowledge({ outcome: resolution.error })
+      ack({ outcome: resolution.error })
       return
     }
-    membership = resolution.value.membership
-    isNew = resolution.value.isNew
-    previousConnectionId = resolution.value.previousConnectionId
-    const { reconnected } = resolution.value
+    rollback = resolution.value
+    const { membership, reconnected } = resolution.value
     const { player } = membership
 
     const result: Extract<JoinResult, { outcome: 'JOINED' }> = {
@@ -179,9 +172,8 @@ export function handleJoin(
       programSubmitted: game.hasSubmittedProgram(player.id),
     }
     void socket.join([publicRoom, playerRoom(player.id)])
-    acknowledged = true
-    acknowledge(result)
-    if (isNew) {
+    ack(result)
+    if (rollback.isNew) {
       socket.to(publicRoom).emit('game.playerJoined', {
         gameId,
         player: result.state.players.find((candidate) => candidate.playerId === player.id)!,
@@ -190,11 +182,11 @@ export function handleJoin(
     } else if (reconnected) {
       notifyReconnected(ctx, player.id)
     }
-  } catch (error) {
+  }, (error, alreadyAcknowledged) => {
     logError('Failed to process game join', error, { command: 'game.join', gameId, payload })
-    if (membership && !acknowledged) rollbackMembership(ctx, { membership, isNew, previousConnectionId })
-    if (!acknowledged) acknowledge({ outcome: 'INTERNAL_ERROR' })
-  }
+    if (rollback && !alreadyAcknowledged) rollbackMembership(ctx, rollback)
+    return { outcome: 'INTERNAL_ERROR' } as const
+  })
 }
 
 export function handleLeave(
@@ -203,20 +195,17 @@ export function handleLeave(
   payload: JoinGame,
   acknowledge: (result: LeaveResult) => void,
 ): void {
-  if (typeof acknowledge !== 'function') return
   const { io, game, gameId, memberships, publicRoom, playerRoom, actionScheduler } = ctx
-
-  let acknowledged = false
   let playerId: string | undefined
-  try {
+
+  withAcknowledgeOnce(acknowledge, (ack) => {
     const resolved = validateMembershipRequest(ctx, leaveGameSchema, payload, socket.data.user)
       .andThen(() => {
         const membership = ownedMembership(ctx, socket)
         return membership ? ok(membership) : err('GAME_NOT_FOUND' as const)
       })
     if (resolved.isErr()) {
-      acknowledged = true
-      acknowledge({ outcome: resolved.error })
+      ack({ outcome: resolved.error })
       return
     }
     const { player, user } = resolved.value
@@ -227,17 +216,16 @@ export function handleLeave(
     memberships.delete(user.userId)
     void socket.leave(publicRoom)
     void socket.leave(playerRoom(player.id))
-    acknowledged = true
-    acknowledge({ outcome: 'LEFT' })
+    ack({ outcome: 'LEFT' })
     io.to(publicRoom).emit('game.playerLeft', {
       gameId, playerId: player.id, robotId: player.robot.id,
     })
     if (phaseBeforeLeave === 'activation' && game.phase === 'programming') actionScheduler.dealHands()
     actionScheduler.scheduleNextAction()
-  } catch (error) {
+  }, (error) => {
     logError('Failed to process player leaving', error, { command: 'game.leave', gameId, playerId })
-    if (!acknowledged) acknowledge({ outcome: 'INTERNAL_ERROR' })
-  }
+    return { outcome: 'INTERNAL_ERROR' } as const
+  })
 }
 
 export function handleDisconnect(ctx: MembershipContext, socket: GameSocket): void {
