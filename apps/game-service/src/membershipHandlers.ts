@@ -1,15 +1,12 @@
 import { err, ok, type Result } from 'neverthrow'
 import {
-  getPublicGameStateSchema,
   joinGameSchema,
   leaveGameSchema,
-  type GetPublicGameState,
   type JoinGame,
   type JoinResult,
   type JoinResultAcknowledgement,
   type LeaveResult,
   type PublicGameState,
-  type PublicGameStateAcknowledgement,
   type User,
 } from '@robo-rally/game-events'
 import {
@@ -256,31 +253,4 @@ export function handleDisconnect(ctx: MembershipContext, socket: GameSocket): vo
   } catch (error) {
     logError('Failed to process player disconnect', error, { command: 'disconnect', gameId: ctx.gameId, playerId: membership.player.id })
   }
-}
-
-export function handleGetPublicGameState(
-  ctx: MembershipContext,
-  socket: GameSocket,
-  payload: GetPublicGameState,
-  acknowledge: PublicGameStateAcknowledgement,
-): void {
-  if (typeof acknowledge !== 'function') return
-
-  const parsed = getPublicGameStateSchema.safeParse(payload)
-  if (!parsed.success) {
-    // Invalid requests receive the same non-disclosing result as unknown games.
-    logError('Rejected public game state request', parsed.error, { command: 'game.getPublicGameState', gameId: ctx.gameId, payload })
-    acknowledge({ outcome: 'GAME_NOT_FOUND' })
-    return
-  }
-
-  if (parsed.data.gameId === ctx.gameId && ownedMembership(ctx, socket)) {
-    acknowledge({
-      outcome: 'GAME_FOUND',
-      state: ctx.publicState(),
-    })
-    return
-  }
-
-  acknowledge({ outcome: 'GAME_NOT_FOUND' })
 }

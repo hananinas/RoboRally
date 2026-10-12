@@ -3,7 +3,6 @@ export type {
   JoinResultAcknowledgement,
   LoginAcknowledgement,
   ProgramResultAcknowledgement,
-  PublicGameStateAcknowledgement,
   ServerToClientEvents,
 } from './events.js'
 export type {
@@ -16,7 +15,6 @@ export type {
   GameAborted,
   GameId,
   GamePhase,
-  GetPublicGameState,
   JoinGame,
   JoinResult,
   LoginResult,
@@ -33,7 +31,6 @@ export type {
   ProgramResultOutcome,
   ProgramSubmitted,
   PublicGameState,
-  PublicGameStateResult,
   Robot,
   RobotId,
   RobotActionResolved,
@@ -43,7 +40,6 @@ export type {
 } from './payloads.js'
 export { loginSchema, parseLogin } from './login.js'
 export type { Login, LoginRequestRejection } from './login.js'
-export { getPublicGameStateSchema } from './getPublicGameState.js'
 export { joinGameSchema } from './joinGame.js'
 export { leaveGameSchema } from './leaveGame.js'
 export { submitProgramSchema } from './submitProgram.js'

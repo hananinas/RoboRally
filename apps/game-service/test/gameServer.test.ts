@@ -106,8 +106,6 @@ describe('game membership over Socket.IO', () => {
     expect(await client.timeout(1000).emitWithAck('user.login', { username: 'Dane' })).toEqual(login)
     expect(await client.timeout(1000).emitWithAck('user.login', { username: 'Other' }))
       .toEqual({ outcome: 'ALREADY_LOGGED_IN' })
-    expect(await client.timeout(1000).emitWithAck('game.getPublicGameState', { gameId: shared.gameId }))
-      .toEqual({ outcome: 'GAME_NOT_FOUND' })
     expect(shared.game.players).toEqual([])
     expect(server.sockets.sockets.get(client.id!)?.rooms).toEqual(new Set([client.id]))
     expect(received).not.toHaveBeenCalled()
@@ -162,8 +160,6 @@ describe('game membership over Socket.IO', () => {
     expect(results.map((result) => result.outcome).sort((a, b) => a.localeCompare(b))).toEqual(['JOINED', 'USER_ALREADY_IN_GAME'])
     expect(shared.game.players).toHaveLength(1)
     const loser = results[0].outcome === 'JOINED' ? second : first
-    expect(await loser.timeout(1000).emitWithAck('game.getPublicGameState', { gameId: shared.gameId }))
-      .toEqual({ outcome: 'GAME_NOT_FOUND' })
     expect(server.sockets.sockets.get(loser.id!)?.rooms).toEqual(new Set([loser.id]))
   })
 
@@ -251,7 +247,7 @@ describe('game membership over Socket.IO', () => {
     await second.timeout(1000).emitWithAck('program.submit', submission(other))
     expect(await firstHand).toEqual({ gameId: shared.gameId, playerId: initial.assignment.playerId, cards: initial.hand })
     expect(await secondHand).toEqual({ gameId: shared.gameId, playerId: other.assignment.playerId, cards: other.hand })
-    await outsider.timeout(1000).emitWithAck('game.getPublicGameState', { gameId: shared.gameId })
+    await outsider.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId })
     expect(outsideEvents).not.toHaveBeenCalled()
   })
 
@@ -266,7 +262,6 @@ describe('game membership over Socket.IO', () => {
     expect(shared.game.board.occupantAt({ x: Integer(10), y: Integer(7) })).toBeUndefined()
     expect(server.sockets.sockets.get(first.id!)?.data.user?.username).toBe('First')
     expect(server.sockets.sockets.get(first.id!)?.rooms).toEqual(new Set([first.id]))
-    expect(await first.timeout(1000).emitWithAck('game.getPublicGameState', { gameId: shared.gameId })).toEqual({ outcome: 'GAME_NOT_FOUND' })
     expect(await first.timeout(1000).emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'NOT_A_MEMBER' })
     expect(await first.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId })).toEqual({ outcome: 'GAME_NOT_FOUND' })
     const fresh = await join(first)
@@ -312,8 +307,7 @@ describe('game membership over Socket.IO', () => {
       gameId: shared.gameId, playerId: disconnectingPlayer.assignment.playerId, connected: false, paused: true,
     })
     expect(shared.game.paused).toBe(true)
-    expect(await otherSocket.timeout(1000).emitWithAck('game.getPublicGameState', { gameId: shared.gameId }))
-      .toMatchObject({ outcome: 'GAME_FOUND', state: { paused: true } })
+    expect((await join(otherSocket)).state.paused).toBe(true)
   })
 
   it('rejects program submissions while paused', async () => {
@@ -459,8 +453,7 @@ describe('game membership over Socket.IO', () => {
     const staleRejected = new Promise<Error>((resolve) => staleSocket.once('connect_error', resolve))
     expect((await staleRejected).message).toBe('USER_ALREADY_IN_GAME')
 
-    expect(await newSocket.timeout(1000).emitWithAck('game.getPublicGameState', { gameId: shared.gameId }))
-      .toMatchObject({ outcome: 'GAME_FOUND' })
+    expect((await join(newSocket)).assignment).toEqual(stalePlayer.assignment)
   })
 
   it('deals the remaining player a hand when leaving completes the final register', async () => {
@@ -491,8 +484,8 @@ describe('game membership over Socket.IO', () => {
     emit('game.join', { gameId: shared.gameId })
     emit('game.leave', { gameId: shared.gameId })
     emit('program.submit', {})
-    expect(await client.timeout(1000).emitWithAck('game.getPublicGameState', { gameId: shared.gameId }))
-      .toEqual({ outcome: 'GAME_NOT_FOUND' })
+    expect(await client.timeout(1000).emitWithAck('game.join', { gameId: shared.gameId }))
+      .toEqual({ outcome: 'LOGIN_REQUIRED' })
     expect(shared.game.players).toHaveLength(0)
     expect(server.sockets.sockets.get(client.id!)?.data.user).toBeUndefined()
   })

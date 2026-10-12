@@ -78,7 +78,6 @@ export type FixtureSnapshot = {
   cards: readonly Card[]
   state: PublicGameState
   submissions: readonly SubmitProgram[]
-  stateRequests: number
   entryRequests: readonly (
     | { event: 'user.login'; socketId: string; payload: Login }
     | { event: 'game.join'; socketId: string; payload: JoinGame }

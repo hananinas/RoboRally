@@ -84,12 +84,11 @@ test('starts with username, a UI-only password and login, validating Unicode cod
   const heading = page.getByRole('complementary', { name: 'Game controls' }).getByRole('heading', { level: 1 })
   await expect(heading).toBeVisible()
   expect(await heading.textContent()).toBe(exactUsername)
-  const { entryRequests, stateRequests } = await game.snapshot()
+  const { entryRequests } = await game.snapshot()
   expect(entryRequests).toEqual([
     { event: 'user.login', socketId: expect.any(String), payload: { username: exactUsername } },
     { event: 'game.join', socketId: entryRequests[0].socketId, payload: { gameId: GAME_ID } },
   ])
-  expect(stateRequests).toBe(0)
 })
 
 test('waits for login then JOINED on the same socket, blocking duplicate requests and partial game entry', async ({ page, game }) => {
@@ -118,10 +117,9 @@ test('waits for login then JOINED on the same socket, blocking duplicate request
   const hand = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
   await expect(hand).toHaveCount(9)
   await expect(hand.first()).toBeEnabled()
-  const { entryRequests, stateRequests } = await game.snapshot()
+  const { entryRequests } = await game.snapshot()
   expect(entryRequests.map((request) => request.event)).toEqual(['user.login', 'game.join'])
   expect(entryRequests[1].socketId).toBe(entryRequests[0].socketId)
-  expect(stateRequests).toBe(0)
 })
 
 test('ignores an early hand until JOINED supplies the authoritative board and hand', async ({ page, game }) => {
@@ -363,5 +361,4 @@ test('uses JOINED phase and submitted status even with no hand', async ({ page, 
   await expect(page.getByRole('status')).toHaveText('Executing')
   await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()
   await expect(page.getByRole('region', { name: 'Programming hand' })).toHaveCount(0)
-  expect((await game.snapshot()).stateRequests).toBe(0)
 })

@@ -142,19 +142,6 @@ export type RobotActionResolved = Readonly<{
   position: Position
 }>
 
-export type GetPublicGameState = Readonly<{
-  gameId: GameId
-}>
-
-export type PublicGameStateResult =
-  | Readonly<{
-      outcome: 'GAME_FOUND'
-      state: PublicGameState
-    }>
-  | Readonly<{
-      outcome: 'GAME_NOT_FOUND'
-    }>
-
 export type JoinResult =
   | Readonly<{
       outcome: 'JOINED'

@@ -32,7 +32,6 @@ type Fixture = {
   sockets: Set<GameSocket>
   outcome: ProgramResultOutcome
   deferred: boolean
-  stateRequests: number
   entryRequests: FixtureSnapshot['entryRequests'][number][]
   loginOutcome: LoginResult['outcome']
   joinOutcome: JoinResult['outcome']
@@ -59,7 +58,6 @@ function snapshot(fixture: Fixture): FixtureSnapshot {
     cards: fixture.cards,
     state: fixture.state,
     submissions: fixture.submissions,
-    stateRequests: fixture.stateRequests,
     entryRequests: fixture.entryRequests,
     pendingLogins: fixture.pendingLogins.length,
     pendingJoins: fixture.pendingJoins.length,
@@ -174,7 +172,6 @@ const httpServer = createServer(async (request, response) => {
       outcome: 'ACCEPTED',
       deferred: false,
       pending: [],
-      stateRequests: 0,
       entryRequests: [],
       loginOutcome: 'LOGGED_IN',
       joinOutcome: 'JOINED',
@@ -266,15 +263,6 @@ io.on('connection', (socket) => {
     }
     if (fixture.deferJoin) fixture.pendingJoins.push({ socket, respond })
     else respond()
-  })
-
-  socket.on('game.getPublicGameState', ({ gameId }, acknowledge) => {
-    fixture.stateRequests += 1
-    if (gameId !== GAME_ID) {
-      acknowledge({ outcome: 'GAME_NOT_FOUND' })
-      return
-    }
-    acknowledge({ outcome: 'GAME_FOUND', state: fixture.state })
   })
 
   socket.on('program.submit', (payload, acknowledge) => {
