@@ -219,7 +219,7 @@ describe('game membership over Socket.IO', () => {
   it('closes new joins permanently on the first accepted program, not an invalid request', async () => {
     const first = await connect('First')
     const initial = await join(first)
-    expect(await raw(first, 'program.submit', { ...submission(initial), cardIds: [] })).toEqual({ outcome: 'MALFORMED_REQUEST' })
+    expect(await raw(first, 'program.submit', { ...submission(initial), cardIds: [] })).toEqual({ outcome: 'INVALID_REQUEST' })
     expect(shared.game.hasStarted).toBe(false)
     expect(await first.timeout(1000).emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'ACCEPTED' })
     expect(shared.game.hasStarted).toBe(true)

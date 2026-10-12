@@ -18,7 +18,9 @@
   "dependencies": {
     "@robo-rally/game-events": "workspace:*",
     "socket.io": "^4.8.4",
-    "neverthrow": "^8.2.0"
+    "neverthrow": "^8.2.0",
+    "pino": "^10.4.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",

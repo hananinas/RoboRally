@@ -1,4 +1,5 @@
 import { err, ok, type Result } from 'neverthrow'
+import type { ZodError } from 'zod'
 import { withAcknowledgeOnce } from '@/acknowledgeOnce'
 import {
   joinGameSchema,
@@ -16,7 +17,8 @@ import {
   type Player,
 } from '@/game/index'
 import { presentCardsDealt } from '@/gamePresenter'
-import { logError } from '@/logger'
+import { logError, logWarn } from '@/logger'
+import { toRejection, type Rejection } from '@/rejection'
 import type { ActionScheduler } from '@/actionScheduler'
 import type { GameSocket, GameSocketServer } from '@/gameServer'
 
@@ -58,15 +60,20 @@ function notifyReconnected(ctx: MembershipContext, playerId: string): void {
   ctx.actionScheduler.scheduleNextAction()
 }
 
+type ValidateMembershipRequestError =
+  | 'LOGIN_REQUIRED'
+  | 'GAME_NOT_FOUND'
+  | Rejection<'INVALID_REQUEST', ZodError>
+
 function validateMembershipRequest(
   ctx: MembershipContext,
   schema: typeof joinGameSchema | typeof leaveGameSchema,
   payload: unknown,
   user: User | undefined,
-): Result<User, 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND'> {
+): Result<User, ValidateMembershipRequestError> {
   if (!user) return err('LOGIN_REQUIRED')
   const parsed = schema.safeParse(payload)
-  if (!parsed.success) return err('INVALID_REQUEST')
+  if (!parsed.success) return err({ outcome: 'INVALID_REQUEST', detail: parsed.error })
   if (parsed.data.gameId !== ctx.gameId) return err('GAME_NOT_FOUND')
   return ok(user)
 }
@@ -156,8 +163,11 @@ export function handleJoin(
   withAcknowledgeOnce(acknowledge, (ack) => {
     const resolution = validateMembershipRequest(ctx, joinGameSchema, payload, socket.data.user)
       .andThen((user) => joinOrReconnectMembership(ctx, socket, user))
+      .mapErr(toRejection)
     if (resolution.isErr()) {
-      ack({ outcome: resolution.error })
+      const { outcome, detail } = resolution.error
+      logWarn('Rejected game.join request', { command: 'game.join', gameId, outcome, detail, payload })
+      ack({ outcome })
       return
     }
     rollback = resolution.value
@@ -204,8 +214,11 @@ export function handleLeave(
         const membership = ownedMembership(ctx, socket)
         return membership ? ok(membership) : err('GAME_NOT_FOUND' as const)
       })
+      .mapErr(toRejection)
     if (resolved.isErr()) {
-      ack({ outcome: resolved.error })
+      const { outcome, detail } = resolved.error
+      logWarn('Rejected game.leave request', { command: 'game.leave', gameId, outcome, detail, payload })
+      ack({ outcome })
       return
     }
     const { player, user } = resolved.value

@@ -5,7 +5,7 @@ import {
 } from '@robo-rally/game-events'
 import { withAcknowledgeOnce } from '@/acknowledgeOnce'
 import type { GameSocket } from '@/gameServer'
-import { logError } from '@/logger'
+import { logError, logWarn } from '@/logger'
 import type { UserRegistry } from '@/userRegistry'
 
 export type AuthHandlerDeps = {
@@ -21,18 +21,19 @@ export function handleLogin(
   withAcknowledgeOnce(acknowledge, (ack) => {
     const parsed = parseLogin(payload)
     if (parsed.isErr()) {
-      logError('Rejected login request', parsed.error, { command: 'user.login', payload })
+      logWarn('Rejected user.login request', { command: 'user.login', outcome: parsed.error, payload })
       ack({ outcome: parsed.error })
       return
     }
     const { username } = parsed.value
 
     if (socket.data.user) {
-      ack(
-        socket.data.user.username === username
-          ? { outcome: 'LOGGED_IN', user: socket.data.user }
-          : { outcome: 'ALREADY_LOGGED_IN' },
-      )
+      if (socket.data.user.username === username) {
+        ack({ outcome: 'LOGGED_IN', user: socket.data.user })
+      } else {
+        logWarn('Rejected user.login request', { command: 'user.login', outcome: 'ALREADY_LOGGED_IN', payload })
+        ack({ outcome: 'ALREADY_LOGGED_IN' })
+      }
       return
     }
 
