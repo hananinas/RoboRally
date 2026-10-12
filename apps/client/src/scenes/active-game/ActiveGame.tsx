@@ -60,6 +60,7 @@ function ActiveGame({ game, username, leaving, onLeave }: {
     handBelowHud && 'game-overlay--hand-below-hud',
     hudFits && 'game-overlay--hud-fits',
   ].filter(Boolean).join(' ')
+  const showDisconnectPopup = true //TEMP for testing
 
   return (
     <div className="game">
@@ -97,6 +98,13 @@ function ActiveGame({ game, username, leaving, onLeave }: {
           />
         )}
       </div>
+      {showDisconnectPopup && (
+        <div className="disconnect-overlay">
+          <div className="disconnect-popup">
+            <h2>A player has disconnected</h2>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -397,6 +397,29 @@
   cursor: default;
 }
 
+/* Disconnect overlay */
+.disconnect-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: #0005;
+  backdrop-filter: blur(6px);
+}
+
+.disconnect-popup {
+  padding: 2rem;
+  border-radius: 1rem;
+  background: white;
+  color: #333;
+  text-align: center;
+}
+
+.disconnect-popup h2 {
+  margin: 0;
+}
+
 /* Wide layout */
 @media (width > 30rem) {
   .game-hud {
