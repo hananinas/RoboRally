@@ -38,6 +38,7 @@ export type ClientGameState = {
   pendingHand: CardsDealt | null
   submission: 'idle' | 'pending' | 'accepted' | 'uncertain'
   error: string | null
+  showDisconnectPopup: boolean
 }
 
 export type GameStateEvent =
@@ -82,6 +83,7 @@ export function createClientGameState(): ClientGameState {
     pendingHand: null,
     submission: 'idle',
     error: null,
+    showDisconnectPopup: false,
   }
 }
 
@@ -155,6 +157,7 @@ export function gameStateReducer(
       if (gameId !== state.assignment?.gameId || !state.playerIds.includes(playerId)) return state
       return {
         ...state,
+        showDisconnectPopup: true,
         playerIds: state.playerIds.filter((id) => id !== playerId),
         playback: robotPlaybackReducer(state.playback, { type: 'remove', robotId }),
       }
