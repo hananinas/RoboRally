@@ -24,6 +24,7 @@ export function createPublicState(): PublicGameState {
     gameId: GAME_ID,
     players: [{ playerId: PLAYER_ID, username: 'Player 1', programSubmitted: false, connected: true }],
     phase: 'PROGRAMMING',
+    paused: false,
     antenna: { x: 5, y: 0, angle: Math.PI / 2 },
     board: {
       width: 11,

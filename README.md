@@ -59,43 +59,6 @@ The recommended development environment uses Nix together with direnv. You do no
 
 The development shell provides the tools required by the project, including Node.js, pnpm, Process Compose, and project-specific development tooling.
 
-### Run the client and server
-
-Run these commands from the repository root. Install the dependencies and
-configure the client before starting the development processes:
-
-```sh
-pnpm install
-cp apps/client/.env.example apps/client/.env
-```
-
-Set the game ID in `apps/client/.env`:
-
-```env
-VITE_GAME_ID=00000000-0000-4000-8000-000000000001
-```
-
-Start the client and Game Service together:
-
-```sh
-pnpm dev
-```
-
-You can also run them in separate terminals. Start the Game Service first:
-
-```sh
-pnpm --filter @robo-rally/game-service dev
-```
-
-The Game Service listens at `http://127.0.0.1:3001`. In another terminal,
-start the client:
-
-```sh
-pnpm --filter @robo-rally/client dev
-```
-
-Vite opens the client in your browser, normally at `http://localhost:5173`.
-
 ### Nix
 #### Requirements
 

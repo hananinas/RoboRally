@@ -1,7 +1,8 @@
 import ActiveGame from './scenes/active-game/ActiveGame.tsx'
 import useGameConnection from './scenes/active-game/useGameConnection.ts'
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import Login from './scenes/login/Login.tsx'
+import { USER_ALREADY_IN_GAME_MESSAGE } from './scenes/active-game/gameState.ts'
 import {
   createSessionState,
   sessionReducer,
@@ -23,7 +24,7 @@ const joinErrors: Record<JoinError, string> = {
   INVALID_REQUEST: 'The configured game ID is invalid.',
   GAME_NOT_FOUND: 'The configured game could not be found.',
   NO_SPAWN_AVAILABLE: 'The game has no available spawn position.',
-  USER_ALREADY_IN_GAME: 'This username is already participating from another connection.',
+  USER_ALREADY_IN_GAME: USER_ALREADY_IN_GAME_MESSAGE,
   GAME_ALREADY_STARTED: 'The game has already started and is no longer accepting new players.',
   INTERNAL_ERROR: 'The Game Service could not join the game. Please try again.',
   CONNECTION_ERROR: 'Connection lost before the game could be joined.',
@@ -36,11 +37,32 @@ function App() {
   const game = useGameConnection(connection.socket)
   const { initialize } = game
   const [session, dispatch] = useReducer(sessionReducer, undefined, createSessionState)
+  const sessionRef = useRef(session)
   const loginPending = useRef(false)
   const loginAttempt = useRef(0)
   const joinPending = useRef(false)
   const joinAttempt = useRef(0)
   const [leaving, setLeaving] = useState(false)
+
+  const sendLogin = useCallback((username: string) => {
+    loginPending.current = true
+    const attempt = ++loginAttempt.current
+    connection.socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit(
+      'user.login',
+      { username },
+      (error, result) => {
+        if (attempt !== loginAttempt.current || !connection.socket.connected) return
+        loginPending.current = false
+        dispatch(error
+          ? { type: 'login-timeout' }
+          : { type: 'login-result', result })
+      },
+    )
+  }, [connection.socket, dispatch])
+
+  useEffect(() => {
+    sessionRef.current = session
+  }, [session])
 
   useEffect(() => {
     const invalidateRequests = () => {
@@ -53,9 +75,16 @@ function App() {
       invalidateRequests()
       dispatch({ type: 'disconnected' })
     }
+    const handleConnect = () => {
+      if (sessionRef.current.status === 'joined' && !connection.socket.recovered) {
+        dispatch({ type: 'resync' })
+      }
+    }
     connection.socket.on('disconnect', handleDisconnect)
+    connection.socket.on('connect', handleConnect)
     return () => {
       connection.socket.off('disconnect', handleDisconnect)
+      connection.socket.off('connect', handleConnect)
       invalidateRequests()
     }
   }, [connection.socket])
@@ -88,6 +117,11 @@ function App() {
     )
   }, [connection.socket, connection.status, session.status, initialize])
 
+  useEffect(() => {
+    if (session.status !== 'resyncing' || loginPending.current) return
+    sendLogin(session.user.username)
+  }, [connection.socket, session, sendLogin])
+
   const username = session.status === 'editing' || session.status === 'logging-in'
     ? session.username
     : session.user.username
@@ -119,21 +153,9 @@ function App() {
       return
     }
 
-    loginPending.current = true
-    const attempt = ++loginAttempt.current
     dispatch({ type: 'username-changed', username: submittedUsername })
     dispatch({ type: 'login-submitted' })
-    connection.socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit(
-      'user.login',
-      { username: submittedUsername },
-      (error, result) => {
-        if (attempt !== loginAttempt.current || !connection.socket.connected) return
-        loginPending.current = false
-        dispatch(error
-          ? { type: 'login-timeout' }
-          : { type: 'login-result', result })
-      },
-    )
+    sendLogin(submittedUsername)
   }
 
   function leaveGame() {
@@ -152,7 +174,7 @@ function App() {
     )
   }
 
-  if (session.status === 'joined') {
+  if (session.status === 'joined' || session.status === 'resyncing') {
     return <ActiveGame game={game} username={session.user.username} leaving={leaving} onLeave={leaveGame} />
   }
 

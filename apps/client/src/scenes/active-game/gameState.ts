@@ -4,6 +4,7 @@ import type {
   GamePhase,
   JoinResult,
   PlayerAssignment,
+  PlayerConnectionChanged,
   PlayerId,
   PlayerJoined,
   PlayerLeft,
@@ -22,11 +23,18 @@ export type ProgramCard = Card
 
 export type Registers = readonly (ProgramCard | null)[]
 
+export type Player = {
+  playerId: PlayerId
+  username: string
+  connected: boolean
+}
+
 export type ClientGameState = {
   connected: boolean
   assignment: PlayerAssignment | null
   phase: GamePhase | null
-  playerIds: readonly PlayerId[]
+  paused: boolean
+  players: readonly Player[]
   board: BoardRenderModel | null
   playback: RobotPlaybackState
   hand: readonly ProgramCard[]
@@ -45,7 +53,10 @@ export type GameStateEvent =
   | { type: 'joined'; result: Extract<JoinResult, { outcome: 'JOINED' }> }
   | { type: 'player-joined'; payload: PlayerJoined }
   | { type: 'player-left'; payload: PlayerLeft }
+  | { type: 'player-connection-changed'; payload: PlayerConnectionChanged }
   | { type: 'disconnected' }
+  | { type: 'reconnected' }
+  | { type: 'connect-error'; message: string }
   | { type: 'dealt'; hand: CardsDealt }
   | { type: 'reset' }
   | { type: 'error'; message: string }
@@ -60,6 +71,13 @@ export type GameStateEvent =
   | { type: 'result'; result: ProgramResult; handVersion: number }
   | { type: 'submission-unknown'; handVersion: number }
 
+export const USER_ALREADY_IN_GAME_MESSAGE =
+  'This username is already participating from another connection.'
+
+const connectErrors: Record<string, string> = {
+  USER_ALREADY_IN_GAME: USER_ALREADY_IN_GAME_MESSAGE,
+}
+
 export const REGISTER_COUNT = 5
 
 function emptyRegisters(): Registers {
@@ -71,7 +89,8 @@ export function createClientGameState(): ClientGameState {
     connected: false,
     assignment: null,
     phase: null,
-    playerIds: [],
+    paused: false,
+    players: [],
     board: null,
     playback: createRobotPlaybackState([]),
     hand: [],
@@ -89,6 +108,7 @@ export function createClientGameState(): ClientGameState {
 
 export function canProgram(state: ClientGameState): boolean {
   return state.connected &&
+    !state.paused &&
     state.assignment !== null &&
     state.phase === 'PROGRAMMING' &&
     state.handReady &&
@@ -145,16 +165,19 @@ export function gameStateReducer(
     case 'player-joined': {
       const { gameId, player, robot } = event.payload
       if (gameId !== state.assignment?.gameId || player.playerId !== robot.playerId ||
-          state.playerIds.includes(player.playerId)) return state
+          state.players.some((candidate) => candidate.playerId === player.playerId)) return state
       return {
         ...state,
-        playerIds: [...state.playerIds, player.playerId],
+        players: [...state.players, {
+          playerId: player.playerId, username: player.username, connected: player.connected,
+        }],
         playback: robotPlaybackReducer(state.playback, { type: 'add', robot: { ...robot, colour: '#c74f4f' } }),
       }
     }
     case 'player-left': {
       const { gameId, playerId, robotId } = event.payload
-      if (gameId !== state.assignment?.gameId || !state.playerIds.includes(playerId)) return state
+      if (gameId !== state.assignment?.gameId ||
+        !state.players.some((player) => player.playerId === playerId)) return state
       return {
         ...state,
         showDisconnectPopup: true,
@@ -162,12 +185,28 @@ export function gameStateReducer(
         playback: robotPlaybackReducer(state.playback, { type: 'remove', robotId }),
       }
     }
+    case 'player-connection-changed': {
+      const { gameId, playerId, connected, paused } = event.payload
+      if (gameId !== state.assignment?.gameId) return state
+      return {
+        ...state,
+        paused,
+        players: state.players.map((player) =>
+          player.playerId === playerId ? { ...player, connected } : player),
+      }
+    }
     case 'disconnected':
       return {
         ...state,
         connected: false,
-        error: 'Connection lost. Reload to connect again; your program was not resent.',
+        error: 'Connection lost. Reconnecting… Your program was not resent.',
       }
+    case 'reconnected':
+      return { ...state, connected: true, error: null }
+    case 'connect-error': {
+      const message = connectErrors[event.message]
+      return message ? { ...state, error: message } : state
+    }
     case 'reset':
       return createClientGameState()
     case 'joined': {
@@ -182,7 +221,10 @@ export function gameStateReducer(
         handReady: snapshot.phase === 'PROGRAMMING' && result.hand.length > 0,
         submission: result.programSubmitted ? 'accepted' : 'idle',
         phase: snapshot.phase,
-        playerIds: snapshot.players.map((player) => player.playerId),
+        paused: snapshot.paused,
+        players: snapshot.players.map((player) => ({
+          playerId: player.playerId, username: player.username, connected: player.connected,
+        })),
         playback: createRobotPlaybackState(
           snapshot.robots.map((robot) => ({ ...robot, colour: '#c74f4f' })),
         ),
@@ -277,11 +319,16 @@ export function gameStateReducer(
     }
     case 'submit':
       return createSubmission(state) ? { ...state, submission: 'pending', error: null } : state
-    case 'result':
+    case 'result': {
       if (event.handVersion !== state.handVersion || state.submission !== 'pending') return state
-      return event.result.outcome === 'ACCEPTED'
-        ? { ...state, submission: 'accepted', error: null }
-        : { ...state, submission: 'idle', error: 'Program rejected. Adjust your selection and try again.' }
+      if (event.result.outcome === 'ACCEPTED') {
+        return { ...state, submission: 'accepted', error: null }
+      }
+      const error = event.result.outcome === 'GAME_PAUSED'
+        ? 'Game paused. Your program was not submitted — try again once reconnected.'
+        : 'Program rejected. Adjust your selection and try again.'
+      return { ...state, submission: 'idle', error }
+    }
     case 'submission-unknown':
       if (event.handVersion !== state.handVersion || state.submission !== 'pending') return state
       return {
