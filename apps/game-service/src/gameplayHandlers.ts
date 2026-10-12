@@ -12,13 +12,13 @@ import { ownedMembership, type MembershipContext } from '@/membershipHandlers'
 
 type ValidateGameplayRequestError = 'NOT_A_MEMBER' | 'MALFORMED_REQUEST' | 'GAME_ID_MISMATCH' | 'PLAYER_ID_MISMATCH'
 
-function validateGameplayRequest<T extends { gameId: string; playerId: string }>(
+function validateGameplayRequest(
   ctx: MembershipContext,
   socket: GameSocket,
-  schema: { safeParse(payload: unknown): { success: true; data: T } | { success: false; error: unknown } },
+  schema: typeof submitProgramSchema,
   payload: unknown,
   command: string,
-): Result<{ player: Player; data: T }, ValidateGameplayRequestError> {
+): Result<{ player: Player; data: SubmitProgram }, ValidateGameplayRequestError> {
   const player = ownedMembership(ctx, socket)?.player
   if (!player) return err('NOT_A_MEMBER')
 
