@@ -6,11 +6,11 @@ import type {
 } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
 import type { Game } from '@/game/index'
-import { presentPublicGameState } from '@/gamePresenter'
+import { presentPublicGameState } from '@/socket/gamePresenter'
 import { createUserRegistry } from '@/userRegistry'
 import { createSharedGame } from '@/game/SinglePlayerGame'
 import { createActionScheduler } from '@/actionScheduler'
-import { handleLogin } from '@/authHandlers'
+import { handleLogin } from '@/socket/handlers/authHandlers'
 import {
   handleDisconnect,
   handleJoin,
@@ -18,8 +18,8 @@ import {
   reconnectIfRecovered,
   type GameMembership,
   type MembershipContext,
-} from '@/membershipHandlers'
-import { handleSubmitProgram } from '@/gameplayHandlers'
+} from '@/socket/handlers/membershipHandlers'
+import { handleSubmitProgram } from '@/socket/handlers/gameplayHandlers'
 
 export type GameSocketData = { user?: User }
 

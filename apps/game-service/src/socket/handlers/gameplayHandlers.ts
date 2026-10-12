@@ -5,12 +5,12 @@ import {
 } from '@robo-rally/game-events'
 import { err, ok, type Result } from 'neverthrow'
 import type { ZodError } from 'zod'
-import { withAcknowledgeOnce } from '@/acknowledgeOnce'
+import { withAcknowledgeOnce } from '@/socket/utilities/acknowledgeOnce'
 import type { Player } from '@/game/index'
-import type { GameSocket } from '@/gameServer'
+import type { GameSocket } from '@/socket/gameServer'
 import { logError, logWarn } from '@/logger'
-import { ownedMembership, type MembershipContext } from '@/membershipHandlers'
-import { toRejection, type Rejection } from '@/rejection'
+import { ownedMembership, type MembershipContext } from '@/socket/handlers/membershipHandlers'
+import { toRejection, type Rejection } from '@/socket/utilities/rejection'
 
 type ValidateGameplayRequestError =
   | 'NOT_A_MEMBER'

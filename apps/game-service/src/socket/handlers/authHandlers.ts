@@ -3,8 +3,8 @@ import {
   type Login,
   type LoginAcknowledgement,
 } from '@robo-rally/game-events'
-import { withAcknowledgeOnce } from '@/acknowledgeOnce'
-import type { GameSocket } from '@/gameServer'
+import { withAcknowledgeOnce } from '@/socket/utilities/acknowledgeOnce'
+import type { GameSocket } from '@/socket/gameServer'
 import { logError, logWarn } from '@/logger'
 import type { UserRegistry } from '@/userRegistry'
 

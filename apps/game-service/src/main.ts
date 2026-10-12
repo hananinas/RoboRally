@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
 import { parseGameServicePort } from '@/config'
-import { createGameSocketServer } from '@/gameServer'
+import { createGameSocketServer } from '@/socket/gameServer'
 import { logError } from '@/logger'
 
 process.on('uncaughtException', (error) => {

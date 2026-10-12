@@ -9,7 +9,7 @@ import { io as createClient, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Board, EmptyTile, Game, Card } from '@/game/index.ts'
 import { createSharedGame } from '@/game/SinglePlayerGame.ts'
-import { createGameSocketServer, type GameSocketServer } from '@/gameServer.ts'
+import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer.ts'
 import { Integer } from '@/numbers'
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>

@@ -1,6 +1,6 @@
 import type { Game } from '@/game/index'
-import { presentCardsDealt, presentRobotActionResolved } from '@/gamePresenter'
-import type { GameSocketServer } from '@/gameServer'
+import { presentCardsDealt, presentRobotActionResolved } from '@/socket/gamePresenter'
+import type { GameSocketServer } from '@/socket/gameServer'
 import { logError } from '@/logger'
 
 export type ActionSchedulerDeps = {

@@ -4,7 +4,7 @@ import type { CardsDealt, ClientToServerEvents, ServerToClientEvents, SubmitProg
 import { io as connectSocket, type Socket } from 'socket.io-client'
 import { expect, it } from 'vitest'
 import { Board, Card, EmptyTile, Game, type Player } from '@/game/index.ts'
-import { createGameSocketServer } from '@/gameServer.ts'
+import { createGameSocketServer } from '@/socket/gameServer.ts'
 import { Integer } from '@/numbers'
 
 it('waits for the roster, broadcasts register-major actions, and deals two private next rounds', async () => {

@@ -1,6 +1,6 @@
 import { err, ok, type Result } from 'neverthrow'
 import type { ZodError } from 'zod'
-import { withAcknowledgeOnce } from '@/acknowledgeOnce'
+import { withAcknowledgeOnce } from '@/socket/utilities/acknowledgeOnce'
 import {
   joinGameSchema,
   leaveGameSchema,
@@ -16,11 +16,11 @@ import {
   type Game,
   type Player,
 } from '@/game/index'
-import { presentCardsDealt } from '@/gamePresenter'
+import { presentCardsDealt } from '@/socket/gamePresenter'
 import { logError, logWarn } from '@/logger'
-import { toRejection, type Rejection } from '@/rejection'
+import { toRejection, type Rejection } from '@/socket/utilities/rejection'
 import type { ActionScheduler } from '@/actionScheduler'
-import type { GameSocket, GameSocketServer } from '@/gameServer'
+import type { GameSocket, GameSocketServer } from '@/socket/gameServer'
 
 export type GameMembership = {
   user: User

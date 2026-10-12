@@ -18,7 +18,7 @@ import {
   presentCardsDealt,
   presentPublicGameState,
   presentRobotActionResolved,
-} from '@/gamePresenter.ts'
+} from '@/socket/gamePresenter.ts'
 import { Integer } from '@/numbers'
 
 describe('game presenter', () => {

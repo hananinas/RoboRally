@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { withAcknowledgeOnce } from '@/acknowledgeOnce'
+import { withAcknowledgeOnce } from '@/socket/utilities/acknowledgeOnce'
 
 describe('withAcknowledgeOnce', () => {
   it('does nothing when acknowledge is not a function', () => {
