@@ -10,15 +10,17 @@ export function Integer(value: number): Integer {
 }
 
 export function UnsignedInteger(value: number): UnsignedInteger {
-  if (!Number.isInteger(value) || value < 0) {
+  const integer = Integer(value)
+  if (integer < 0) {
     throw new RangeError(`Expected an unsigned integer, got ${value}`)
   }
-  return value as UnsignedInteger
+  return integer as UnsignedInteger
 }
 
 export function PositiveInteger(value: number): PositiveInteger {
-  if (!Number.isInteger(value) || value <= 0) {
+  const unsigned = UnsignedInteger(value)
+  if (unsigned <= 0) {
     throw new RangeError(`Expected a positive integer, got ${value}`)
   }
-  return value as PositiveInteger
+  return unsigned as PositiveInteger
 }
