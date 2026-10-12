@@ -109,20 +109,31 @@ export class Game {
     return this.submittedPlayerIds.has(playerId)
   }
 
-  addPlayer(): Result<Player, AddPlayerError> {
+  private checkCanAddPlayer(): Result<void, 'GAME_ALREADY_STARTED'> {
     if (this.started) return err('GAME_ALREADY_STARTED')
+    return ok(undefined)
+  }
+
+  private findSpawn(): Result<Position, 'NO_SPAWN_AVAILABLE'> {
     const { width, height } = this.board
     const y = Math.floor(height / 2)
     let x = Math.floor(width / 2)
     while (x >= 0 && this.board.occupantAt({ x: Integer(x), y: Integer(y) }) !== undefined) x--
     if (x < 0) return err('NO_SPAWN_AVAILABLE')
+    return ok({ x: Integer(x), y: Integer(y) })
+  }
 
-    const robot = new Robot(randomUUID(), Direction.NORTH)
-    const hand = this.deck.map((card) => new Card(randomUUID(), card.instruction))
-    const player = new Player(randomUUID(), robot, hand)
-    this.board.placeRobot(robot.id, { x: Integer(x), y: Integer(y) })
-    this.roster.push(player)
-    return ok(player)
+  addPlayer(): Result<Player, AddPlayerError> {
+    return this.checkCanAddPlayer().andThen(() =>
+      this.findSpawn().map((position) => {
+        const robot = new Robot(randomUUID(), Direction.NORTH)
+        const hand = this.deck.map((card) => new Card(randomUUID(), card.instruction))
+        const player = new Player(randomUUID(), robot, hand)
+        this.board.placeRobot(robot.id, position)
+        this.roster.push(player)
+        return player
+      }),
+    )
   }
 
   removePlayer(playerId: PlayerId): void {
@@ -144,7 +155,7 @@ export class Game {
     this.recheckProgrammingPhase()
   }
 
-  checkCanSubmitProgram(
+  private checkCanSubmitProgram(
     playerId: PlayerId,
   ): Result<Player, 'GAME_PAUSED' | 'WRONG_PHASE' | 'PLAYER_NOT_IN_GAME' | 'ALREADY_SUBMITTED'> {
     if (this.isPaused) return err('GAME_PAUSED')
