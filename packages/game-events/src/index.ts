@@ -46,6 +46,8 @@ export {
   getPublicGameStateSchema,
   parseGetPublicGameState,
 } from './getPublicGameState.js'
+export { joinGameSchema } from './joinGame.js'
+export { leaveGameSchema } from './leaveGame.js'
 export { parseSubmitProgram, submitProgramSchema } from './submitProgram.js'
 export type { ProgramCardIds, SubmitProgram } from './submitProgram.js'
 
