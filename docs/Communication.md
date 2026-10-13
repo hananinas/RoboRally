@@ -72,6 +72,20 @@ sequenceDiagram
     end
 ```
 
+### Reading lobby details before joining
+
+After login, the client may read a game's lobby details without joining it:
+
+`game.getLobbyDetails {gameId}`
+
+which returns:
+
+`LOBBY_FOUND {lobby: {gameId, name, playerNames, playerCount, map: {name, icon, maxPlayers}}}`
+
+The details come from the server's current state. Reading them creates no player, robot or membership, grants no room access, and never includes hands or other gameplay data. The connection receives no live updates afterwards; it must read again to refresh. Maps are not implemented yet, so `map` is a constant (`DEMO MAP`, icon `demo-map`, 6 players) until they are.
+
+A connection that has not logged in receives `LOGIN_REQUIRED`, a malformed request receives `INVALID_REQUEST`, and an unavailable game receives `GAME_NOT_FOUND`. Because the game may change between reading and joining, the client initializes the game from the JOINED response, not from the lobby details.
+
 
 ## Game has started
 ### Programming
