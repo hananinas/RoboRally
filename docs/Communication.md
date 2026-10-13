@@ -42,16 +42,6 @@ If another connection attempts to join the same game for that user, it receives:
 
 A failed join leaves the user logged in and the client may attempt another join later.
 
-Only the connection associated with the membership may read that game's public snapshot through:
-
-`game.getPublicGameState`
-
-Other connections receive:
-
-`GAME_NOT_FOUND`
-
-without receiving game state.
-
 An explicit `game.leave {gameId}` removes the owning connection's player and robot, frees the occupied tile, and revokes its public/private room access. `LEFT` retains login. Remaining members receive `game.playerLeft {gameId, playerId, robotId}`. A disconnected player remains a member; disconnecting is not leaving. Leaving does not reopen a game that has already started.
 
 Reconnection behavior is described in the Reconnection section.
@@ -109,11 +99,9 @@ This informs other players that the player has submitted their program without r
 
 ### Submission failures
 
-`INVALID_PROGRAM` indicates that the submitted program is malformed, stale, contains duplicate cards, contains cards the player does not own, or was submitted during an invalid game phase.
+A submission can be rejected for a mismatched or malformed request, because the connection is not a member of the game, because the round has already moved past programming, because the player already has a stored program for this round, because the game is paused, or because of an unexpected service failure. See [AsyncAPI](asyncapi.yaml) for the exact rejection codes.
 
-An invalid submission does not replace or modify the player's current program.
-
-`INTERNAL_ERROR` means that the service failed before accepting the program.
+A rejected submission does not replace or modify the player's current program.
 
 If the client receives no acknowledgement, the outcome is unknown. The client must not automatically resend the submission because the original request may have been accepted.
 
@@ -140,6 +128,8 @@ The test board uses:
 The antenna does not occupy a robot tile.
 
 Exact priority ties are resolved using player join order. The priority algorithm defines the complete robot action order.
+
+If an unexpected service failure makes gameplay unrecoverable, members receive `game.aborted {gameId}` and the game ends permanently.
 
 ### Dealing the next hand
 

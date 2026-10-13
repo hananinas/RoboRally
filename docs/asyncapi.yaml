@@ -24,8 +24,6 @@ channels:
         $ref: '#/components/messages/LeaveGame'
       submitProgram:
         $ref: '#/components/messages/SubmitProgram'
-      getPublicGameState:
-        $ref: '#/components/messages/GetPublicGameState'
 
   loginReplies:
     address: null
@@ -63,15 +61,6 @@ channels:
       programResult:
         $ref: '#/components/messages/ProgramResult'
 
-  publicGameStateReplies:
-    address: null
-    description: |
-      Logical reply channel
-      Delivered through the acknowledgement of game.getPublicGameState
-    messages:
-      publicGameStateResult:
-        $ref: '#/components/messages/PublicGameStateResult'
-
   player:
     address: 'game:{gameId}:player:{playerId}'
     parameters:
@@ -99,6 +88,8 @@ channels:
         $ref: '#/components/messages/PlayerLeft'
       playerConnectionChanged:
         $ref: '#/components/messages/PlayerConnectionChanged'
+      gameAborted:
+        $ref: '#/components/messages/GameAborted'
 
 operations:
   handleLogin:
@@ -166,20 +157,6 @@ operations:
     action: send
     channel:
       $ref: '#/channels/public'
-
-  handleGetGameState:
-    action: receive
-    channel:
-      $ref: '#/channels/commands'
-    messages:
-      - $ref: '#/channels/commands/messages/getPublicGameState'
-    reply:
-      channel:
-        $ref: '#/channels/publicGameStateReplies'
-      messages:
-        - $ref: '#/channels/publicGameStateReplies/messages/publicGameStateResult'
-      x-socketio:
-        acknowledgement: true
 
 components:
   messages:
@@ -378,30 +355,6 @@ components:
       payload:
         $ref: '#/components/schemas/PlayerJoined'
 
-    GetPublicGameState:
-      name: game.getPublicGameState
-      payload:
-        type: object
-        additionalProperties: false
-        required: [ gameId ]
-        properties:
-          gameId:
-            $ref: '#/components/schemas/GameId'
-      description: >-
-        Requests the public state of the game joined by this connection.
-
-    PublicGameStateResult:
-      name: game.publicGameStateResult
-      description: Returns the public game state or GAME_NOT_FOUND.
-      payload:
-        oneOf:
-          - $ref: '#/components/schemas/PublicGameStateFound'
-          - $ref: '#/components/schemas/PublicGameStateNotFound'
-      examples:
-        - name: nonmember
-          payload:
-            outcome: GAME_NOT_FOUND
-
     SubmitProgram:
       name: program.submit
       payload:
@@ -449,12 +402,27 @@ components:
             enum:
               - ACCEPTED
               - INVALID_PROGRAM
-              - INTERNAL_ERROR
               - GAME_PAUSED
-      description: >-
-        ACCEPTED confirms the program was stored. INVALID_PROGRAM rejects the
-        submission without changing game state. INTERNAL_ERROR means the service
-        failed before accepting it. GAME_PAUSED rejects a submission because the game is paused. 
+              - ALREADY_SUBMITTED
+              - WRONG_PHASE
+              - NOT_A_MEMBER
+              - INVALID_REQUEST
+              - GAME_ID_MISMATCH
+              - PLAYER_ID_MISMATCH
+              - PLAYER_NOT_IN_GAME
+              - INTERNAL_ERROR
+      description: |
+        ACCEPTED: the program was stored.
+        INVALID_PROGRAM: the cards did not match the player's hand, or did not cover all five registers.
+        GAME_PAUSED: rejected because the game is paused.
+        ALREADY_SUBMITTED: this player already has a stored program for the current round; it is unchanged.
+        WRONG_PHASE: the round had already moved into activation before this submission arrived.
+        NOT_A_MEMBER: this connection does not own a membership for this game.
+        INVALID_REQUEST: the request did not match the expected shape.
+        GAME_ID_MISMATCH: the request's gameId did not match the connection's game.
+        PLAYER_ID_MISMATCH: the request's playerId did not match the connection's own player.
+        PLAYER_NOT_IN_GAME: the player is no longer part of the game (left or otherwise removed).
+        INTERNAL_ERROR: unexpected service failure.
         No acknowledgement means the outcome is unknown.
 
     ProgramSubmitted:
@@ -587,6 +555,17 @@ components:
             connected: true
             paused: false
 
+    GameAborted:
+      name: game.aborted
+      description: >-
+        Announces that gameplay has stopped irrecoverably after an unexpected service failure. 
+      payload:
+        $ref: '#/components/schemas/GameAborted'
+      examples:
+        - name: aborted
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+
   schemas:
 
     # Login
@@ -641,7 +620,7 @@ components:
           enum: [ INVALID_USERNAME, INVALID_REQUEST, ALREADY_LOGGED_IN, INTERNAL_ERROR ]
       description: |
         INVALID_USERNAME covers a missing/non-string username or a length outside 1–30.
-        INVALID_REQUEST covers a non-object request or additional properties.
+        INVALID_REQUEST: the request did not match the expected shape.
         ALREADY_LOGGED_IN means this connection is bound to a different username.
         Repeating login with the same username returns LOGGED_IN with the same user.
         INTERNAL_ERROR is an unexpected service failure; do not expose internals.
@@ -719,7 +698,7 @@ components:
               INTERNAL_ERROR
             ]
       description: >-
-        LOGIN_REQUIRED: no approved user. INVALID_REQUEST: malformed request.
+        LOGIN_REQUIRED: no approved user. INVALID_REQUEST: the request did not match the expected shape.
         GAME_NOT_FOUND: unavailable game. NO_SPAWN_AVAILABLE: no valid spawn.
         GAME_ALREADY_STARTED: The game has already accepted its first program.
         USER_ALREADY_IN_GAME: another connection currently owns this user's membership. 
@@ -735,7 +714,7 @@ components:
       description: |
         LEFT: membership and robot removed, room access revoked, login retained.
         LOGIN_REQUIRED: this connection has no approved user.
-        INVALID_REQUEST: malformed request, including an invalid gameId.
+        INVALID_REQUEST: the request did not match the expected shape.
         GAME_NOT_FOUND: unavailable game or membership not owned by this connection;
         this also covers a repeated leave after a successful departure.
         INTERNAL_ERROR: unexpected service failure; do not expose internals.
@@ -821,29 +800,6 @@ components:
         paused:
           type: boolean
           description: Whether gameplay is paused because a game member is disconnected.
-
-    PublicGameStateFound:
-      type: object
-      additionalProperties: false
-      required: [ outcome, state ]
-      properties:
-        outcome:
-          type: string
-          enum: [ GAME_FOUND ]
-        state:
-          $ref: '#/components/schemas/PublicGameState'
-
-    PublicGameStateNotFound:
-      type: object
-      additionalProperties: false
-      required: [ outcome ]
-      properties:
-        outcome:
-          type: string
-          enum: [ GAME_NOT_FOUND ]
-      description: >-
-        No accessible game: the game is unknown, the connection is not a member, or the request is
-        malformed. Do not return state or reveal whether an inaccessible game exists.
 
     GamePhase:
       type: string
@@ -994,3 +950,11 @@ components:
         paused:
           type: boolean
           description: Whether any game member remains disconnected after this change.
+
+    GameAborted:
+      type: object
+      additionalProperties: false
+      required: [ gameId ]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
