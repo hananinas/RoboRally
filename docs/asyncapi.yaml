@@ -24,6 +24,8 @@ channels:
         $ref: '#/components/messages/LeaveGame'
       submitProgram:
         $ref: '#/components/messages/SubmitProgram'
+      getLobbyDetails:
+        $ref: '#/components/messages/GetLobbyDetails'
 
   loginReplies:
     address: null
@@ -60,6 +62,15 @@ channels:
     messages:
       programResult:
         $ref: '#/components/messages/ProgramResult'
+
+  lobbyDetailsReplies:
+    address: null
+    description: |
+      Logical reply channel
+      Delivered through the acknowledgement of game.getLobbyDetails
+    messages:
+      lobbyDetailsResult:
+        $ref: '#/components/messages/LobbyDetailsResult'
 
   player:
     address: 'game:{gameId}:player:{playerId}'
@@ -157,6 +168,20 @@ operations:
     action: send
     channel:
       $ref: '#/channels/public'
+
+  handleGetLobbyDetails:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/getLobbyDetails'
+    reply:
+      channel:
+        $ref: '#/channels/lobbyDetailsReplies'
+      messages:
+        - $ref: '#/channels/lobbyDetailsReplies/messages/lobbyDetailsResult'
+      x-socketio:
+        acknowledgement: true
 
 components:
   messages:
@@ -354,6 +379,52 @@ components:
       description: Announces a new player and robot to existing game participants.
       payload:
         $ref: '#/components/schemas/PlayerJoined'
+
+    GetLobbyDetails:
+      name: game.getLobbyDetails
+      description: >-
+        Reads a game's lobby details before joining. Requires login but not
+        membership. Reading is side-effect free: it creates no player, robot, or
+        membership, grants no access to the public or private player rooms, and
+        never returns hands. Details reflect the server's state when the request
+        is handled; join with game.join to receive authoritative state.
+      payload:
+        $ref: '#/components/schemas/GetLobbyDetails'
+      examples:
+        - name: lobbyDetails
+          summary: Configured shared game
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+
+    LobbyDetailsResult:
+      name: game.lobbyDetailsResult
+      description: >-
+        Returns the game's lobby details or a rejection. This is returned through
+        the request's acknowledgement callback, not emitted as game.lobbyDetailsResult.
+      payload:
+        $ref: '#/components/schemas/LobbyDetailsResult'
+      examples:
+        - name: found
+          summary: Two players in the shared game on the demo map
+          payload:
+            outcome: LOBBY_FOUND
+            lobby:
+              gameId: 00000000-0000-4000-8000-000000000001
+              name: Shared game
+              playerNames: [ Dane, Abid ]
+              playerCount: 2
+              map:
+                name: DEMO MAP
+                icon: demo-map
+                maxPlayers: 6
+        - name: loginRequired
+          summary: The connection has not logged in
+          payload:
+            outcome: LOGIN_REQUIRED
+        - name: gameNotFound
+          summary: The requested game is unavailable
+          payload:
+            outcome: GAME_NOT_FOUND
 
     SubmitProgram:
       name: program.submit
@@ -800,6 +871,87 @@ components:
         paused:
           type: boolean
           description: Whether gameplay is paused because a game member is disconnected.
+
+    GetLobbyDetails:
+      type: object
+      additionalProperties: false
+      required: [ gameId ]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+
+    LobbyMap:
+      type: object
+      additionalProperties: false
+      required: [ name, icon, maxPlayers ]
+      properties:
+        name:
+          type: string
+          description: Display name of the map. Constant "DEMO MAP" until maps exist.
+        icon:
+          type: string
+          description: >-
+            Key of the map's icon. The client maps it to its own image.
+            Constant "demo-map" until maps exist.
+        maxPlayers:
+          type: integer
+          minimum: 1
+          description: Most players the map supports. Constant 6 until maps exist.
+
+    LobbyDetails:
+      type: object
+      additionalProperties: false
+      required: [ gameId, name, playerNames, playerCount, map ]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+        name:
+          type: string
+          description: Display name of the game.
+        playerNames:
+          type: array
+          description: Usernames of current members in join order, including disconnected members.
+          items:
+            $ref: '#/components/schemas/Username'
+        playerCount:
+          type: integer
+          minimum: 0
+          description: Equals the length of playerNames.
+        map:
+          $ref: '#/components/schemas/LobbyMap'
+      description: >-
+        Public pre-join summary of a game. Never contains cards, board, robot,
+        or player identifiers.
+
+    LobbyDetailsResult:
+      oneOf:
+        - $ref: '#/components/schemas/LobbyFound'
+        - $ref: '#/components/schemas/LobbyDetailsRejected'
+
+    LobbyFound:
+      type: object
+      additionalProperties: false
+      required: [ outcome, lobby ]
+      properties:
+        outcome:
+          type: string
+          enum: [ LOBBY_FOUND ]
+        lobby:
+          $ref: '#/components/schemas/LobbyDetails'
+
+    LobbyDetailsRejected:
+      type: object
+      additionalProperties: false
+      required: [ outcome ]
+      properties:
+        outcome:
+          type: string
+          enum: [ LOGIN_REQUIRED, INVALID_REQUEST, GAME_NOT_FOUND, INTERNAL_ERROR ]
+      description: |
+        LOGIN_REQUIRED: this connection has no approved user; checked before the payload.
+        INVALID_REQUEST: the request did not match the expected shape.
+        GAME_NOT_FOUND: the requested game is unavailable on this service.
+        INTERNAL_ERROR: unexpected service failure; do not expose internals.
 
     GamePhase:
       type: string
