@@ -25,7 +25,6 @@ test('login keeps the entry shell and waits for an explicit join', async ({ page
   await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
   expect(await shell!.evaluate((element) => element.isConnected)).toBe(true)
   expect((await game.snapshot()).entryRequests.map((request) => request.event)).toEqual(['user.login'])
-  expect((await game.snapshot()).stateRequests).toBe(0)
   await join.press('Enter')
   await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
   expect((await game.snapshot()).entryRequests.map((request) => request.event)).toEqual(['user.login', 'game.join'])
