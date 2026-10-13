@@ -158,7 +158,7 @@ export function handleJoin(
   acknowledge: JoinResultAcknowledgement,
 ): void {
   const { game, gameId, publicRoom, playerRoom, publicState } = ctx
-  let rollback: MembershipSuccess | undefined
+  let membershipSuccess: MembershipSuccess | undefined
 
   withAcknowledgeOnce(acknowledge, (ack) => {
     const resolution = validateMembershipRequest(ctx, joinGameSchema, payload, socket.data.user)
@@ -170,7 +170,7 @@ export function handleJoin(
       ack({ outcome })
       return
     }
-    rollback = resolution.value
+    membershipSuccess = resolution.value
     const { membership, reconnected } = resolution.value
     const { player } = membership
 
@@ -183,7 +183,7 @@ export function handleJoin(
     }
     void socket.join([publicRoom, playerRoom(player.id)])
     ack(result)
-    if (rollback.isNew) {
+    if (membershipSuccess.isNew) {
       socket.to(publicRoom).emit('game.playerJoined', {
         gameId,
         player: result.state.players.find((candidate) => candidate.playerId === player.id)!,
@@ -194,7 +194,7 @@ export function handleJoin(
     }
   }, (error, alreadyAcknowledged) => {
     logError('Failed to process game join', error, { command: 'game.join', gameId, payload })
-    if (rollback && !alreadyAcknowledged) rollbackMembership(ctx, rollback)
+    if (membershipSuccess && !alreadyAcknowledged) rollbackMembership(ctx, membershipSuccess)
     return { outcome: 'INTERNAL_ERROR' } as const
   })
 }
@@ -209,19 +209,19 @@ export function handleLeave(
   let playerId: string | undefined
 
   withAcknowledgeOnce(acknowledge, (ack) => {
-    const resolved = validateMembershipRequest(ctx, leaveGameSchema, payload, socket.data.user)
+    const result = validateMembershipRequest(ctx, leaveGameSchema, payload, socket.data.user)
       .andThen(() => {
         const membership = ownedMembership(ctx, socket)
         return membership ? ok(membership) : err('GAME_NOT_FOUND' as const)
       })
       .mapErr(toRejection)
-    if (resolved.isErr()) {
-      const { outcome, detail } = resolved.error
+    if (result.isErr()) {
+      const { outcome, detail } = result.error
       logWarn('Rejected game.leave request', { command: 'game.leave', gameId, outcome, detail, payload })
       ack({ outcome })
       return
     }
-    const { player, user } = resolved.value
+    const { player, user } = result.value
     playerId = player.id
 
     const phaseBeforeLeave = game.phase
