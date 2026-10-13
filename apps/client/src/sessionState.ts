@@ -15,6 +15,7 @@ export type JoinError = Exclude<JoinFailure, 'LOGIN_REQUIRED'>
 export type SessionState =
   | { status: 'editing'; username: string; error: LoginError | null }
   | { status: 'logging-in'; username: string }
+  | { status: 'ready-to-join'; user: User }
   | { status: 'joining'; user: User }
   | { status: 'join-failed'; user: User; error: JoinError | null }
   | { status: 'resyncing'; user: User }
@@ -31,7 +32,7 @@ export type SessionEvent =
   | { type: 'login-submitted' }
   | { type: 'login-result'; result: LoginResult }
   | { type: 'login-timeout' }
-  | { type: 'join-retried' }
+  | { type: 'join-requested' }
   | { type: 'join-result'; result: JoinResult }
   | { type: 'join-error'; error: JoinError }
 
@@ -53,7 +54,7 @@ export function sessionReducer(state: SessionState, event: SessionEvent): Sessio
   switch (event.type) {
     case 'left':
       return state.status === 'joined'
-        ? { status: 'join-failed', user: state.user, error: null }
+        ? { status: 'ready-to-join', user: state.user }
         : state
     case 'disconnected':
       // Keep the entered game visible; its connection state locks interaction.
@@ -85,15 +86,15 @@ export function sessionReducer(state: SessionState, event: SessionEvent): Sessio
       if (!isAwaitingLogin(state)) return state
       const username = usernameOf(state)
       return event.result.outcome === 'LOGGED_IN'
-        ? { status: 'joining', user: event.result.user }
+        ? { status: state.status === 'resyncing' ? 'joining' : 'ready-to-join', user: event.result.user }
         : { status: 'editing', username, error: event.result.outcome }
     }
     case 'login-timeout':
       return isAwaitingLogin(state)
         ? { status: 'editing', username: usernameOf(state), error: 'TIMEOUT' }
         : state
-    case 'join-retried':
-      return state.status === 'join-failed'
+    case 'join-requested':
+      return state.status === 'ready-to-join' || state.status === 'join-failed'
         ? { status: 'joining', user: state.user }
         : state
     case 'join-error':
