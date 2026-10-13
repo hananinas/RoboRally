@@ -1,18 +1,6 @@
-import { expect, test, type Page } from '@playwright/test'
-
-async function login(page: Page, username: string) {
-  await page.goto('/')
-  await page.getByRole('textbox', { name: 'Username' }).fill(username)
-  await page.getByRole('button', { name: 'Log in', exact: true }).click()
-  await page.getByRole('button', { name: 'Join game', exact: true }).click()
-  await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
-  await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button')).toHaveCount(9)
-}
-
-async function robotIds(page: Page): Promise<string[]> {
-  return page.locator('[data-robot-id]').evaluateAll((elements) =>
-    [...new Set(elements.map((element) => element.getAttribute('data-robot-id')!))])
-}
+import type { Page } from '@playwright/test'
+import { expect, test } from './real-game-fixture.ts'
+import { login, robotIds } from './browserClient.ts'
 
 async function leave(page: Page) {
   await page.getByRole('button', { name: 'Game options', exact: true }).click()

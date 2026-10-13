@@ -1,7 +1,9 @@
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { parseSubmitProgram } from '@robo-rally/game-events'
-import type { ClientToServerEvents, JoinResult, ServerToClientEvents } from '@robo-rally/game-events'
+import type {
+  ClientToServerEvents, JoinResult, PlayerConnectionChanged, ServerToClientEvents,
+} from '@robo-rally/game-events'
 import { io as createClient, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Board, EmptyTile, Game, Card } from '@/game/index.ts'
@@ -35,8 +37,13 @@ describe('game membership over Socket.IO', () => {
     await new Promise<void>((resolve) => server.close(() => resolve()))
   })
 
-  async function connect(username?: string): Promise<Client> {
-    const client: Client = createClient(url, { autoConnect: false, transports: ['websocket'], reconnection: false })
+  async function connect(
+    username?: string,
+    options?: Partial<Parameters<typeof createClient>[1]>,
+  ): Promise<Client> {
+    const client: Client = createClient(url, {
+      autoConnect: false, transports: ['websocket'], reconnection: false, ...options,
+    })
     clients.push(client)
     await new Promise<void>((resolve, reject) => {
       client.once('connect', resolve)
@@ -52,6 +59,28 @@ describe('game membership over Socket.IO', () => {
     expect(result.outcome).toBe('JOINED')
     if (result.outcome !== 'JOINED') throw new Error(result.outcome)
     return result
+  }
+
+  async function disconnectClient(client: Client): Promise<void> {
+    const closed = new Promise((resolve) => server.sockets.sockets.get(client.id!)!.once('disconnect', resolve))
+    client.disconnect()
+    await closed
+  }
+
+  async function disconnectClientRecoverably(client: Client): Promise<void> {
+    const closed = new Promise((resolve) => server.sockets.sockets.get(client.id!)!.once('disconnect', resolve))
+    client.io.engine.close()
+    await closed
+  }
+
+  function waitForConnectionChanges(client: Client, count: number) {
+    return new Promise<PlayerConnectionChanged[]>((resolve) => {
+      const seen: PlayerConnectionChanged[] = []
+      client.on('game.playerConnectionChanged', (payload) => {
+        seen.push(payload)
+        if (seen.length === count) resolve(seen)
+      })
+    })
   }
 
   function raw(client: Client, event: string, payload: unknown): Promise<unknown> {
@@ -266,6 +295,151 @@ describe('game membership over Socket.IO', () => {
     const restored = await join(replacement)
     expect(restored.assignment).toEqual(initial.assignment)
     expect(restored.hand).toEqual(initial.hand)
+  })
+
+  it('pauses the game and announces disconnection when a member drops', async () => {
+    const disconnectingSocket = await connect('A')
+    const disconnectingPlayer = await join(disconnectingSocket)
+    const otherSocket = await connect('B')
+    await join(otherSocket)
+
+    const connectionChanged = new Promise((resolve) => otherSocket.once('game.playerConnectionChanged', resolve))
+    await disconnectClient(disconnectingSocket)
+
+    expect(await connectionChanged).toEqual({
+      gameId: shared.gameId, playerId: disconnectingPlayer.assignment.playerId, connected: false, paused: true,
+    })
+    expect(shared.game.paused).toBe(true)
+    expect(await otherSocket.timeout(1000).emitWithAck('game.getPublicGameState', { gameId: shared.gameId }))
+      .toMatchObject({ outcome: 'GAME_FOUND', state: { paused: true } })
+  })
+
+  it('rejects program submissions while paused', async () => {
+    const disconnectingSocket = await connect('A')
+    await join(disconnectingSocket)
+    const otherSocket = await connect('B')
+    const otherPlayer = await join(otherSocket)
+
+    await disconnectClient(disconnectingSocket)
+
+    expect(await otherSocket.timeout(1000).emitWithAck('program.submit', submission(otherPlayer)))
+      .toEqual({ outcome: 'GAME_PAUSED' })
+    expect(shared.game.hasSubmittedProgram(otherPlayer.assignment.playerId)).toBe(false)
+  })
+
+  it('stays paused while another member remains disconnected', async () => {
+    const firstDisconnectingSocket = await connect('A')
+    await join(firstDisconnectingSocket)
+    const secondDisconnectingSocket = await connect('B')
+    await join(secondDisconnectingSocket)
+    const otherSocket = await connect('C')
+    await join(otherSocket)
+
+    const connectionChanges = waitForConnectionChanges(otherSocket, 3)
+    await disconnectClient(firstDisconnectingSocket)
+    await disconnectClient(secondDisconnectingSocket)
+    expect(shared.game.paused).toBe(true)
+
+    await join(await connect('A'))
+
+    expect((await connectionChanges).at(-1)).toMatchObject({ connected: true, paused: true })
+    expect(shared.game.paused).toBe(true)
+  })
+
+  it('resumes and accepts submissions again once every member reconnects', async () => {
+    const disconnectingSocket = await connect('A')
+    const disconnectingPlayer = await join(disconnectingSocket)
+    const otherSocket = await connect('B')
+    const otherPlayer = await join(otherSocket)
+
+    const connectionChanges = waitForConnectionChanges(otherSocket, 2)
+    await disconnectClient(disconnectingSocket)
+    expect(shared.game.paused).toBe(true)
+
+    const replacement = await connect('A')
+    const restored = await join(replacement)
+
+    expect((await connectionChanges).at(-1)).toEqual({
+      gameId: shared.gameId, playerId: disconnectingPlayer.assignment.playerId, connected: true, paused: false,
+    })
+    expect(shared.game.paused).toBe(false)
+
+    expect(await replacement.timeout(1000).emitWithAck('program.submit', submission(restored)))
+      .toEqual({ outcome: 'ACCEPTED' })
+    expect(await otherSocket.timeout(1000).emitWithAck('program.submit', submission(otherPlayer)))
+      .toEqual({ outcome: 'ACCEPTED' })
+    expect(shared.game.hasStarted).toBe(true)
+  })
+
+  it('resumes mid-activation execution after the last disconnected member reconnects', async () => {
+    const disconnectingSocket = await connect('A')
+    await join(disconnectingSocket)
+    const otherSocket = await connect('B')
+    await join(otherSocket)
+    for (const player of shared.game.players) {
+      shared.game.submitProgram(player.id, player.hand.slice(0, 5))
+    }
+    for (let action = 0; action < 9; action++) shared.game.executeNextAction()
+    expect(shared.game.currentRegister).toBe(4)
+
+    await disconnectClient(disconnectingSocket)
+    expect(shared.game.paused).toBe(true)
+
+    const resolvedActions: unknown[] = []
+    otherSocket.on('robot.actionResolved', (payload) => resolvedActions.push(payload))
+    const hand = new Promise((resolve) => otherSocket.once('cards.dealt', resolve))
+
+    await join(await connect('A'))
+    await hand
+
+    expect(resolvedActions).toHaveLength(1)
+    expect(shared.game.phase).toBe('programming')
+    expect(shared.game.paused).toBe(false)
+  })
+
+  it('automatically reattaches and resumes a recovered connection without resending game.join', async () => {
+    const disconnectingSocket = await connect('A', { reconnection: true })
+    const disconnectingPlayer = await join(disconnectingSocket)
+    const otherSocket = await connect('B')
+    const otherJoined = new Promise((resolve) => disconnectingSocket.once('game.playerJoined', resolve))
+    await join(otherSocket)
+    // Recovery needs an offset to resume from; this primes it before disconnecting.
+    await otherJoined
+
+    const connectionChanges = waitForConnectionChanges(otherSocket, 2)
+    await disconnectClientRecoverably(disconnectingSocket)
+    expect(shared.game.paused).toBe(true)
+
+    const reconnected = new Promise<void>((resolve) => disconnectingSocket.once('connect', resolve))
+    await reconnected
+
+    expect(disconnectingSocket.recovered).toBe(true)
+    expect((await connectionChanges).at(-1)).toEqual({
+      gameId: shared.gameId, playerId: disconnectingPlayer.assignment.playerId, connected: true, paused: false,
+    })
+    expect(shared.game.paused).toBe(false)
+  })
+
+  it('rejects a stale recovered connection when another connection already owns the membership', async () => {
+    const staleSocket = await connect('A', { reconnection: true })
+    const stalePlayer = await join(staleSocket)
+    const bystander = await connect('Bystander')
+    const bystanderJoined = new Promise((resolve) => staleSocket.once('game.playerJoined', resolve))
+    await join(bystander)
+    await bystanderJoined
+
+    await disconnectClientRecoverably(staleSocket)
+    expect(shared.game.paused).toBe(true)
+
+    const newSocket = await connect('A')
+    const restored = await join(newSocket)
+    expect(restored.assignment).toEqual(stalePlayer.assignment)
+
+    const staleRejected = new Promise<Error>((resolve) => staleSocket.once('connect_error', resolve))
+    expect((await staleRejected).message).toBe('USER_ALREADY_IN_GAME')
+
+    expect(await newSocket.timeout(1000).emitWithAck('game.getPublicGameState', { gameId: shared.gameId }))
+      .toMatchObject({ outcome: 'GAME_FOUND' })
   })
 
   it('deals the remaining player a hand when leaving completes the final register', async () => {

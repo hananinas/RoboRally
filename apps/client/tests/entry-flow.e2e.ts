@@ -330,7 +330,7 @@ for (const stage of ['login', 'join'] as const) {
     // The pending request's timeout must not replace the disconnect guidance.
     await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100))
     await page.clock.runFor(5000)
-    await expect(page.getByRole('alert')).toContainText('Connection lost. Reload')
+    await expect(page.getByRole('alert')).toContainText('Connection lost. Reconnecting')
     await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
     await expect(page.getByRole('region', { name: 'Programming hand' })).toHaveCount(0)
     expect((await game.snapshot()).submissions).toEqual([])

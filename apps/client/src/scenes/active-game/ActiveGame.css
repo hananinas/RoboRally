@@ -113,17 +113,58 @@
 }
 
 .game-menu__option {
-  width: 100%;
+  padding: 0.25rem 0.75rem;
+}
+
+.game-menu__option-summary {
   min-height: var(--ui-menu-trigger-size);
+  display: flex;
+  align-items: center;
+  margin: 0 -0.75rem;
   padding: 0.75rem;
-  border: 0;
   border-radius: 0.5rem;
-  background: #f3f3f3;
   color: #666;
-  font: inherit;
   font-size: 0.875rem;
-  text-align: left;
-  cursor: default;
+  cursor: pointer;
+}
+
+.game-menu__option-summary:hover {
+  background: #e9e9e9;
+}
+
+.game-menu__option-summary:active {
+  background: #e2e2e2;
+}
+
+.game-menu__keybinds {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.75rem;
+  row-gap: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.game-menu__keybind {
+  display: contents;
+}
+
+.game-menu__keybind dt {
+  font-weight: 600;
+  font-family: monospace;
+  white-space: nowrap;
+}
+
+.game-menu__keybind dd {
+  margin: 0;
+  color: #666;
+}
+
+.game-menu__keybind:not(:last-child) dt,
+.game-menu__keybind:not(:last-child) dd {
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid #eee;
 }
 
 /* Panels */
@@ -245,6 +286,11 @@
   opacity: 0.45;
 }
 
+.register-panel__done--awaiting-confirm {
+  outline: 3px solid green;
+  outline-offset: 3px;
+}
+
 /* Hand and cards */
 .programming-hand {
   grid-column: 1;
@@ -334,8 +380,13 @@
 }
 
 /* Interaction states */
-.program-card:focus-visible,
+.program-card:focus-visible {
+  outline: 3px solid orange;
+  outline-offset: 3px;
+}
+
 .game-menu__trigger:focus-visible,
+.game-menu__option-summary:focus-visible,
 .player-panel__toggle:focus-visible,
 .register-panel__done:focus-visible {
   outline: 3px solid #333;

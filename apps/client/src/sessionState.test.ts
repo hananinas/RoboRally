@@ -21,6 +21,7 @@ const joined: Extract<JoinResult, { outcome: 'JOINED' }> = {
     robots: [],
     players: [],
     phase: 'PROGRAMMING',
+    paused: false,
   },
   hand: [],
   programSubmitted: false,
@@ -39,6 +40,11 @@ function joiningState(): SessionState {
   return sessionReducer(readyState(), { type: 'join-requested' })
 }
 
+function resyncingState(): SessionState {
+  const entered = sessionReducer(joiningState(), { type: 'join-result', result: joined })
+  return sessionReducer(entered, { type: 'resync' })
+}
+
 describe('sessionReducer', () => {
   const editing: SessionState = { status: 'editing', username: user.username, error: null }
   it.each([
@@ -47,6 +53,7 @@ describe('sessionReducer', () => {
     readyState(),
     joiningState(),
     sessionReducer(joiningState(), { type: 'join-error', error: 'TIMEOUT' }),
+    resyncingState(),
   ])('requires fresh login after disconnect from $status', (previous) => {
     const reset = sessionReducer(previous, { type: 'disconnected' })
     expect(reset).toEqual(editing)
@@ -147,6 +154,35 @@ describe('sessionReducer', () => {
     })
 
     expect(state).toEqual({ status: 'join-failed', user, error: 'TIMEOUT' })
+  })
+
+  it('moves from joined to resyncing on a failed-recovery reconnect, then back to joining', () => {
+    const entered = sessionReducer(joiningState(), { type: 'join-result', result: joined })
+    const resyncing = sessionReducer(entered, { type: 'resync' })
+    expect(resyncing).toEqual({ status: 'resyncing', user })
+
+    const state = sessionReducer(resyncing, {
+      type: 'login-result', result: { outcome: 'LOGGED_IN', user },
+    })
+    expect(state).toEqual({ status: 'joining', user })
+  })
+
+  it('ignores resync outside the joined state', () => {
+    expect(sessionReducer(editing, { type: 'resync' })).toBe(editing)
+    const joining = joiningState()
+    expect(sessionReducer(joining, { type: 'resync' })).toBe(joining)
+  })
+
+  it('returns a rejected resync login to editing with the known username', () => {
+    const state = sessionReducer(resyncingState(), {
+      type: 'login-result', result: { outcome: 'INVALID_USERNAME' },
+    })
+    expect(state).toEqual({ status: 'editing', username: user.username, error: 'INVALID_USERNAME' })
+  })
+
+  it('allows retry after a resync login timeout', () => {
+    const state = sessionReducer(resyncingState(), { type: 'login-timeout' })
+    expect(state).toEqual({ status: 'editing', username: user.username, error: 'TIMEOUT' })
   })
 
   it('ignores duplicate submissions and results outside their pending state', () => {

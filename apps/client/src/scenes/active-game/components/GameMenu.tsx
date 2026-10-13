@@ -1,4 +1,5 @@
 import { useId, useState } from 'react'
+import { KEYBINDS } from './useGameKeybinds.ts'
 
 // Uses a native popover for Escape, outside-click dismissal, and top-layer display.
 function GameMenu({ onLeave, leaveDisabled }: { onLeave?: () => void; leaveDisabled?: boolean }) {
@@ -27,7 +28,10 @@ function GameMenu({ onLeave, leaveDisabled }: { onLeave?: () => void; leaveDisab
         className="game-menu__popover"
         popover="auto"
         aria-label="Game options"
-        onToggle={(event) => setOpen(event.newState === 'open')}
+        onToggle={(event) => {
+          if (event.target !== event.currentTarget) return
+          setOpen(event.newState === 'open')
+        }}
       >
         <h2 className="game-menu__heading">Game options</h2>
         <ul className="game-menu__options">
@@ -35,6 +39,19 @@ function GameMenu({ onLeave, leaveDisabled }: { onLeave?: () => void; leaveDisab
             <button className="game-menu__option" type="button" disabled={!onLeave || leaveDisabled} onClick={onLeave}>
               {onLeave ? 'Leave game' : 'No options available yet'}
             </button>
+          </li>
+          <li>
+            <details className="game-menu__option" open>
+              <summary className="game-menu__option-summary">Keybinds</summary>
+              <dl className="game-menu__keybinds">
+                {KEYBINDS.map(({ keys, description }) => (
+                  <div className="game-menu__keybind" key={keys}>
+                    <dt>{keys}</dt>
+                    <dd>{description}</dd>
+                  </div>
+                ))}
+              </dl>
+            </details>
           </li>
         </ul>
       </section>

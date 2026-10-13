@@ -18,6 +18,7 @@ export type SessionState =
   | { status: 'ready-to-join'; user: User }
   | { status: 'joining'; user: User }
   | { status: 'join-failed'; user: User; error: JoinError | null }
+  | { status: 'resyncing'; user: User }
   | {
       status: 'joined'
       user: User
@@ -26,6 +27,7 @@ export type SessionState =
 export type SessionEvent =
   | { type: 'left' }
   | { type: 'disconnected' }
+  | { type: 'resync' }
   | { type: 'username-changed'; username: string }
   | { type: 'login-submitted' }
   | { type: 'login-result'; result: LoginResult }
@@ -36,6 +38,16 @@ export type SessionEvent =
 
 export function createSessionState(): SessionState {
   return { status: 'editing', username: '', error: null }
+}
+
+type AwaitingLogin = { status: 'logging-in'; username: string } | { status: 'resyncing'; user: User }
+
+function isAwaitingLogin(state: SessionState): state is AwaitingLogin {
+  return state.status === 'logging-in' || state.status === 'resyncing'
+}
+
+function usernameOf(state: AwaitingLogin): string {
+  return state.status === 'logging-in' ? state.username : state.user.username
 }
 
 export function sessionReducer(state: SessionState, event: SessionEvent): SessionState {
@@ -54,6 +66,10 @@ export function sessionReducer(state: SessionState, event: SessionEvent): Sessio
           : state.user.username,
         error: null,
       }
+    case 'resync':
+      return state.status === 'joined'
+        ? { status: 'resyncing', user: state.user }
+        : state
     case 'username-changed':
       return state.status === 'editing'
         ? {
@@ -66,14 +82,16 @@ export function sessionReducer(state: SessionState, event: SessionEvent): Sessio
       return state.status === 'editing'
         ? { status: 'logging-in', username: state.username }
         : state
-    case 'login-result':
-      if (state.status !== 'logging-in') return state
+    case 'login-result': {
+      if (!isAwaitingLogin(state)) return state
+      const username = usernameOf(state)
       return event.result.outcome === 'LOGGED_IN'
-        ? { status: 'ready-to-join', user: event.result.user }
-        : { status: 'editing', username: state.username, error: event.result.outcome }
+        ? { status: state.status === 'resyncing' ? 'joining' : 'ready-to-join', user: event.result.user }
+        : { status: 'editing', username, error: event.result.outcome }
+    }
     case 'login-timeout':
-      return state.status === 'logging-in'
-        ? { status: 'editing', username: state.username, error: 'TIMEOUT' }
+      return isAwaitingLogin(state)
+        ? { status: 'editing', username: usernameOf(state), error: 'TIMEOUT' }
         : state
     case 'join-requested':
       return state.status === 'ready-to-join' || state.status === 'join-failed'

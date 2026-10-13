@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import type { Dialog, Page } from '@playwright/test'
 import { expect, openGame, test } from './game-fixture.ts'
 import { GAME_ID, OTHER_PLAYER_ID, OTHER_ROBOT_ID, PLAYER_ID, ROBOT_ID, ROUND_ACTIONS } from './game-fixture-data.ts'
 async function fillProgram(page: Page, indices = [0, 1, 2, 3, 4]) {
@@ -153,6 +153,108 @@ test('drags a card into a register and ignores outside drops', async ({
   await page.mouse.up()
 
   await expect(registeredCards).toHaveCount(1)
+})
+
+test('navigates the hand with h/l, wrapping around and skipping registered cards', async ({ page }) => {
+  await openGame(page)
+  const handCards = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
+
+  await handCards.nth(1).click()
+  await expect(handCards.nth(1)).toBeDisabled()
+  await page.mouse.move(0, 0)
+
+  await handCards.nth(0).focus()
+  await page.keyboard.press('l')
+  await expect(handCards.nth(2)).toBeFocused()
+
+  await page.keyboard.press('h')
+  await expect(handCards.nth(0)).toBeFocused()
+
+  await page.keyboard.press('h')
+  await expect(handCards.nth(8)).toBeFocused()
+})
+
+test('d then a digit removes one register, and dd clears all of them', async ({ page }) => {
+  await openGame(page)
+  await fillProgram(page)
+  const registerCards = page.getByRole('complementary', { name: 'Game controls' })
+    .getByRole('button', { name: /remove from register/ })
+  await expect(registerCards).toHaveCount(5)
+
+  await page.keyboard.press('d')
+  await page.keyboard.press('1')
+  await expect(registerCards).toHaveCount(4)
+
+  await page.keyboard.press('d')
+  await page.keyboard.press('d')
+  await expect(registerCards).toHaveCount(0)
+
+  await page.keyboard.press('u')
+  await expect(registerCards).toHaveCount(4)
+})
+
+test('clears a dangling "d" instead of letting it bleed into the next round', async ({ page, game }) => {
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
+  await openGame(page)
+  await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button').first()).toBeEnabled()
+  await pauseClock(page)
+  await fillProgram(page)
+
+  const registerCards = page.getByRole('complementary', { name: 'Game controls' })
+    .getByRole('button', { name: /remove from register/ })
+  await expect(registerCards).toHaveCount(5)
+
+  // Start a delete sequence, then submit by mouse before pressing the second key.
+  await page.keyboard.press('d')
+  await page.getByRole('button', { name: 'Done', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()
+  
+  //wait for round to finish
+  await game.control({ type: 'round', actions: ROUND_ACTIONS })
+  for (const action of ROUND_ACTIONS) {
+    await page.clock.runFor(action.instruction === 'TURN_LEFT' ? 300 : 600)
+  }
+
+  await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button').first()).toBeEnabled()
+  await expect(page.getByText('Programming', { exact: true })).toBeVisible()
+  await fillProgram(page)
+  await expect(registerCards).toHaveCount(5)
+
+  // A leftover "d" from last round must not be mistaken for the second key of "dd".
+  await page.keyboard.press('d')
+  await expect(registerCards).toHaveCount(5)
+  await page.keyboard.press('1')
+  await expect(registerCards).toHaveCount(4)
+})
+
+test(':w then Enter submits after confirming, only once the program is complete', async ({ page }) => {
+  await openGame(page)
+  const controls = page.getByRole('complementary', { name: 'Game controls' })
+  const done = controls.getByRole('button', { name: 'Done' })
+
+  await fillProgram(page, [0, 1, 2])
+  await expect(done).toBeDisabled()
+
+  let dialogShown = false
+  const onUnexpectedDialog = (dialog: Dialog) => {
+    dialogShown = true
+    void dialog.dismiss()
+  }
+  page.on('dialog', onUnexpectedDialog)
+  await page.keyboard.press(':')
+  await page.keyboard.press('w')
+  await page.keyboard.press('Enter')
+  await expect(done).toBeDisabled()
+  expect(dialogShown).toBe(false)
+  page.off('dialog', onUnexpectedDialog)
+
+  await fillProgram(page, [3, 4])
+  await expect(done).toBeEnabled()
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.keyboard.press(':')
+  await page.keyboard.press('w')
+  await page.keyboard.press('Enter')
+  await expect(controls.getByRole('button', { name: 'Confirmed' })).toBeDisabled()
 })
 
 test('adapts the hand and panel overflow to available space', async ({
@@ -482,7 +584,7 @@ test('does not resend a program after its acknowledgement times out', async ({ p
 })
 
 for (const submitting of [false, true]) {
-  test(`preserves the game and reload guidance when disconnected ${submitting ? 'during submission' : 'while programming'}`, async ({ page, game }) => {
+  test(`preserves the game and reconnection guidance when disconnected ${submitting ? 'during submission' : 'while programming'}`, async ({ page, game }) => {
     await game.control({ type: 'submission', outcome: 'ACCEPTED', deferred: true })
     await openGame(page)
     await fillProgram(page)
@@ -496,7 +598,7 @@ for (const submitting of [false, true]) {
 
     await game.control({ type: 'disconnect' })
     await expect(page.getByRole('status')).toHaveText('Not connected')
-    await expect(page.getByRole('alert')).toContainText('Connection lost. Reload to connect again; your program was not resent.')
+    await expect(page.getByRole('alert')).toContainText('Connection lost. Reconnecting… Your program was not resent.')
     await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
     await expect(page.getByRole('textbox', { name: 'Username' })).toHaveCount(0)
     await expect(registered).toHaveCount(5)

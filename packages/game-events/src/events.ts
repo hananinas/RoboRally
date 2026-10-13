@@ -10,6 +10,7 @@ import type {
   RobotActionResolved,
   PlayerJoined,
   PlayerLeft,
+  PlayerConnectionChanged,
   LeaveResult,
 } from './payloads.js'
 import type { SubmitProgram } from './submitProgram.js'
@@ -40,6 +41,7 @@ export interface ClientToServerEvents {
 export interface ServerToClientEvents {
   'game.playerJoined': (payload: PlayerJoined) => void
   'game.playerLeft': (payload: PlayerLeft) => void
+  'game.playerConnectionChanged': (payload: PlayerConnectionChanged) => void
   'cards.dealt': (payload: CardsDealt) => void
   'program.submitted': (payload: ProgramSubmitted) => void
   'robot.actionResolved': (payload: RobotActionResolved) => void

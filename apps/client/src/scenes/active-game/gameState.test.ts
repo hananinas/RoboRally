@@ -14,6 +14,7 @@ import {
   placeCard,
   REGISTER_COUNT,
   removeCard,
+  USER_ALREADY_IN_GAME_MESSAGE,
   type ClientGameState,
   type ProgramCard,
   type Registers,
@@ -44,6 +45,7 @@ const stationaryRobotId = '30000000-0000-4000-8000-000000000002'
 const publicState: PublicGameState = {
   gameId: '40000000-0000-4000-8000-000000000001',
   phase: 'PROGRAMMING',
+  paused: false,
   players: [
     { playerId: '50000000-0000-4000-8000-000000000001', username: 'First', connected: true, programSubmitted: false },
     { playerId: '50000000-0000-4000-8000-000000000002', username: 'Second', connected: true, programSubmitted: false },
@@ -139,11 +141,11 @@ describe('placeCard', () => {
     expect(emptyRegisters).toEqual([null, null, null, null, null])
   })
 
-  it('rejects occupied, duplicate, and invalid placements', () => {
+  it('overwrites an occupied register, and rejects duplicate and invalid placements', () => {
     const occupiedRegisters = placeCard(emptyRegisters, firstCard, 0)
 
-    expect(placeCard(occupiedRegisters, secondCard, 0)).toBe(
-      occupiedRegisters,
+    expect(placeCard(occupiedRegisters, secondCard, 0)).toEqual(
+      [secondCard, null, null, null, null],
     )
     expect(placeCard(occupiedRegisters, firstCard, 1)).toBe(
       occupiedRegisters,
@@ -171,6 +173,49 @@ describe('removeCard', () => {
     expect(removeCard(emptyRegisters, -1)).toBe(emptyRegisters)
     expect(removeCard(emptyRegisters, REGISTER_COUNT)).toBe(emptyRegisters)
     expect(removeCard(emptyRegisters, 1.5)).toBe(emptyRegisters)
+  })
+})
+
+describe('undo, redo, and clear', () => {
+  it('undoes and redoes a placement', () => {
+    const empty = programmingState()
+    const placed = gameStateReducer(empty, { type: 'place', cardId: firstCard.id, registerIndex: 0 })
+
+    expect(placed.registers[0]).toBe(firstCard)
+
+    const undone = gameStateReducer(placed, { type: 'undo' })
+    expect(undone.registers).toEqual(empty.registers)
+
+    const redone = gameStateReducer(undone, { type: 'redo' })
+    expect(redone.registers).toEqual(placed.registers)
+  })
+
+  it('does nothing when there is no history to undo or redo', () => {
+    const state = programmingState()
+
+    expect(gameStateReducer(state, { type: 'undo' })).toBe(state)
+    expect(gameStateReducer(state, { type: 'redo' })).toBe(state)
+  })
+
+  it('clears the redo history once a new action follows an undo', () => {
+    let state = programmingState()
+    state = gameStateReducer(state, { type: 'place', cardId: firstCard.id, registerIndex: 0 })
+    state = gameStateReducer(state, { type: 'undo' })
+    state = gameStateReducer(state, { type: 'place', cardId: secondCard.id, registerIndex: 1 })
+
+    expect(gameStateReducer(state, { type: 'redo' })).toBe(state)
+  })
+
+  it('clears every register at once, and the clear can be undone', () => {
+    let state = programmingState()
+    state = gameStateReducer(state, { type: 'place', cardId: firstCard.id, registerIndex: 0 })
+    state = gameStateReducer(state, { type: 'place', cardId: secondCard.id, registerIndex: 1 })
+    const filled = state
+
+    const cleared = gameStateReducer(state, { type: 'clear' })
+    expect(cleared.registers).toEqual(emptyRegisters)
+    expect(gameStateReducer(cleared, { type: 'undo' }).registers).toEqual(filled.registers)
+    expect(gameStateReducer(cleared, { type: 'clear' })).toBe(cleared)
   })
 })
 
@@ -324,6 +369,21 @@ describe('client game state', () => {
     state = gameStateReducer(state, { type: 'submit' })
     expect(canProgram(state)).toBe(false)
     expect(createSubmission(state)).toBeNull()
+  })
+
+  it('shows the game-paused message on a paused rejection', () => {
+    let state = selectProgram()
+    const submission = createSubmission(state)
+    state = gameStateReducer(state, { type: 'submit' })
+    state = gameStateReducer(state, {
+      type: 'result',
+      result: { outcome: 'GAME_PAUSED' },
+      handVersion: state.handVersion,
+    })
+
+    expect(state.submission).toBe('idle')
+    expect(state.error).toBe('Game paused. Your program was not submitted — try again once reconnected.')
+    expect(createSubmission(state)).toEqual(submission)
   })
 
   it('preserves an unacknowledged selection without allowing a duplicate resend', () => {
@@ -511,7 +571,7 @@ describe('client game state', () => {
     expect(state).toEqual({
       ...before,
       connected: false,
-      error: 'Connection lost. Reload to connect again; your program was not resent.',
+      error: 'Connection lost. Reconnecting… Your program was not resent.',
     })
     expect(canProgram(state)).toBe(false)
     expect(createSubmission(state)).toBeNull()
@@ -532,6 +592,54 @@ describe('client game state', () => {
     expect(state.registers).toEqual(emptyRegisters)
     expect(canProgram(state)).toBe(true)
   })
+
+  it('restores a recovered connection', () => {
+    const before = gameStateReducer(selectProgram(), { type: 'submit' })
+    const disconnected = gameStateReducer(before, { type: 'disconnected' })
+    const state = gameStateReducer(disconnected, { type: 'reconnected' })
+
+    expect(state).toEqual({ ...before, connected: true, error: null })
+    expect(canProgram(state)).toBe(false)
+  })
+
+  it('reports a recognized connect error in place of the generic disconnect message', () => {
+    const disconnected = gameStateReducer(selectProgram(), { type: 'disconnected' })
+    const state = gameStateReducer(disconnected, {
+      type: 'connect-error', message: 'USER_ALREADY_IN_GAME',
+    })
+
+    expect(state).toEqual({ ...disconnected, error: USER_ALREADY_IN_GAME_MESSAGE })
+  })
+
+  it('ignores an unrecognized connect error and reports generic disconnect message', () => {
+    const disconnected = gameStateReducer(selectProgram(), { type: 'disconnected' })
+    const state = gameStateReducer(disconnected, {
+      type: 'connect-error', message: 'transport error',
+    })
+
+    expect(state).toEqual(disconnected)
+  })
+
+  it('locks programming while paused and unlocks once every player reconnects', () => {
+    const state = programmingState()
+    const otherPlayerId = publicState.players[1].playerId
+    expect(canProgram(state)).toBe(true)
+
+    const paused = gameStateReducer(state, {
+      type: 'player-connection-changed',
+      payload: { gameId: publicState.gameId, playerId: otherPlayerId, connected: false, paused: true },
+    })
+    expect(paused.paused).toBe(true)
+    expect(paused.players.find((player) => player.playerId === otherPlayerId)?.connected).toBe(false)
+    expect(canProgram(paused)).toBe(false)
+
+    const resumed = gameStateReducer(paused, {
+      type: 'player-connection-changed',
+      payload: { gameId: publicState.gameId, playerId: otherPlayerId, connected: true, paused: false },
+    })
+    expect(resumed.paused).toBe(false)
+    expect(canProgram(resumed)).toBe(true)
+  })
 })
 
 describe('membership updates', () => {
@@ -545,7 +653,7 @@ describe('membership updates', () => {
     let state = programmingState()
     state = gameStateReducer(state, { type: 'action', action: actions[0] })
     const updated = gameStateReducer(state, { type: 'player-joined', payload: newcomer })
-    expect(updated.playerIds).toContain('new-player')
+    expect(updated.players.map((player) => player.playerId)).toContain('new-player')
     expect(updated.playback.robots.at(-1)?.robotId).toBe('new-robot')
     expect(updated.playback.active).toBe(state.playback.active)
     expect(gameStateReducer(updated, { type: 'player-joined', payload: newcomer })).toBe(updated)
@@ -558,7 +666,7 @@ describe('membership updates', () => {
     state = gameStateReducer(state, { type: 'action', action: { ...actions[0], robotId: 'new-robot' } })
     const payload = { gameId: publicState.gameId, playerId: 'new-player', robotId: 'new-robot' }
     const updated = gameStateReducer(state, { type: 'player-left', payload })
-    expect(updated.playerIds).not.toContain('new-player')
+    expect(updated.players.map((player) => player.playerId)).not.toContain('new-player')
     expect(updated.playback.robots.some((robot) => robot.robotId === 'new-robot')).toBe(false)
     expect(updated.playback.pending).toEqual([])
     expect(updated.playback.active).toBe(state.playback.active)

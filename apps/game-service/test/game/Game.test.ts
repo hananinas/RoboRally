@@ -100,4 +100,37 @@ describe('Game programming', () => {
     expect(() => new Game(board, [player], deck.slice(0, 4))).toThrow(RangeError)
     expect(() => new Game(board, [player], [deck[0], deck[0], ...deck.slice(1, 5)])).toThrow(RangeError)
   })
+
+  it('starts unpaused and toggles via pause/resume', () => {
+    const { game } = createGame()
+    expect(game.paused).toBe(false)
+    game.pause()
+    expect(game.paused).toBe(true)
+    game.resume()
+    expect(game.paused).toBe(false)
+  })
+
+  it('blocks program submission while paused without changing state', () => {
+    const { robot, player, deck, game } = createGame()
+    const valid = deck.slice(0, 5)
+
+    game.pause()
+    expect(() => game.submitProgram(player.id, valid)).toThrow()
+    expect(game.phase).toBe('programming')
+    expect(robot.program).toEqual([])
+
+    game.resume()
+    game.submitProgram(player.id, valid)
+    expect(game.phase).toBe('activation')
+  })
+
+  it('still executes an already-committed action while paused', () => {
+    const { player, deck, game } = createGame()
+    game.submitProgram(player.id, deck.slice(0, 5))
+
+    game.pause()
+    expect(() => game.executeNextAction()).not.toThrow()
+    expect(game.currentRegister).toBe(1)
+  })
+
 })
