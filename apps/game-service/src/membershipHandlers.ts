@@ -4,11 +4,14 @@ import {
   joinGameSchema,
   leaveGameSchema,
   parseGetPublicGameState,
+  getLobbyDetailsSchema,
+  type GetLobbyDetails,
   type GetPublicGameState,
   type JoinGame,
   type JoinResult,
   type JoinResultAcknowledgement,
   type LeaveResult,
+  type LobbyDetailsAcknowledgement,
   type PublicGameState,
   type PublicGameStateAcknowledgement,
   type User,
@@ -19,7 +22,7 @@ import {
   Direction,
   type Game,
 } from '@/game/index'
-import { presentCardsDealt } from '@/gamePresenter'
+import { presentCardsDealt, presentLobbyDetails } from '@/gamePresenter'
 import { createHand } from '@/game/SinglePlayerGame'
 import type { ActionScheduler } from '@/actionScheduler'
 import type { GameSocket, GameSocketServer } from '@/gameServer'
@@ -64,7 +67,7 @@ function notifyReconnected(ctx: MembershipContext, playerId: string): void {
 
 function validateMembershipRequest(
   ctx: MembershipContext,
-  schema: typeof joinGameSchema | typeof leaveGameSchema,
+  schema: typeof joinGameSchema | typeof leaveGameSchema | typeof getLobbyDetailsSchema,
   payload: unknown,
   user: User | undefined,
 ): Result<User, 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND'> {
@@ -260,4 +263,21 @@ export function handleGetPublicGameState(
   }
 
   acknowledge({ outcome: 'GAME_NOT_FOUND' })
+}
+
+export function handleGetLobbyDetails(
+  ctx: MembershipContext,
+  socket: GameSocket,
+  payload: GetLobbyDetails,
+  acknowledge: LobbyDetailsAcknowledgement,
+): void {
+  if (typeof acknowledge !== 'function') return
+  const verdict = validateMembershipRequest(ctx, getLobbyDetailsSchema, payload, socket.data.user)
+  if (verdict.isErr()) return acknowledge({ outcome: verdict.error })
+  try {
+    const playerNames = [...ctx.memberships.values()].map(({ user }) => user.username)
+    acknowledge({ outcome: 'LOBBY_FOUND', lobby: presentLobbyDetails(ctx.gameId, ctx.game, playerNames) })
+  } catch {
+    acknowledge({ outcome: 'INTERNAL_ERROR' })
+  }
 }
