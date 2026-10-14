@@ -82,6 +82,8 @@ channels:
         $ref: '#/components/messages/ProgramSubmitted'
       robotActionResolved:
         $ref: '#/components/messages/RobotActionResolved'
+      robotCheckpointCompleted:
+        $ref: '#/components/messages/RobotCheckpointCompleted'
       playerJoined:
         $ref: '#/components/messages/PlayerJoined'
       playerLeft:
@@ -236,6 +238,7 @@ components:
               robots:
                 - robotId: 00000000-0000-4000-8000-000000000003
                   playerId: 00000000-0000-4000-8000-000000000002
+                  lastCheckpoint: 0
                   position:
                     coordinate:
                       x: 0
@@ -483,6 +486,24 @@ components:
                 x: 10
                 y: 6
               orientation: NORTH
+
+    RobotCheckpointCompleted:
+      name: robot.checkpointCompleted
+      payload:
+        $ref: '#/components/schemas/RobotCheckpointCompleted'
+      description: >-
+        Broadcasts a newly completed checkpoint to game:{gameId}:public after
+        checking all remaining robots at the end of a register. Follows that
+        register's final robot.actionResolved, or game.playerLeft when leaving
+        finishes the register, and precedes the next action or private hand.
+        Reports authoritative progress independently of movement playback.
+        Unchanged progress produces no event. Checkpoints are not consumed.
+      examples:
+        - name: firstCheckpoint
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            robotId: 00000000-0000-4000-8000-000000000003
+            checkpointNumber: 1
 
     CardsDealt:
       name: cards.dealt
@@ -871,7 +892,7 @@ components:
 
     Robot:
       type: object
-      required: [ robotId, playerId, position ]
+      required: [ robotId, playerId, position, lastCheckpoint ]
       properties:
         robotId:
           $ref: '#/components/schemas/RobotId'
@@ -879,9 +900,19 @@ components:
           $ref: '#/components/schemas/PlayerId'
         position:
           $ref: '#/components/schemas/Position'
+        lastCheckpoint:
+          type: integer
+          minimum: 0
+          description: >-
+            Last checkpoint completed in numerical order, initially 0 and never
+            greater than the number of checkpoint tiles. Persists across rounds
+            and reconnections. Completing the final checkpoint does not end the game.
 
     Board:
       type: object
+      description: >-
+        Checkpoint tiles have fixed positions and unique consecutive numbers from 1.
+        A board without checkpoints is valid. Every robot can use the same checkpoints.
       required: [ width, height, tiles ]
       properties:
         width:
@@ -896,6 +927,11 @@ components:
             $ref: '#/components/schemas/Tile'
 
     Tile:
+      oneOf:
+        - $ref: '#/components/schemas/EmptyTile'
+        - $ref: '#/components/schemas/CheckpointTile'
+
+    EmptyTile:
       type: object
       required: [ position, type ]
       properties:
@@ -909,6 +945,48 @@ components:
           uniqueItems: true
           items:
             $ref: '#/components/schemas/Orientation'
+
+    CheckpointTile:
+      type: object
+      required: [ position, type, checkpointNumber ]
+      properties:
+        position:
+          $ref: '#/components/schemas/Coordinate'
+        type:
+          type: string
+          enum: [ CHECKPOINT ]
+        checkpointNumber:
+          $ref: '#/components/schemas/CheckpointNumber'
+        walls:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Orientation'
+      description: >-
+        A permanent numbered checkpoint. At the end of a register, a robot on
+        this tile completes it only when checkpointNumber equals lastCheckpoint + 1.
+        Passing over the tile during movement does not complete it.
+
+    CheckpointNumber:
+      type: integer
+      minimum: 1
+
+    RobotCheckpointCompleted:
+      type: object
+      additionalProperties: false
+      required: [ gameId, robotId, checkpointNumber ]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+        robotId:
+          $ref: '#/components/schemas/RobotId'
+        checkpointNumber:
+          $ref: '#/components/schemas/CheckpointNumber'
+      description: >-
+        New lastCheckpoint for the identified robot. Clients initialize progress
+        from JOINED and apply this value on receipt without changing action playback.
+        Ignore other games, unknown robots, and duplicate or older completion values.
+
     Antenna:
       type: object
       additionalProperties: false

@@ -131,6 +131,24 @@ Exact priority ties are resolved using player join order. The priority algorithm
 
 If an unexpected service failure makes gameplay unrecoverable, members receive `game.aborted {gameId}` and the game ends permanently.
 
+### Checkpoint progress
+
+This extension is proposed in [#129](https://github.com/hananinas/RoboRally/issues/129) for implementation in [#123](https://github.com/hananinas/RoboRally/issues/123) after design approval.
+
+Public board tiles distinguish `EMPTY` from `CHECKPOINT`. A checkpoint tile includes `checkpointNumber`, its fixed position, and any walls. Numbers are unique and consecutive from 1. Each public robot includes `lastCheckpoint`, starting at 0; its value is the last checkpoint completed in numerical order. The board and every robot's progress are included in the authoritative JOINED state, including reconnecting or repeated joins, and in the robot announced by `game.playerJoined`.
+
+After all robot actions in a register, the service checks each remaining robot's final tile. Only its next numbered checkpoint counts. Passing over a checkpoint does not count, and checkpoints remain available to all robots. Progress survives rounds and disconnection. Completing the final checkpoint does not end the game.
+
+For each newly completed checkpoint, the service broadcasts:
+
+`robot.checkpointCompleted {gameId, robotId, checkpointNumber}`
+
+to `game:{gameId}:public`. In normal execution, these events follow the register's final `robot.actionResolved` and precede the next register's actions or the next private hands. If a player leaving completes a register, completion events for remaining robots follow `game.playerLeft` and precede the next actions or hands. Removing the last robot produces no completion event. No event is emitted for unchanged progress, and clients cannot request or award checkpoint completion.
+
+The client initializes progress from JOINED and updates its assigned robot's `x/y` count on receipt of completion events. Here `x` is `lastCheckpoint` and `y` is the number of checkpoint tiles; a board without checkpoints shows `0/0`. Ignore events for another game or a removed/unknown robot. Replayed completion events must not reduce or duplicate progress. Socket.IO recovery replays these events through the existing recovery path; failed recovery obtains fresh progress through JOINED.
+
+The count reflects authoritative progress as soon as an event arrives, even when movement animations are still queued. Completion events do not move robots, clear selected cards, change phases, or unlock programming. Existing ordered action playback and next-hand gating remain unchanged.
+
 ### Dealing the next hand
 
 After all five registers have been resolved, the service deals each player a private hand for the next programming round.

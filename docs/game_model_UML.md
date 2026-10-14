@@ -1,6 +1,8 @@
 This UML Class diagram is to be used for internal development purposes. Such as planning what needs to be implemented and how. \
 Will update with a more conceptual domain diagram which will be used for presentations highlighting parts of the model.
 
+The checkpoint extension is proposed in [#129](https://github.com/hananinas/RoboRally/issues/129). Implementation belongs to [#123](https://github.com/hananinas/RoboRally/issues/123) after this design is approved.
+
 ```mermaid
     classDiagram
         direction LR
@@ -17,11 +19,13 @@ Will update with a more conceptual domain diagram which will be used for present
         +executeCurrentRegister()
         -nextRobotByPriority() RobotId
         -executeCard(RobotId robotId, Card card)
+        -activateBoardElements()
         }
 
         class Board {
         -tiles: Tile[][]
         -robotPositions: Map
+        +checkpointCount: int
         +positionOf(RobotId robotId) Position
         +occupantAt(Position position) RobotId?
         +moveRobot(RobotId robotId, Direction direction, int steps) MovementResult
@@ -34,6 +38,10 @@ Will update with a more conceptual domain diagram which will be used for present
 
         class EmptyTile
 
+        class CheckpointTile {
+        +number: int
+        }
+
         class Player {
         -robot: Robot
         -hand: Card[] unordered
@@ -43,6 +51,8 @@ Will update with a more conceptual domain diagram which will be used for present
         +id: RobotId
         -direction: Direction
         +program: Card[5] ordered
+        +lastCheckpoint: int
+        +completeCheckpoint(int number) bool
         +setProgram(Card[5] program)
         +getProgramCard(int registerIndex) Card
         +turn(int quarterTurns)
@@ -67,6 +77,7 @@ Will update with a more conceptual domain diagram which will be used for present
 
         Robot --> Direction
         Tile <|-- EmptyTile
+        Tile <|-- CheckpointTile
 
         Player "1" --> "1" Robot
 
@@ -82,7 +93,7 @@ Responsible for dictating the game loop: dealing cards, taking programs, and exe
 
 Keeps track of the current phase and register. `submitProgram()` checks a player's five cards before assigning them to their Robot. During activation, Game chooses the next robot from those that have not acted yet, using current positions on Board and the priority antenna. It reads that robot's card and applies it: movement goes through Board, while turns change Robot's direction. Priority is worked out again after each robot acts.
 
-Board elements activate after the robot actions in each register. This is a no-op in V0, but leaves room for ordered board effects later. After the fifth register, Game returns to the programming phase.
+Board elements activate after the robot actions in each register. This is currently a no-op; the proposed checkpoint extension uses this existing stage. After the fifth register, Game returns to the programming phase.
 
 # Board
 
@@ -99,6 +110,20 @@ Tiles do not hold robots or activate themselves. Game can schedule board effects
 # Robot
 
 Has an ID, its direction, and an ordered program of five cards. Game assigns the program through `setProgram()` and reads the card for each register. Robot does not know its position or which Tile it occupies.
+
+# Checkpoints
+
+`CheckpointTile` inherits Tile's walls and has a fixed positive integer `number`. Its position is its cell in Board's grid; it does not store a second position. Board validates that checkpoint numbers are unique and consecutive from 1 to `checkpointCount`. An empty checkpoint set is valid. Checkpoints remain on the board and are never consumed or assigned to a particular robot.
+
+Each Robot starts with `lastCheckpoint = 0`. `completeCheckpoint(number)` advances it only when `number === lastCheckpoint + 1`, returning whether progress changed. Repeating or skipping a number leaves progress unchanged. Clearing a program or finishing a round does not reset progress. Disconnecting retains the same Robot and its progress; an explicit leave removes that Robot with the existing membership behavior.
+
+At `activateBoardElements()`, Game checks the tile at every remaining robot's current Board position. A robot on its next checkpoint completes it, regardless of its facing or whether its card moved it. Passing over a checkpoint during a multi-step move does not count. Placing a robot or submitting a program does not complete a checkpoint. Each robot completes at most one checkpoint per register, independently of the others.
+
+The existing `removePlayer()` path can finish a register when every remaining robot has acted. It must perform the same checkpoint check for the remaining robots. Game returns immutable completion records (`robotId`, `checkpointNumber`) from both execution paths, including the fifth register, for the service to publish. Transport events remain outside the domain.
+
+The shared 21 by 15 board has checkpoint 1 at `(10, 6)` and checkpoint 2 at `(8, 9)`, using the existing top-left coordinate origin. These positions do not change the antenna or spawn row. The client displays `lastCheckpoint/checkpointCount` for its assigned robot, including `0/0` on a board without checkpoints. This proposal limits client presentation to that count; board markers and checkpoint animations are deferred.
+
+Completing the final checkpoint leaves the existing programming/activation loop running. Winner selection, movement, antenna priority, hands, pause behavior, and membership rules are unchanged.
 
 # Player
 
@@ -132,7 +157,7 @@ while game.currentRegister < 5:
         card = robot(robotId).getProgramCard(game.currentRegister)
         game.executeCard(robotId, card)           # Movement via Board, turning via Robot
         remaining.remove(robotId)                 # Priority is checked again for the next robot
-    game.activateBoardElements()                  # No-op in V0; ordered effects later
+    game.activateBoardElements()                  # Checkpoints; other ordered effects later
     game.finishRegister()                         # Advance to the next register
 game.finishRound()                                # Return to programming phase
 ```
