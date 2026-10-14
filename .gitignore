@@ -9,7 +9,7 @@ test-results/
 *.tsbuildinfo
 
 # Rauthy local dev data
-infra/rauthy/data/
+rauthy/data/
 
 # Environment files
 .env

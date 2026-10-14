@@ -1,0 +1,27 @@
+[
+  {
+    "id": "game-service",
+    "secret": "generate",
+    "redirect_uris": [
+      "http://localhost:8080/auth/callback"
+    ],
+    "enabled": true,
+    "flows_enabled": [
+      "authorization_code"
+    ],
+    "access_token_alg": "EdDSA",
+    "id_token_alg": "EdDSA",
+    "auth_code_lifetime": 60,
+    "access_token_lifetime": 900,
+    "scopes": [
+      "openid"
+    ],
+    "default_scopes": [
+      "openid"
+    ],
+    "challenges": [
+      "S256"
+    ],
+    "force_mfa": false
+  }
+]

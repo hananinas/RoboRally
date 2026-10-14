@@ -1,8 +1,16 @@
 version: "0.5"
 
 processes:
+  reset-rauthy-db:
+    command: "rm -rf rauthy/data"
+
   rauthy:
     command: "rauthy serve -c infra/rauthy/config.toml"
+    environment:
+      - "BOOTSTRAP_DIR=infra/rauthy/bootstrap"
+    depends_on:
+      reset-rauthy-db:
+        condition: process_completed_successfully
 
   build-game-events:
     command: "pnpm --filter @robo-rally/game-events run build"
