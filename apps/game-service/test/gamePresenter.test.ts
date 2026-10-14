@@ -66,7 +66,7 @@ describe('game presenter', () => {
         new EmptyTile([Direction.NORTH, Direction.WEST]),
         new EmptyTile(),
       ],
-    ])
+    ], { x: 0, y: 0, angle: Math.PI / 2 })
     const robot = new Robot('robot', Direction.EAST)
     board.placeRobot(robot.id, { x: 0, y: 0 })
     const player = new Player('player', robot)
@@ -74,7 +74,7 @@ describe('game presenter', () => {
       { length: 5 },
       (_, index) => new Card(`card-${index}`, 'MOVE_1'),
     )
-    const game = new Game(board, [player], cards, { x: 0, y: 0, angle: Math.PI / 2 })
+    const game = new Game(board, [player], cards)
     game.submitProgram(player.id, cards)
 
     const state = presentPublicGameState('game', game)

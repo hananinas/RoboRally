@@ -1,4 +1,4 @@
-import type { Antenna } from '@/game/Game'
+import type { Antenna } from '@/game/Board'
 import { Direction } from '@/game/spatial'
 
 const { NORTH: N, WEST: W, SOUTH: S, EAST: E } = Direction

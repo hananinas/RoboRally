@@ -7,7 +7,7 @@ function createMultiplayerGame(
   antenna: Antenna = { x: 4, y: 4, angle: Math.PI / 2 },
   board = new Board(Array.from({ length: 9 }, () =>
     Array.from({ length: 9 }, () => new EmptyTile()),
-  )),
+  ), antenna),
   deck: readonly Card[] = Array.from({ length: 6 }, (_, index) => new Card(`left-${index}`, 'TURN_LEFT')),
 ) {
   const players = positions.map((position, index) => {
@@ -15,8 +15,8 @@ function createMultiplayerGame(
     board.placeRobot(robot.id, position)
     return new Player(`player-${index}`, robot)
   })
-  const game = new Game(board, players, deck, antenna)
-  return { board, players, deck, antenna, game }
+  const game = new Game(board, players, deck)
+  return { board, players, deck, game }
 }
 
 describe('Game fixed-roster programming', () => {
@@ -51,7 +51,7 @@ describe('Game fixed-roster programming', () => {
   })
 
   it('copies the fixed roster and keeps an empty roster idle', () => {
-    const { board, players, deck, antenna, game } = createMultiplayerGame([{ x: 4, y: 5 }])
+    const { board, players, deck, game } = createMultiplayerGame([{ x: 4, y: 5 }])
     const player = players[0]
     players.length = 0
     expect(game.players).toEqual([player])
@@ -59,7 +59,7 @@ describe('Game fixed-roster programming', () => {
     game.submitProgram(player.id, deck.slice(0, 5))
     expect(game.phase).toBe('activation')
 
-    const empty = new Game(board, [], deck, antenna)
+    const empty = new Game(board, [], deck)
     empty.recheckProgrammingPhase()
     expect(empty.phase).toBe('programming')
     expect(empty.currentRegister).toBe(0)
@@ -68,28 +68,17 @@ describe('Game fixed-roster programming', () => {
   })
 
   it('rejects duplicate player IDs, duplicate robot IDs, and unplaced robots', () => {
-    const { board, players, deck, antenna } = createMultiplayerGame([{ x: 4, y: 5 }, { x: 5, y: 4 }])
-    expect(() => new Game(board, [players[0], new Player(players[0].id, players[1].robot)], deck, antenna)).toThrow(RangeError)
-    expect(() => new Game(board, [players[0], new Player('other', new Robot(players[0].robot.id, Direction.NORTH))], deck, antenna)).toThrow(RangeError)
-    expect(() => new Game(board, [new Player('unplaced', new Robot('unplaced', Direction.NORTH))], deck, antenna)).toThrow()
+    const { board, players, deck } = createMultiplayerGame([{ x: 4, y: 5 }, { x: 5, y: 4 }])
+    expect(() => new Game(board, [players[0], new Player(players[0].id, players[1].robot)], deck)).toThrow(RangeError)
+    expect(() => new Game(board, [players[0], new Player('other', new Robot(players[0].robot.id, Direction.NORTH))], deck)).toThrow(RangeError)
+    expect(() => new Game(board, [new Player('unplaced', new Robot('unplaced', Direction.NORTH))], deck)).toThrow()
   })
 
-  it('validates and freezes an independent positioned antenna', () => {
+  it('exposes the antenna of its board', () => {
     const antenna = { x: 4, y: 4, angle: Math.PI / 2 }
-    const { board, players, deck, game } = createMultiplayerGame([{ x: 4, y: 5 }], antenna)
-    antenna.x = 0
-    antenna.angle = 0
-    expect(game.antenna).toEqual({ x: 4, y: 4, angle: Math.PI / 2 })
-    expect(() => Object.assign(game.antenna, { angle: 0 })).toThrow()
-    for (const invalid of [
-      { x: -1, y: 0, angle: 0 },
-      { x: 0, y: board.height, angle: 0 },
-      { x: 0.5, y: 0, angle: 0 },
-      { x: 0, y: 0, angle: Infinity },
-      { x: 0, y: 0, angle: NaN },
-    ]) {
-      expect(() => new Game(board, players, deck, invalid)).toThrow(RangeError)
-    }
+    const { board, game } = createMultiplayerGame([{ x: 4, y: 5 }], antenna)
+    expect(game.board.antenna).toEqual(antenna)
+    expect(game.board.antenna).toBe(board.antenna)
   })
 })
 
@@ -192,7 +181,7 @@ describe('Game multiplayer activation', () => {
     }
     const board = new TiedPositionBoard(Array.from({ length: 9 }, () =>
       Array.from({ length: 9 }, () => new EmptyTile()),
-    ))
+    ), { x: 4, y: 4, angle: Math.PI / 2 })
     const { players, deck, game } = createMultiplayerGame(
       [{ x: 4, y: 5 }, { x: 5, y: 4 }], undefined, board,
     )
@@ -211,7 +200,7 @@ describe('Game multiplayer activation', () => {
     }
     const board = new DisplacingBoard(Array.from({ length: 9 }, () =>
       Array.from({ length: 9 }, () => new EmptyTile()),
-    ))
+    ), { x: 4, y: 4, angle: Math.PI / 2 })
     const deck = Array.from({ length: 5 }, (_, index) => new Card(`move-${index}`, 'MOVE_1'))
     const { players, game } = createMultiplayerGame(
       [{ x: 4, y: 5 }, { x: 4, y: 6 }, { x: 6, y: 4 }], undefined, board, deck,

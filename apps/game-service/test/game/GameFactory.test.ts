@@ -17,7 +17,7 @@ describe('game factory', () => {
   it('uses the antenna specified by the map', () => {
     const { game } = createGame()
 
-    expect(game.antenna).toEqual(boardMaps['test-map'].antenna)
+    expect(game.board.antenna).toEqual(boardMaps['test-map'].antenna)
   })
 
   it('creates players with unique ids, a north-facing robot and nine cards in a fixed order', () => {

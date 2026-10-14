@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { Card } from '@/game/Card'
-import { createBoard, getAntenna, type BoardMapName } from '@/game/BoardFactory'
+import { createBoard, type BoardMapName } from '@/game/BoardFactory'
 import { Game } from '@/game/Game'
 import type { GameId } from '@/game/ids'
 import { Player } from '@/game/Player'
@@ -38,6 +38,6 @@ export function createPlayer(): Player {
 export function createGame(
   mapName: BoardMapName = 'test-map',
 ): Readonly<{ gameId: GameId; game: Game }> {
-  const game = new Game(createBoard(mapName), [], createHand(), getAntenna(mapName))
+  const game = new Game(createBoard(mapName), [], createHand())
   return { gameId: GAME_ID, game }
 }

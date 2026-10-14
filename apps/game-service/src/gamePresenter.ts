@@ -61,7 +61,7 @@ export function presentPublicGameState(
   return {
     gameId,
     players,
-    antenna: game.antenna,
+    antenna: game.board.antenna,
     board: {
       width: game.board.width,
       height: game.board.height,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { boardMaps } from '@/game/boardMaps'
-import { Direction, EmptyTile, createBoard, getAntenna } from '@/game/index'
+import { Direction, EmptyTile, createBoard } from '@/game/index'
 
 describe('board factory', () => {
   it('creates the empty map with the size specified by the map and no walls', () => {
@@ -34,12 +34,12 @@ describe('board factory', () => {
   })
 
   it('reads the priority antenna location from the map', () => {
-    expect(getAntenna('test-map')).toEqual(boardMaps['test-map'].antenna)
-    expect(getAntenna()).toEqual(boardMaps['empty-map'].antenna)
+    expect(createBoard('test-map').antenna).toEqual(boardMaps['test-map'].antenna)
+    expect(createBoard().antenna).toEqual(boardMaps['empty-map'].antenna)
   })
 
-  it('returns a fresh antenna object each call', () => {
-    expect(getAntenna('test-map')).not.toBe(getAntenna('test-map'))
+  it('gives each board its own antenna object', () => {
+    expect(createBoard('test-map').antenna).not.toBe(createBoard('test-map').antenna)
   })
 
   it('creates an independent board for each call', () => {

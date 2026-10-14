@@ -8,13 +8,16 @@ export type MovementResult = Readonly<{
   blocked: boolean
 }>
 
+export type Antenna = Readonly<Position & { angle: number }>
+
 export class Board {
   private readonly tiles: readonly (readonly Tile[])[]
   private readonly robotPositions = new Map<RobotId, Position>()
   readonly width: number
   readonly height: number
+  readonly antenna: Antenna
 
-  constructor(tiles: readonly (readonly Tile[])[]) {
+  constructor(tiles: readonly (readonly Tile[])[], antenna: Antenna) {
     const width = tiles[0]?.length ?? 0
     if (width === 0 || tiles.some((row) => row.length !== width)) {
       throw new RangeError('A board must be a non-empty rectangular tile grid')
@@ -23,6 +26,11 @@ export class Board {
     this.width = width
     this.height = tiles.length
     this.tiles = tiles.map((row) => [...row])
+
+    if (!this.contains(antenna) || !Number.isFinite(antenna.angle)) {
+      throw new RangeError('The antenna must be on the board with a finite angle')
+    }
+    this.antenna = Object.freeze({ ...antenna })
   }
 
   contains(position: Position): boolean {
