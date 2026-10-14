@@ -613,10 +613,39 @@ describe('client game state', () => {
     expect(canProgram(state)).toBe(true)
   })
 
-  it('clears the executed program on completion even if the next hand has not arrived', () => {
+  it('preserves the executed program across a paused playback queue gap', () => {
     let state = selectProgram()
+    const program = state.registers
     state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, {
+      type: 'player-connection-changed',
+      payload: {
+        gameId: publicState.gameId,
+        playerId: publicState.players[1].playerId,
+        connected: false,
+        paused: true,
+      },
+    })
     state = gameStateReducer(state, { type: 'complete' })
+    expect(state.playbackProgram).toEqual(program)
+    expect(state.registers).toEqual(program)
+
+    state = gameStateReducer(state, {
+      type: 'player-connection-changed',
+      payload: {
+        gameId: publicState.gameId,
+        playerId: publicState.players[1].playerId,
+        connected: true,
+        paused: false,
+      },
+    })
+    state = gameStateReducer(state, { type: 'action', action: actions[1] })
+    expect(state.playbackProgram).toEqual(program)
+    expect(state.registers).toEqual(program)
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(state.playbackProgram).toEqual(program)
+
+    state = gameStateReducer(state, { type: 'dealt', hand })
     expect(state.playbackProgram).toBeNull()
     expect(state.registers).toEqual(emptyRegisters)
   })

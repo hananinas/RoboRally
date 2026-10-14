@@ -151,6 +151,7 @@ function activateHand(state: ClientGameState): ClientGameState {
     registers: emptyRegisters(),
     registersPast: [],
     registersFuture: [],
+    playbackProgram: null,
     submission: 'idle',
     error: state.connected ? null : state.error,
   }
@@ -269,6 +270,7 @@ export function gameStateReducer(
     case 'complete': {
       const playback = robotPlaybackReducer(state.playback, { type: 'complete' })
       if (playback.active) return { ...state, playback }
+      if (state.phase !== 'PROGRAMMING') return { ...state, playback }
       return activateHand({
         ...state,
         playback,
