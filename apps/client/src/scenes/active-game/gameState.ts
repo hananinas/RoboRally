@@ -4,7 +4,10 @@ import type {
   GamePhase,
   JoinResult,
   PlayerAssignment,
+  PlayerConnectionChanged,
   PlayerId,
+  PlayerJoined,
+  PlayerLeft,
   ProgramResult,
   RobotActionResolved,
   SubmitProgram,
@@ -20,15 +23,24 @@ export type ProgramCard = Card
 
 export type Registers = readonly (ProgramCard | null)[]
 
+export type Player = {
+  playerId: PlayerId
+  username: string
+  connected: boolean
+}
+
 export type ClientGameState = {
   connected: boolean
   assignment: PlayerAssignment | null
   phase: GamePhase | null
-  playerIds: readonly PlayerId[]
+  paused: boolean
+  players: readonly Player[]
   board: BoardRenderModel | null
   playback: RobotPlaybackState
   hand: readonly ProgramCard[]
   registers: Registers
+  registersPast: readonly Registers[]
+  registersFuture: readonly Registers[]
   // Copy of the submitted program shown while its actions play back.
   playbackProgram: Registers | null
   handVersion: number
@@ -40,16 +52,32 @@ export type ClientGameState = {
 
 export type GameStateEvent =
   | { type: 'joined'; result: Extract<JoinResult, { outcome: 'JOINED' }> }
+  | { type: 'player-joined'; payload: PlayerJoined }
+  | { type: 'player-left'; payload: PlayerLeft }
+  | { type: 'player-connection-changed'; payload: PlayerConnectionChanged }
   | { type: 'disconnected' }
+  | { type: 'reconnected' }
+  | { type: 'connect-error'; message: string }
   | { type: 'dealt'; hand: CardsDealt }
   | { type: 'reset' }
+  | { type: 'error'; message: string }
   | { type: 'action'; action: RobotActionResolved }
   | { type: 'complete' }
   | { type: 'place'; cardId: string; registerIndex: number }
   | { type: 'remove'; registerIndex: number }
+  | { type: 'clear' }
+  | { type: 'undo' }
+  | { type: 'redo' }
   | { type: 'submit' }
   | { type: 'result'; result: ProgramResult; handVersion: number }
   | { type: 'submission-unknown'; handVersion: number }
+
+export const USER_ALREADY_IN_GAME_MESSAGE =
+  'This username is already participating from another connection.'
+
+const connectErrors: Record<string, string> = {
+  USER_ALREADY_IN_GAME: USER_ALREADY_IN_GAME_MESSAGE,
+}
 
 export const REGISTER_COUNT = 5
 
@@ -62,11 +90,14 @@ export function createClientGameState(): ClientGameState {
     connected: false,
     assignment: null,
     phase: null,
-    playerIds: [],
+    paused: false,
+    players: [],
     board: null,
     playback: createRobotPlaybackState([]),
     hand: [],
     registers: emptyRegisters(),
+    registersPast: [],
+    registersFuture: [],
     playbackProgram: null,
     handVersion: 0,
     handReady: false,
@@ -78,6 +109,7 @@ export function createClientGameState(): ClientGameState {
 
 export function canProgram(state: ClientGameState): boolean {
   return state.connected &&
+    !state.paused &&
     state.assignment !== null &&
     state.phase === 'PROGRAMMING' &&
     state.handReady &&
@@ -117,6 +149,8 @@ function activateHand(state: ClientGameState): ClientGameState {
     handVersion: state.handVersion + 1,
     pendingHand: null,
     registers: emptyRegisters(),
+    registersPast: [],
+    registersFuture: [],
     submission: 'idle',
     error: state.connected ? null : state.error,
   }
@@ -127,12 +161,52 @@ export function gameStateReducer(
   event: GameStateEvent,
 ): ClientGameState {
   switch (event.type) {
+    case 'error':
+      return { ...state, error: event.message }
+    case 'player-joined': {
+      const { gameId, player, robot } = event.payload
+      if (gameId !== state.assignment?.gameId || player.playerId !== robot.playerId ||
+          state.players.some((candidate) => candidate.playerId === player.playerId)) return state
+      return {
+        ...state,
+        players: [...state.players, {
+          playerId: player.playerId, username: player.username, connected: player.connected,
+        }],
+        playback: robotPlaybackReducer(state.playback, { type: 'add', robot: { ...robot, colour: '#c74f4f' } }),
+      }
+    }
+    case 'player-left': {
+      const { gameId, playerId, robotId } = event.payload
+      if (gameId !== state.assignment?.gameId ||
+        !state.players.some((player) => player.playerId === playerId)) return state
+      return {
+        ...state,
+        players: state.players.filter((player) => player.playerId !== playerId),
+        playback: robotPlaybackReducer(state.playback, { type: 'remove', robotId }),
+      }
+    }
+    case 'player-connection-changed': {
+      const { gameId, playerId, connected, paused } = event.payload
+      if (gameId !== state.assignment?.gameId) return state
+      return {
+        ...state,
+        paused,
+        players: state.players.map((player) =>
+          player.playerId === playerId ? { ...player, connected } : player),
+      }
+    }
     case 'disconnected':
       return {
         ...state,
         connected: false,
-        error: 'Connection lost. Reload to connect again; your program was not resent.',
+        error: 'Connection lost. Reconnecting… Your program was not resent.',
       }
+    case 'reconnected':
+      return { ...state, connected: true, error: null }
+    case 'connect-error': {
+      const message = connectErrors[event.message]
+      return message ? { ...state, error: message } : state
+    }
     case 'reset':
       return createClientGameState()
     case 'joined': {
@@ -147,7 +221,10 @@ export function gameStateReducer(
         handReady: snapshot.phase === 'PROGRAMMING' && result.hand.length > 0,
         submission: result.programSubmitted ? 'accepted' : 'idle',
         phase: snapshot.phase,
-        playerIds: snapshot.robots.map((robot) => robot.playerId),
+        paused: snapshot.paused,
+        players: snapshot.players.map((player) => ({
+          playerId: player.playerId, username: player.username, connected: player.connected,
+        })),
         playback: createRobotPlaybackState(
           snapshot.robots.map((robot) => ({ ...robot, colour: '#c74f4f' })),
         ),
@@ -204,19 +281,64 @@ export function gameStateReducer(
       const card = state.hand.find((candidate) => candidate.id === event.cardId)
       if (!card) return state
       const registers = placeCard(state.registers, card, event.registerIndex)
-      return registers === state.registers ? state : { ...state, registers }
+      return registers === state.registers ? state : {
+        ...state,
+        registers,
+        registersPast: [...state.registersPast, state.registers],
+        registersFuture: [],
+      }
     }
-    case 'remove':
-      return canProgram(state)
-        ? { ...state, registers: removeCard(state.registers, event.registerIndex) }
-        : state
+    case 'remove': {
+      if (!canProgram(state)) return state
+      const registers = removeCard(state.registers, event.registerIndex)
+      return registers === state.registers ? state : {
+        ...state,
+        registers,
+        registersPast: [...state.registersPast, state.registers],
+        registersFuture: [],
+      }
+    }
+    case 'clear': {
+      if (!canProgram(state) || state.registers.every((card) => card === null)) return state
+      return {
+        ...state,
+        registers: emptyRegisters(),
+        registersPast: [...state.registersPast, state.registers],
+        registersFuture: [],
+      }
+    }
+    case 'undo': {
+      if (!canProgram(state) || state.registersPast.length === 0) return state
+      const previous = state.registersPast[state.registersPast.length - 1]
+      return {
+        ...state,
+        registers: previous,
+        registersPast: state.registersPast.slice(0, -1),
+        registersFuture: [...state.registersFuture, state.registers],
+      }
+    }
+    case 'redo': {
+      if (!canProgram(state) || state.registersFuture.length === 0) return state
+      const next = state.registersFuture[state.registersFuture.length - 1]
+      return {
+        ...state,
+        registers: next,
+        registersFuture: state.registersFuture.slice(0, -1),
+        registersPast: [...state.registersPast, state.registers],
+      }
+    }
     case 'submit':
       return createSubmission(state) ? { ...state, submission: 'pending', error: null } : state
-    case 'result':
+    case 'result': {
       if (event.handVersion !== state.handVersion || state.submission !== 'pending') return state
-      return event.result.outcome === 'ACCEPTED'
-        ? { ...state, submission: 'accepted', error: null }
-        : { ...state, submission: 'idle', error: 'Program rejected. Adjust your selection and try again.' }
+      if (event.result.outcome === 'ACCEPTED') {
+        return { ...state, submission: 'accepted', error: null }
+      }
+      const error = event.result.outcome === 'GAME_PAUSED'
+        ? 'Game paused. Your program was not submitted — try again once reconnected.'
+        : 'Program rejected. Adjust your selection and try again.'
+      return { ...state, submission: 'idle', error }
+    }
     case 'submission-unknown':
       if (event.handVersion !== state.handVersion || state.submission !== 'pending') return state
       return {
@@ -237,7 +359,6 @@ export function placeCard(
     !Number.isInteger(registerIndex) ||
     registerIndex < 0 ||
     registerIndex >= registers.length ||
-    registers[registerIndex] !== null ||
     registers.some((registeredCard) => registeredCard?.id === card.id)
 
   if (cannotPlace) return registers

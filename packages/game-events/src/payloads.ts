@@ -1,3 +1,5 @@
+import type { Instruction } from './instructions.js'
+
 export type GameId = string
 export type PlayerId = string
 export type RobotId = string
@@ -26,14 +28,6 @@ export type PlayerAssignment = Readonly<{
   playerId: PlayerId
   robotId: RobotId
 }>
-
-export type Instruction = | 'MOVE_1'
-  | 'MOVE_2'
-  | 'MOVE_3'
-  | 'BACK_UP'
-  | 'TURN_LEFT'
-  | 'TURN_RIGHT'
-  | 'U_TURN'
 
 export type Card = Readonly<{
   id: CardId
@@ -80,6 +74,34 @@ export type PublicGameState = Readonly<{
   board: Board
   robots: readonly Robot[]
   phase: GamePhase
+  players: readonly PlayerState[]
+  paused: boolean
+}>
+
+export type PlayerState = Readonly<{
+  playerId: PlayerId
+  username: string
+  programSubmitted: boolean
+  connected: boolean
+}>
+
+export type PlayerJoined = Readonly<{
+  gameId: GameId
+  player: PlayerState
+  robot: Robot
+}>
+
+export type PlayerLeft = Readonly<{ gameId: GameId; playerId: PlayerId; robotId: RobotId }>
+
+export type PlayerConnectionChanged = Readonly<{
+  gameId: GameId
+  playerId: PlayerId
+  connected: boolean
+  paused: boolean
+}>
+
+export type LeaveResult = Readonly<{
+  outcome: 'LEFT' | 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND' | 'INTERNAL_ERROR'
 }>
 
 export type CardsDealt = Readonly<{
@@ -88,7 +110,7 @@ export type CardsDealt = Readonly<{
   cards: readonly Card[]
 }>
 
-export type ProgramResultOutcome = 'ACCEPTED' | 'INVALID_PROGRAM'
+export type ProgramResultOutcome = 'ACCEPTED' | 'INVALID_PROGRAM' | 'GAME_PAUSED'
 
 export type ProgramResult = Readonly<{
   outcome: ProgramResultOutcome

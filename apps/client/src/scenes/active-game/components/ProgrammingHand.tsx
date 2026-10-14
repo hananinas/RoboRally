@@ -1,4 +1,4 @@
-import { useState, type PointerEvent, type Ref } from 'react'
+import { useEffect, useRef, useState, type PointerEvent, type Ref } from 'react'
 import type { ProgramCard as Card } from '../gameState.ts'
 import ProgramCard from './ProgramCard.tsx'
 
@@ -18,8 +18,10 @@ type ProgrammingHandProps = {
   cards: readonly Card[]
   registeredCardIds: ReadonlySet<string>
   disabled: boolean
+  highlightedIndex: number | null
+  onHighlightCard: (cardIndex: number) => void
   onSelect: (card: Card) => void
-  onDrop: (card: Card, registerIndex: number) => void
+  onPlaceCard: (card: Card, registerIndex: number) => void
 }
 
 const dragThreshold = 4
@@ -39,10 +41,20 @@ function ProgrammingHand({
   cards,
   registeredCardIds,
   disabled,
+  highlightedIndex,
+  onHighlightCard,
   onSelect,
-  onDrop,
+  onPlaceCard,
 }: ProgrammingHandProps) {
   const [drag, setDrag] = useState<CardDrag | null>(null)
+  const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
+
+  useEffect(() => {
+    if (highlightedIndex === null) return
+
+    const card = cardRefs.current[highlightedIndex]
+    if (card && document.activeElement !== card) card.focus()
+  }, [highlightedIndex])
 
   // Starts pointer tracking.
   function startDrag(card: Card, event: PointerEvent<HTMLButtonElement>) {
@@ -98,7 +110,7 @@ function ProgrammingHand({
 
     if (moved) {
       const registerIndex = registerAtPoint(event.clientX, event.clientY)
-      if (registerIndex !== null) onDrop(drag.card, registerIndex)
+      if (registerIndex !== null) onPlaceCard(drag.card, registerIndex)
     } else {
       onSelect(drag.card)
     }
@@ -117,12 +129,13 @@ function ProgrammingHand({
       className="programming-hand"
       aria-label="Programming hand"
     >
-      {cards.map((card) => {
+      {cards.map((card, index) => {
         const selected = registeredCardIds.has(card.id)
 
         return (
           <ProgramCard
             key={card.id}
+            ref={(node) => { cardRefs.current[index] = node }}
             card={card}
             size="hand"
             selected={selected}
@@ -136,6 +149,8 @@ function ProgrammingHand({
             onPointerUp={finishDrag}
             onPointerCancel={cancelDrag}
             onLostPointerCapture={cancelDrag}
+            onMouseEnter={() => onHighlightCard(index)}
+            onFocus={() => onHighlightCard(index)}
           />
         )
       })}

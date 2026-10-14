@@ -1,15 +1,6 @@
 import { parseSubmitProgram } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'
-import {
-  Direction,
-  EmptyTile,
-  Move1,
-  TurnLeft,
-  Move2,
-  Move3,
-  TurnRight,UTurn,BackUp,
-  createSinglePlayerGame,
-} from '@/game/index.ts'
+import { Direction, EmptyTile, createSinglePlayerGame } from '@/game/index'
 
 describe('single-player game', () => {
   it('creates the fixed board, player, and robot', () => {
@@ -29,21 +20,21 @@ describe('single-player game', () => {
   })
 
   it('deals nine distinct, contract-valid cards in a fixed order', () => {
-    const { gameId, game, player } = createSinglePlayerGame()
+    const { gameId, player } = createSinglePlayerGame()
     const cardIds = player.hand.map((card) => card.id)
 
     expect(player.hand).toHaveLength(9)
     expect(new Set(cardIds).size).toBe(9)
-    expect(player.hand.map((card) => card.constructor)).toEqual([
-      Move1, 
-      Move2, 
-      Move3, 
-      BackUp, 
-      TurnLeft, 
-      TurnRight, 
-      UTurn, 
-      Move1, 
-      TurnLeft,
+    expect(player.hand.map((card) => card.instruction)).toEqual([
+      'MOVE_1',
+      'MOVE_2',
+      'MOVE_3',
+      'BACK_UP',
+      'TURN_LEFT',
+      'TURN_RIGHT',
+      'U_TURN',
+      'MOVE_1',
+      'TURN_LEFT',
     ])
     expect(parseSubmitProgram({
       gameId,

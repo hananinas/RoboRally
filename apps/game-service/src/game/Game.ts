@@ -1,14 +1,6 @@
 import type { Board } from '@/game/Board'
-import {
-  Move1,
-  Move2,
-  Move3,
-  TurnLeft,
-  TurnRight,
-  UTurn,
-  BackUp,
-  type Card,
-} from '@/game/Card'
+import { instructions } from '@robo-rally/game-events'
+import type { Card } from '@/game/Card'
 import type { PlayerId, RobotId } from '@/game/ids'
 import type { Player } from '@/game/Player'
 import type { Robot } from '@/game/Robot'
@@ -32,13 +24,15 @@ export type NextActionResult = Readonly<{
 
 export class Game {
   readonly board: Board
-  readonly players: readonly Player[]
+  private readonly roster: Player[]
   readonly antenna: Antenna
   private readonly deck: readonly Card[]
   private currentPhase: GamePhase = 'programming'
   private registerIndex = 0
   private readonly submittedPlayerIds = new Set<PlayerId>()
   private readonly activatedRobotIds = new Set<RobotId>()
+  private started = false
+  private isPaused = false
 
   constructor(
     board: Board,
@@ -65,7 +59,7 @@ export class Game {
     }
 
     this.board = board
-    this.players = Object.freeze([...players])
+    this.roster = [...players]
     this.antenna = Object.freeze({ ...antenna })
     this.deck = [...deck]
     this.dealCards()
@@ -79,11 +73,69 @@ export class Game {
     return this.registerIndex
   }
 
+  get players(): readonly Player[] {
+    return Object.freeze([...this.roster])
+  }
+
+  get hasStarted(): boolean {
+    return this.started
+  }
+
+  get paused(): boolean {
+    return this.isPaused
+  }
+
+  pause(): void {
+    this.isPaused = true
+  }
+
+  resume(): void {
+    this.isPaused = false
+  }
+
   hasSubmittedProgram(playerId: PlayerId): boolean {
     return this.submittedPlayerIds.has(playerId)
   }
 
+  addPlayer(player: Player): boolean {
+    if (this.started) throw new Error('Game has already started')
+    if (this.roster.some((member) => member.id === player.id || member.robot.id === player.robot.id)) {
+      throw new Error('Player or robot is already in the game')
+    }
+    const { width, height } = this.board
+    const y = Math.floor(height / 2)
+    let x = Math.floor(width / 2)
+    while (x >= 0 && this.board.occupantAt({ x, y }) !== undefined) x--
+    if (x < 0) return false
+    this.board.placeRobot(player.robot.id, { x, y })
+    if (player.hand.length === 0) player.setHand(this.deck)
+    this.roster.push(player)
+    return true
+  }
+
+  removePlayer(playerId: PlayerId): void {
+    const index = this.roster.findIndex((player) => player.id === playerId)
+    if (index < 0) return
+    const [player] = this.roster.splice(index, 1)
+    this.board.removeRobot(player.robot.id)
+    player.robot.clearProgram()
+    this.submittedPlayerIds.delete(playerId)
+    this.activatedRobotIds.delete(player.robot.id)
+    if (this.currentPhase === 'activation') {
+      if (this.roster.length === 0) {
+        this.finishRound()
+      } else if (this.activatedRobotIds.size === this.roster.length) {
+        this.activateBoardElements()
+        this.finishRegister()
+      }
+    }
+    this.recheckProgrammingPhase()
+  }
+
   submitProgram(playerId: PlayerId, program: readonly Card[]): void {
+    if (this.isPaused) {
+      throw new Error('Programs cannot be submitted while the game is paused')
+    }
     if (this.currentPhase !== 'programming') {
       throw new Error('Programs can only be submitted during programming')
     }
@@ -105,6 +157,7 @@ export class Game {
     }
 
     player.robot.setProgram(program)
+    this.started = true
     this.submittedPlayerIds.add(playerId)
     this.recheckProgrammingPhase()
   }
@@ -147,7 +200,9 @@ export class Game {
 
   private dealCards(): void {
     // V0 uses the supplied deck as a fixed hand, without drawing or shuffling.
-    for (const player of this.players) player.setHand(this.deck)
+    for (const player of this.players) {
+      if (player.hand.length === 0) player.setHand(this.deck)
+    }
   }
 
   private startActivationPhase(): void {
@@ -184,23 +239,12 @@ export class Game {
   }
 
   private executeCard(robot: Robot, card: Card): void {
-    if (card instanceof Move1) {
-      this.board.moveRobot(robot.id, robot.direction, 1)
-    } else if (card instanceof Move2) {
-      this.board.moveRobot(robot.id, robot.direction, 2)
-    } else if (card instanceof Move3) {
-      this.board.moveRobot(robot.id, robot.direction, 3)
-    } else if (card instanceof BackUp) {
-      // Moves one space backwards; the robot keeps facing the same way.
-      this.board.moveRobot(robot.id, opposite(robot.direction), 1)
-    } else if (card instanceof TurnLeft) {
-      robot.turnLeft()
-    } else if (card instanceof TurnRight) {
-      robot.turnRight()
-    } else if (card instanceof UTurn) {
-      robot.uTurn()
+    const effect = instructions[card.instruction]
+    if (effect.kind === 'move') {
+      const direction = effect.steps < 0 ? opposite(robot.direction) : robot.direction
+      this.board.moveRobot(robot.id, direction, Math.abs(effect.steps))
     } else {
-      throw new Error(`Unsupported card ${card.id}`)
+      robot.turn(effect.quarterTurns)
     }
   }
 

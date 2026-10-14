@@ -2,22 +2,15 @@ import type {
   Card as CardPayload,
   CardsDealt,
   GamePhase as GamePhasePayload,
-  Instruction,
   Orientation,
   PublicGameState,
   RobotActionResolved,
+  PlayerState,
   Tile as TilePayload,
 } from '@robo-rally/game-events'
 import {
   Direction,
   EmptyTile,
-  Move1,
-  TurnLeft,
-  TurnRight,
-  Move2,
-  Move3,
-  UTurn,
-  BackUp,
   type Card,
   type Game,
   type GameId,
@@ -38,19 +31,8 @@ const phases: Record<GamePhase, GamePhasePayload> = {
   activation: 'EXECUTING',
 }
 
-function instructionFor(card: Card): Instruction {
-  if (card instanceof Move1) return 'MOVE_1'
-  if (card instanceof TurnLeft) return 'TURN_LEFT'
-  if (card instanceof Move2) return 'MOVE_2'
-  if (card instanceof Move3) return 'MOVE_3'
-  if (card instanceof BackUp) return 'BACK_UP'
-  if (card instanceof TurnRight) return 'TURN_RIGHT'
-  if (card instanceof UTurn) return 'U_TURN'
-  throw new Error(`Unsupported card ${card.id}`)
-}
-
 function presentCard(card: Card): CardPayload {
-  return { id: card.id, instruction: instructionFor(card) }
+  return { id: card.id, instruction: card.instruction }
 }
 
 function presentTile(game: Game, x: number, y: number): TilePayload {
@@ -70,6 +52,7 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
 export function presentPublicGameState(
   gameId: GameId,
   game: Game,
+  players: readonly PlayerState[] = [],
 ): PublicGameState {
   const tiles = Array.from({ length: game.board.height }, (_, y) =>
     Array.from({ length: game.board.width }, (_, x) => presentTile(game, x, y)),
@@ -77,6 +60,7 @@ export function presentPublicGameState(
 
   return {
     gameId,
+    players,
     antenna: game.antenna,
     board: {
       width: game.board.width,
@@ -92,6 +76,7 @@ export function presentPublicGameState(
       },
     })),
     phase: phases[game.phase],
+    paused: game.paused,
   }
 }
 
@@ -111,7 +96,7 @@ export function presentRobotActionResolved(
     gameId,
     registerIndex,
     robotId: action.robotId,
-    instruction: instructionFor(action.card),
+    instruction: action.card.instruction,
     position: {
       coordinate: action.position,
       orientation: orientations[action.direction],

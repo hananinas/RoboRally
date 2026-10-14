@@ -22,7 +22,9 @@ export const OTHER_ROBOT_ID = '33333333-3333-4333-8333-333333333334'
 export function createPublicState(): PublicGameState {
   return {
     gameId: GAME_ID,
+    players: [{ playerId: PLAYER_ID, username: 'Player 1', programSubmitted: false, connected: true }],
     phase: 'PROGRAMMING',
+    paused: false,
     antenna: { x: 5, y: 0, angle: Math.PI / 2 },
     board: {
       width: 11,
@@ -43,6 +45,11 @@ export function createPublicState(): PublicGameState {
     }],
   }
 }
+
+export const HAND_INSTRUCTIONS = [
+  'MOVE_1', 'MOVE_2', 'MOVE_3', 'BACK_UP', 'TURN_LEFT',
+  'TURN_RIGHT', 'U_TURN', 'MOVE_1', 'TURN_LEFT',
+] as const
 
 export const ROUND_ACTIONS: readonly RobotActionResolved[] = [
   { gameId: GAME_ID, registerIndex: 0, robotId: ROBOT_ID, instruction: 'MOVE_1', position: { coordinate: { x: 5, y: 4 }, orientation: 'NORTH' } },

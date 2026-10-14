@@ -5,13 +5,15 @@ import {
   type Registers,
 } from '../gameState.ts'
 import Panel from './Panel.tsx'
-import { instructionLabel } from './cardInstructions.ts'
+import { cardPresentation } from './cardInstructions.ts'
 import ProgramCard from './ProgramCard.tsx'
 
 type RegisterPanelProps = {
   registers: Registers
   activeRegister: number | null
   disabled: boolean
+  pendingDelete: boolean
+  awaitingSubmitConfirm: boolean
   submission: ClientGameState['submission']
   status: string
   error: string | null
@@ -24,6 +26,7 @@ type RegisterSlotProps = {
   index: number
   active: boolean
   disabled: boolean
+  pendingDelete: boolean
   onRemove: (registerIndex: number) => void
 }
 
@@ -33,12 +36,13 @@ function RegisterSlot({
   index,
   active,
   disabled,
+  pendingDelete,
   onRemove,
 }: RegisterSlotProps) {
   const cardClassName = card
     ? 'register__card register__card--filled'
     : 'register__card'
-  const registerIndex = card || disabled ? undefined : index
+  const registerIndex = disabled ? undefined : index
 
   return (
     <li
@@ -46,12 +50,19 @@ function RegisterSlot({
       aria-current={active ? 'step' : undefined}
       data-active={active || undefined}
     >
-      <div className={cardClassName} data-register-index={registerIndex}>
+      <div
+        className={cardClassName}
+        data-register-index={registerIndex}
+        style={{
+          outline: pendingDelete ? '3px solid crimson' : undefined,
+          outlineOffset: '3px',
+        }}
+      >
         {card && (
           <ProgramCard
                   card={card}
                   size="register"
-                  label={`${instructionLabel(card.instruction)}, remove from register ${index + 1}`}
+                  label={`${cardPresentation[card.instruction].label}, remove from register ${index + 1}`}
                   disabled={disabled}
                   onClick={() => onRemove(index)}
                 />
@@ -67,6 +78,8 @@ function RegisterPanel({
   registers,
   activeRegister,
   disabled,
+  pendingDelete,
+  awaitingSubmitConfirm,
   submission,
   status,
   error,
@@ -88,12 +101,16 @@ function RegisterPanel({
             index={index}
             active={index === activeRegister}
             disabled={disabled}
+            pendingDelete={pendingDelete}
             onRemove={onRemove}
           />
         ))}
       </ol>
       <button
-        className="register-panel__done"
+        className={
+          'register-panel__done' +
+          (awaitingSubmitConfirm ? ' register-panel__done--awaiting-confirm' : '')
+        }
         type="button"
         disabled={!registersAreFilled(registers) || disabled}
         onClick={onConfirm}

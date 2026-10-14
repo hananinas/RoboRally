@@ -1,6 +1,6 @@
 export { Board } from '@/game/Board'
 export type { MovementResult } from '@/game/Board'
-export { Card, Move1, TurnLeft, BackUp, Move2,Move3, TurnRight,UTurn } from '@/game/Card'
+export { Card } from '@/game/Card'
 export { Game } from '@/game/Game'
 export type { Antenna, GamePhase, NextActionResult, RobotActionResult } from '@/game/Game'
 export { Player } from '@/game/Player'

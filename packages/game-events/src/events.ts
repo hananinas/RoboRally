@@ -8,6 +8,10 @@ import type {
   ProgramSubmitted,
   PublicGameStateResult,
   RobotActionResolved,
+  PlayerJoined,
+  PlayerLeft,
+  PlayerConnectionChanged,
+  LeaveResult,
 } from './payloads.js'
 import type { SubmitProgram } from './submitProgram.js'
 import type { Login } from './login.js'
@@ -21,6 +25,7 @@ export type PublicGameStateAcknowledgement = (
 ) => void
 
 export interface ClientToServerEvents {
+  'game.leave': (payload: JoinGame, acknowledge: (result: LeaveResult) => void) => void
   'game.join': (payload: JoinGame, acknowledge: JoinResultAcknowledgement) => void
   'user.login': (payload: Login, acknowledge: LoginAcknowledgement) => void
   'program.submit': (
@@ -34,6 +39,9 @@ export interface ClientToServerEvents {
 }
 
 export interface ServerToClientEvents {
+  'game.playerJoined': (payload: PlayerJoined) => void
+  'game.playerLeft': (payload: PlayerLeft) => void
+  'game.playerConnectionChanged': (payload: PlayerConnectionChanged) => void
   'cards.dealt': (payload: CardsDealt) => void
   'program.submitted': (payload: ProgramSubmitted) => void
   'robot.actionResolved': (payload: RobotActionResolved) => void
