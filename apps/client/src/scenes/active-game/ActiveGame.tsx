@@ -43,7 +43,7 @@ function ActiveGame({ game, username, leaving, onLeave }: {
     hudFits,
     overlayRef,
   } = useOverlayLayout(state.handVersion)
-  const disabled = leaving || !canProgram(state)
+  const disabled = leaving || state.paused || !canProgram(state)
   const handleRemove = (registerIndex: number) => dispatch({ type: 'remove', registerIndex })
   const handlePlaceCard = (card: ProgramCard, registerIndex: number) =>
     dispatch({ type: 'place', cardId: card.id, registerIndex })
@@ -64,7 +64,6 @@ function ActiveGame({ game, username, leaving, onLeave }: {
     handBelowHud && 'game-overlay--hand-below-hud',
     hudFits && 'game-overlay--hud-fits',
   ].filter(Boolean).join(' ')
-  const showDisconnectPopup = state.showDisconnectPopup
 
   return (
     <div className="game">
@@ -102,7 +101,7 @@ function ActiveGame({ game, username, leaving, onLeave }: {
           />
         )}
       </div>
-      {showDisconnectPopup && (
+      {state.paused && (
         <div className="disconnect-overlay">
           <div className="disconnect-popup">
             <h2>A player has disconnected</h2>
