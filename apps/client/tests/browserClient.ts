@@ -4,6 +4,7 @@ export async function login(page: Page, username: string) {
   await page.goto('/')
   await page.getByRole('textbox', { name: 'Username' }).fill(username)
   await page.getByRole('button', { name: 'Log in', exact: true }).click()
+  await page.getByRole('button', { name: 'Join game', exact: true }).click()
   await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button')).toHaveCount(9)
 }
