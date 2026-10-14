@@ -16,6 +16,7 @@ import {
 } from '@/game/index.ts'
 import {
   presentCardsDealt,
+  presentLobbyDetails,
   presentPublicGameState,
   presentRobotActionResolved,
 } from '@/gamePresenter.ts'
@@ -133,6 +134,17 @@ describe('game presenter', () => {
         coordinate: { x: 4, y: 5 },
         orientation: 'SOUTH',
       },
+    })
+  })
+
+  it('presents lobby details with the game name, players, and the demo map', () => {
+    const { gameId, game } = createSinglePlayerGame()
+    expect(presentLobbyDetails(gameId, game, ['Dane', 'Abid'])).toEqual({
+      gameId,
+      name: game.name,
+      playerNames: ['Dane', 'Abid'],
+      playerCount: 2,
+      map: { name: 'DEMO MAP', icon: 'demo-map', maxPlayers: 6 },
     })
   })
 })
