@@ -22,7 +22,10 @@ export type NextActionResult = Readonly<{
   action: RobotActionResult
 }>
 
+export const DEFAULT_GAME_NAME = 'Game'
+
 export class Game {
+  readonly name: string  
   readonly board: Board
   private readonly roster: Player[]
   readonly antenna: Antenna
@@ -39,6 +42,7 @@ export class Game {
     players: readonly Player[],
     deck: readonly Card[],
     antenna: Antenna = { x: Math.floor(board.width / 2), y: 0, angle: Math.PI / 2 },
+    name: string = DEFAULT_GAME_NAME,
   ) {
     if (deck.length < 5 || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')
@@ -59,6 +63,7 @@ export class Game {
     }
 
     this.board = board
+    this.name = name
     this.roster = [...players]
     this.antenna = Object.freeze({ ...antenna })
     this.deck = [...deck]
