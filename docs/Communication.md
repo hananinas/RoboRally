@@ -28,18 +28,6 @@ A successful join returns:
 
 The acknowledgement contains the player's current robot assignment, public game state, private hand, and program-submission status. The client must apply all JOINED data before processing later live game events. A future lobby may be inserted between login and joining without changing this model.
 
-### Listing lobbies
-
-After login, the client can ask which lobbies exist:
-
-`game.getLobbyDetails`
-
-A successful request returns:
-
-`LOBBY_FOUND {lobbies}`
-
-Each lobby includes its `gameId`, which the client uses to send `game.join`. A connection that has not logged in receives `LOGIN_REQUIRED`, and a malformed request receives `INVALID_REQUEST`.
-
 ### Membership
 
 New players may join a game until the server accepts the first program submission. Accepting that submission starts the game and permanently closes joining to new players. Later attempts by new players receive GAME_ALREADY_STARTED. 
@@ -58,7 +46,7 @@ An explicit `game.leave {gameId}` removes the owning connection's player and rob
 
 Reconnection behavior is described in the Reconnection section.
 
-The following diagram documents logging in, listing lobbies and joining:
+The following diagram documents the initial join behaviour:
 
 ```mermaid
 sequenceDiagram
@@ -70,9 +58,6 @@ sequenceDiagram
     Client->>Server: user.login {username}
     alt Valid username
         Server-->>Client: Acknowledgement: LOGGED_IN {user}
-        Client->>Server : game.getLobbyDetails
-        Server-->>Client: Acknowledgement: LOBBY_FOUND {lobbies}
-        Note over Client: Picks a lobby's gameId
         Client->>Server: game.join {gameId}
         alt Join accepted
             Server-->>Client: Acknowledgement: JOINED {assignment, state, hand, programSubmitted}
@@ -86,6 +71,7 @@ sequenceDiagram
         Server-->>Client: Acknowledgement: INVALID_USERNAME
     end
 ```
+
 
 ## Game has started
 ### Programming
@@ -144,6 +130,22 @@ The antenna does not occupy a robot tile.
 Exact priority ties are resolved using player join order. The priority algorithm defines the complete robot action order.
 
 If an unexpected service failure makes gameplay unrecoverable, members receive `game.aborted {gameId}` and the game ends permanently.
+
+### Checkpoint progress (proposal; approval required)
+
+Checkpoint progress belongs to the player. Public `PlayerState` includes `lastCheckpoint`, initially 0, and `PublicGameState` includes `checkpointCount`, the total number of checkpoints on the board. JOINED supplies both values for initialization and reconnection. `game.playerJoined` supplies the new player's initial progress to existing members.
+
+When a player's checkpoint progress changes, the service broadcasts:
+
+`player.checkpointProgress {gameId, playerId, lastCheckpoint, checkpointCount}`
+
+to `game:{gameId}:public`. The values are authoritative integers with `0 <= lastCheckpoint <= checkpointCount`. Progress records the last checkpoint completed in numerical order and persists across rounds and reconnections. Clients cannot award progress or request a checkpoint change.
+
+The broadcast follows the related `robot.actionResolved`, or `game.playerLeft` when a departure completes a register, and precedes subsequent actions or private hands. Only remaining players receive gameplay broadcasts. No progress event is emitted when progress is unchanged.
+
+The client displays `lastCheckpoint/checkpointCount` for its assigned player, starting at `0/x`; a board without checkpoints shows `0/0`. It applies broadcasts on receipt, independently of queued movement animations. Ignore other games, unknown or removed players, and duplicate or older progress values. Successful Socket.IO recovery replays missed progress events; failed recovery replaces progress from the new JOINED snapshot.
+
+Progress broadcasts do not change robot positions, selected cards, phases, or programming availability. Completing all checkpoints does not end the existing game loop. Existing playback, membership, pause behavior, and private hands remain unchanged.
 
 ### Dealing the next hand
 
