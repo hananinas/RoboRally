@@ -870,7 +870,7 @@ components:
       additionalProperties: false
 
 
-    LobbyMap:
+    GameMap:
       type: object
       additionalProperties: false
       required: [ name, icon, maxPlayers ]
@@ -880,9 +880,7 @@ components:
           description: Display name of the map.
         icon:
           type: string
-          description: >-
-            Key of the map's icon. The client maps it to its own image.
-            Constant "demo-map" until maps exist.
+          description: Map icon as a base64-encoded image data URI.
         maxPlayers:
           type: integer
           minimum: 1
@@ -915,7 +913,7 @@ components:
           items:
             $ref: '#/components/schemas/LobbyPlayer'
         map:
-          $ref: '#/components/schemas/LobbyMap'
+          $ref: '#/components/schemas/GameMap'
       description: >-
         Lobby information
 
@@ -948,7 +946,6 @@ components:
       description: |
         LOGIN_REQUIRED: this connection has no approved user; checked before the payload.
         INVALID_REQUEST: the request did not match the expected shape.
-        GAME_NOT_FOUND: the requested game is unavailable on this service.
         INTERNAL_ERROR: unexpected service failure; do not expose internals.
 
     GamePhase:
