@@ -406,8 +406,11 @@ components:
             lobbies:
               - gameId: 00000000-0000-4000-8000-000000000001
                 name: Shared game
-                playerNames: [ Malte, Abid ]
-                playerCount: 2
+                players:
+                  - playerId: 00000000-0000-4000-8000-000000000011
+                    username: Malte
+                  - playerId: 00000000-0000-4000-8000-000000000012
+                    username: Abid
                 map:
                   name: DEMO MAP
                   icon: demo-map
@@ -885,25 +888,32 @@ components:
           minimum: 1
           description: Most players the map supports.
 
+
+    LobbyPlayer:
+      type: object
+      additionalProperties: false
+      required: [ playerId, username ]
+      properties:
+        playerId:
+          $ref: '#/components/schemas/PlayerId'
+        username:
+          $ref: '#/components/schemas/Username'
+
     LobbyDetails:
       type: object
       additionalProperties: false
-      required: [ gameId, name, playerNames, playerCount, map ]
+      required: [ gameId, name, players, map ]
       properties:
         gameId:
           $ref: '#/components/schemas/GameId'
         name:
           type: string
           description: Display name of the game.
-        playerNames:
+        players:
           type: array
-          description: Usernames of current members in join order, including disconnected members.
+          description: Current members in join order, including disconnected members.
           items:
-            $ref: '#/components/schemas/Username'
-        playerCount:
-          type: integer
-          minimum: 0
-          description: Equals the length of playerNames.
+            $ref: '#/components/schemas/LobbyPlayer'
         map:
           $ref: '#/components/schemas/LobbyMap'
       description: >-
