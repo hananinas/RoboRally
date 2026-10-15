@@ -44,8 +44,9 @@ test('plays every register of two consecutive programs through the real Game Ser
   await expect(done).toBeDisabled()
 
   // Pause only browser time; service execution and Socket.IO delivery stay real.
-  // Use a relative pause to avoid jumping past the socket heartbeat interval.
-  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
+  // Keep the initial jump below the real service's one-second heartbeat so
+  // advancing playback does not immediately expire the socket's ping timer.
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100))
   const rounds = [
     [
       { card: 'Move 1', x: 10, y: 6, angle: 0 },
