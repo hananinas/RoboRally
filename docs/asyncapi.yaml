@@ -413,7 +413,7 @@ components:
                     username: Abid
                 map:
                   name: DEMO MAP
-                  icon: demo-map
+                  icon: data:image/svg+xml;base64,PHN2Zy8+
                   maxPlayers: 6
         - name: loginRequired
           summary: The connection has not logged in
