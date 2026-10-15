@@ -114,11 +114,33 @@
 
 .lobby {
   display: flex;
+  width: 100%;
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
   border: 1px solid #4c5560;
   border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lobby:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.lobby:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
+.lobby--selected {
+  border-color: #dcbd05;
+  background: rgb(220 189 5 / 12%);
+  box-shadow: 0 0 0 2px #dcbd05;
 }
 
 .lobby__image {
@@ -128,6 +150,7 @@
   border: 1px solid #4c5560;
   border-radius: 6px;
   background: #2b323b;
+  object-fit: cover;
 }
 
 .lobby__details {

@@ -11,22 +11,36 @@ async function submitUsername(page: Page, value = username) {
 }
 
 async function joinGame(page: Page) {
+  await page.getByRole('button', { name: /Lobby 1/ }).click()
   await page.getByRole('button', { name: 'Join game', exact: true }).click()
 }
+
+test('Join stays disabled until the first lobby is selected, and other lobbies cannot be selected', async ({ page }) => {
+  await submitUsername(page)
+  const join = page.getByRole('button', { name: 'Join game', exact: true })
+  const first = page.getByRole('button', { name: /Lobby 1/ })
+  await expect(join).toBeDisabled()
+  await expect(page.getByRole('button', { name: /Lobby 2/ })).toBeDisabled()
+  await expect(page.getByRole('button', { name: /Lobby 3/ })).toBeDisabled()
+  await first.click()
+  await expect(first).toHaveAttribute('aria-pressed', 'true')
+  await expect(join).toBeEnabled()
+})
 
 test('login keeps the entry shell and waits for an explicit join', async ({ page, game }) => {
   await page.goto('/')
   const shell = await page.locator('.login-panel').elementHandle()
   await page.getByRole('textbox', { name: 'Username' }).fill(username)
   await page.getByRole('button', { name: 'Log in', exact: true }).click()
-  const join = page.getByRole('button', { name: 'Join game', exact: true })
-  await expect(join).toBeFocused()
+  const firstLobby = page.getByRole('button', { name: /Lobby 1/ })
+  await expect(firstLobby).toBeFocused()
   await expect(page.locator('input')).toHaveCount(0)
   await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
   expect(await shell!.evaluate((element) => element.isConnected)).toBe(true)
   expect((await game.snapshot()).entryRequests.map((request) => request.event)).toEqual(['user.login'])
   expect((await game.snapshot()).stateRequests).toBe(0)
-  await join.press('Enter')
+  await firstLobby.press('Enter')
+  await page.getByRole('button', { name: 'Join game', exact: true }).click()
   await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
   expect((await game.snapshot()).entryRequests.map((request) => request.event)).toEqual(['user.login', 'game.join'])
 })
