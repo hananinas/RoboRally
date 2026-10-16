@@ -28,6 +28,18 @@ A successful join returns:
 
 The acknowledgement contains the player's current robot assignment, public game state, private hand, and program-submission status. The client must apply all JOINED data before processing later live game events. A future lobby may be inserted between login and joining without changing this model.
 
+### Listing lobbies
+
+After login, the client can ask which lobbies exist:
+
+`game.getLobbyDetails`
+
+A successful request returns:
+
+`LOBBY_FOUND {lobbies}`
+
+Each lobby includes its `gameId`, which the client uses to send `game.join`. A connection that has not logged in receives `LOGIN_REQUIRED`, and a malformed request receives `INVALID_REQUEST`.
+
 ### Membership
 
 New players may join a game until the server accepts the first program submission. Accepting that submission starts the game and permanently closes joining to new players. Later attempts by new players receive GAME_ALREADY_STARTED. 
@@ -46,7 +58,7 @@ An explicit `game.leave {gameId}` removes the owning connection's player and rob
 
 Reconnection behavior is described in the Reconnection section.
 
-The following diagram documents the initial join behaviour:
+The following diagram documents logging in, listing lobbies and joining:
 
 ```mermaid
 sequenceDiagram
@@ -58,6 +70,9 @@ sequenceDiagram
     Client->>Server: user.login {username}
     alt Valid username
         Server-->>Client: Acknowledgement: LOGGED_IN {user}
+        Client->>Server : game.getLobbyDetails
+        Server-->>Client: Acknowledgement: LOBBY_FOUND {lobbies}
+        Note over Client: Picks a lobby's gameId
         Client->>Server: game.join {gameId}
         alt Join accepted
             Server-->>Client: Acknowledgement: JOINED {assignment, state, hand, programSubmitted}
@@ -71,21 +86,6 @@ sequenceDiagram
         Server-->>Client: Acknowledgement: INVALID_USERNAME
     end
 ```
-
-### Reading lobby details before joining
-
-After login, the client may read a game's lobby details without joining it:
-
-`game.getLobbyDetails {gameId}`
-
-which returns:
-
-`LOBBY_FOUND {lobby: {gameId, name, playerNames, playerCount, map: {name, icon, maxPlayers}}}`
-
-The details come from the server's current state. Reading them creates no player, robot or membership, grants no room access, and never includes hands or other gameplay data. The connection receives no live updates afterwards; it must read again to refresh. Maps are not implemented yet, so `map` is a constant (`DEMO MAP`, icon `demo-map`, 6 players) until they are.
-
-A connection that has not logged in receives `LOGIN_REQUIRED`, a malformed request receives `INVALID_REQUEST`, and an unavailable game receives `GAME_NOT_FOUND`. Because the game may change between reading and joining, the client initializes the game from the JOINED response, not from the lobby details.
-
 
 ## Game has started
 ### Programming

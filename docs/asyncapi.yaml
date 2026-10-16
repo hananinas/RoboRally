@@ -383,48 +383,42 @@ components:
     GetLobbyDetails:
       name: game.getLobbyDetails
       description: >-
-        Reads a game's lobby details before joining. Requires login but not
-        membership. Reading is side-effect free: it creates no player, robot, or
-        membership, grants no access to the public or private player rooms, and
-        never returns hands. Details reflect the server's state when the request
-        is handled; join with game.join to receive authoritative state.
+        Queries for available game lobbies.
       payload:
         $ref: '#/components/schemas/GetLobbyDetails'
       examples:
         - name: lobbyDetails
-          summary: Configured shared game
-          payload:
-            gameId: 00000000-0000-4000-8000-000000000001
+          summary: List the available lobbies
+          payload: {}
 
     LobbyDetailsResult:
       name: game.lobbyDetailsResult
       description: >-
-        Returns the game's lobby details or a rejection. This is returned through
+        Returns the available lobbies or a rejection. This is returned through
         the request's acknowledgement callback, not emitted as game.lobbyDetailsResult.
       payload:
         $ref: '#/components/schemas/LobbyDetailsResult'
       examples:
         - name: found
-          summary: Two players in the shared game on the demo map
+          summary: One lobby with two players on the demo map
           payload:
             outcome: LOBBY_FOUND
-            lobby:
-              gameId: 00000000-0000-4000-8000-000000000001
-              name: Shared game
-              playerNames: [ Dane, Abid ]
-              playerCount: 2
-              map:
-                name: DEMO MAP
-                icon: demo-map
-                maxPlayers: 6
+            lobbies:
+              - gameId: 00000000-0000-4000-8000-000000000001
+                name: Shared game
+                players:
+                  - playerId: 00000000-0000-4000-8000-000000000011
+                    username: Malte
+                  - playerId: 00000000-0000-4000-8000-000000000012
+                    username: Abid
+                map:
+                  name: DEMO MAP
+                  icon: data:image/svg+xml;base64,PHN2Zy8+
+                  maxPlayers: 6
         - name: loginRequired
           summary: The connection has not logged in
           payload:
             outcome: LOGIN_REQUIRED
-        - name: gameNotFound
-          summary: The requested game is unavailable
-          payload:
-            outcome: GAME_NOT_FOUND
 
     SubmitProgram:
       name: program.submit
@@ -762,7 +756,6 @@ components:
             [
               LOGIN_REQUIRED,
               INVALID_REQUEST,
-              GAME_NOT_FOUND,
               NO_SPAWN_AVAILABLE,
               USER_ALREADY_IN_GAME,
               GAME_ALREADY_STARTED,
@@ -875,53 +868,54 @@ components:
     GetLobbyDetails:
       type: object
       additionalProperties: false
-      required: [ gameId ]
-      properties:
-        gameId:
-          $ref: '#/components/schemas/GameId'
 
-    LobbyMap:
+
+    GameMap:
       type: object
       additionalProperties: false
       required: [ name, icon, maxPlayers ]
       properties:
         name:
           type: string
-          description: Display name of the map. Constant "DEMO MAP" until maps exist.
+          description: Display name of the map.
         icon:
           type: string
-          description: >-
-            Key of the map's icon. The client maps it to its own image.
-            Constant "demo-map" until maps exist.
+          description: Map icon as a base64-encoded image data URI.
         maxPlayers:
           type: integer
           minimum: 1
-          description: Most players the map supports. Constant 6 until maps exist.
+          description: Most players the map supports.
+
+
+    LobbyPlayer:
+      type: object
+      additionalProperties: false
+      required: [ playerId, username ]
+      properties:
+        playerId:
+          $ref: '#/components/schemas/PlayerId'
+        username:
+          $ref: '#/components/schemas/Username'
 
     LobbyDetails:
       type: object
       additionalProperties: false
-      required: [ gameId, name, playerNames, playerCount, map ]
+      required: [ gameId, name, players, map ]
       properties:
         gameId:
           $ref: '#/components/schemas/GameId'
         name:
           type: string
           description: Display name of the game.
-        playerNames:
+        players:
           type: array
-          description: Usernames of current members in join order, including disconnected members.
+          description: Current members in join order, including disconnected members.
           items:
-            $ref: '#/components/schemas/Username'
-        playerCount:
-          type: integer
-          minimum: 0
-          description: Equals the length of playerNames.
+            $ref: '#/components/schemas/LobbyPlayer'
         map:
-          $ref: '#/components/schemas/LobbyMap'
+          $ref: '#/components/schemas/GameMap'
       description: >-
-        Public pre-join summary of a game. Never contains cards, board, robot,
-        or player identifiers.
+        Lobby information
 
     LobbyDetailsResult:
       oneOf:
@@ -931,13 +925,15 @@ components:
     LobbyFound:
       type: object
       additionalProperties: false
-      required: [ outcome, lobby ]
+      required: [ outcome, lobbies ]
       properties:
         outcome:
           type: string
           enum: [ LOBBY_FOUND ]
-        lobby:
-          $ref: '#/components/schemas/LobbyDetails'
+        lobbies:
+          type: array
+          items:
+            $ref: '#/components/schemas/LobbyDetails'
 
     LobbyDetailsRejected:
       type: object
@@ -946,11 +942,10 @@ components:
       properties:
         outcome:
           type: string
-          enum: [ LOGIN_REQUIRED, INVALID_REQUEST, GAME_NOT_FOUND, INTERNAL_ERROR ]
+          enum: [ LOGIN_REQUIRED, INVALID_REQUEST, INTERNAL_ERROR ]
       description: |
         LOGIN_REQUIRED: this connection has no approved user; checked before the payload.
         INVALID_REQUEST: the request did not match the expected shape.
-        GAME_NOT_FOUND: the requested game is unavailable on this service.
         INTERNAL_ERROR: unexpected service failure; do not expose internals.
 
     GamePhase:

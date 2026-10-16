@@ -593,6 +593,63 @@ describe('client game state', () => {
     expect(canProgram(state)).toBe(true)
   })
 
+  it('highlights registers in order when all five results arrive in a burst', () => {
+    let state = selectProgram()
+    const program = state.registers
+    for (const action of actions) state = gameStateReducer(state, { type: 'action', action })
+    state = gameStateReducer(state, { type: 'dealt', hand })
+
+    for (const [index, action] of actions.entries()) {
+      expect(state.playback.active).toEqual(action)
+      expect(state.playback.active?.registerIndex).toBe(index)
+      expect(state.playbackProgram).toEqual(program)
+      expect(canProgram(state)).toBe(false)
+      state = gameStateReducer(state, { type: 'complete' })
+    }
+
+    expect(state.playback.active).toBeNull()
+    expect(state.playbackProgram).toBeNull()
+    expect(state.registers).toEqual(emptyRegisters)
+    expect(canProgram(state)).toBe(true)
+  })
+
+  it('preserves the executed program across a paused playback queue gap', () => {
+    let state = selectProgram()
+    const program = state.registers
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, {
+      type: 'player-connection-changed',
+      payload: {
+        gameId: publicState.gameId,
+        playerId: publicState.players[1].playerId,
+        connected: false,
+        paused: true,
+      },
+    })
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(state.playbackProgram).toEqual(program)
+    expect(state.registers).toEqual(program)
+
+    state = gameStateReducer(state, {
+      type: 'player-connection-changed',
+      payload: {
+        gameId: publicState.gameId,
+        playerId: publicState.players[1].playerId,
+        connected: true,
+        paused: false,
+      },
+    })
+    state = gameStateReducer(state, { type: 'action', action: actions[1] })
+    expect(state.playbackProgram).toEqual(program)
+    expect(state.registers).toEqual(program)
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(state.playbackProgram).toEqual(program)
+
+    state = gameStateReducer(state, { type: 'dealt', hand })
+    expect(state.playbackProgram).toBeNull()
+    expect(state.registers).toEqual(emptyRegisters)
+  })
+
   it('restores a recovered connection', () => {
     const before = gameStateReducer(selectProgram(), { type: 'submit' })
     const disconnected = gameStateReducer(before, { type: 'disconnected' })
