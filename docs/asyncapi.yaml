@@ -1108,6 +1108,13 @@ components:
           uniqueItems: true
           items:
             $ref: '#/components/schemas/Orientation'
+        checkpointNumber:
+          type: integer
+          minimum: 1
+          description: >-
+            Optional checkpoint on this tile, independent of its walls and type.
+            Omit when absent. Numbers are unique and consecutive from 1 on a board.
+            Checkpoints stay at their fixed positions and are available to every player.
     Antenna:
       type: object
       additionalProperties: false

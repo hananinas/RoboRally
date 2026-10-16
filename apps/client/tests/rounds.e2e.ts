@@ -27,7 +27,7 @@ test('plays every register of two consecutive programs through the real Game Ser
   await page.getByRole('button', { name: 'Join game', exact: true }).click()
 
   await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Checkpoints', exact: true }).locator('..')).toContainText('0/0')
+  await expect(page.getByRole('heading', { name: 'Checkpoints', exact: true }).locator('..')).toContainText('0/2')
   await expect(page.locator('.board-canvas')).toHaveAttribute('data-board-columns', '21')
   await expect(page.locator('.board-canvas')).toHaveAttribute('data-board-rows', '15')
   const robotIds = await page.locator('[data-robot-id]').evaluateAll((elements) =>

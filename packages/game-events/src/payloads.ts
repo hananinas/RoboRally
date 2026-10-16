@@ -56,6 +56,7 @@ export type Tile = Readonly<{
   position: Coordinate
   type: 'EMPTY'
   walls?: readonly Orientation[]
+  checkpointNumber?: number
 }>
 
 export type Board = Readonly<{

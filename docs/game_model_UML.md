@@ -30,6 +30,7 @@ Will update with a more conceptual domain diagram which will be used for present
         class Tile {
             <<abstract>>
             +walls: Direction[] set
+            +checkpointNumber: int?
         }
 
         class EmptyTile
@@ -93,6 +94,8 @@ Answers position and occupancy queries, and carries out movement. Board checks w
 # Tile
 
 Abstract class describing what is on a board space. Walls are properties of any Tile, not a separate tile type. EmptyTile is currently the only tile type shown for V0.
+
+An optional `checkpointNumber` is another Tile property. A positive number identifies a checkpoint; absence means no checkpoint. Board owns its position through the tile grid, validates unique consecutive numbering from 1, and derives the checkpoint count. Checkpoints do not require a separate tile subclass and can coexist with walls.
 
 Tiles do not hold robots or activate themselves. Game can schedule board effects later, with Board handling the spatial checks needed to find what they affect.
 

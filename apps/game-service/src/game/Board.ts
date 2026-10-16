@@ -11,6 +11,7 @@ export type MovementResult = Readonly<{
 export class Board {
   private readonly tiles: readonly (readonly Tile[])[]
   private readonly robotPositions = new Map<RobotId, Position>()
+  private readonly checkpointTotal: number
   readonly width: number
   readonly height: number
 
@@ -20,14 +21,21 @@ export class Board {
       throw new RangeError('A board must be a non-empty rectangular tile grid')
     }
 
+    const checkpoints = tiles.flat().map((tile) => tile.checkpointNumber)
+      .filter((number) => number !== undefined)
+    if (new Set(checkpoints).size !== checkpoints.length ||
+        checkpoints.some((number) => number > checkpoints.length)) {
+      throw new RangeError('Checkpoint numbers must be unique and consecutive from 1')
+    }
+
+    this.checkpointTotal = checkpoints.length
     this.width = width
     this.height = tiles.length
     this.tiles = tiles.map((row) => [...row])
   }
 
   get checkpointCount(): number {
-    // Current boards have no checkpoint tiles.
-    return 0
+    return this.checkpointTotal
   }
 
   contains(position: Position): boolean {

@@ -145,7 +145,9 @@ Exact priority ties are resolved using player join order. The priority algorithm
 
 If an unexpected service failure makes gameplay unrecoverable, members receive `game.aborted {gameId}` and the game ends permanently.
 
-### Checkpoint progress (proposal; approval required)
+### Checkpoint progress
+
+Tiles carry an optional `checkpointNumber` alongside their walls; an absent number means no checkpoint. The tile's existing `type` remains `EMPTY`. Checkpoint numbers are positive integers, unique on the board, and consecutive from 1. `checkpointCount` is derived from these tiles. A checkpoint remains at its fixed tile for every player; it is not removed on completion. The shared demo board places checkpoint 1 at `(10, 6)` and checkpoint 2 at `(8, 9)`.
 
 Checkpoint progress belongs to the player. Public `PlayerState` includes `lastCheckpoint`, initially 0, and `PublicGameState` includes `checkpointCount`, the total number of checkpoints on the board. JOINED supplies both values for initialization and reconnection. `game.playerJoined` supplies the new player's initial progress to existing members.
 

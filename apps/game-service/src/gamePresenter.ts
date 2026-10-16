@@ -46,6 +46,7 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
     position: { x, y },
     type: 'EMPTY',
     ...(walls.length === 0 ? {} : { walls }),
+    ...(tile.checkpointNumber === undefined ? {} : { checkpointNumber: tile.checkpointNumber }),
   }
 }
 
