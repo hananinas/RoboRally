@@ -5,6 +5,7 @@ import type {
   JoinResult,
   PlayerAssignment,
   PlayerConnectionChanged,
+  PlayerCheckpointProgress,
   PlayerId,
   PlayerJoined,
   PlayerLeft,
@@ -25,6 +26,7 @@ export type Registers = readonly (ProgramCard | null)[]
 
 export type Player = {
   playerId: PlayerId
+  lastCheckpoint: number
   username: string
   connected: boolean
 }
@@ -35,6 +37,7 @@ export type ClientGameState = {
   phase: GamePhase | null
   paused: boolean
   players: readonly Player[]
+  checkpointCount: number
   board: BoardRenderModel | null
   playback: RobotPlaybackState
   hand: readonly ProgramCard[]
@@ -55,6 +58,7 @@ export type GameStateEvent =
   | { type: 'player-joined'; payload: PlayerJoined }
   | { type: 'player-left'; payload: PlayerLeft }
   | { type: 'player-connection-changed'; payload: PlayerConnectionChanged }
+  | { type: 'checkpoint-progress'; payload: PlayerCheckpointProgress }
   | { type: 'disconnected' }
   | { type: 'reconnected' }
   | { type: 'connect-error'; message: string }
@@ -92,6 +96,7 @@ export function createClientGameState(): ClientGameState {
     phase: null,
     paused: false,
     players: [],
+    checkpointCount: 0,
     board: null,
     playback: createRobotPlaybackState([]),
     hand: [],
@@ -172,6 +177,7 @@ export function gameStateReducer(
         ...state,
         players: [...state.players, {
           playerId: player.playerId, username: player.username, connected: player.connected,
+          lastCheckpoint: player.lastCheckpoint,
         }],
         playback: robotPlaybackReducer(state.playback, { type: 'add', robot: { ...robot, colour: '#c74f4f' } }),
       }
@@ -184,6 +190,19 @@ export function gameStateReducer(
         ...state,
         players: state.players.filter((player) => player.playerId !== playerId),
         playback: robotPlaybackReducer(state.playback, { type: 'remove', robotId }),
+      }
+    }
+    case 'checkpoint-progress': {
+      const { gameId, playerId, lastCheckpoint, checkpointCount } = event.payload
+      const player = state.players.find((candidate) => candidate.playerId === playerId)
+      if (gameId !== state.assignment?.gameId || !player ||
+          !Number.isSafeInteger(lastCheckpoint) || !Number.isSafeInteger(checkpointCount) ||
+          lastCheckpoint > checkpointCount || lastCheckpoint <= player.lastCheckpoint) return state
+      return {
+        ...state,
+        checkpointCount,
+        players: state.players.map((candidate) =>
+          candidate.playerId === playerId ? { ...candidate, lastCheckpoint } : candidate),
       }
     }
     case 'player-connection-changed': {
@@ -223,8 +242,10 @@ export function gameStateReducer(
         submission: result.programSubmitted ? 'accepted' : 'idle',
         phase: snapshot.phase,
         paused: snapshot.paused,
+        checkpointCount: snapshot.checkpointCount,
         players: snapshot.players.map((player) => ({
           playerId: player.playerId, username: player.username, connected: player.connected,
+          lastCheckpoint: player.lastCheckpoint,
         })),
         playback: createRobotPlaybackState(
           snapshot.robots.map((robot) => ({ ...robot, colour: '#c74f4f' })),

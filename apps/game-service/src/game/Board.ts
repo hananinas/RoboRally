@@ -25,6 +25,11 @@ export class Board {
     this.tiles = tiles.map((row) => [...row])
   }
 
+  get checkpointCount(): number {
+    // Current boards have no checkpoint tiles.
+    return 0
+  }
+
   contains(position: Position): boolean {
     return (
       Number.isInteger(position.x) &&

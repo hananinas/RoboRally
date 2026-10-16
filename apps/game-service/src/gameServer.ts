@@ -59,6 +59,7 @@ export function createGameSocketServer(
   const publicState = () => presentPublicGameState(gameId, game,
     [...memberships.values()].map(({ user, player, connectionId }) => ({
       playerId: player.id,
+      lastCheckpoint: player.lastCheckpoint,
       username: user.username,
       programSubmitted: game.hasSubmittedProgram(player.id),
       connected: connectionId !== null,

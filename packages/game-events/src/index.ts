@@ -25,6 +25,7 @@ export type {
   PlayerJoined,
   PlayerLeft,
   PlayerConnectionChanged,
+  PlayerCheckpointProgress,
   LeaveResult,
   PlayerState,
   Position,

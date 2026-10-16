@@ -11,6 +11,7 @@ import type {
   PlayerJoined,
   PlayerLeft,
   PlayerConnectionChanged,
+  PlayerCheckpointProgress,
   LeaveResult,
 } from './payloads.js'
 import type { SubmitProgram } from './submitProgram.js'
@@ -39,6 +40,7 @@ export interface ClientToServerEvents {
 }
 
 export interface ServerToClientEvents {
+  'player.checkpointProgress': (payload: PlayerCheckpointProgress) => void
   'game.playerJoined': (payload: PlayerJoined) => void
   'game.playerLeft': (payload: PlayerLeft) => void
   'game.playerConnectionChanged': (payload: PlayerConnectionChanged) => void

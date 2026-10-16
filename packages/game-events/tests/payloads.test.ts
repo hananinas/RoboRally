@@ -30,6 +30,7 @@ describe('game event payload types', () => {
       players: [],
       phase: 'PROGRAMMING',
       paused: false,
+      checkpointCount: 0,
     } satisfies PublicGameState
     const found = {
       outcome: 'GAME_FOUND',

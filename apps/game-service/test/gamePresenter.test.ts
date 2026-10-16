@@ -28,6 +28,7 @@ describe('game presenter', () => {
     expectTypeOf(state).toEqualTypeOf<PublicGameState>()
     expect(state).toMatchObject({
       gameId,
+      checkpointCount: 0,
       board: { width: 21, height: 15 },
       phase: 'PROGRAMMING',
       robots: [

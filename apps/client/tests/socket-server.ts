@@ -85,6 +85,9 @@ function acknowledgeProgram(
 
 function controlFixture(fixture: Fixture, control: FixtureControl) {
   switch (control.type) {
+    case 'checkpoint-progress':
+      for (const socket of fixture.sockets) socket.emit('player.checkpointProgress', control.progress)
+      break
     case 'hand':
       for (const socket of fixture.sockets) socket.emit('cards.dealt', control.hand)
       break

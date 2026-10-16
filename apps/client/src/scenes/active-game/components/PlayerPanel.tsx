@@ -3,13 +3,14 @@ import GameMenu from './GameMenu.tsx'
 import Panel from './Panel.tsx'
 
 type PlayerPanelProps = {
-  player: { name: string }
+  player: { name: string; lastCheckpoint: number }
+  checkpointCount: number
   onLeave?: () => void
   leaveDisabled?: boolean
 }
 
 // Shows collapsible player details.
-function PlayerPanel({ player, onLeave, leaveDisabled }: PlayerPanelProps) {
+function PlayerPanel({ player, checkpointCount, onLeave, leaveDisabled }: PlayerPanelProps) {
   const [expanded, setExpanded] = useState(true)
 
   return (
@@ -23,6 +24,7 @@ function PlayerPanel({ player, onLeave, leaveDisabled }: PlayerPanelProps) {
           {['Checkpoints', 'Health', 'Energy', 'Upgrades'].map((section) => (
             <section key={section} className="player-panel__detail">
               <h2>{section}</h2>
+              {section === 'Checkpoints' && <p>{player.lastCheckpoint}/{checkpointCount}</p>}
             </section>
           ))}
         </div>

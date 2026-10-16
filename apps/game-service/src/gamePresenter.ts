@@ -60,6 +60,7 @@ export function presentPublicGameState(
 
   return {
     gameId,
+    checkpointCount: game.board.checkpointCount,
     players,
     antenna: game.antenna,
     board: {
