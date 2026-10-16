@@ -28,6 +28,13 @@ test('plays every register of two consecutive programs through the real Game Ser
 
   await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Checkpoints', exact: true }).locator('..')).toContainText('0/2')
+  for (const [number, position] of [[1, '10,6'], [2, '8,9']] as const) {
+    const checkpoint = page.getByRole('img', { name: `Checkpoint ${number}`, exact: true })
+    await expect(checkpoint).toBeVisible()
+    await expect(checkpoint).toHaveAttribute('data-board-tile', position)
+    await expect.poll(() => checkpoint.locator('img').evaluate((image: HTMLImageElement) =>
+      image.complete && image.naturalWidth > 0)).toBe(true)
+  }
   await expect(page.locator('.board-canvas')).toHaveAttribute('data-board-columns', '21')
   await expect(page.locator('.board-canvas')).toHaveAttribute('data-board-rows', '15')
   const robotIds = await page.locator('[data-robot-id]').evaluateAll((elements) =>
@@ -91,6 +98,8 @@ test('plays every register of two consecutive programs through the real Game Ser
     }
 
     await expect(page.getByRole('status')).toHaveText('Programming')
+    await expect(page.getByRole('heading', { name: 'Checkpoints', exact: true }).locator('..')).toContainText('2/2')
+    await expect(page.locator('[data-board-checkpoint]')).toHaveCount(2)
     await expect(registered).toHaveCount(0)
     await expect(hand).toHaveCount(9)
     for (const card of await hand.all()) await expect(card).toBeEnabled()

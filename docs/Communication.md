@@ -159,6 +159,8 @@ to `game:{gameId}:public`. The values are authoritative integers with `0 <= last
 
 The broadcast follows the related `robot.actionResolved`, or `game.playerLeft` when a departure completes a register, and precedes subsequent actions or private hands. Only remaining players receive gameplay broadcasts. No progress event is emitted when progress is unchanged.
 
+Checkpoint checks run after every remaining robot has acted in a register. A player completes only the next checkpoint when their robot ends that register on its tile; passing over a checkpoint during movement does not count. Facing does not matter. If a departure finishes the register, the same check applies to the remaining players. The client shows the supplied numbered flag assets as placeholder board markers, which remain after completion.
+
 The client displays `lastCheckpoint/checkpointCount` for its assigned player, starting at `0/x`; a board without checkpoints shows `0/0`. It applies broadcasts on receipt, independently of queued movement animations. Ignore other games, unknown or removed players, and duplicate or older progress values. Successful Socket.IO recovery replays missed progress events; failed recovery replaces progress from the new JOINED snapshot.
 
 Progress broadcasts do not change robot positions, selected cards, phases, or programming availability. Completing all checkpoints does not end the existing game loop. Existing playback, membership, pause behavior, and private hands remain unchanged.

@@ -38,6 +38,8 @@ Will update with a more conceptual domain diagram which will be used for present
         class Player {
         -robot: Robot
         -hand: Card[] unordered
+        +lastCheckpoint: int
+        +completeCheckpoint(int number) bool
         }
 
         class Robot {
@@ -83,7 +85,7 @@ Responsible for dictating the game loop: dealing cards, taking programs, and exe
 
 Keeps track of the current phase and register. `submitProgram()` checks a player's five cards before assigning them to their Robot. During activation, Game chooses the next robot from those that have not acted yet, using current positions on Board and the priority antenna. It reads that robot's card and applies it: movement goes through Board, while turns change Robot's direction. Priority is worked out again after each robot acts.
 
-Board elements activate after the robot actions in each register. This is a no-op in V0, but leaves room for ordered board effects later. After the fifth register, Game returns to the programming phase.
+Board elements activate after the robot actions in each register. Game reads each remaining robot's final tile and asks its Player to complete that checkpoint. Player advances only to the next numbered checkpoint. Passing over one during movement does not count. This also runs when removing a player finishes a register. After the fifth register, Game returns to programming, preserving checkpoint progress; completing the course does not end the game.
 
 # Board
 
@@ -135,7 +137,7 @@ while game.currentRegister < 5:
         card = robot(robotId).getProgramCard(game.currentRegister)
         game.executeCard(robotId, card)           # Movement via Board, turning via Robot
         remaining.remove(robotId)                 # Priority is checked again for the next robot
-    game.activateBoardElements()                  # No-op in V0; ordered effects later
+    game.activateBoardElements()                  # Check final tiles for ordered checkpoints
     game.finishRegister()                         # Advance to the next register
 game.finishRound()                                # Return to programming phase
 ```

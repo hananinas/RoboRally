@@ -502,7 +502,6 @@ describe('game membership over Socket.IO', () => {
   })
 
   it('deals the remaining player a hand when leaving completes the final register', async () => {
-    vi.spyOn(shared.game.board, 'checkpointCount', 'get').mockReturnValue(2)
     const first = await connect('First')
     const initial = await join(first)
     const second = await connect('Second')
@@ -513,11 +512,9 @@ describe('game membership over Socket.IO', () => {
     for (let action = 0; action < 9; action++) shared.game.executeNextAction()
     expect(shared.game.currentRegister).toBe(4)
     const player = shared.game.players[0]
-    const removePlayer = shared.game.removePlayer.bind(shared.game)
-    vi.spyOn(shared.game, 'removePlayer').mockImplementation((playerId) => {
-      removePlayer(playerId)
-      player.completeCheckpoint(1)
-    })
+    expect(player.lastCheckpoint).toBe(1)
+    shared.game.board.removeRobot(player.robot.id)
+    shared.game.board.placeRobot(player.robot.id, { x: 8, y: 9 })
     const events: string[] = []
     first.onAny((name) => {
       if (['game.playerLeft', 'player.checkpointProgress', 'cards.dealt'].includes(name)) events.push(name)
@@ -532,7 +529,7 @@ describe('game membership over Socket.IO', () => {
       gameId: shared.gameId, playerId: initial.assignment.playerId, cards: initial.hand,
     })
     expect(await progress).toEqual({
-      gameId: shared.gameId, playerId: player.id, lastCheckpoint: 1, checkpointCount: 2,
+      gameId: shared.gameId, playerId: player.id, lastCheckpoint: 2, checkpointCount: 2,
     })
     expect(events).toEqual(['game.playerLeft', 'player.checkpointProgress', 'cards.dealt'])
     expect(shared.game.phase).toBe('programming')

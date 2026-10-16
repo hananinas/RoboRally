@@ -73,6 +73,22 @@
     --board-piece-angle var(--tank-turn-duration) var(--tank-motion-easing);
 }
 
+.board-piece--checkpoint {
+  aspect-ratio: 3 / 4;
+  transform: translate(-35.833%, -85%)
+    translate(var(--board-piece-x), var(--board-piece-y))
+    scale(var(--board-piece-scale));
+  color: white;
+  font-size: 2rem;
+  text-align: center;
+}
+
+.board-piece--checkpoint img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .board-piece--test-tank {
     transition-duration: 0s;

@@ -709,10 +709,13 @@ describe('checkpoint progress', () => {
   it('initializes and replaces progress from authoritative join snapshots', () => {
     const snapshot = {
       ...publicState, checkpointCount: 2,
+      board: { ...publicState.board, tiles: publicState.board.tiles.map((tile, index) =>
+        index === 0 ? { ...tile, checkpointNumber: 1 } : tile) },
       players: publicState.players.map((player) => ({ ...player, lastCheckpoint: 1 })),
     }
     const state = gameStateReducer(createClientGameState(), { type: 'joined', result: { ...result, state: snapshot } })
     expect(state.checkpointCount).toBe(2)
+    expect(state.board?.cells[0].checkpointNumber).toBe(1)
     expect(state.players.map((player) => player.lastCheckpoint)).toEqual([1, 1])
     const replaced = gameStateReducer(state, { type: 'joined', result })
     expect(replaced.checkpointCount).toBe(0)
