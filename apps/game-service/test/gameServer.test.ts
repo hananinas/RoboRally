@@ -284,9 +284,11 @@ describe('game membership over Socket.IO', () => {
     expect(shared.game.phase).toBe('programming')
   })
 
-  it('retains disconnected membership, robot and hand for the returning user', async () => {
+  it('retains disconnected membership, robot, hand and checkpoint progress for the returning user', async () => {
     const first = await connect('First')
     const initial = await join(first)
+    const player = shared.game.players[0]
+    player.completeCheckpoint(1)
     const disconnected = new Promise((resolve) => server.sockets.sockets.get(first.id!)!.once('disconnect', resolve))
     first.disconnect()
     await disconnected
@@ -295,6 +297,8 @@ describe('game membership over Socket.IO', () => {
     const restored = await join(replacement)
     expect(restored.assignment).toEqual(initial.assignment)
     expect(restored.hand).toEqual(initial.hand)
+    expect(shared.game.players[0]).toBe(player)
+    expect(player.lastCheckpoint).toBe(1)
   })
 
   it('pauses the game and announces disconnection when a member drops', async () => {
