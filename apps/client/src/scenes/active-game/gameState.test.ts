@@ -710,7 +710,7 @@ describe('checkpoint progress', () => {
     const snapshot = {
       ...publicState, checkpointCount: 2,
       board: { ...publicState.board, tiles: publicState.board.tiles.map((tile, index) =>
-        index === 0 ? { ...tile, checkpointNumber: 1 } : tile) },
+        index < 2 ? { ...tile, checkpointNumber: index + 1 } : tile) },
       players: publicState.players.map((player) => ({ ...player, lastCheckpoint: 1 })),
     }
     const state = gameStateReducer(createClientGameState(), { type: 'joined', result: { ...result, state: snapshot } })

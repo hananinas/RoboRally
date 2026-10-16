@@ -33,6 +33,11 @@ test('shows checkpoint counts from snapshots and broadcasts without disrupting q
   await page.clock.install()
   const state = {
     ...game.initial.state, checkpointCount: 2,
+    board: {
+      ...game.initial.state.board,
+      tiles: game.initial.state.board.tiles.map((tile, index) =>
+        index < 2 ? { ...tile, checkpointNumber: index + 1 } : tile),
+    },
     players: [...game.initial.state.players, {
       playerId: OTHER_PLAYER_ID, username: 'Other player', connected: true, programSubmitted: false, lastCheckpoint: 0,
     }],
