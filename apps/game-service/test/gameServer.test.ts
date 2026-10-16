@@ -285,7 +285,6 @@ describe('game membership over Socket.IO', () => {
   })
 
   it('broadcasts changed progress to members after actions and before next hands, without repeating it', async () => {
-    vi.spyOn(shared.game.board, 'checkpointCount', 'get').mockReturnValue(2)
     const first = await connect('First')
     const initial = await join(first)
     expect(initial.state.checkpointCount).toBe(2)
@@ -298,13 +297,10 @@ describe('game membership over Socket.IO', () => {
     const spectatorProgress = vi.fn()
     spectator.on('player.checkpointProgress', spectatorProgress)
 
-    const executeNextAction = shared.game.executeNextAction.bind(shared.game)
-    vi.spyOn(shared.game, 'executeNextAction').mockImplementation(() => {
-      const result = executeNextAction()
-      if (result.registerIndex === 0 && shared.game.currentRegister === 1) {
-        for (const player of shared.game.players) player.completeCheckpoint(1)
-      }
-      return result
+    // Turn right, move, turn left, move, U-turn: reach checkpoint 1 in register 4.
+    const otherProgram = parseSubmitProgram({
+      ...submission(other),
+      cardIds: [5, 0, 4, 7, 6].map((index) => other.hand[index].id),
     })
     const seen: { name: string; payload: unknown }[][] = [[], []]
     for (const [index, client] of [first, second].entries()) {
@@ -317,12 +313,16 @@ describe('game membership over Socket.IO', () => {
     for (const round of [1, 2]) {
       const hands = [first, second].map((client) => new Promise((resolve) => client.once('cards.dealt', resolve)))
       await first.timeout(1000).emitWithAck('program.submit', submission(initial))
-      await second.timeout(1000).emitWithAck('program.submit', submission(other))
+      await second.timeout(1000).emitWithAck('program.submit', otherProgram)
       await Promise.all(hands)
       for (const events of seen) {
         const actions = Array.from({ length: 10 }, () => 'robot.actionResolved')
         expect(events.map((event) => event.name)).toEqual(round === 1
-          ? [...actions.slice(0, 2), 'player.checkpointProgress', 'player.checkpointProgress', ...actions.slice(2), 'cards.dealt']
+          ? [
+            ...actions.slice(0, 2), 'player.checkpointProgress',
+            ...actions.slice(2, 8), 'player.checkpointProgress',
+            ...actions.slice(8), 'cards.dealt',
+          ]
           : [...actions, 'cards.dealt'])
         if (round === 1) expect(events.filter((event) => event.name === 'player.checkpointProgress').map((event) => event.payload))
           .toEqual(shared.game.players.map((player) => ({
@@ -337,7 +337,6 @@ describe('game membership over Socket.IO', () => {
   })
 
   it('retains disconnected membership, robot, hand and checkpoint progress for the returning user', async () => {
-    vi.spyOn(shared.game.board, 'checkpointCount', 'get').mockReturnValue(2)
     const first = await connect('First')
     const initial = await join(first)
     const player = shared.game.players[0]
