@@ -105,6 +105,15 @@ function ActiveGame({ game, username, leaving, onLeave }: {
         <div className="disconnect-overlay">
           <div className="disconnect-popup">
             <h2>A player has disconnected</h2>
+            <div className="disconnect-spinner" role="status"/>
+            <button
+              className="game-menu__button game-menu__button--leave"
+              type="button"
+              onClick={onLeave}
+              disabled={leaving || !state.connected}
+            >
+              Leave game
+            </button>
           </div>
         </div>
       )}
