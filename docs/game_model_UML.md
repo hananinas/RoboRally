@@ -99,7 +99,7 @@ Abstract class describing what is on a board space. Walls are properties of any 
 
 An optional `checkpointNumber` is another Tile property. A positive number identifies a checkpoint; absence means no checkpoint. Board owns its position through the tile grid, validates unique consecutive numbering from 1, and derives the checkpoint count. Checkpoints do not require a separate tile subclass and can coexist with walls.
 
-Tiles do not hold robots or activate themselves. Game can schedule board effects later, with Board handling the spatial checks needed to find what they affect.
+Tiles do not hold robots or activate themselves. Game runs board effects after robot actions in each register, using Board to find each robot's tile.
 
 # Robot
 
