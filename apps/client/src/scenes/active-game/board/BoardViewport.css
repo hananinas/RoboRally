@@ -75,6 +75,7 @@
 
 .board-piece--checkpoint {
   aspect-ratio: 3 / 4;
+  /* Anchor the base at (43, 136) in the 120×160 SVG to the tile centre. */
   transform: translate(-35.833%, -85%)
     translate(var(--board-piece-x), var(--board-piece-y))
     scale(var(--board-piece-scale));

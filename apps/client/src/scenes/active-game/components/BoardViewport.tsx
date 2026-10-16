@@ -141,6 +141,7 @@ const ROBOT_COMPONENTS = [
 ] as const
 
 const CHECKPOINT_IMAGES = [checkpoint1, checkpoint2, checkpoint3, checkpoint4, checkpoint5, checkpoint6]
+const CHECKPOINT_LAYER = 3
 
 function CheckpointPiece({ tile }: { tile: BoardSceneTile }) {
   const number = tile.cell.checkpointNumber
@@ -153,8 +154,8 @@ function CheckpointPiece({ tile }: { tile: BoardSceneTile }) {
       aria-label={`Checkpoint ${number}`}
       data-board-checkpoint={number}
       data-board-tile={`${tile.cell.x},${tile.cell.y}`}
-      data-board-height={3 / BOARD_CONFIG.parallaxReferenceLayer}
-      data-board-lift-height={3 / BOARD_CONFIG.parallaxReferenceLayer}
+      data-board-height={CHECKPOINT_LAYER / BOARD_CONFIG.parallaxReferenceLayer}
+      data-board-lift-height={CHECKPOINT_LAYER / BOARD_CONFIG.parallaxReferenceLayer}
       style={{ left: tile.tileCentre.worldX, top: tile.tileCentre.worldY, width: BOARD_CONFIG.tile * 0.8 }}
     >
       {image ? <img src={image} alt="" draggable={false} /> : number}
@@ -254,7 +255,7 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
               {pieces.map((piece) => (
                 <BoardPiece key={piece.key} piece={piece} />
               ))}
-              {layer === 3 && scene.tiles.filter((tile) => tile.cell.checkpointNumber !== undefined)
+              {layer === CHECKPOINT_LAYER && scene.tiles.filter((tile) => tile.cell.checkpointNumber !== undefined)
                 .map((tile) => <CheckpointPiece key={`${tile.cell.x},${tile.cell.y}`} tile={tile} />)}
               {robotComponent && robots.map((robot) => (
                 <RobotPiece
