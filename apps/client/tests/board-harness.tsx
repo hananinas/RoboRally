@@ -103,6 +103,7 @@ export default function BoardHarness() {
             <PlayerPanel player={{ name: 'Board fixture player' }} />
             <RegisterPanel
               registers={registers}
+              activeRegister={null}
               disabled={confirmed}
               pendingDelete={pendingDelete}
               awaitingSubmitConfirm={awaitingSubmitConfirm}
