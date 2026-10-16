@@ -67,7 +67,7 @@ function notifyReconnected(ctx: MembershipContext, playerId: string): void {
 
 function validateMembershipRequest(
   ctx: MembershipContext,
-  schema: typeof joinGameSchema | typeof leaveGameSchema | typeof getLobbyDetailsSchema,
+  schema: typeof joinGameSchema | typeof leaveGameSchema,
   payload: unknown,
   user: User | undefined,
 ): Result<User, 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND'> {
@@ -272,11 +272,14 @@ export function handleGetLobbyDetails(
   acknowledge: LobbyDetailsAcknowledgement,
 ): void {
   if (typeof acknowledge !== 'function') return
-  const verdict = validateMembershipRequest(ctx, getLobbyDetailsSchema, payload, socket.data.user)
-  if (verdict.isErr()) return acknowledge({ outcome: verdict.error })
+  if (!socket.data.user) return acknowledge({ outcome: 'LOGIN_REQUIRED' })
+  if (!getLobbyDetailsSchema.safeParse(payload).success) return acknowledge({ outcome: 'INVALID_REQUEST' })
   try {
-    const playerNames = [...ctx.memberships.values()].map(({ user }) => user.username)
-    acknowledge({ outcome: 'LOBBY_FOUND', lobby: presentLobbyDetails(ctx.gameId, ctx.game, playerNames) })
+    const players = [...ctx.memberships.values()].map(({ user, player }) => ({
+      playerId: player.id,
+      username: user.username,
+    }))
+    acknowledge({ outcome: 'LOBBY_FOUND', lobbies: [presentLobbyDetails(ctx.gameId, ctx.game, players)] })
   } catch {
     acknowledge({ outcome: 'INTERNAL_ERROR' })
   }

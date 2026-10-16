@@ -3,6 +3,7 @@ import type {
   CardsDealt,
   GamePhase as GamePhasePayload,
   LobbyDetails,
+  LobbyPlayer,
   Orientation,
   PublicGameState,
   RobotActionResolved,
@@ -85,13 +86,12 @@ export function presentPublicGameState(
 export function presentLobbyDetails(
   gameId: GameId,
   game: Game,
-  playerNames: readonly string[],
+  players: readonly LobbyPlayer[],
 ): LobbyDetails {
   return {
     gameId,
     name: game.name,
-    playerNames: [...playerNames],
-    playerCount: playerNames.length,
+    players: players.map(({ playerId, username }) => ({ playerId, username })),
     map: { name: DEMO_MAP.name, icon: DEMO_MAP.icon, maxPlayers: DEMO_MAP.maxPlayers },
   }
 }

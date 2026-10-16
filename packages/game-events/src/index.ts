@@ -15,6 +15,7 @@ export type {
   CardsDealt,
   Coordinate,
   GameId,
+  GameMap,
   GamePhase,
   GetLobbyDetails,
   GetPublicGameState,
@@ -22,7 +23,7 @@ export type {
   JoinResult,
   LobbyDetails,
   LobbyDetailsResult,
-  LobbyMap,
+  LobbyPlayer,
   LoginResult,
   Orientation,
   PlayerAssignment,
@@ -52,7 +53,7 @@ export {
   parseGetPublicGameState,
 } from './getPublicGameState.js'
 export { joinGameSchema } from './joinGame.js'
-  export { getLobbyDetailsSchema } from './getLobbyDetails.js'
+export { getLobbyDetailsSchema } from './getLobbyDetails.js'
 export { leaveGameSchema } from './leaveGame.js'
 export { parseSubmitProgram, submitProgramSchema } from './submitProgram.js'
 export type { ProgramCardIds, SubmitProgram } from './submitProgram.js'
