@@ -147,23 +147,21 @@ If an unexpected service failure makes gameplay unrecoverable, members receive `
 
 ### Checkpoint progress
 
-Tiles carry an optional `checkpointNumber` alongside their walls; an absent number means no checkpoint. The tile's existing `type` remains `EMPTY`. Checkpoint numbers are positive integers, unique on the board, and consecutive from 1. `checkpointCount` is derived from these tiles. A checkpoint remains at its fixed tile for every player; it is not removed on completion. The shared demo board places checkpoint 1 at `(10, 6)` and checkpoint 2 at `(8, 9)`.
+Tiles have an optional `checkpointNumber` alongside their walls and keep type `EMPTY`. Omit the number when there is no checkpoint. Numbers are positive integers, unique and consecutive from 1. Checkpoints stay at fixed positions and remain available to every player after completion. The demo board places checkpoint 1 at `(10, 6)` and checkpoint 2 at `(8, 9)`.
 
-Checkpoint progress belongs to the player. Public `PlayerState` includes `lastCheckpoint`, initially 0, and `PublicGameState` includes `checkpointCount`, the total number of checkpoints on the board. JOINED supplies both values for initialization and reconnection. `game.playerJoined` supplies the new player's initial progress to existing members.
+`PlayerState.lastCheckpoint` starts at 0 and persists across rounds and reconnections. `PublicGameState.checkpointCount` counts the checkpoint tiles. Both values are authoritative integers with `0 <= lastCheckpoint <= checkpointCount`. Clients cannot award or request changes to progress. JOINED supplies both values; `game.playerJoined` includes the new player's initial progress.
 
-When a player's checkpoint progress changes, the service broadcasts:
+After all remaining robots have acted in a register, a player completes the next numbered checkpoint if their robot ends on its tile. Passing over a checkpoint does not count; facing does not matter. The same check runs if a departure completes the register.
+
+When progress changes, the service broadcasts to `game:{gameId}:public`:
 
 `player.checkpointProgress {gameId, playerId, lastCheckpoint, checkpointCount}`
 
-to `game:{gameId}:public`. The values are authoritative integers with `0 <= lastCheckpoint <= checkpointCount`. Progress records the last checkpoint completed in numerical order and persists across rounds and reconnections. Clients cannot award progress or request a checkpoint change.
+The event follows the related `robot.actionResolved`, or `game.playerLeft` when a departure completes a register, and precedes subsequent actions or private hands. Only remaining players receive it. Unchanged progress produces no event.
 
-The broadcast follows the related `robot.actionResolved`, or `game.playerLeft` when a departure completes a register, and precedes subsequent actions or private hands. Only remaining players receive gameplay broadcasts. No progress event is emitted when progress is unchanged.
+The client displays `lastCheckpoint/checkpointCount` for its assigned player, initially `0/x` or `0/0` without checkpoints. Apply events immediately, independently of queued movement animations. Ignore other games, unknown or removed players, and duplicate or older progress. Successful Socket.IO recovery replays missed events; failed recovery replaces progress from JOINED.
 
-Checkpoint checks run after every remaining robot has acted in a register. A player completes only the next checkpoint when their robot ends that register on its tile; passing over a checkpoint during movement does not count. Facing does not matter. If a departure finishes the register, the same check applies to the remaining players. The client shows the supplied numbered flag assets as placeholder board markers, which remain after completion.
-
-The client displays `lastCheckpoint/checkpointCount` for its assigned player, starting at `0/x`; a board without checkpoints shows `0/0`. It applies broadcasts on receipt, independently of queued movement animations. Ignore other games, unknown or removed players, and duplicate or older progress values. Successful Socket.IO recovery replays missed progress events; failed recovery replaces progress from the new JOINED snapshot.
-
-Progress broadcasts do not change robot positions, selected cards, phases, or programming availability. Completing all checkpoints does not end the existing game loop. Existing playback, membership, pause behavior, and private hands remain unchanged.
+Progress updates leave robot positions, selected cards, phases, programming availability, playback, membership, pause behavior and private hands unchanged. Completing all checkpoints does not end the game.
 
 ### Dealing the next hand
 
