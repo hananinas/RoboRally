@@ -481,7 +481,7 @@ describe('game membership over Socket.IO', () => {
       const result = await client.timeout(1000).emitWithAck('game.getLobbyDetails', {})
       return result.outcome === 'LOBBY_FOUND' ? result.lobbies : result
     }
-    const demoMap = { name: 'DEMO MAP', icon: 'demo-map', maxPlayers: 6 }
+    const demoMap = { name: 'DEMO MAP', icon: expect.stringMatching(/^data:image\/svg\+xml;base64,/), maxPlayers: 6 }
     const usernames = async (client: Client) => {
       const [lobby] = await lobbies(client) as readonly LobbyDetails[]
       return lobby!.players.map((player) => player.username)

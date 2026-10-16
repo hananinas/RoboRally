@@ -147,7 +147,7 @@ describe('game presenter', () => {
       gameId,
       name: game.name,
       players,
-      map: { name: 'DEMO MAP', icon: 'demo-map', maxPlayers: 6 },
+      map: { name: 'DEMO MAP', icon: expect.stringMatching(/^data:image\/svg\+xml;base64,/), maxPlayers: 6 },
     })
   })
 })
