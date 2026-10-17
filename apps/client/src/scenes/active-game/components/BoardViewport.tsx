@@ -1,12 +1,6 @@
 import { useMemo, useRef, type CSSProperties } from 'react'
 import laserSprites from '../board/assets/lasers.hbls?raw'
 import tankSprites from '../board/assets/tanks.hbls?raw'
-import checkpoint1 from '../board/assets/checkpoints/checkpoint-1.svg'
-import checkpoint2 from '../board/assets/checkpoints/checkpoint-2.svg'
-import checkpoint3 from '../board/assets/checkpoints/checkpoint-3.svg'
-import checkpoint4 from '../board/assets/checkpoints/checkpoint-4.svg'
-import checkpoint5 from '../board/assets/checkpoints/checkpoint-5.svg'
-import checkpoint6 from '../board/assets/checkpoints/checkpoint-6.svg'
 import {
   BOARD_COMPONENTS,
   BOARD_CONFIG,
@@ -18,13 +12,14 @@ import {
   ROBOT_TURN_DURATION_MS,
   type DisplayRobot,
 } from '../board/robotPlayback.ts'
-import { createBoardScene, type BoardScenePiece, type BoardSceneTile } from '../board/boardScene.ts'
+import { createBoardScene, type BoardScenePiece } from '../board/boardScene.ts'
 import type {
   BoardRenderModel,
   BoardTileWalls,
   BoardWallSide,
 } from '../board/boardModel.ts'
 import useBoardInteraction from '../board/useBoardInteraction.ts'
+import CheckpointPiece from './CheckpointPiece.tsx'
 import '../board/BoardViewport.css'
 
 type BoardViewportProps = Readonly<{
@@ -140,29 +135,6 @@ const ROBOT_COMPONENTS = [
   'testTank5',
 ] as const
 
-const CHECKPOINT_IMAGES = [checkpoint1, checkpoint2, checkpoint3, checkpoint4, checkpoint5, checkpoint6]
-const CHECKPOINT_LAYER = 3
-
-function CheckpointPiece({ tile }: { tile: BoardSceneTile }) {
-  const number = tile.cell.checkpointNumber
-  if (number === undefined) return null
-  const image = CHECKPOINT_IMAGES[number - 1]
-  return (
-    <div
-      className="board-piece board-piece--checkpoint"
-      role="img"
-      aria-label={`Checkpoint ${number}`}
-      data-board-checkpoint={number}
-      data-board-tile={`${tile.cell.x},${tile.cell.y}`}
-      data-board-height={CHECKPOINT_LAYER / BOARD_CONFIG.parallaxReferenceLayer}
-      data-board-lift-height={CHECKPOINT_LAYER / BOARD_CONFIG.parallaxReferenceLayer}
-      style={{ left: tile.tileCentre.worldX, top: tile.tileCentre.worldY, width: BOARD_CONFIG.tile * 0.8 }}
-    >
-      {image ? <img src={image} alt="" draggable={false} /> : number}
-    </div>
-  )
-}
-
 function RobotPiece({
   board,
   componentName,
@@ -222,6 +194,7 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
     [board],
   )
   useBoardInteraction({ canvasRef, robots, scene, viewportRef })
+  const checkpointTiles = scene.tiles.filter((tile) => tile.cell.checkpointNumber !== undefined)
 
   return (
     <main
@@ -255,8 +228,9 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
               {pieces.map((piece) => (
                 <BoardPiece key={piece.key} piece={piece} />
               ))}
-              {layer === CHECKPOINT_LAYER && scene.tiles.filter((tile) => tile.cell.checkpointNumber !== undefined)
-                .map((tile) => <CheckpointPiece key={`${tile.cell.x},${tile.cell.y}`} tile={tile} />)}
+              {checkpointTiles.map((tile) => (
+                <CheckpointPiece key={`${tile.cell.x},${tile.cell.y}`} tile={tile} layer={layer} />
+              ))}
               {robotComponent && robots.map((robot) => (
                 <RobotPiece
                   board={board}

@@ -32,8 +32,8 @@ test('plays every register of two consecutive programs through the real Game Ser
     const checkpoint = page.getByRole('img', { name: `Checkpoint ${number}`, exact: true })
     await expect(checkpoint).toBeVisible()
     await expect(checkpoint).toHaveAttribute('data-board-tile', position)
-    await expect.poll(() => checkpoint.locator('img').evaluate((image: HTMLImageElement) =>
-      image.complete && image.naturalWidth > 0)).toBe(true)
+    await expect(checkpoint.locator('text')).toHaveText(String(number))
+    await expect(page.locator(`[data-board-checkpoint-slice="${number}"]`)).toHaveCount(11)
   }
   await expect(page.locator('.board-canvas')).toHaveAttribute('data-board-columns', '21')
   await expect(page.locator('.board-canvas')).toHaveAttribute('data-board-rows', '15')

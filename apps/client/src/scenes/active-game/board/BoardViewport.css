@@ -74,20 +74,15 @@
 }
 
 .board-piece--checkpoint {
-  aspect-ratio: 3 / 4;
-  /* Anchor the base at (43, 136) in the 120×160 SVG to the tile centre. */
-  transform: translate(-35.833%, -85%)
-    translate(var(--board-piece-x), var(--board-piece-y))
-    scale(var(--board-piece-scale));
-  color: white;
-  font-size: 2rem;
-  text-align: center;
+  display: block;
+  height: auto;
 }
 
-.board-piece--checkpoint img {
-  display: block;
-  width: 100%;
-  height: auto;
+.board-checkpoint-number {
+  fill: #fff1e9;
+  font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
+  font-size: 11.5px;
+  font-weight: 700;
 }
 
 @media (prefers-reduced-motion: reduce) {
