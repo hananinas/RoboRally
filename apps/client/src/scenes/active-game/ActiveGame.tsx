@@ -73,7 +73,8 @@ function ActiveGame({ game, username, leaving, onLeave }: {
           <div ref={hudContentRef} className="game-hud__content">
             <PlayerPanel player={{ name: username }} onLeave={onLeave} leaveDisabled={leaving || !state.connected} />
             <RegisterPanel
-              registers={state.registers}
+              registers={state.playbackProgram ?? state.registers}
+              activeRegister={state.playback.active?.registerIndex ?? null}
               disabled={disabled}
               submission={state.submission}
               status={status}
