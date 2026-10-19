@@ -152,6 +152,35 @@ export type PublicGameStateResult =
       outcome: 'GAME_NOT_FOUND'
     }>
 
+export type GetLobbyDetails = Readonly<Record<string, never>>
+
+export type GameMap = Readonly<{
+  name: string
+  icon: string
+  maxPlayers: number
+}>
+
+export type LobbyPlayer = Readonly<{
+  playerId: PlayerId
+  username: string
+}>
+
+export type LobbyDetails = Readonly<{
+  gameId: GameId
+  name: string
+  players: readonly LobbyPlayer[]
+  map: GameMap
+}>
+
+export type LobbyDetailsResult =
+  | Readonly<{
+      outcome: 'LOBBY_FOUND'
+      lobbies: readonly LobbyDetails[]
+    }>
+  | Readonly<{
+      outcome: 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'INTERNAL_ERROR'
+    }>
+
 export type JoinResult =
   | Readonly<{
       outcome: 'JOINED'

@@ -2,6 +2,8 @@ import type {
   Card as CardPayload,
   CardsDealt,
   GamePhase as GamePhasePayload,
+  LobbyDetails,
+  LobbyPlayer,
   Orientation,
   PublicGameState,
   RobotActionResolved,
@@ -17,6 +19,7 @@ import {
   type GamePhase,
   type NextActionResult,
   type Player,
+  DEMO_MAP,
 } from '@/game/index'
 
 const orientations: Record<Direction, Orientation> = {
@@ -79,6 +82,19 @@ export function presentPublicGameState(
     })),
     phase: phases[game.phase],
     paused: game.paused,
+  }
+}
+
+export function presentLobbyDetails(
+  gameId: GameId,
+  game: Game,
+  players: readonly LobbyPlayer[],
+): LobbyDetails {
+  return {
+    gameId,
+    name: game.name,
+    players: players.map(({ playerId, username }) => ({ playerId, username })),
+    map: { name: DEMO_MAP.name, icon: DEMO_MAP.icon, maxPlayers: DEMO_MAP.maxPlayers },
   }
 }
 
