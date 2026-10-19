@@ -209,9 +209,11 @@ test('clears a dangling "d" instead of letting it bleed into the next round', as
   await page.getByRole('button', { name: 'Done', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()
   
-  //wait for round to finish
+  // Wait for each register to start before advancing its playback timer. The
+  // HTTP control response can arrive before the browser receives socket events.
   await game.control({ type: 'round', actions: ROUND_ACTIONS })
   for (const action of ROUND_ACTIONS) {
+    await expect(page.locator('.register[data-active]')).toContainText(String(action.registerIndex + 1))
     await page.clock.runFor(action.instruction === 'TURN_LEFT' ? 300 : 600)
   }
 
