@@ -133,4 +133,16 @@ describe('Game programming', () => {
     expect(game.currentRegister).toBe(1)
   })
 
+  it('has a name, which defaults when none is given', () => {
+    const { game, deck } = createGame()
+    expect(game.name).toBe('Game')
+    const named = new Game(
+      new Board([[new EmptyTile()]], { x: 0, y: 0, angle: Math.PI / 2 }),
+      [],
+      deck,
+      'Shared game',
+    )
+    expect(named.name).toBe('Shared game')
+  })
+
 })

@@ -8,11 +8,12 @@ import { Server, type Socket } from 'socket.io'
 import type { Game } from '@/game/index'
 import { presentPublicGameState } from '@/gamePresenter'
 import { createUserRegistry } from '@/userRegistry'
-import { createGame } from '@/game/GameFactory'
+import { createSharedGame } from '@/game/GameFactory'
 import { createActionScheduler } from '@/actionScheduler'
 import { handleLogin } from '@/authHandlers'
 import {
   handleDisconnect,
+  handleGetLobbyDetails,
   handleGetPublicGameState,
   handleJoin,
   handleLeave,
@@ -37,7 +38,7 @@ export type GameSession = Readonly<{ gameId: string; game: Game }>
 
 export function createGameSocketServer(
   httpServer: HttpServer,
-  sharedGame: GameSession = createGame(),
+  sharedGame: GameSession = createSharedGame(),
 ): GameSocketServer {
   const io = new Server<
     ClientToServerEvents,
@@ -90,6 +91,8 @@ export function createGameSocketServer(
     socket.on('game.join', (payload, acknowledge) => handleJoin(membershipContext, socket, payload, acknowledge))
     socket.on('game.leave', (payload, acknowledge) => handleLeave(membershipContext, socket, payload, acknowledge))
     socket.on('disconnect', () => handleDisconnect(membershipContext, socket))
+    socket.on('game.getLobbyDetails', (payload, acknowledge) =>
+      handleGetLobbyDetails(membershipContext, socket, payload, acknowledge))
     socket.on('game.getPublicGameState', (payload, acknowledge) =>
       handleGetPublicGameState(membershipContext, socket, payload, acknowledge))
     socket.on('program.submit', (payload, acknowledge) =>

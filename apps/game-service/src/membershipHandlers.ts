@@ -3,11 +3,14 @@ import {
   joinGameSchema,
   leaveGameSchema,
   parseGetPublicGameState,
+  getLobbyDetailsSchema,
+  type GetLobbyDetails,
   type GetPublicGameState,
   type JoinGame,
   type JoinResult,
   type JoinResultAcknowledgement,
   type LeaveResult,
+  type LobbyDetailsAcknowledgement,
   type PublicGameState,
   type PublicGameStateAcknowledgement,
   type User,
@@ -15,6 +18,7 @@ import {
 import type { Game, Player } from '@/game/index'
 import { presentCardsDealt } from '@/gamePresenter'
 import { createPlayer } from '@/game/GameFactory'
+import { presentLobbyDetails } from '@/gamePresenter'
 import type { ActionScheduler } from '@/actionScheduler'
 import type { GameSocket, GameSocketServer } from '@/gameServer'
 
@@ -253,4 +257,24 @@ export function handleGetPublicGameState(
   }
 
   acknowledge({ outcome: 'GAME_NOT_FOUND' })
+}
+
+export function handleGetLobbyDetails(
+  ctx: MembershipContext,
+  socket: GameSocket,
+  payload: GetLobbyDetails,
+  acknowledge: LobbyDetailsAcknowledgement,
+): void {
+  if (typeof acknowledge !== 'function') return
+  if (!socket.data.user) return acknowledge({ outcome: 'LOGIN_REQUIRED' })
+  if (!getLobbyDetailsSchema.safeParse(payload).success) return acknowledge({ outcome: 'INVALID_REQUEST' })
+  try {
+    const players = [...ctx.memberships.values()].map(({ user, player }) => ({
+      playerId: player.id,
+      username: user.username,
+    }))
+    acknowledge({ outcome: 'LOBBY_FOUND', lobbies: [presentLobbyDetails(ctx.gameId, ctx.game, players)] })
+  } catch {
+    acknowledge({ outcome: 'INTERNAL_ERROR' })
+  }
 }

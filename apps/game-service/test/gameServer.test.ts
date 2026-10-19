@@ -2,7 +2,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { parseSubmitProgram } from '@robo-rally/game-events'
 import type {
-  ClientToServerEvents, JoinResult, PlayerConnectionChanged, ServerToClientEvents,
+  ClientToServerEvents, JoinResult, LobbyDetails, PlayerConnectionChanged, ServerToClientEvents,
 } from '@robo-rally/game-events'
 import { io as createClient, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -20,7 +20,7 @@ describe('game membership over Socket.IO', () => {
   let clients: Client[]
 
   beforeEach(async () => {
-    shared = createGame('empty-map')
+    shared = createGame('empty-map', 'Shared game')
     clients = []
     await start()
   })
@@ -475,5 +475,75 @@ describe('game membership over Socket.IO', () => {
       .toEqual({ outcome: 'GAME_NOT_FOUND' })
     expect(shared.game.players).toHaveLength(0)
     expect(server.sockets.sockets.get(client.id!)?.data.user).toBeUndefined()
+  })
+
+  describe('game.getLobbyDetails', () => {
+    const lobbies = async (client: Client) => {
+      const result = await client.timeout(1000).emitWithAck('game.getLobbyDetails', {})
+      return result.outcome === 'LOBBY_FOUND' ? result.lobbies : result
+    }
+    const demoMap = { name: 'DEMO MAP', icon: expect.stringMatching(/^data:image\/svg\+xml;base64,/), maxPlayers: 6 }
+    const usernames = async (client: Client) => {
+      const [lobby] = await lobbies(client) as readonly LobbyDetails[]
+      return lobby!.players.map((player) => player.username)
+    }
+
+    it('rejects unauthenticated and malformed requests', async () => {
+      const anonymous = await connect()
+      expect(await lobbies(anonymous)).toEqual({ outcome: 'LOGIN_REQUIRED' })
+      const client = await connect('Reader')
+      expect(await raw(client, 'game.getLobbyDetails', { gameId: shared.gameId }))
+        .toEqual({ outcome: 'INVALID_REQUEST' })
+      expect(await raw(client, 'game.getLobbyDetails', null)).toEqual({ outcome: 'INVALID_REQUEST' })
+    })
+
+    it('lists the lobbies with their players and map without creating membership or room access', async () => {
+      const reader = await connect('Reader')
+      const received = vi.fn()
+      reader.onAny(received)
+      expect(await lobbies(reader)).toEqual([
+        { gameId: shared.gameId, name: 'Shared game', players: [], map: demoMap },
+      ])
+
+      const first = await connect('First')
+      const firstJoin = await join(first)
+      const secondJoin = await join(await connect('Second'))
+      expect(await lobbies(reader)).toEqual([{
+        gameId: shared.gameId,
+        name: 'Shared game',
+        players: [
+          { playerId: firstJoin.assignment.playerId, username: 'First' },
+          { playerId: secondJoin.assignment.playerId, username: 'Second' },
+        ],
+        map: demoMap,
+      }])
+      await first.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId })
+      expect(await usernames(reader)).toEqual(['Second'])
+
+      // Reading never made the reader a member: no player, robot, rooms, hand, or broadcasts.
+      expect(shared.game.players).toHaveLength(1)
+      expect(server.sockets.sockets.get(reader.id!)?.rooms).toEqual(new Set([reader.id]))
+      expect(await reader.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId }))
+        .toEqual({ outcome: 'GAME_NOT_FOUND' })
+      expect(received).not.toHaveBeenCalled()
+    })
+
+    it('leaves a later join unaffected', async () => {
+      const reader = await connect('Reader')
+      await lobbies(reader)
+      await lobbies(reader)
+      const joined = await join(reader)
+      expect(joined.state.players.map((player) => player.username)).toEqual(['Reader'])
+      expect(shared.game.players).toHaveLength(1)
+      expect(await usernames(reader)).toEqual(['Reader'])
+    })
+
+    it('does not reply without an acknowledgement', async () => {
+      const client = await connect('Reader')
+      const emit = client.emit.bind(client) as unknown as (event: string, payload: unknown) => void
+      emit('game.getLobbyDetails', {})
+      expect(await lobbies(client)).toHaveLength(1)
+      expect(shared.game.players).toHaveLength(0)
+    })
   })
 })
