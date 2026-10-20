@@ -112,6 +112,44 @@ describe('Tile and Board layout', () => {
 })
 
 describe('Board robot ownership', () => {
+  it('rejects initial placement on pits without adding the robot', () => {
+    const board = new Board([[new PitTile(), new EmptyTile()]])
+
+    expect(() => board.placeRobot('alpha', { x: 0, y: 0 })).toThrow(RangeError)
+    expect(board.occupantAt({ x: 0, y: 0 })).toBeUndefined()
+    expect(() => board.positionOf('alpha')).toThrow()
+  })
+
+  it('relocates a robot without retaining its old occupancy or the supplied position', () => {
+    const board = new Board(grid())
+    board.placeRobot('alpha', { x: 0, y: 0 })
+    const destination = { x: 2, y: 2 }
+
+    board.relocateRobot('alpha', destination)
+    destination.x = 0
+
+    expect(board.positionOf('alpha')).toEqual({ x: 2, y: 2 })
+    expect(board.occupantAt({ x: 0, y: 0 })).toBeUndefined()
+    expect(board.occupantAt({ x: 2, y: 2 })).toBe('alpha')
+    expect(() => board.relocateRobot('alpha', { x: 2, y: 2 })).not.toThrow()
+  })
+
+  it('rejects unsafe relocation without changing either robot', () => {
+    const board = new Board([[new EmptyTile(), new EmptyTile(), new PitTile()]])
+    board.placeRobot('alpha', { x: 0, y: 0 })
+    board.placeRobot('beta', { x: 1, y: 0 })
+
+    for (const destination of [
+      { x: -1, y: 0 }, { x: 0.5, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 },
+    ]) {
+      expect(() => board.relocateRobot('alpha', destination)).toThrow()
+      expect(board.positionOf('alpha')).toEqual({ x: 0, y: 0 })
+      expect(board.positionOf('beta')).toEqual({ x: 1, y: 0 })
+    }
+    expect(() => board.relocateRobot('unknown', { x: 0, y: 0 })).toThrow()
+    expect(() => board.positionOf('unknown')).toThrow()
+  })
+
   it('places robots, answers occupancy, and does not expose mutable positions', () => {
     const board = new Board(grid())
     const placement = { x: 1, y: 1 }
@@ -229,5 +267,43 @@ describe('Board robot ownership', () => {
       blocked: true,
     })
     expect(board.positionOf('alpha')).toEqual({ x: 2, y: 0 })
+  })
+})
+
+describe('Board reboot destinations', () => {
+  it('prefers the requested tile, then distance, then top-to-bottom and left-to-right order', () => {
+    const board = new Board(grid(5, 5))
+    const origin = { x: 2, y: 2 }
+    expect(board.nearestFreePosition(origin)).toEqual(origin)
+    board.placeRobot('centre', origin)
+
+    expect(board.nearestFreePosition(origin)).toEqual({ x: 2, y: 1 })
+    board.placeRobot('north', { x: 2, y: 1 })
+    expect(board.nearestFreePosition(origin)).toEqual({ x: 1, y: 2 })
+    board.placeRobot('west', { x: 1, y: 2 })
+    expect(board.nearestFreePosition(origin)).toEqual({ x: 3, y: 2 })
+    board.placeRobot('east', { x: 3, y: 2 })
+    expect(board.nearestFreePosition(origin)).toEqual({ x: 2, y: 3 })
+    expect(board.positionOf('centre')).toEqual(origin)
+  })
+
+  it('skips pits and occupied tiles while allowing destinations enclosed by walls', () => {
+    const tiles = grid()
+    tiles[0][1] = new PitTile()
+    tiles[1][0] = new PitTile()
+    tiles[2][1] = new EmptyTile([Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST])
+    const board = new Board(tiles)
+    board.placeRobot('centre', { x: 1, y: 1 })
+    board.placeRobot('east', { x: 2, y: 1 })
+
+    expect(board.nearestFreePosition({ x: 1, y: 1 })).toEqual({ x: 1, y: 2 })
+  })
+
+  it('returns no destination when every non-pit tile is occupied', () => {
+    const board = new Board([[new EmptyTile(), new PitTile()]])
+    board.placeRobot('alpha', { x: 0, y: 0 })
+
+    expect(board.nearestFreePosition({ x: 0, y: 0 })).toBeUndefined()
+    expect(board.positionOf('alpha')).toEqual({ x: 0, y: 0 })
   })
 })

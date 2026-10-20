@@ -31,7 +31,7 @@ describe('game presenter', () => {
       new EmptyTile([Direction.SOUTH], 1),
     ]])
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
-    const game = new Game(board, [], cards)
+    const game = new Game(board, [], cards, undefined, undefined, { x: 0, y: 0 })
     const state = presentPublicGameState('game', game)
 
     expect(state.checkpointCount).toBe(1)

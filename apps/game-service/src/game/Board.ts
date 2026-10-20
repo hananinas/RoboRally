@@ -1,6 +1,6 @@
 import { type Direction, type Position, neighbour, opposite } from '@/game/spatial'
 import type { RobotId } from '@/game/ids'
-import type { Tile } from '@/game/Tile'
+import { PitTile, type Tile } from '@/game/Tile'
 
 export type MovementResult = Readonly<{
   position: Position
@@ -38,6 +38,10 @@ export class Board {
     return this.checkpointTotal
   }
 
+  get hasPits(): boolean {
+    return this.tiles.some((row) => row.some((tile) => tile instanceof PitTile))
+  }
+
   contains(position: Position): boolean {
     return (
       Number.isInteger(position.x) &&
@@ -57,6 +61,9 @@ export class Board {
     if (!this.contains(position)) {
       throw new RangeError('Robot position must be on the board')
     }
+    if (this.getTile(position) instanceof PitTile) {
+      throw new RangeError('Robots cannot be placed on pits')
+    }
     if (this.robotPositions.has(robotId)) {
       throw new Error(`Robot ${robotId} is already on the board`)
     }
@@ -65,6 +72,35 @@ export class Board {
     }
 
     this.robotPositions.set(robotId, { ...position })
+  }
+
+  relocateRobot(robotId: RobotId, position: Position): void {
+    this.positionOf(robotId)
+    if (!this.contains(position) || this.getTile(position) instanceof PitTile) {
+      throw new RangeError('Robot destination must be a non-pit tile on the board')
+    }
+    const occupant = this.occupantAt(position)
+    if (occupant !== undefined && occupant !== robotId) {
+      throw new Error('Tile is already occupied')
+    }
+    this.updateRobotPosition(robotId, position)
+  }
+
+  nearestFreePosition(origin: Position): Position | undefined {
+    let nearest: Position | undefined
+    let nearestDistance = Infinity
+    for (let y = 0; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        const position = { x, y }
+        if (this.tiles[y][x] instanceof PitTile || this.occupantAt(position) !== undefined) continue
+        const distance = Math.abs(x - origin.x) + Math.abs(y - origin.y)
+        if (distance < nearestDistance) {
+          nearest = position
+          nearestDistance = distance
+        }
+      }
+    }
+    return nearest
   }
 
   positionOf(robotId: RobotId): Position {

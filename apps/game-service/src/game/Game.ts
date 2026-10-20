@@ -4,6 +4,7 @@ import type { Card } from '@/game/Card'
 import type { PlayerId, RobotId } from '@/game/ids'
 import type { Player } from '@/game/Player'
 import type { Robot } from '@/game/Robot'
+import { PitTile } from '@/game/Tile'
 import { opposite, type Direction, type Position } from '@/game/spatial'
 
 export type GamePhase = 'programming' | 'activation'
@@ -29,6 +30,7 @@ export class Game {
   readonly board: Board
   private readonly roster: Player[]
   readonly antenna: Antenna
+  readonly rebootTile?: Position
   private readonly deck: readonly Card[]
   private currentPhase: GamePhase = 'programming'
   private registerIndex = 0
@@ -43,12 +45,20 @@ export class Game {
     deck: readonly Card[],
     antenna: Antenna = { x: Math.floor(board.width / 2), y: 0, angle: Math.PI / 2 },
     name: string = DEFAULT_GAME_NAME,
+    rebootTile?: Position,
   ) {
     if (deck.length < 5 || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')
     }
     if (!board.contains(antenna) || !Number.isFinite(antenna.angle)) {
       throw new RangeError('The antenna must be on the board with a finite angle')
+    }
+    if (board.hasPits && rebootTile === undefined) {
+      throw new RangeError('A board with pits requires a reboot tile')
+    }
+    if (rebootTile !== undefined &&
+        (!board.contains(rebootTile) || board.getTile(rebootTile) instanceof PitTile)) {
+      throw new RangeError('Reboot tile must be a non-pit tile on the board')
     }
 
     const playerIds = new Set<PlayerId>()
@@ -57,7 +67,9 @@ export class Game {
       if (playerIds.has(player.id) || robotIds.has(player.robot.id)) {
         throw new RangeError('Players and robots must have unique IDs')
       }
-      board.positionOf(player.robot.id)
+      if (board.getTile(board.positionOf(player.robot.id)) instanceof PitTile) {
+        throw new RangeError('Robots cannot start on pits')
+      }
       playerIds.add(player.id)
       robotIds.add(player.robot.id)
     }
@@ -66,6 +78,7 @@ export class Game {
     this.name = name
     this.roster = [...players]
     this.antenna = Object.freeze({ ...antenna })
+    this.rebootTile = rebootTile === undefined ? undefined : Object.freeze({ ...rebootTile })
     this.deck = [...deck]
     this.dealCards()
   }
@@ -110,7 +123,8 @@ export class Game {
     const { width, height } = this.board
     const y = Math.floor(height / 2)
     let x = Math.floor(width / 2)
-    while (x >= 0 && this.board.occupantAt({ x, y }) !== undefined) x--
+    while (x >= 0 && (this.board.getTile({ x, y }) instanceof PitTile ||
+      this.board.occupantAt({ x, y }) !== undefined)) x--
     if (x < 0) return false
     this.board.placeRobot(player.robot.id, { x, y })
     if (player.hand.length === 0) player.setHand(this.deck)
