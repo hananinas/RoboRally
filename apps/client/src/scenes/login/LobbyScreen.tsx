@@ -5,7 +5,7 @@ import map1 from './maps/map-1.png'
 import map2 from './maps/map-2.png'
 import useLobbyDetails from './useLobbyDetails.ts'
 
-type JoinGameProps = {
+type LobbyScreenProps = {
   socket: GameSocket
   username: string
   pending: boolean
@@ -23,7 +23,7 @@ const sampleLobbies = [
   { id: 'lobby-3', name: 'Lobby 3', map: 'Map 1', image: map1, players: 6, locked: false },
 ]
 
-export default function JoinGame({ socket, username, pending, connected, error, onJoin }: JoinGameProps) {
+export default function LobbyScreen({ socket, username, pending, connected, error, onJoin }: LobbyScreenProps) {
   const { state: details, refresh } = useLobbyDetails(socket, connected)
   const [selectedLobbyId, setSelectedLobbyId] = useState<string | null>(null)
   const lobby = details.status === 'loaded' ? details.lobby : null

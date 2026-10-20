@@ -3,7 +3,7 @@ import useGameConnection from './scenes/active-game/useGameConnection.ts'
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import Login from './scenes/login/Login.tsx'
 import EntryScreen from './scenes/login/EntryScreen.tsx'
-import JoinGame from './scenes/login/JoinGame.tsx'
+import LobbyScreen from './scenes/login/LobbyScreen.tsx'
 import type { GameId } from '@robo-rally/game-events'
 import { USER_ALREADY_IN_GAME_MESSAGE } from './scenes/active-game/gameState.ts'
 import {
@@ -186,7 +186,7 @@ function App() {
           username={username}
         />
       ) : (
-        <JoinGame
+        <LobbyScreen
           socket={connection.socket}
           username={username}
           pending={session.status === 'joining'}
