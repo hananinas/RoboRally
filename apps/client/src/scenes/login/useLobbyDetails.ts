@@ -1,5 +1,5 @@
 import type { LobbyDetails, LobbyDetailsResult } from '@robo-rally/game-events'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ACKNOWLEDGEMENT_TIMEOUT_MS, type GameSocket } from '../../useGameSocket.ts'
 
 type LobbyDetailsError =
@@ -20,17 +20,13 @@ export type LobbyDetailsState =
   | { status: 'loaded'; lobbies: readonly LobbyDetails[] }
   | { status: 'error'; message: string }
 
-
+// Reads the lobby details. Fetching never joins a game.
 export default function useLobbyDetails(socket: GameSocket, connected: boolean) {
   const [state, setState] = useState<LobbyDetailsState>({ status: 'loading' })
-  const attempt = useRef(0)
 
-  
+  // Sends the request; state changes only once the Game Service replies.
   const request = useCallback(() => {
-    const current = ++attempt.current
     socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit('game.getLobbyDetails', {}, (error, result) => {
-      
-      if (current !== attempt.current) return
       if (error) {
         setState({ status: 'error', message: lobbyDetailsErrors.TIMEOUT })
       } else if (result.outcome !== 'LOBBY_FOUND') {
@@ -41,15 +37,12 @@ export default function useLobbyDetails(socket: GameSocket, connected: boolean) 
     })
   }, [socket])
 
-  
+  // Fetch when the lobby page opens (state starts as loading).
   useEffect(() => {
     if (connected) request()
-    return () => {
-      attempt.current += 1
-    }
   }, [connected, request])
 
-  
+  // Used by the Refresh and Retry buttons.
   const refresh = useCallback(() => {
     if (!socket.connected) {
       setState({ status: 'error', message: lobbyDetailsErrors.CONNECTION_ERROR })
