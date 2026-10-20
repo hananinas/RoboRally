@@ -191,6 +191,7 @@ function App() {
         />
       ) : (
         <JoinGame
+          socket={connection.socket}
           username={username}
           pending={session.status === 'joining'}
           connected={connection.status === 'connected'}
