@@ -34,11 +34,12 @@ export type SinglePlayerGame = Readonly<{
 }>
 
 function createBoard(): Board {
-  return new Board(
-    Array.from({ length: BOARD_HEIGHT }, () =>
-      Array.from({ length: BOARD_WIDTH }, () => new EmptyTile()),
-    ),
+  const tiles = Array.from({ length: BOARD_HEIGHT }, () =>
+    Array.from({ length: BOARD_WIDTH }, () => new EmptyTile()),
   )
+  tiles[6][10] = new EmptyTile([], 1)
+  tiles[9][8] = new EmptyTile([], 2)
+  return new Board(tiles)
 }
 
 const HAND_INSTRUCTIONS = [

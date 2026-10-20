@@ -19,6 +19,7 @@ import type {
   BoardWallSide,
 } from '../board/boardModel.ts'
 import useBoardInteraction from '../board/useBoardInteraction.ts'
+import CheckpointPiece from './CheckpointPiece.tsx'
 import '../board/BoardViewport.css'
 
 type BoardViewportProps = Readonly<{
@@ -193,6 +194,7 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
     [board],
   )
   useBoardInteraction({ canvasRef, robots, scene, viewportRef })
+  const checkpointTiles = scene.tiles.filter((tile) => tile.cell.checkpointNumber !== undefined)
 
   return (
     <main
@@ -225,6 +227,9 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
             >
               {pieces.map((piece) => (
                 <BoardPiece key={piece.key} piece={piece} />
+              ))}
+              {checkpointTiles.map((tile) => (
+                <CheckpointPiece key={`${tile.cell.x},${tile.cell.y}`} tile={tile} layer={layer} />
               ))}
               {robotComponent && robots.map((robot) => (
                 <RobotPiece

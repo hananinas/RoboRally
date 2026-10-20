@@ -156,25 +156,20 @@
 .lobby__details {
   display: grid;
   flex: 1;
-  min-width: 0;
   gap: 2px;
-  overflow-wrap: anywhere;
 }
 
 .lobby__name {
   font-weight: 600;
 }
 
-.lobby__map,
-.lobby__sample {
+.lobby__map {
   color: #9aa4b0;
   font-size: 12px;
 }
 
 .lobby__status {
   display: grid;
-  grid-template-rows: repeat(2, 1lh);
-  flex: none;
   justify-items: end;
   gap: 2px;
   font-size: 12px;

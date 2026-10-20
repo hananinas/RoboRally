@@ -49,6 +49,7 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
     position: { x, y },
     type: 'EMPTY',
     ...(walls.length === 0 ? {} : { walls }),
+    ...(tile.checkpointNumber === undefined ? {} : { checkpointNumber: tile.checkpointNumber }),
   }
 }
 
@@ -63,6 +64,7 @@ export function presentPublicGameState(
 
   return {
     gameId,
+    checkpointCount: game.board.checkpointCount,
     players,
     antenna: game.antenna,
     board: {

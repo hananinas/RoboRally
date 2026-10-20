@@ -227,6 +227,7 @@ export function handleLeave(
   io.to(publicRoom).emit('game.playerLeft', {
     gameId, playerId: player.id, robotId: player.robot.id,
   })
+  actionScheduler.broadcastCheckpointProgress()
   if (phaseBeforeLeave === 'activation' && game.phase === 'programming') actionScheduler.dealHands()
   actionScheduler.scheduleNextAction()
 }

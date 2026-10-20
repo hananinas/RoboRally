@@ -73,6 +73,18 @@
     --board-piece-angle var(--tank-turn-duration) var(--tank-motion-easing);
 }
 
+.board-piece--checkpoint {
+  display: block;
+  height: auto;
+}
+
+.board-checkpoint-number {
+  fill: #fff1e9;
+  font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .board-piece--test-tank {
     transition-duration: 0s;
