@@ -54,7 +54,7 @@ export type Robot = Readonly<{
 
 export type Tile = Readonly<{
   position: Coordinate
-  type: 'EMPTY'
+  type: 'EMPTY' | 'PIT'
   walls?: readonly Orientation[]
   checkpointNumber?: number
 }>
