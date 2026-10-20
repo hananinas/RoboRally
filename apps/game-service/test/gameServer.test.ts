@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Board, EmptyTile, PitTile, Game, Card } from '@/game/index.ts'
 import { createHand, createSharedGame } from '@/game/SinglePlayerGame.ts'
 import { createGameSocketServer, type GameSocketServer } from '@/gameServer.ts'
+import * as gamePresenter from '@/gamePresenter.ts'
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>
 type Joined = Extract<JoinResult, { outcome: 'JOINED' }>
@@ -191,13 +192,19 @@ describe('game membership over Socket.IO', () => {
 
   it('rolls back a failed join snapshot before granting room access', async () => {
     const client = await connect('First')
-    vi.spyOn(shared.game.board, 'getTile').mockImplementationOnce(() => { throw new Error('Presentation failed') })
+    const removed = vi.spyOn(shared.game, 'removePlayer')
+    const snapshot = vi.spyOn(gamePresenter, 'presentPublicGameState')
+      .mockImplementationOnce(() => { throw new Error('Presentation failed') })
     expect(await client.timeout(1000).emitWithAck('game.join', { gameId: shared.gameId }))
       .toEqual({ outcome: 'INTERNAL_ERROR' })
+    snapshot.mockRestore()
+    expect(removed).toHaveBeenCalledTimes(1)
     expect(shared.game.players).toEqual([])
     expect(shared.game.board.occupantAt({ x: 10, y: 7 })).toBeUndefined()
     expect(server.sockets.sockets.get(client.id!)?.rooms).toEqual(new Set([client.id]))
-    expect((await join(client)).state.robots).toHaveLength(1)
+    const retried = await join(client)
+    expect(retried.assignment.playerId).not.toBe(removed.mock.calls[0][0])
+    expect(retried.state.robots).toHaveLength(1)
   })
 
   it('rejects nonmember and foreign-hand submissions and reports accepted programs', async () => {
