@@ -5,6 +5,7 @@ import type {
   JoinResult,
   Login,
   LoginResult,
+  PlayerCheckpointProgress,
   ProgramResultOutcome,
   ProgramSubmitted,
   PublicGameState,
@@ -22,10 +23,11 @@ export const OTHER_ROBOT_ID = '33333333-3333-4333-8333-333333333334'
 export function createPublicState(): PublicGameState {
   return {
     gameId: GAME_ID,
-    players: [{ playerId: PLAYER_ID, username: 'Player 1', programSubmitted: false, connected: true }],
+    players: [{ playerId: PLAYER_ID, lastCheckpoint: 0, username: 'Player 1', programSubmitted: false, connected: true }],
     phase: 'PROGRAMMING',
     paused: false,
     aborted: false,
+    checkpointCount: 0,
     antenna: { x: 5, y: 0, angle: Math.PI / 2 },
     board: {
       width: 11,
@@ -61,6 +63,7 @@ export const ROUND_ACTIONS: readonly RobotActionResolved[] = [
 ]
 
 export type FixtureControl =
+  | { type: 'checkpoint-progress'; progress: PlayerCheckpointProgress }
   | { type: 'submission'; outcome: ProgramResultOutcome; deferred: boolean }
   | { type: 'acknowledge'; outcome: ProgramResultOutcome }
   | { type: 'disconnect' }

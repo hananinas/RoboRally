@@ -4,10 +4,13 @@ import { withAcknowledgeOnce } from '@/socket/utilities/acknowledgeOnce'
 import {
   joinGameSchema,
   leaveGameSchema,
+  getLobbyDetailsSchema,
+  type GetLobbyDetails,
   type JoinGame,
   type JoinResult,
   type JoinResultAcknowledgement,
   type LeaveResult,
+  type LobbyDetailsAcknowledgement,
   type PublicGameState,
   type User,
 } from '@robo-rally/game-events'
@@ -16,9 +19,10 @@ import {
   type Game,
   type Player,
 } from '@/game/index'
-import { presentCardsDealt } from '@/socket/gamePresenter'
 import { logError, logWarn } from '@/logger'
 import { toRejection, type Rejection } from '@/socket/utilities/rejection'
+import { presentCardsDealt, presentLobbyDetails } from '@/socket/gamePresenter'
+import { createHand } from '@/game/SinglePlayerGame'
 import type { ActionScheduler } from '@/actionScheduler'
 import type { GameSocket, GameSocketServer } from '@/socket/gameServer'
 
@@ -233,6 +237,7 @@ export function handleLeave(
     io.to(publicRoom).emit('game.playerLeft', {
       gameId, playerId: player.id, robotId: player.robot.id,
     })
+    actionScheduler.broadcastCheckpointProgress()
     if (phaseBeforeLeave === 'activation' && game.phase === 'programming') actionScheduler.dealHands()
     actionScheduler.scheduleNextAction()
   }, (error) => {
@@ -253,5 +258,25 @@ export function handleDisconnect(ctx: MembershipContext, socket: GameSocket): vo
     })
   } catch (error) {
     logError('Failed to process player disconnect', error, { command: 'disconnect', gameId: ctx.gameId, playerId: membership.player.id })
+  }
+}
+
+export function handleGetLobbyDetails(
+  ctx: MembershipContext,
+  socket: GameSocket,
+  payload: GetLobbyDetails,
+  acknowledge: LobbyDetailsAcknowledgement,
+): void {
+  if (typeof acknowledge !== 'function') return
+  if (!socket.data.user) return acknowledge({ outcome: 'LOGIN_REQUIRED' })
+  if (!getLobbyDetailsSchema.safeParse(payload).success) return acknowledge({ outcome: 'INVALID_REQUEST' })
+  try {
+    const players = [...ctx.memberships.values()].map(({ user, player }) => ({
+      playerId: player.id,
+      username: user.username,
+    }))
+    acknowledge({ outcome: 'LOBBY_FOUND', lobbies: [presentLobbyDetails(ctx.gameId, ctx.game, players)] })
+  } catch {
+    acknowledge({ outcome: 'INTERNAL_ERROR' })
   }
 }

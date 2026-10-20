@@ -100,9 +100,10 @@ export default function BoardHarness() {
       <div ref={overlayRef} className={overlayClassName}>
         <aside className="game-hud" aria-label="Game controls">
           <div ref={hudContentRef} className="game-hud__content">
-            <PlayerPanel player={{ name: 'Board fixture player' }} />
+            <PlayerPanel player={{ name: 'Board fixture player', lastCheckpoint: 0 }} checkpointCount={0} />
             <RegisterPanel
               registers={registers}
+              activeRegister={null}
               disabled={confirmed}
               pendingDelete={pendingDelete}
               awaitingSubmitConfirm={awaitingSubmitConfirm}

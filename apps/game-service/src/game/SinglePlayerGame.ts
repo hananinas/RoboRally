@@ -12,6 +12,7 @@ const BOARD_WIDTH = 21
 const BOARD_HEIGHT = 15
 
 const GAME_ID: GameId = '00000000-0000-4000-8000-000000000001'
+const SHARED_GAME_NAME = 'Shared game'
 const PLAYER_ID = '00000000-0000-4000-8000-000000000002'
 const ROBOT_ID = '00000000-0000-4000-8000-000000000003'
 
@@ -34,11 +35,12 @@ export type SinglePlayerGame = Readonly<{
 }>
 
 function createBoard(): Board {
-  return new Board(
-    Array.from({ length: BOARD_HEIGHT }, () =>
-      Array.from({ length: BOARD_WIDTH }, () => new EmptyTile()),
-    ),
+  const tiles = Array.from({ length: BOARD_HEIGHT }, () =>
+    Array.from({ length: BOARD_WIDTH }, () => new EmptyTile()),
   )
+  tiles[6][10] = new EmptyTile([], 1)
+  tiles[9][8] = new EmptyTile([], 2)
+  return new Board(tiles)
 }
 
 const HAND_INSTRUCTIONS = [
@@ -51,7 +53,7 @@ export function createHand(cardIds: readonly string[] = CARD_IDS): readonly Card
 }
 
 export function createSharedGame(): Readonly<{ gameId: GameId; game: Game }> {
-  return { gameId: GAME_ID, game: new Game(createBoard(), [], createHand()) }
+  return { gameId: GAME_ID, game: new Game(createBoard(), [], createHand(),undefined, SHARED_GAME_NAME) }
 }
 
 export function createSinglePlayerGame(): SinglePlayerGame {

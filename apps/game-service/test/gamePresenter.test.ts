@@ -16,6 +16,7 @@ import {
 } from '@/game/index.ts'
 import {
   presentCardsDealt,
+  presentLobbyDetails,
   presentPublicGameState,
   presentRobotActionResolved,
 } from '@/socket/gamePresenter.ts'
@@ -29,6 +30,7 @@ describe('game presenter', () => {
     expectTypeOf(state).toEqualTypeOf<PublicGameState>()
     expect(state).toMatchObject({
       gameId,
+      checkpointCount: 2,
       board: { width: 21, height: 15 },
       phase: 'PROGRAMMING',
       robots: [
@@ -51,12 +53,16 @@ describe('game presenter', () => {
       position: { x: 20, y: 14 },
       type: 'EMPTY',
     })
+    expect(state.board.tiles.filter((tile) => tile.checkpointNumber !== undefined)).toEqual([
+      { position: { x: 10, y: 6 }, type: 'EMPTY', checkpointNumber: 1 },
+      { position: { x: 8, y: 9 }, type: 'EMPTY', checkpointNumber: 2 },
+    ])
   })
 
   it('maps tile walls and the activation phase to contract values', () => {
     const board = new Board([
       [
-        new EmptyTile([Direction.NORTH, Direction.WEST]),
+        new EmptyTile([Direction.NORTH, Direction.WEST], 1),
         new EmptyTile(),
       ],
     ])
@@ -78,6 +84,7 @@ describe('game presenter', () => {
         position: { x: 0, y: 0 },
         type: 'EMPTY',
         walls: ['NORTH', 'WEST'],
+        checkpointNumber: 1,
       },
       { position: { x: 1, y: 0 }, type: 'EMPTY' },
     ])
@@ -134,6 +141,20 @@ describe('game presenter', () => {
         coordinate: { x: 4, y: 5 },
         orientation: 'SOUTH',
       },
+    })
+  })
+
+  it('presents lobby details with the game name, players, and the demo map', () => {
+    const { gameId, game } = createSinglePlayerGame()
+    const players = [
+      { playerId: '00000000-0000-4000-8000-000000000011', username: 'Malte' },
+      { playerId: '00000000-0000-4000-8000-000000000012', username: 'Abid' },
+    ]
+    expect(presentLobbyDetails(gameId, game, players)).toEqual({
+      gameId,
+      name: game.name,
+      players,
+      map: { name: 'DEMO MAP', icon: expect.stringMatching(/^data:image\/svg\+xml;base64,/), maxPlayers: 6 },
     })
   })
 })

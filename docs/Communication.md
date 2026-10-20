@@ -28,6 +28,18 @@ A successful join returns:
 
 The acknowledgement contains the player's current robot assignment, public game state, private hand, and program-submission status. The client must apply all JOINED data before processing later live game events. A future lobby may be inserted between login and joining without changing this model.
 
+### Listing lobbies
+
+After login, the client can ask which lobbies exist:
+
+`game.getLobbyDetails`
+
+A successful request returns:
+
+`LOBBY_FOUND {lobbies}`
+
+Each lobby includes its `gameId`, which the client uses to send `game.join`. A connection that has not logged in receives `LOGIN_REQUIRED`, and a malformed request receives `INVALID_REQUEST`.
+
 ### Membership
 
 New players may join a game until the server accepts the first program submission. Accepting that submission starts the game and permanently closes joining to new players. Later attempts by new players receive GAME_ALREADY_STARTED. 
@@ -46,7 +58,7 @@ An explicit `game.leave {gameId}` removes the owning connection's player and rob
 
 Reconnection behavior is described in the Reconnection section.
 
-The following diagram documents the initial join behaviour:
+The following diagram documents logging in, listing lobbies and joining:
 
 ```mermaid
 sequenceDiagram
@@ -58,6 +70,9 @@ sequenceDiagram
     Client->>Server: user.login {username}
     alt Valid username
         Server-->>Client: Acknowledgement: LOGGED_IN {user}
+        Client->>Server : game.getLobbyDetails
+        Server-->>Client: Acknowledgement: LOBBY_FOUND {lobbies}
+        Note over Client: Picks a lobby's gameId
         Client->>Server: game.join {gameId}
         alt Join accepted
             Server-->>Client: Acknowledgement: JOINED {assignment, state, hand, programSubmitted}
@@ -71,7 +86,6 @@ sequenceDiagram
         Server-->>Client: Acknowledgement: INVALID_USERNAME
     end
 ```
-
 
 ## Game has started
 ### Programming
@@ -130,6 +144,24 @@ The antenna does not occupy a robot tile.
 Exact priority ties are resolved using player join order. The priority algorithm defines the complete robot action order.
 
 If an unexpected service failure makes gameplay unrecoverable, members receive `game.aborted {gameId}` and the game ends permanently.
+
+### Checkpoint progress
+
+Tiles have an optional `checkpointNumber` alongside their walls and keep type `EMPTY`. Omit the number when there is no checkpoint. Numbers are positive integers, unique and consecutive from 1. Checkpoints stay at fixed positions and remain available to every player after completion. The demo board places checkpoint 1 at `(10, 6)` and checkpoint 2 at `(8, 9)`.
+
+`PlayerState.lastCheckpoint` starts at 0 and persists across rounds and reconnections. `PublicGameState.checkpointCount` counts the checkpoint tiles. Both values are authoritative integers with `0 <= lastCheckpoint <= checkpointCount`. Clients cannot award or request changes to progress. JOINED supplies both values; `game.playerJoined` includes the new player's initial progress.
+
+After all remaining robots have acted in a register, a player completes the next numbered checkpoint if their robot ends on its tile. Passing over a checkpoint does not count; facing does not matter. The same check runs if a departure completes the register.
+
+When progress changes, the service broadcasts to `game:{gameId}:public`:
+
+`player.checkpointProgress {gameId, playerId, lastCheckpoint, checkpointCount}`
+
+The event follows the related `robot.actionResolved`, or `game.playerLeft` when a departure completes a register, and precedes subsequent actions or private hands. Only remaining players receive it. Unchanged progress produces no event.
+
+The client displays `lastCheckpoint/checkpointCount` for its assigned player, initially `0/x` or `0/0` without checkpoints. Apply events immediately, independently of queued movement animations. Ignore other games, unknown or removed players, and duplicate or older progress. Successful Socket.IO recovery replays missed events; failed recovery replaces progress from JOINED.
+
+Progress updates leave robot positions, selected cards, phases, programming availability, playback, membership, pause behavior and private hands unchanged. Completing all checkpoints does not end the game.
 
 ### Dealing the next hand
 

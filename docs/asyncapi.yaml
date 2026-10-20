@@ -24,6 +24,8 @@ channels:
         $ref: '#/components/messages/LeaveGame'
       submitProgram:
         $ref: '#/components/messages/SubmitProgram'
+      getLobbyDetails:
+        $ref: '#/components/messages/GetLobbyDetails'
 
   loginReplies:
     address: null
@@ -61,6 +63,15 @@ channels:
       programResult:
         $ref: '#/components/messages/ProgramResult'
 
+  lobbyDetailsReplies:
+    address: null
+    description: |
+      Logical reply channel
+      Delivered through the acknowledgement of game.getLobbyDetails
+    messages:
+      lobbyDetailsResult:
+        $ref: '#/components/messages/LobbyDetailsResult'
+
   player:
     address: 'game:{gameId}:player:{playerId}'
     parameters:
@@ -82,6 +93,8 @@ channels:
         $ref: '#/components/messages/ProgramSubmitted'
       robotActionResolved:
         $ref: '#/components/messages/RobotActionResolved'
+      playerCheckpointProgress:
+        $ref: '#/components/messages/PlayerCheckpointProgress'
       playerJoined:
         $ref: '#/components/messages/PlayerJoined'
       playerLeft:
@@ -158,6 +171,20 @@ operations:
     channel:
       $ref: '#/channels/public'
 
+  handleGetLobbyDetails:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/getLobbyDetails'
+    reply:
+      channel:
+        $ref: '#/channels/lobbyDetailsReplies'
+      messages:
+        - $ref: '#/channels/lobbyDetailsReplies/messages/lobbyDetailsResult'
+      x-socketio:
+        acknowledgement: true
+
 components:
   messages:
 
@@ -225,6 +252,7 @@ components:
               robotId: 00000000-0000-4000-8000-000000000003
             state:
               gameId: 00000000-0000-4000-8000-000000000001
+              checkpointCount: 0
               board:
                 width: 1
                 height: 1
@@ -249,6 +277,7 @@ components:
               players:
                 - playerId: 00000000-0000-4000-8000-000000000002
                   username: Dane
+                  lastCheckpoint: 0
                   programSubmitted: false
                   connected: true
               paused: false
@@ -354,6 +383,46 @@ components:
       description: Announces a new player and robot to existing game participants.
       payload:
         $ref: '#/components/schemas/PlayerJoined'
+
+    GetLobbyDetails:
+      name: game.getLobbyDetails
+      description: >-
+        Queries for available game lobbies.
+      payload:
+        $ref: '#/components/schemas/GetLobbyDetails'
+      examples:
+        - name: lobbyDetails
+          summary: List the available lobbies
+          payload: {}
+
+    LobbyDetailsResult:
+      name: game.lobbyDetailsResult
+      description: >-
+        Returns the available lobbies or a rejection. This is returned through
+        the request's acknowledgement callback, not emitted as game.lobbyDetailsResult.
+      payload:
+        $ref: '#/components/schemas/LobbyDetailsResult'
+      examples:
+        - name: found
+          summary: One lobby with two players on the demo map
+          payload:
+            outcome: LOBBY_FOUND
+            lobbies:
+              - gameId: 00000000-0000-4000-8000-000000000001
+                name: Shared game
+                players:
+                  - playerId: 00000000-0000-4000-8000-000000000011
+                    username: Malte
+                  - playerId: 00000000-0000-4000-8000-000000000012
+                    username: Abid
+                map:
+                  name: DEMO MAP
+                  icon: data:image/svg+xml;base64,PHN2Zy8+
+                  maxPlayers: 6
+        - name: loginRequired
+          summary: The connection has not logged in
+          payload:
+            outcome: LOGIN_REQUIRED
 
     SubmitProgram:
       name: program.submit
@@ -485,6 +554,35 @@ components:
                 x: 10
                 y: 6
               orientation: NORTH
+
+    PlayerCheckpointProgress:
+      name: player.checkpointProgress
+      description: >-
+        Broadcasts changed player checkpoint progress to game:{gameId}:public after the
+        related robot.actionResolved, or game.playerLeft when a departure finishes a
+        register, and before subsequent actions or private hands. Unchanged progress
+        produces no event. Clients apply progress on receipt without changing movement
+        playback or programming availability. Replayed events must not reduce progress.
+      payload:
+        type: object
+        additionalProperties: false
+        required: [ gameId, playerId, lastCheckpoint, checkpointCount ]
+        properties:
+          gameId:
+            $ref: '#/components/schemas/GameId'
+          playerId:
+            $ref: '#/components/schemas/PlayerId'
+          lastCheckpoint:
+            $ref: '#/components/schemas/LastCheckpoint'
+          checkpointCount:
+            $ref: '#/components/schemas/CheckpointCount'
+      examples:
+        - name: firstCheckpoint
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            lastCheckpoint: 1
+            checkpointCount: 2
 
     CardsDealt:
       name: cards.dealt
@@ -693,7 +791,6 @@ components:
             [
               LOGIN_REQUIRED,
               INVALID_REQUEST,
-              GAME_NOT_FOUND,
               NO_SPAWN_AVAILABLE,
               USER_ALREADY_IN_GAME,
               GAME_ALREADY_STARTED,
@@ -741,6 +838,7 @@ components:
         - username
         - programSubmitted
         - connected
+        - lastCheckpoint
       properties:
         playerId:
           $ref: "#/components/schemas/PlayerId"
@@ -750,6 +848,8 @@ components:
           type: boolean
         connected:
           type: boolean
+        lastCheckpoint:
+          $ref: '#/components/schemas/LastCheckpoint'
       description: >-
         Public participation and submission status; never contains cards.
 
@@ -783,6 +883,7 @@ components:
         - phase
         - paused
         - aborted
+        - checkpointCount
       properties:
         gameId:
           $ref: "#/components/schemas/GameId"
@@ -806,6 +907,104 @@ components:
         aborted:
           type: boolean
           description: Whether gameplay has stopped irrecoverably after an unexpected service failure.
+        checkpointCount:
+          $ref: '#/components/schemas/CheckpointCount'
+
+    LastCheckpoint:
+      type: integer
+      minimum: 0
+      description: >-
+        Last checkpoint completed by the player in numerical order, initially 0.
+        Must not exceed checkpointCount. Persists across rounds and reconnections.
+        Completing the final checkpoint does not end the game.
+
+    CheckpointCount:
+      type: integer
+      minimum: 0
+      description: Total number of checkpoints on the board; 0 on a board without checkpoints.
+
+    GetLobbyDetails:
+      type: object
+      additionalProperties: false
+
+
+    GameMap:
+      type: object
+      additionalProperties: false
+      required: [ name, icon, maxPlayers ]
+      properties:
+        name:
+          type: string
+          description: Display name of the map.
+        icon:
+          type: string
+          description: Map icon as a base64-encoded image data URI.
+        maxPlayers:
+          type: integer
+          minimum: 1
+          description: Most players the map supports.
+
+
+    LobbyPlayer:
+      type: object
+      additionalProperties: false
+      required: [ playerId, username ]
+      properties:
+        playerId:
+          $ref: '#/components/schemas/PlayerId'
+        username:
+          $ref: '#/components/schemas/Username'
+
+    LobbyDetails:
+      type: object
+      additionalProperties: false
+      required: [ gameId, name, players, map ]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+        name:
+          type: string
+          description: Display name of the game.
+        players:
+          type: array
+          description: Current members in join order, including disconnected members.
+          items:
+            $ref: '#/components/schemas/LobbyPlayer'
+        map:
+          $ref: '#/components/schemas/GameMap'
+      description: >-
+        Lobby information
+
+    LobbyDetailsResult:
+      oneOf:
+        - $ref: '#/components/schemas/LobbyFound'
+        - $ref: '#/components/schemas/LobbyDetailsRejected'
+
+    LobbyFound:
+      type: object
+      additionalProperties: false
+      required: [ outcome, lobbies ]
+      properties:
+        outcome:
+          type: string
+          enum: [ LOBBY_FOUND ]
+        lobbies:
+          type: array
+          items:
+            $ref: '#/components/schemas/LobbyDetails'
+
+    LobbyDetailsRejected:
+      type: object
+      additionalProperties: false
+      required: [ outcome ]
+      properties:
+        outcome:
+          type: string
+          enum: [ LOGIN_REQUIRED, INVALID_REQUEST, INTERNAL_ERROR ]
+      description: |
+        LOGIN_REQUIRED: this connection has no approved user; checked before the payload.
+        INVALID_REQUEST: the request did not match the expected shape.
+        INTERNAL_ERROR: unexpected service failure; do not expose internals.
 
     GamePhase:
       type: string
@@ -915,6 +1114,13 @@ components:
           uniqueItems: true
           items:
             $ref: '#/components/schemas/Orientation'
+        checkpointNumber:
+          type: integer
+          minimum: 1
+          description: >-
+            Optional checkpoint on this tile, independent of its walls and type.
+            Omit when absent. Numbers are unique and consecutive from 1 on a board.
+            Checkpoints stay at their fixed positions and are available to every player.
     Antenna:
       type: object
       additionalProperties: false

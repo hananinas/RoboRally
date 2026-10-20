@@ -23,9 +23,18 @@ test('plays every register of two consecutive programs through the real Game Ser
   await page.goto('/')
   await page.getByRole('textbox', { name: 'Username' }).fill('Round player')
   await page.getByRole('button', { name: 'Log in', exact: true }).click()
+  await page.getByRole('button', { name: /Lobby 1/ }).click()
   await page.getByRole('button', { name: 'Join game', exact: true }).click()
 
   await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Checkpoints', exact: true }).locator('..')).toContainText('0/2')
+  for (const [number, position] of [[1, '10,6'], [2, '8,9']] as const) {
+    const checkpoint = page.getByRole('img', { name: `Checkpoint ${number}`, exact: true })
+    await expect(checkpoint).toBeVisible()
+    await expect(checkpoint).toHaveAttribute('data-board-tile', position)
+    await expect(checkpoint.locator('text')).toHaveText(String(number))
+    await expect(page.locator(`[data-board-checkpoint-slice="${number}"]`)).toHaveCount(11)
+  }
   await expect(page.locator('.board-canvas')).toHaveAttribute('data-board-columns', '21')
   await expect(page.locator('.board-canvas')).toHaveAttribute('data-board-rows', '15')
   const robotIds = await page.locator('[data-robot-id]').evaluateAll((elements) =>
@@ -43,8 +52,9 @@ test('plays every register of two consecutive programs through the real Game Ser
   await expect(done).toBeDisabled()
 
   // Pause only browser time; service execution and Socket.IO delivery stay real.
-  // Use a relative pause to avoid jumping past the socket heartbeat interval.
-  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
+  // Keep the initial jump below the real service's one-second heartbeat so
+  // advancing playback does not immediately expire the socket's ping timer.
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100))
   const rounds = [
     [
       { card: 'Move 1', x: 10, y: 6, angle: 0 },
@@ -88,6 +98,8 @@ test('plays every register of two consecutive programs through the real Game Ser
     }
 
     await expect(page.getByRole('status')).toHaveText('Programming')
+    await expect(page.getByRole('heading', { name: 'Checkpoints', exact: true }).locator('..')).toContainText('2/2')
+    await expect(page.locator('[data-board-checkpoint]')).toHaveCount(2)
     await expect(registered).toHaveCount(0)
     await expect(hand).toHaveCount(9)
     for (const card of await hand.all()) await expect(card).toBeEnabled()

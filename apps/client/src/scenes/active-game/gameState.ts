@@ -5,6 +5,7 @@ import type {
   JoinResult,
   PlayerAssignment,
   PlayerConnectionChanged,
+  PlayerCheckpointProgress,
   PlayerId,
   PlayerJoined,
   PlayerLeft,
@@ -25,6 +26,7 @@ export type Registers = readonly (ProgramCard | null)[]
 
 export type Player = {
   playerId: PlayerId
+  lastCheckpoint: number
   username: string
   connected: boolean
 }
@@ -35,12 +37,15 @@ export type ClientGameState = {
   phase: GamePhase | null
   paused: boolean
   players: readonly Player[]
+  checkpointCount: number
   board: BoardRenderModel | null
   playback: RobotPlaybackState
   hand: readonly ProgramCard[]
   registers: Registers
   registersPast: readonly Registers[]
   registersFuture: readonly Registers[]
+  // Copy of the submitted program shown while its actions play back.
+  playbackProgram: Registers | null
   handVersion: number
   handReady: boolean
   pendingHand: CardsDealt | null
@@ -54,6 +59,7 @@ export type GameStateEvent =
   | { type: 'player-joined'; payload: PlayerJoined }
   | { type: 'player-left'; payload: PlayerLeft }
   | { type: 'player-connection-changed'; payload: PlayerConnectionChanged }
+  | { type: 'checkpoint-progress'; payload: PlayerCheckpointProgress }
   | { type: 'disconnected' }
   | { type: 'reconnected' }
   | { type: 'connect-error'; message: string }
@@ -92,12 +98,14 @@ export function createClientGameState(): ClientGameState {
     phase: null,
     paused: false,
     players: [],
+    checkpointCount: 0,
     board: null,
     playback: createRobotPlaybackState([]),
     hand: [],
     registers: emptyRegisters(),
     registersPast: [],
     registersFuture: [],
+    playbackProgram: null,
     handVersion: 0,
     handReady: false,
     pendingHand: null,
@@ -152,6 +160,7 @@ function activateHand(state: ClientGameState): ClientGameState {
     registers: emptyRegisters(),
     registersPast: [],
     registersFuture: [],
+    playbackProgram: null,
     submission: 'idle',
     error: state.connected ? null : state.error,
   }
@@ -172,6 +181,7 @@ export function gameStateReducer(
         ...state,
         players: [...state.players, {
           playerId: player.playerId, username: player.username, connected: player.connected,
+          lastCheckpoint: player.lastCheckpoint,
         }],
         playback: robotPlaybackReducer(state.playback, { type: 'add', robot: { ...robot, colour: '#c74f4f' } }),
       }
@@ -184,6 +194,19 @@ export function gameStateReducer(
         ...state,
         players: state.players.filter((player) => player.playerId !== playerId),
         playback: robotPlaybackReducer(state.playback, { type: 'remove', robotId }),
+      }
+    }
+    case 'checkpoint-progress': {
+      const { gameId, playerId, lastCheckpoint, checkpointCount } = event.payload
+      const player = state.players.find((candidate) => candidate.playerId === playerId)
+      if (gameId !== state.assignment?.gameId || !player ||
+          !Number.isSafeInteger(lastCheckpoint) || !Number.isSafeInteger(checkpointCount) ||
+          lastCheckpoint > checkpointCount || lastCheckpoint <= player.lastCheckpoint) return state
+      return {
+        ...state,
+        checkpointCount,
+        players: state.players.map((candidate) =>
+          candidate.playerId === playerId ? { ...candidate, lastCheckpoint } : candidate),
       }
     }
     case 'player-connection-changed': {
@@ -231,8 +254,10 @@ export function gameStateReducer(
         paused: snapshot.paused,
         aborted: snapshot.aborted,
         error: snapshot.aborted ? 'This game has encountered an error and cannot continue.' : null,
+        checkpointCount: snapshot.checkpointCount,
         players: snapshot.players.map((player) => ({
           playerId: player.playerId, username: player.username, connected: player.connected,
+          lastCheckpoint: player.lastCheckpoint,
         })),
         playback: createRobotPlaybackState(
           snapshot.robots.map((robot) => ({ ...robot, colour: '#c74f4f' })),
@@ -241,6 +266,8 @@ export function gameStateReducer(
           snapshot.board.width,
           snapshot.board.height,
           {
+            checkpoints: snapshot.board.tiles.flatMap((tile) => tile.checkpointNumber === undefined
+              ? [] : [{ ...tile.position, checkpointNumber: tile.checkpointNumber }]),
             walls: snapshot.board.tiles.map((tile) => ({
               ...tile.position,
               north: tile.walls?.includes('NORTH'),
@@ -271,10 +298,21 @@ export function gameStateReducer(
         phase: 'EXECUTING',
         handReady: false,
         pendingHand: null,
+        playbackProgram: state.playbackProgram ??
+          (state.registers.some((card) => card !== null) ? state.registers : null),
         playback: robotPlaybackReducer(state.playback, { type: 'enqueue', action: event.action }),
       }
-    case 'complete':
-      return activateHand({ ...state, playback: robotPlaybackReducer(state.playback, { type: 'complete' }) })
+    case 'complete': {
+      const playback = robotPlaybackReducer(state.playback, { type: 'complete' })
+      if (playback.active) return { ...state, playback }
+      if (state.phase !== 'PROGRAMMING') return { ...state, playback }
+      return activateHand({
+        ...state,
+        playback,
+        playbackProgram: null,
+        registers: state.playbackProgram ? emptyRegisters() : state.registers,
+      })
+    }
     case 'place': {
       if (!canProgram(state)) return state
       const card = state.hand.find((candidate) => candidate.id === event.cardId)

@@ -1,8 +1,10 @@
 import type {
   CardsDealt,
   GameAborted,
+  GetLobbyDetails,
   JoinGame,
   JoinResult,
+  LobbyDetailsResult,
   LoginResult,
   ProgramResult,
   ProgramSubmitted,
@@ -10,6 +12,7 @@ import type {
   PlayerJoined,
   PlayerLeft,
   PlayerConnectionChanged,
+  PlayerCheckpointProgress,
   LeaveResult,
 } from './payloads.js'
 import type { SubmitProgram } from './submitProgram.js'
@@ -18,11 +21,13 @@ import type { Login } from './login.js'
 export type JoinResultAcknowledgement = (result: JoinResult) => void
 export type ProgramResultAcknowledgement = (result: ProgramResult) => void
 export type LoginAcknowledgement = (result: LoginResult) => void
+export type LobbyDetailsAcknowledgement = (result: LobbyDetailsResult) => void
 
 export interface ClientToServerEvents {
   'game.leave': (payload: JoinGame, acknowledge: (result: LeaveResult) => void) => void
   'game.join': (payload: JoinGame, acknowledge: JoinResultAcknowledgement) => void
   'user.login': (payload: Login, acknowledge: LoginAcknowledgement) => void
+  'game.getLobbyDetails': (payload: GetLobbyDetails, acknowledge: LobbyDetailsAcknowledgement) => void
   'program.submit': (
     payload: SubmitProgram,
     acknowledge: ProgramResultAcknowledgement,
@@ -30,6 +35,7 @@ export interface ClientToServerEvents {
 }
 
 export interface ServerToClientEvents {
+  'player.checkpointProgress': (payload: PlayerCheckpointProgress) => void
   'game.playerJoined': (payload: PlayerJoined) => void
   'game.playerLeft': (payload: PlayerLeft) => void
   'game.playerConnectionChanged': (payload: PlayerConnectionChanged) => void

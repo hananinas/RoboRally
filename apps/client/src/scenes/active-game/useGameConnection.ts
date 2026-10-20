@@ -3,6 +3,7 @@ import type {
   GameAborted,
   JoinResult,
   PlayerConnectionChanged,
+  PlayerCheckpointProgress,
   RobotActionResolved,
   PlayerJoined,
   PlayerLeft,
@@ -62,6 +63,8 @@ export default function useGameConnection(socket: GameSocket) {
     const handlePlayerConnectionChanged = (payload: PlayerConnectionChanged) =>
       receive({ type: 'player-connection-changed', payload })
     const handleAborted = (_payload: GameAborted) => receive({ type: 'aborted' })
+    const handleCheckpointProgress = (payload: PlayerCheckpointProgress) =>
+      receive({ type: 'checkpoint-progress', payload })
 
     socket.on('disconnect', handleDisconnect)
     socket.on('connect', handleConnect)
@@ -72,6 +75,7 @@ export default function useGameConnection(socket: GameSocket) {
     socket.on('game.playerLeft', handlePlayerLeft)
     socket.on('game.playerConnectionChanged', handlePlayerConnectionChanged)
     socket.on('game.aborted', handleAborted)
+    socket.on('player.checkpointProgress', handleCheckpointProgress)
     return () => {
       generation.current += 1
       socket.off('disconnect', handleDisconnect)
@@ -83,6 +87,7 @@ export default function useGameConnection(socket: GameSocket) {
       socket.off('game.playerLeft', handlePlayerLeft)
       socket.off('game.playerConnectionChanged', handlePlayerConnectionChanged)
       socket.off('game.aborted', handleAborted)
+      socket.off('player.checkpointProgress', handleCheckpointProgress)
     }
   }, [dispatch, socket])
 

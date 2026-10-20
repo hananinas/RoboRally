@@ -2,6 +2,8 @@ import type {
   Card as CardPayload,
   CardsDealt,
   GamePhase as GamePhasePayload,
+  LobbyDetails,
+  LobbyPlayer,
   Orientation,
   PublicGameState,
   RobotActionResolved,
@@ -17,6 +19,7 @@ import {
   type GamePhase,
   type NextActionResult,
   type Player,
+  DEMO_MAP,
 } from '@/game/index'
 import { Integer } from '@/numbers'
 
@@ -47,6 +50,7 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
     position: { x: Integer(x), y: Integer(y) },
     type: 'EMPTY',
     ...(walls.length === 0 ? {} : { walls }),
+    ...(tile.checkpointNumber === undefined ? {} : { checkpointNumber: tile.checkpointNumber }),
   }
 }
 
@@ -61,6 +65,7 @@ export function presentPublicGameState(
 
   return {
     gameId,
+    checkpointCount: game.board.checkpointCount,
     players,
     antenna: game.antenna,
     board: {
@@ -79,6 +84,19 @@ export function presentPublicGameState(
     phase: phases[game.phase],
     paused: game.paused,
     aborted: game.aborted,
+  }
+}
+
+export function presentLobbyDetails(
+  gameId: GameId,
+  game: Game,
+  players: readonly LobbyPlayer[],
+): LobbyDetails {
+  return {
+    gameId,
+    name: game.name,
+    players: players.map(({ playerId, username }) => ({ playerId, username })),
+    map: { name: DEMO_MAP.name, icon: DEMO_MAP.icon, maxPlayers: DEMO_MAP.maxPlayers },
   }
 }
 

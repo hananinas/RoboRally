@@ -1,6 +1,7 @@
 export type {
   ClientToServerEvents,
   JoinResultAcknowledgement,
+  LobbyDetailsAcknowledgement,
   LoginAcknowledgement,
   ProgramResultAcknowledgement,
   ServerToClientEvents,
@@ -14,9 +15,14 @@ export type {
   Coordinate,
   GameAborted,
   GameId,
+  GameMap,
   GamePhase,
+  GetLobbyDetails,
   JoinGame,
   JoinResult,
+  LobbyDetails,
+  LobbyDetailsResult,
+  LobbyPlayer,
   LoginResult,
   Orientation,
   PlayerAssignment,
@@ -24,6 +30,7 @@ export type {
   PlayerJoined,
   PlayerLeft,
   PlayerConnectionChanged,
+  PlayerCheckpointProgress,
   LeaveResult,
   PlayerState,
   Position,
@@ -41,6 +48,7 @@ export type {
 export { loginSchema, parseLogin } from './login.js'
 export type { Login, LoginRequestRejection } from './login.js'
 export { joinGameSchema } from './joinGame.js'
+export { getLobbyDetailsSchema } from './getLobbyDetails.js'
 export { leaveGameSchema } from './leaveGame.js'
 export { submitProgramSchema } from './submitProgram.js'
 export type { ProgramCardIds, SubmitProgram } from './submitProgram.js'

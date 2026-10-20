@@ -34,8 +34,10 @@ export type SubmitProgramError =
   | 'PLAYER_NOT_IN_GAME'
   | 'ALREADY_SUBMITTED'
   | 'INVALID_PROGRAM'
+export const DEFAULT_GAME_NAME = 'Game'
 
 export class Game {
+  readonly name: string  
   readonly board: Board
   private readonly roster: Player[]
   readonly antenna: Antenna
@@ -53,6 +55,7 @@ export class Game {
     players: readonly Player[],
     deck: readonly Card[],
     antenna: Antenna = { x: Integer(Math.floor(board.width / 2)), y: Integer(0), angle: Math.PI / 2 },
+    name: string = DEFAULT_GAME_NAME,
   ) {
     if (deck.length < 5 || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')
@@ -73,6 +76,7 @@ export class Game {
     }
 
     this.board = board
+    this.name = name
     this.roster = [...players]
     this.antenna = Object.freeze({ ...antenna })
     this.deck = [...deck]
@@ -289,8 +293,11 @@ export class Game {
   }
 
   private activateBoardElements(): void {
-    // V0 has no board effects.
-    // Ordered board effects run here after every robot has acted.
+    for (const player of this.players) {
+      const position = this.board.positionOf(player.robot.id)
+      const checkpoint = this.board.getTile(position)?.checkpointNumber
+      if (checkpoint !== undefined) player.completeCheckpoint(checkpoint)
+    }
   }
 
   private finishRegister(): void {

@@ -13,6 +13,7 @@ import { createActionScheduler } from '@/actionScheduler'
 import { handleLogin } from '@/socket/handlers/authHandlers'
 import {
   handleDisconnect,
+  handleGetLobbyDetails,
   handleJoin,
   handleLeave,
   reconnectIfRecovered,
@@ -58,6 +59,7 @@ export function createGameSocketServer(
   const publicState = () => presentPublicGameState(gameId, game,
     [...memberships.values()].map(({ user, player, connectionId }) => ({
       playerId: player.id,
+      lastCheckpoint: player.lastCheckpoint,
       username: user.username,
       programSubmitted: game.hasSubmittedProgram(player.id),
       connected: connectionId !== null,
@@ -89,6 +91,8 @@ export function createGameSocketServer(
     socket.on('game.join', (payload, acknowledge) => handleJoin(membershipContext, socket, payload, acknowledge))
     socket.on('game.leave', (payload, acknowledge) => handleLeave(membershipContext, socket, payload, acknowledge))
     socket.on('disconnect', () => handleDisconnect(membershipContext, socket))
+    socket.on('game.getLobbyDetails', (payload, acknowledge) =>
+      handleGetLobbyDetails(membershipContext, socket, payload, acknowledge))
     socket.on('program.submit', (payload, acknowledge) =>
       handleSubmitProgram(membershipContext, socket, payload, acknowledge))
   })

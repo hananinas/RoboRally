@@ -56,6 +56,7 @@ export type Tile = Readonly<{
   position: Coordinate
   type: 'EMPTY'
   walls?: readonly Orientation[]
+  checkpointNumber?: number
 }>
 
 export type Board = Readonly<{
@@ -70,6 +71,7 @@ export type Antenna = Readonly<Coordinate & { angle: number }>
 
 export type PublicGameState = Readonly<{
   gameId: GameId
+  checkpointCount: number
   antenna: Antenna
   board: Board
   robots: readonly Robot[]
@@ -81,6 +83,7 @@ export type PublicGameState = Readonly<{
 
 export type PlayerState = Readonly<{
   playerId: PlayerId
+  lastCheckpoint: number
   username: string
   programSubmitted: boolean
   connected: boolean
@@ -95,6 +98,12 @@ export type PlayerJoined = Readonly<{
 export type PlayerLeft = Readonly<{ gameId: GameId; playerId: PlayerId; robotId: RobotId }>
 
 export type GameAborted = Readonly<{ gameId: GameId }>
+export type PlayerCheckpointProgress = Readonly<{
+  gameId: GameId
+  playerId: PlayerId
+  lastCheckpoint: number
+  checkpointCount: number
+}>
 
 export type PlayerConnectionChanged = Readonly<{
   gameId: GameId
@@ -143,6 +152,35 @@ export type RobotActionResolved = Readonly<{
   instruction: Instruction
   position: Position
 }>
+
+export type GetLobbyDetails = Readonly<Record<string, never>>
+
+export type GameMap = Readonly<{
+  name: string
+  icon: string
+  maxPlayers: number
+}>
+
+export type LobbyPlayer = Readonly<{
+  playerId: PlayerId
+  username: string
+}>
+
+export type LobbyDetails = Readonly<{
+  gameId: GameId
+  name: string
+  players: readonly LobbyPlayer[]
+  map: GameMap
+}>
+
+export type LobbyDetailsResult =
+  | Readonly<{
+      outcome: 'LOBBY_FOUND'
+      lobbies: readonly LobbyDetails[]
+    }>
+  | Readonly<{
+      outcome: 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'INTERNAL_ERROR'
+    }>
 
 export type JoinResult =
   | Readonly<{

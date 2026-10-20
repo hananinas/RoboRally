@@ -30,6 +30,7 @@ describe('game event payload types', () => {
       phase: 'PROGRAMMING',
       paused: false,
       aborted: false,
+      checkpointCount: 0,
     } satisfies PublicGameState
 
     expect(state.gameId).toBe('game')

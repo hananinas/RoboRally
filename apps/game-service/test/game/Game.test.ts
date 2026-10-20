@@ -202,4 +202,12 @@ describe('Game.addPlayer', () => {
     expect(result.isErr()).toBe(true)
     expect(result._unsafeUnwrapErr()).toBe('NO_SPAWN_AVAILABLE')
   })
+
+  it('has a name, which defaults when none is given', () => {
+    const { game, deck } = createGame()
+    expect(game.name).toBe('Game')
+    const named = new Game(new Board([[new EmptyTile()]]), [], deck, undefined, 'Shared game')
+    expect(named.name).toBe('Shared game')
+  })
+
 })

@@ -6,7 +6,7 @@ async function leave(page: Page) {
   await page.getByRole('button', { name: 'Game options', exact: true }).click()
   await page.getByRole('button', { name: 'Leave game', exact: true }).click()
   await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Join game', exact: true })).toBeEnabled()
+  await expect(page.getByRole('button', { name: /Lobby 1/ })).toBeEnabled()
 }
 
 test('two real clients see joins and leaves without losing the first player’s selected cards', async ({ browser, page, baseURL }) => {
@@ -33,6 +33,7 @@ test('two real clients see joins and leaves without losing the first player’s 
     await expect.poll(() => robotIds(page)).toEqual([firstRobot])
     await expect(selected).toBeVisible()
 
+    await other.getByRole('button', { name: /Lobby 1/ }).click()
     await other.getByRole('button', { name: 'Join game', exact: true }).click()
     await expect(other.getByRole('main', { name: 'Game board' })).toBeVisible()
     await expect.poll(() => robotIds(page)).toHaveLength(2)

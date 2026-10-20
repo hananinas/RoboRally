@@ -3,7 +3,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { submitProgramSchema } from '@robo-rally/game-events'
 import type {
-  ClientToServerEvents, JoinResult, PlayerConnectionChanged, ServerToClientEvents,
+  ClientToServerEvents, JoinResult, LobbyDetails, PlayerConnectionChanged, PlayerCheckpointProgress, ServerToClientEvents,
 } from '@robo-rally/game-events'
 import { io as createClient, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -281,9 +281,63 @@ describe('game membership over Socket.IO', () => {
     expect(shared.game.phase).toBe('programming')
   })
 
-  it('retains disconnected membership, robot and hand for the returning user', async () => {
+  it('broadcasts changed progress to members after actions and before next hands, without repeating it', async () => {
     const first = await connect('First')
     const initial = await join(first)
+    expect(initial.state.checkpointCount).toBe(2)
+    expect(initial.state.players[0].lastCheckpoint).toBe(0)
+    const joinedEvent = new Promise((resolve) => first.once('game.playerJoined', resolve))
+    const second = await connect('Second')
+    const other = await join(second)
+    expect(await joinedEvent).toMatchObject({ player: { playerId: other.assignment.playerId, lastCheckpoint: 0 } })
+    const spectator = await connect('Login only')
+    const spectatorProgress = vi.fn()
+    spectator.on('player.checkpointProgress', spectatorProgress)
+
+    // Turn right, move, turn left, move, U-turn: reach checkpoint 1 in register 4.
+    const otherProgram = submitProgramSchema.parse({
+      ...submission(other),
+      cardIds: [5, 0, 4, 7, 6].map((index) => other.hand[index].id),
+    })
+    const seen: { name: string; payload: unknown }[][] = [[], []]
+    for (const [index, client] of [first, second].entries()) {
+      client.onAny((name, payload: unknown) => {
+        if (['robot.actionResolved', 'player.checkpointProgress', 'cards.dealt'].includes(name)) {
+          seen[index].push({ name, payload })
+        }
+      })
+    }
+    for (const round of [1, 2]) {
+      const hands = [first, second].map((client) => new Promise((resolve) => client.once('cards.dealt', resolve)))
+      await first.timeout(1000).emitWithAck('program.submit', submission(initial))
+      await second.timeout(1000).emitWithAck('program.submit', otherProgram)
+      await Promise.all(hands)
+      for (const events of seen) {
+        const actions = Array.from({ length: 10 }, () => 'robot.actionResolved')
+        expect(events.map((event) => event.name)).toEqual(round === 1
+          ? [
+            ...actions.slice(0, 2), 'player.checkpointProgress',
+            ...actions.slice(2, 8), 'player.checkpointProgress',
+            ...actions.slice(8), 'cards.dealt',
+          ]
+          : [...actions, 'cards.dealt'])
+        if (round === 1) expect(events.filter((event) => event.name === 'player.checkpointProgress').map((event) => event.payload))
+          .toEqual(shared.game.players.map((player) => ({
+            gameId: shared.gameId, playerId: player.id, lastCheckpoint: 1, checkpointCount: 2,
+          })))
+        events.length = 0
+      }
+    }
+    expect((await join(first)).state.players.map((player) => player.lastCheckpoint)).toEqual([1, 1])
+    await spectator.timeout(1000).emitWithAck('game.getLobbyDetails', {})
+    expect(spectatorProgress).not.toHaveBeenCalled()
+  })
+
+  it('retains disconnected membership, robot, hand and checkpoint progress for the returning user', async () => {
+    const first = await connect('First')
+    const initial = await join(first)
+    const player = shared.game.players[0]
+    player.completeCheckpoint(1)
     const disconnected = new Promise((resolve) => server.sockets.sockets.get(first.id!)!.once('disconnect', resolve))
     first.disconnect()
     await disconnected
@@ -292,6 +346,10 @@ describe('game membership over Socket.IO', () => {
     const restored = await join(replacement)
     expect(restored.assignment).toEqual(initial.assignment)
     expect(restored.hand).toEqual(initial.hand)
+    expect(shared.game.players[0]).toBe(player)
+    expect(player.lastCheckpoint).toBe(1)
+    expect(restored.state.checkpointCount).toBe(2)
+    expect(restored.state.players[0].lastCheckpoint).toBe(1)
   })
 
   it('pauses the game and announces disconnection when a member drops', async () => {
@@ -466,6 +524,15 @@ describe('game membership over Socket.IO', () => {
     }
     for (let action = 0; action < 9; action++) shared.game.executeNextAction()
     expect(shared.game.currentRegister).toBe(4)
+    const player = shared.game.players[0]
+    expect(player.lastCheckpoint).toBe(1)
+    shared.game.board.removeRobot(player.robot.id)
+    shared.game.board.placeRobot(player.robot.id, { x: Integer(8), y: Integer(9) })
+    const events: string[] = []
+    first.onAny((name) => {
+      if (['game.playerLeft', 'player.checkpointProgress', 'cards.dealt'].includes(name)) events.push(name)
+    })
+    const progress = new Promise<PlayerCheckpointProgress>((resolve) => first.once('player.checkpointProgress', resolve))
     const hand = new Promise((resolve) => first.once('cards.dealt', resolve))
 
     expect(await second.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId }))
@@ -474,6 +541,10 @@ describe('game membership over Socket.IO', () => {
     expect(await hand).toEqual({
       gameId: shared.gameId, playerId: initial.assignment.playerId, cards: initial.hand,
     })
+    expect(await progress).toEqual({
+      gameId: shared.gameId, playerId: player.id, lastCheckpoint: 2, checkpointCount: 2,
+    })
+    expect(events).toEqual(['game.playerLeft', 'player.checkpointProgress', 'cards.dealt'])
     expect(shared.game.phase).toBe('programming')
   })
 
@@ -508,5 +579,75 @@ describe('game membership over Socket.IO', () => {
       .toEqual({ outcome: 'LOGIN_REQUIRED' })
     expect(shared.game.players).toHaveLength(0)
     expect(server.sockets.sockets.get(client.id!)?.data.user).toBeUndefined()
+  })
+
+  describe('game.getLobbyDetails', () => {
+    const lobbies = async (client: Client) => {
+      const result = await client.timeout(1000).emitWithAck('game.getLobbyDetails', {})
+      return result.outcome === 'LOBBY_FOUND' ? result.lobbies : result
+    }
+    const demoMap = { name: 'DEMO MAP', icon: expect.stringMatching(/^data:image\/svg\+xml;base64,/), maxPlayers: 6 }
+    const usernames = async (client: Client) => {
+      const [lobby] = await lobbies(client) as readonly LobbyDetails[]
+      return lobby!.players.map((player) => player.username)
+    }
+
+    it('rejects unauthenticated and malformed requests', async () => {
+      const anonymous = await connect()
+      expect(await lobbies(anonymous)).toEqual({ outcome: 'LOGIN_REQUIRED' })
+      const client = await connect('Reader')
+      expect(await raw(client, 'game.getLobbyDetails', { gameId: shared.gameId }))
+        .toEqual({ outcome: 'INVALID_REQUEST' })
+      expect(await raw(client, 'game.getLobbyDetails', null)).toEqual({ outcome: 'INVALID_REQUEST' })
+    })
+
+    it('lists the lobbies with their players and map without creating membership or room access', async () => {
+      const reader = await connect('Reader')
+      const received = vi.fn()
+      reader.onAny(received)
+      expect(await lobbies(reader)).toEqual([
+        { gameId: shared.gameId, name: 'Shared game', players: [], map: demoMap },
+      ])
+
+      const first = await connect('First')
+      const firstJoin = await join(first)
+      const secondJoin = await join(await connect('Second'))
+      expect(await lobbies(reader)).toEqual([{
+        gameId: shared.gameId,
+        name: 'Shared game',
+        players: [
+          { playerId: firstJoin.assignment.playerId, username: 'First' },
+          { playerId: secondJoin.assignment.playerId, username: 'Second' },
+        ],
+        map: demoMap,
+      }])
+      await first.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId })
+      expect(await usernames(reader)).toEqual(['Second'])
+
+      // Reading never made the reader a member: no player, robot, rooms, hand, or broadcasts.
+      expect(shared.game.players).toHaveLength(1)
+      expect(server.sockets.sockets.get(reader.id!)?.rooms).toEqual(new Set([reader.id]))
+      expect(await reader.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId }))
+        .toEqual({ outcome: 'GAME_NOT_FOUND' })
+      expect(received).not.toHaveBeenCalled()
+    })
+
+    it('leaves a later join unaffected', async () => {
+      const reader = await connect('Reader')
+      await lobbies(reader)
+      await lobbies(reader)
+      const joined = await join(reader)
+      expect(joined.state.players.map((player) => player.username)).toEqual(['Reader'])
+      expect(shared.game.players).toHaveLength(1)
+      expect(await usernames(reader)).toEqual(['Reader'])
+    })
+
+    it('does not reply without an acknowledgement', async () => {
+      const client = await connect('Reader')
+      const emit = client.emit.bind(client) as unknown as (event: string, payload: unknown) => void
+      emit('game.getLobbyDetails', {})
+      expect(await lobbies(client)).toHaveLength(1)
+      expect(shared.game.players).toHaveLength(0)
+    })
   })
 })
