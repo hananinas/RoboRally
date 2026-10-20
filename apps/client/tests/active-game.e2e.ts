@@ -26,6 +26,49 @@ test('renders the programming interface', async ({ page }) => {
   await expect(hand.getByRole('button')).toHaveCount(9)
   await expect(controls.getByRole('button', { name: 'Done' })).toBeDisabled()
   await expect(page.getByText('Programming', { exact: true })).toBeVisible()
+  await expect(controls.getByRole('heading', { name: 'Checkpoints', exact: true }).locator('..')).toContainText('0/0')
+})
+
+test('shows checkpoint counts from snapshots and broadcasts without disrupting queued playback', async ({ page, game }) => {
+  await page.clock.install()
+  const state = {
+    ...game.initial.state, checkpointCount: 2,
+    board: {
+      ...game.initial.state.board,
+      tiles: game.initial.state.board.tiles.map((tile, index) =>
+        index < 2 ? { ...tile, checkpointNumber: index + 1 } : tile),
+    },
+    players: [...game.initial.state.players, {
+      playerId: OTHER_PLAYER_ID, username: 'Other player', connected: true, programSubmitted: false, lastCheckpoint: 0,
+    }],
+  }
+  await game.control({ type: 'joined-state', state, hand: game.initial.cards, programSubmitted: false })
+  await openGame(page)
+  const checkpoints = page.getByRole('heading', { name: 'Checkpoints', exact: true }).locator('..')
+  await expect(checkpoints).toContainText('0/2')
+  await fillProgram(page)
+  await page.getByRole('button', { name: 'Done', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()
+  await pauseClock(page)
+  await game.control({ type: 'checkpoint-progress', progress: {
+    gameId: GAME_ID, playerId: OTHER_PLAYER_ID, lastCheckpoint: 1, checkpointCount: 2,
+  } })
+  await game.control({ type: 'round', actions: ROUND_ACTIONS, deferHand: true })
+  await expect(page.getByRole('status')).toHaveText('Executing')
+  await expect(checkpoints).toContainText('0/2')
+  await game.control({ type: 'checkpoint-progress', progress: {
+    gameId: GAME_ID, playerId: PLAYER_ID, lastCheckpoint: 1, checkpointCount: 2,
+  } })
+  await expect(checkpoints).toContainText('1/2')
+  await expect(page.getByRole('button', { name: /remove from register/ })).toHaveCount(5)
+  await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()
+  await expect(page.locator(`[data-robot-id="${ROBOT_ID}"]`).first()).toHaveAttribute('data-board-tile', '5,4')
+
+  await game.control({ type: 'joined-state', state: {
+    ...state, players: state.players.map((player) => ({ ...player, lastCheckpoint: 1 })),
+  }, hand: game.initial.cards, programSubmitted: false })
+  await openGame(page)
+  await expect(checkpoints).toContainText('1/2')
 })
 
 test('collapses player details from the keyboard', async ({ page }) => {

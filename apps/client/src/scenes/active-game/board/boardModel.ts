@@ -9,6 +9,7 @@ export type BoardCell = BoardPoint &
   Readonly<{
     tile: BoardTileType
     walls: BoardTileWalls
+    checkpointNumber?: number
   }>
 
 export type BoardRenderModel = Readonly<{
@@ -98,6 +99,7 @@ type BoardAssignments = Readonly<{
   hole?: readonly (readonly [number, number])[]
   laser?: readonly (readonly [number, number])[]
   walls?: readonly BoardWallAssignment[]
+  checkpoints?: readonly (BoardPoint & { checkpointNumber: number })[]
 }>
 
 export const BOARD_WALL_SIDES: readonly BoardWallSide[] = [
@@ -169,6 +171,15 @@ export function createBoardRenderModel(
     walls.set(key, createTileWalls(assignment))
   }
 
+  const checkpoints = new Map<string, number>()
+  for (const { x, y, checkpointNumber } of assignments.checkpoints ?? []) {
+    const key = positionKey(x, y)
+    if (!Number.isSafeInteger(checkpointNumber) || checkpointNumber < 1 || checkpoints.has(key)) {
+      throw new RangeError(`Invalid checkpoint assignment for cell ${key}`)
+    }
+    checkpoints.set(key, checkpointNumber)
+  }
+
   const cells = Object.freeze(
     Array.from({ length: rows }, (_, y) =>
       Array.from({ length: columns }, (_, x) =>
@@ -177,6 +188,7 @@ export function createBoardRenderModel(
           y,
           tile: tiles.get(`${x},${y}`) ?? 'empty',
           walls: walls.get(`${x},${y}`) ?? EMPTY_WALLS,
+          ...(checkpoints.has(`${x},${y}`) ? { checkpointNumber: checkpoints.get(`${x},${y}`) } : {}),
         }),
       ),
     ).flat(),

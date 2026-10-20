@@ -1,6 +1,7 @@
 import { parseSubmitProgram } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'
 import { Direction, EmptyTile, createSinglePlayerGame } from '@/game/index'
+import { createSharedGame } from '@/game/SinglePlayerGame'
 
 describe('single-player game', () => {
   it('creates the fixed board, player, and robot', () => {
@@ -45,6 +46,16 @@ describe('single-player game', () => {
       playerId: player.id,
       cardIds: cardIds.slice(0, 5),
     })
+  })
+
+  it('places the same fixed checkpoints in both game factories', () => {
+    for (const { game } of [createSinglePlayerGame(), createSharedGame()]) {
+      expect(game.board.checkpointCount).toBe(2)
+      expect(game.board.getTile({ x: 10, y: 6 })?.checkpointNumber).toBe(1)
+      expect(game.board.getTile({ x: 8, y: 9 })?.checkpointNumber).toBe(2)
+      expect(game.board.getTile({ x: 10, y: 7 })?.checkpointNumber).toBeUndefined()
+      expect(game.board.getTile({ x: 10, y: 0 })?.checkpointNumber).toBeUndefined()
+    }
   })
 
   it('creates isolated state for each service instance', () => {

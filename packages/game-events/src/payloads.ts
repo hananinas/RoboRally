@@ -56,6 +56,7 @@ export type Tile = Readonly<{
   position: Coordinate
   type: 'EMPTY'
   walls?: readonly Orientation[]
+  checkpointNumber?: number
 }>
 
 export type Board = Readonly<{
@@ -70,6 +71,7 @@ export type Antenna = Readonly<Coordinate & { angle: number }>
 
 export type PublicGameState = Readonly<{
   gameId: GameId
+  checkpointCount: number
   antenna: Antenna
   board: Board
   robots: readonly Robot[]
@@ -80,6 +82,7 @@ export type PublicGameState = Readonly<{
 
 export type PlayerState = Readonly<{
   playerId: PlayerId
+  lastCheckpoint: number
   username: string
   programSubmitted: boolean
   connected: boolean
@@ -92,6 +95,13 @@ export type PlayerJoined = Readonly<{
 }>
 
 export type PlayerLeft = Readonly<{ gameId: GameId; playerId: PlayerId; robotId: RobotId }>
+
+export type PlayerCheckpointProgress = Readonly<{
+  gameId: GameId
+  playerId: PlayerId
+  lastCheckpoint: number
+  checkpointCount: number
+}>
 
 export type PlayerConnectionChanged = Readonly<{
   gameId: GameId

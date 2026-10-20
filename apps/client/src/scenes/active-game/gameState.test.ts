@@ -46,9 +46,10 @@ const publicState: PublicGameState = {
   gameId: '40000000-0000-4000-8000-000000000001',
   phase: 'PROGRAMMING',
   paused: false,
+  checkpointCount: 0,
   players: [
-    { playerId: '50000000-0000-4000-8000-000000000001', username: 'First', connected: true, programSubmitted: false },
-    { playerId: '50000000-0000-4000-8000-000000000002', username: 'Second', connected: true, programSubmitted: false },
+    { playerId: '50000000-0000-4000-8000-000000000001', lastCheckpoint: 0, username: 'First', connected: true, programSubmitted: false },
+    { playerId: '50000000-0000-4000-8000-000000000002', lastCheckpoint: 0, username: 'Second', connected: true, programSubmitted: false },
   ],
   antenna: { x: 2, y: 0, angle: Math.PI / 2 },
   board: {
@@ -699,10 +700,64 @@ describe('client game state', () => {
   })
 })
 
+describe('checkpoint progress', () => {
+  const progress = {
+    gameId: publicState.gameId, playerId: result.assignment.playerId,
+    lastCheckpoint: 1, checkpointCount: 2,
+  }
+
+  it('initializes and replaces progress from authoritative join snapshots', () => {
+    const snapshot = {
+      ...publicState, checkpointCount: 2,
+      board: { ...publicState.board, tiles: publicState.board.tiles.map((tile, index) =>
+        index < 2 ? { ...tile, checkpointNumber: index + 1 } : tile) },
+      players: publicState.players.map((player) => ({ ...player, lastCheckpoint: 1 })),
+    }
+    const state = gameStateReducer(createClientGameState(), { type: 'joined', result: { ...result, state: snapshot } })
+    expect(state.checkpointCount).toBe(2)
+    expect(state.board?.cells[0].checkpointNumber).toBe(1)
+    expect(state.players.map((player) => player.lastCheckpoint)).toEqual([1, 1])
+    const replaced = gameStateReducer(state, { type: 'joined', result })
+    expect(replaced.checkpointCount).toBe(0)
+    expect(replaced.players.map((player) => player.lastCheckpoint)).toEqual([0, 0])
+  })
+
+  it('updates the identified player immediately without changing programming or playback', () => {
+    let state = selectProgram()
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, { type: 'action', action: actions[1] })
+    const updated = gameStateReducer(state, { type: 'checkpoint-progress', payload: progress })
+    expect(updated.players.map((player) => player.lastCheckpoint)).toEqual([1, 0])
+    expect(updated.checkpointCount).toBe(2)
+    expect(updated).toEqual({ ...state, players: updated.players, checkpointCount: 2 })
+    expect(updated.playback).toBe(state.playback)
+    expect(canProgram(updated)).toBe(false)
+    const restored = gameStateReducer(gameStateReducer(updated, { type: 'disconnected' }), { type: 'reconnected' })
+    expect(restored.players).toBe(updated.players)
+  })
+
+  it('ignores duplicates, older progress, unrelated games and unknown or departed players', () => {
+    const state = gameStateReducer(programmingState(), { type: 'checkpoint-progress', payload: progress })
+    for (const payload of [
+      progress, { ...progress, lastCheckpoint: 0 },
+      { ...progress, gameId: 'another-game', lastCheckpoint: 2 },
+      { ...progress, playerId: 'unknown' },
+      { ...progress, lastCheckpoint: 3 },
+      { ...progress, lastCheckpoint: 1.5 },
+      { ...progress, checkpointCount: -1, lastCheckpoint: 2 },
+    ]) expect(gameStateReducer(state, { type: 'checkpoint-progress', payload })).toBe(state)
+    const departed = gameStateReducer(state, { type: 'player-left', payload: {
+      gameId: progress.gameId, playerId: progress.playerId, robotId,
+    } })
+    expect(gameStateReducer(departed, { type: 'checkpoint-progress', payload: progress })).toBe(departed)
+    expect(gameStateReducer(state, { type: 'reset' }).checkpointCount).toBe(0)
+  })
+})
+
 describe('membership updates', () => {
   const newcomer = {
     gameId: publicState.gameId,
-    player: { playerId: 'new-player', username: 'New', connected: true, programSubmitted: false },
+    player: { playerId: 'new-player', lastCheckpoint: 0, username: 'New', connected: true, programSubmitted: false },
     robot: { robotId: 'new-robot', playerId: 'new-player', position: { coordinate: { x: 1, y: 3 }, orientation: 'NORTH' as const } },
   }
 
@@ -711,6 +766,7 @@ describe('membership updates', () => {
     state = gameStateReducer(state, { type: 'action', action: actions[0] })
     const updated = gameStateReducer(state, { type: 'player-joined', payload: newcomer })
     expect(updated.players.map((player) => player.playerId)).toContain('new-player')
+    expect(updated.players.at(-1)?.lastCheckpoint).toBe(0)
     expect(updated.playback.robots.at(-1)?.robotId).toBe('new-robot')
     expect(updated.playback.active).toBe(state.playback.active)
     expect(gameStateReducer(updated, { type: 'player-joined', payload: newcomer })).toBe(updated)
