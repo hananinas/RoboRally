@@ -28,3 +28,9 @@ export class EmptyTile extends Tile {
     super(walls, checkpointNumber)
   }
 }
+
+export class PitTile extends Tile {
+  constructor(walls: Iterable<Direction> = []) {
+    super(walls)
+  }
+}

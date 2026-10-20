@@ -13,6 +13,7 @@ import type {
 import {
   Direction,
   EmptyTile,
+  PitTile,
   type Card,
   type Game,
   type GameId,
@@ -40,14 +41,14 @@ function presentCard(card: Card): CardPayload {
 
 function presentTile(game: Game, x: number, y: number): TilePayload {
   const tile = game.board.getTile({ x, y })
-  if (!(tile instanceof EmptyTile)) {
+  if (!(tile instanceof EmptyTile) && !(tile instanceof PitTile)) {
     throw new Error(`Unsupported tile at ${x},${y}`)
   }
 
   const walls = [...tile.walls].map((direction) => orientations[direction])
   return {
     position: { x, y },
-    type: 'EMPTY',
+    type: tile instanceof PitTile ? 'PIT' : 'EMPTY',
     ...(walls.length === 0 ? {} : { walls }),
     ...(tile.checkpointNumber === undefined ? {} : { checkpointNumber: tile.checkpointNumber }),
   }

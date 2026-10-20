@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Board, Direction, EmptyTile } from '@/game/index.ts'
+import { Board, Direction, EmptyTile, PitTile } from '@/game/index.ts'
 import type { Position } from '@/game/index.ts'
 
 function grid(width = 3, height = 3): EmptyTile[][] {
@@ -16,6 +16,16 @@ const steps: { direction: Direction; target: Position; opposite: Direction }[] =
 ]
 
 describe('Tile and Board layout', () => {
+  it('stores pits with walls without counting them as checkpoints', () => {
+    const pit = new PitTile([Direction.NORTH])
+    const board = new Board([[pit, new EmptyTile([], 1), new PitTile()]])
+
+    expect(board.getTile({ x: 0, y: 0 })).toBe(pit)
+    expect(pit.hasWall(Direction.NORTH)).toBe(true)
+    expect(pit.checkpointNumber).toBeUndefined()
+    expect(board.checkpointCount).toBe(1)
+  })
+
   it('stores checkpoint state alongside walls and derives the total from the grid', () => {
     const checkpoint = new EmptyTile([Direction.NORTH], 2)
     const first = new EmptyTile([], 1)
