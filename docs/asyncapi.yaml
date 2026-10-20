@@ -7,6 +7,19 @@ info:
     This document describes RoboRally's client-server communication. No code change
     regarding communication should be made without updating this document.
     Server broadcast destinations represent Socket.IO rooms.
+    Register and stat snapshots and broadcasts are restricted to the owning lobby's
+    members, including recovered connections; lobby discovery never exposes them.
+    Only the membership-owning connection receives its own hand in JOINED and
+    cards.dealt. No payload delivered to another player may contain that hand.
+    Public register slots contain no card instance IDs. HIDDEN slots contain only
+    a face-down marker, never a card type or instruction; an instruction becomes
+    public only when that owner's register executes.
+    Public visibility grants no write access: the server checks connection-owned
+    game/player membership and card ownership independently of displayed state.
+    Snapshot creation and live-event delivery are ordered so no update is lost
+    between JOINED and later events. After JOINED, do not replay events predating
+    that snapshot. Successful recovery instead replays missed events in order
+    against retained state.
 defaultContentType: application/json
 
 channels:
@@ -24,6 +37,8 @@ channels:
         $ref: '#/components/messages/LeaveGame'
       submitProgram:
         $ref: '#/components/messages/SubmitProgram'
+      updateRegisters:
+        $ref: '#/components/messages/UpdateRegisters'
       getLobbyDetails:
         $ref: '#/components/messages/GetLobbyDetails'
 
@@ -62,6 +77,15 @@ channels:
     messages:
       programResult:
         $ref: '#/components/messages/ProgramResult'
+
+  registerUpdateReplies:
+    address: null
+    description: |
+      Logical reply channel
+      Delivered through the acknowledgement of program.updateRegisters
+    messages:
+      result:
+        $ref: '#/components/messages/RegisterUpdateResult'
 
   lobbyDetailsReplies:
     address: null
@@ -103,6 +127,10 @@ channels:
         $ref: '#/components/messages/PlayerConnectionChanged'
       gameAborted:
         $ref: '#/components/messages/GameAborted'
+      playerStateChanged:
+        $ref: '#/components/messages/PlayerStateChanged'
+      programmingStarted:
+        $ref: '#/components/messages/ProgrammingStarted'
 
 operations:
   handleLogin:
@@ -185,6 +213,20 @@ operations:
       x-socketio:
         acknowledgement: true
 
+  handleUpdateRegisters:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/updateRegisters'
+    reply:
+      channel:
+        $ref: '#/channels/registerUpdateReplies'
+      messages:
+        - $ref: '#/channels/registerUpdateReplies/messages/result'
+      x-socketio:
+        acknowledgement: true
+
 components:
   messages:
 
@@ -236,8 +278,11 @@ components:
     JoinResult:
       name: game.joinResult
       description: >-
-        Returns the player's assignment, game state, private hand, and submission
-        status, or a rejection.
+        Returns the player's assignment, every lobby member's public registers and
+        stats in state.players, the requesting player's private hand, and submission
+        status, or a rejection. Reconnecting uses this same response, preserving
+        revealed instructions but hiding every unexecuted placed card. Apply the
+        complete snapshot before later live events; replace, do not merge old rounds.
       payload:
         $ref: '#/components/schemas/JoinResult'
 
@@ -253,6 +298,7 @@ components:
             state:
               gameId: 00000000-0000-4000-8000-000000000001
               checkpointCount: 0
+              roundNumber: 1
               board:
                 width: 1
                 height: 1
@@ -278,6 +324,13 @@ components:
                 - playerId: 00000000-0000-4000-8000-000000000002
                   username: Dane
                   lastCheckpoint: 0
+                  damage: 0
+                  registers:
+                    - status: EMPTY
+                    - status: EMPTY
+                    - status: EMPTY
+                    - status: EMPTY
+                    - status: EMPTY
                   programSubmitted: false
                   connected: true
               paused: false
@@ -301,6 +354,72 @@ components:
               - id: 00000000-0000-4000-8000-000000000109
                 instruction: TURN_LEFT
             programSubmitted: false
+        - name: reconnectedDuringExecution
+          summary: Own hand only; another player's first register revealed, later slots hidden
+          payload:
+            outcome: JOINED
+            assignment:
+              gameId: 00000000-0000-4000-8000-000000000001
+              playerId: 00000000-0000-4000-8000-000000000002
+              robotId: 00000000-0000-4000-8000-000000000003
+            state:
+              gameId: 00000000-0000-4000-8000-000000000001
+              roundNumber: 2
+              checkpointCount: 2
+              board:
+                width: 2
+                height: 1
+                tiles:
+                  - position: { x: 0, y: 0 }
+                    type: EMPTY
+                    checkpointNumber: 1
+                  - position: { x: 1, y: 0 }
+                    type: EMPTY
+                    checkpointNumber: 2
+              robots:
+                - robotId: 00000000-0000-4000-8000-000000000003
+                  playerId: 00000000-0000-4000-8000-000000000002
+                  position:
+                    coordinate: { x: 0, y: 0 }
+                    orientation: NORTH
+                - robotId: 00000000-0000-4000-8000-000000000013
+                  playerId: 00000000-0000-4000-8000-000000000012
+                  position:
+                    coordinate: { x: 1, y: 0 }
+                    orientation: SOUTH
+              phase: EXECUTING
+              antenna: { x: 1, y: 0, angle: 1.5707963267948966 }
+              players:
+                - playerId: 00000000-0000-4000-8000-000000000002
+                  username: Dane
+                  lastCheckpoint: 0
+                  damage: 0
+                  programSubmitted: true
+                  connected: true
+                  registers:
+                    - status: HIDDEN
+                    - status: HIDDEN
+                    - status: HIDDEN
+                    - status: HIDDEN
+                    - status: HIDDEN
+                - playerId: 00000000-0000-4000-8000-000000000012
+                  username: Malte
+                  lastCheckpoint: 1
+                  damage: 2
+                  programSubmitted: true
+                  connected: true
+                  registers:
+                    - status: REVEALED
+                      instruction: TURN_LEFT
+                    - status: HIDDEN
+                    - status: HIDDEN
+                    - status: HIDDEN
+                    - status: HIDDEN
+              paused: false
+            hand:
+              - id: 00000000-0000-4000-8000-000000000110
+                instruction: MOVE_1
+            programSubmitted: true
         - name: duplicateUser
           summary: Another connection already owns membership
           payload:
@@ -366,8 +485,8 @@ components:
         in game:{gameId}:public after a successful explicit leave. The leaving
         connection loses public and private room access before LEFT is
         acknowledged and does not receive this broadcast. Recipients remove the
-        player and robot from their public state. Disconnecting does not emit
-        this event.
+        player, robot, registers, and stats from their public state and discard
+        queued updates for that membership. Disconnecting does not emit this event.
       payload:
         $ref: '#/components/schemas/PlayerLeft'
       examples:
@@ -380,9 +499,34 @@ components:
 
     PlayerJoined:
       name: game.playerJoined
-      description: Announces a new player and robot to existing game participants.
+      description: >-
+        Announces a new player and robot, including initial empty registers and
+        stats, to existing participants in this lobby only. Never includes a hand.
       payload:
         $ref: '#/components/schemas/PlayerJoined'
+      examples:
+        - name: playerJoined
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            player:
+              playerId: 00000000-0000-4000-8000-000000000002
+              username: Dane
+              lastCheckpoint: 0
+              damage: 0
+              programSubmitted: false
+              connected: true
+              registers:
+                - status: EMPTY
+                - status: EMPTY
+                - status: EMPTY
+                - status: EMPTY
+                - status: EMPTY
+            robot:
+              robotId: 00000000-0000-4000-8000-000000000003
+              playerId: 00000000-0000-4000-8000-000000000002
+              position:
+                coordinate: { x: 10, y: 10 }
+                orientation: NORTH
 
     GetLobbyDetails:
       name: game.getLobbyDetails
@@ -432,12 +576,15 @@ components:
         required:
           - gameId
           - playerId
+          - roundNumber
           - cardIds
         properties:
           gameId:
             $ref: "#/components/schemas/GameId"
           playerId:
             $ref: "#/components/schemas/PlayerId"
+          roundNumber:
+            $ref: '#/components/schemas/RoundNumber'
           cardIds:
             type: array
             description: Card instance IDs in register order.
@@ -447,12 +594,17 @@ components:
             items:
               $ref: "#/components/schemas/CardId"
       description: >-
-        Submits five cards in register order for the connection-owned player.
+        Submits five cards in register order for the connection-owned player and
+        current round. The server verifies membership, matching gameId/playerId,
+        phase, pause state, and that every distinct card ID belongs to that player's
+        current hand. Public instructions and occupancy markers never authorize
+        submission of another player's cards.
       examples:
         - name: submit
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
             playerId: 00000000-0000-4000-8000-000000000002
+            roundNumber: 1
             cardIds:
               - 00000000-0000-4000-8000-000000000101
               - 00000000-0000-4000-8000-000000000102
@@ -475,6 +627,7 @@ components:
               - ALREADY_SUBMITTED
               - WRONG_PHASE
               - NOT_A_MEMBER
+              - STALE_ROUND
               - INVALID_REQUEST
               - GAME_ID_MISMATCH
               - PLAYER_ID_MISMATCH
@@ -488,42 +641,230 @@ components:
         WRONG_PHASE: the round had already moved into activation before this submission arrived.
         NOT_A_MEMBER: this connection does not own a membership for this game.
         INVALID_REQUEST: the request did not match the expected shape.
+        STALE_ROUND: roundNumber does not match the current round; no program is changed.
         GAME_ID_MISMATCH: the request's gameId did not match the connection's game.
         PLAYER_ID_MISMATCH: the request's playerId did not match the connection's own player.
         PLAYER_NOT_IN_GAME: the player is no longer part of the game (left or otherwise removed).
         INTERNAL_ERROR: unexpected service failure.
         No acknowledgement means the outcome is unknown.
+      examples:
+        - name: accepted
+          payload:
+            outcome: ACCEPTED
+        - name: staleRound
+          payload:
+            outcome: STALE_ROUND
+
+    UpdateRegisters:
+      name: program.updateRegisters
+      description: >-
+        Updates only the connection-owned player's draft slot occupancy while
+        programming, after each local placement or removal. Contains no card
+        identities and does not store or submit a playable program. Validate
+        membership, matching gameId/playerId, current round, programming phase,
+        unpaused state, and no accepted program before applying. Reject malformed
+        requests without changing state. Accepted changes emit game.playerStateChanged
+        to every connected member of this lobby, including the sender.
+      payload:
+        type: object
+        additionalProperties: false
+        required: [ gameId, playerId, roundNumber, occupied ]
+        properties:
+          gameId:
+            $ref: '#/components/schemas/GameId'
+          playerId:
+            $ref: '#/components/schemas/PlayerId'
+          roundNumber:
+            $ref: '#/components/schemas/RoundNumber'
+          occupied:
+            type: array
+            minItems: 5
+            maxItems: 5
+            description: Full draft in register order; true becomes HIDDEN, false becomes EMPTY.
+            items:
+              type: boolean
+      examples:
+        - name: firstTwoPlaced
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            roundNumber: 1
+            occupied: [ true, true, false, false, false ]
+
+    RegisterUpdateResult:
+      name: program.updateRegistersResult
+      description: |
+        Acknowledges program.updateRegisters, not a separate event.
+        ACCEPTED: draft occupancy applied; no program was submitted.
+        INVALID_REQUEST: malformed payload, including an invalid occupied array.
+        NOT_A_MEMBER: this connection does not own a game membership.
+        GAME_ID_MISMATCH / PLAYER_ID_MISMATCH: identifiers do not match that membership.
+        PLAYER_NOT_IN_GAME: the player has been removed.
+        STALE_ROUND: roundNumber differs from the current round.
+        WRONG_PHASE / GAME_PAUSED: gameplay does not currently allow editing.
+        ALREADY_SUBMITTED: an accepted program cannot be edited.
+        INTERNAL_ERROR: unexpected service failure.
+        Rejections leave occupancy and program unchanged.
+      payload:
+        type: object
+        additionalProperties: false
+        required: [ outcome ]
+        properties:
+          outcome:
+            type: string
+            enum:
+              - ACCEPTED
+              - INVALID_REQUEST
+              - NOT_A_MEMBER
+              - GAME_ID_MISMATCH
+              - PLAYER_ID_MISMATCH
+              - PLAYER_NOT_IN_GAME
+              - STALE_ROUND
+              - WRONG_PHASE
+              - GAME_PAUSED
+              - ALREADY_SUBMITTED
+              - INTERNAL_ERROR
+      examples:
+        - name: accepted
+          payload:
+            outcome: ACCEPTED
+        - name: anotherPlayer
+          payload:
+            outcome: PLAYER_ID_MISMATCH
+
+    PlayerStateChanged:
+      name: game.playerStateChanged
+      description: >-
+        Broadcasts the complete public PlayerState to every connected lobby member
+        after a draft occupancy change or any damage change, including changes
+        outside robot actions. No hand or unexecuted card identity is included.
+        Apply only for an existing player in the current game and round; this event
+        cannot create membership. Replaces that player's public state. Preserve
+        already revealed slots until the next game.programmingStarted. Checkpoint,
+        submission, execution, and connection changes use their existing events.
+        Damage caused by an action follows its robot.actionResolved and precedes
+        subsequent actions and the next round start, so it cannot reveal a register
+        before the execution event. All public state events share server order.
+      payload:
+        type: object
+        additionalProperties: false
+        required: [ gameId, roundNumber, player ]
+        properties:
+          gameId:
+            $ref: '#/components/schemas/GameId'
+          roundNumber:
+            $ref: '#/components/schemas/RoundNumber'
+          player:
+            $ref: '#/components/schemas/PlayerState'
+      examples:
+        - name: draftChanged
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            roundNumber: 1
+            player:
+              playerId: 00000000-0000-4000-8000-000000000002
+              username: Dane
+              lastCheckpoint: 0
+              damage: 0
+              programSubmitted: false
+              connected: true
+              registers:
+                - status: HIDDEN
+                - status: HIDDEN
+                - status: EMPTY
+                - status: EMPTY
+                - status: EMPTY
+        - name: damageChanged
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            roundNumber: 1
+            player:
+              playerId: 00000000-0000-4000-8000-000000000002
+              username: Dane
+              lastCheckpoint: 0
+              damage: 2
+              programSubmitted: true
+              connected: true
+              registers:
+                - status: REVEALED
+                  instruction: MOVE_1
+                - status: HIDDEN
+                - status: HIDDEN
+                - status: HIDDEN
+                - status: HIDDEN
+
+    ProgrammingStarted:
+      name: game.programmingStarted
+      description: >-
+        Broadcasts a new round to every connected lobby member after the previous
+        round's actions and stat updates, before any private cards.dealt. Increment
+        roundNumber once per new deal. Atomically set phase to PROGRAMMING, every
+        remaining player's five registers to EMPTY, and programSubmitted to false;
+        preserve stats, membership, and connection state. Clear the previous active
+        register and discard its pending draft updates. Initial JOINED provides the
+        same baseline for round 1. Duplicate or older round starts have no effect.
+      payload:
+        type: object
+        additionalProperties: false
+        required: [ gameId, roundNumber ]
+        properties:
+          gameId:
+            $ref: '#/components/schemas/GameId'
+          roundNumber:
+            $ref: '#/components/schemas/RoundNumber'
+      examples:
+        - name: nextRound
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            roundNumber: 2
 
     ProgramSubmitted:
       name: program.submitted
       description: >-
-        Event signaling another player has submitted their program.
+        Broadcasts an accepted program to every connected member of this lobby.
+        Set this player's programSubmitted to true and all five registers to HIDDEN,
+        without any card identity. phase is the authoritative phase after acceptance;
+        the final required submission changes it to EXECUTING. When a departure
+        makes the remaining programs ready, the first robot.actionResolved establishes
+        EXECUTING. Apply only for an existing player and the current round.
       payload:
         type: object
+        additionalProperties: false
         required:
           - playerId
           - gameId
+          - roundNumber
+          - phase
         properties:
           playerId:
             $ref: "#/components/schemas/PlayerId"
           gameId:
             $ref: "#/components/schemas/GameId"
+          roundNumber:
+            $ref: '#/components/schemas/RoundNumber'
+          phase:
+            $ref: '#/components/schemas/GamePhase'
       examples:
         - name: ready
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
             playerId: 00000000-0000-4000-8000-000000000002
+            roundNumber: 1
+            phase: EXECUTING
 
     RobotActionResolved:
       name: robot.actionResolved
       payload:
         type: object
+        additionalProperties: false
         required:
           - robotId
           - instruction
           - position
           - gameId
           - registerIndex
+          - playerId
+          - roundNumber
         properties:
           robotId:
             $ref: "#/components/schemas/RobotId"
@@ -538,13 +879,24 @@ components:
             minimum: 0
             maximum: 4
             description: Zero-based register index; display 1–5. Multiple robot actions can share one index.
+          playerId:
+            $ref: '#/components/schemas/PlayerId'
+          roundNumber:
+            $ref: '#/components/schemas/RoundNumber'
       description: >-
-        Reports the resulting robot state after one programmed instruction.
+        Reports the resulting robot state after one programmed instruction to every
+        connected lobby member. playerId must match the robot's owner. Establishes
+        EXECUTING and reveals only that player's registerIndex as REVEALED with the
+        executed instruction; no card instance ID is sent. Other filled registers
+        stay HIDDEN until their own execution. Apply actions in received order only
+        for existing players in the current round. Snapshots retain these reveals.
       examples:
         - name: firstRegister
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
             registerIndex: 0
+            roundNumber: 1
+            playerId: 00000000-0000-4000-8000-000000000002
             robotId: 00000000-0000-4000-8000-000000000003
             instruction: MOVE_1
             position:
@@ -564,7 +916,7 @@ components:
       payload:
         type: object
         additionalProperties: false
-        required: [ gameId, playerId, lastCheckpoint, checkpointCount ]
+        required: [ gameId, roundNumber, playerId, lastCheckpoint, checkpointCount ]
         properties:
           gameId:
             $ref: '#/components/schemas/GameId'
@@ -574,10 +926,13 @@ components:
             $ref: '#/components/schemas/LastCheckpoint'
           checkpointCount:
             $ref: '#/components/schemas/CheckpointCount'
+          roundNumber:
+            $ref: '#/components/schemas/RoundNumber'
       examples:
         - name: firstCheckpoint
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
+            roundNumber: 1
             playerId: 00000000-0000-4000-8000-000000000002
             lastCheckpoint: 1
             checkpointCount: 2
@@ -590,6 +945,7 @@ components:
           - cards
           - gameId
           - playerId
+          - roundNumber
         properties:
           cards:
             type: array
@@ -599,13 +955,19 @@ components:
             $ref: "#/components/schemas/GameId"
           playerId:
             $ref: "#/components/schemas/PlayerId"
+          roundNumber:
+            $ref: '#/components/schemas/RoundNumber'
       description: >-
-        Private hand dealt to the named player for a programming round.
+        Private hand dealt only to the membership-owning connection for the named
+        player and round, never to another player or the public room. Follows
+        game.programmingStarted for a new round. Does not reset public registers;
+        apply only for the current game, own player, and current round.
       examples:
         - name: nextHand
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
             playerId: 00000000-0000-4000-8000-000000000002
+            roundNumber: 2
             cards:
               - id: 00000000-0000-4000-8000-000000000101
                 instruction: MOVE_1
@@ -629,8 +991,9 @@ components:
     PlayerConnectionChanged:
       name: game.playerConnectionChanged
       description: >-
-        Announces an existing player's connection status and the resulting
-        game pause state. 
+        Announces an existing player's connection status and the resulting game
+        pause state to this lobby only. Temporary disconnection retains that
+        player's registers and stats; only game.playerLeft removes them.
       payload:
         $ref: '#/components/schemas/PlayerConnectionChanged'
       examples:
@@ -771,12 +1134,16 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Card"
-          description: The player's current private hand.
+          description: Only assignment.playerId's private hand, never any other player's hand.
 
         programSubmitted:
           type: boolean
           description: Whether this player has submitted for the current round.
-      description:  Returns a new assignment or preserves the existing assignment when reconnecting.
+      description: >-
+        Returns a new assignment or preserves the existing assignment when
+        reconnecting. state.players contains every current lobby member, including
+        disconnected members, with registers and stats keyed by playerId. The
+        top-level programSubmitted equals the assigned player's state value.
 
     JoinRejected:
       type: object
@@ -837,6 +1204,8 @@ components:
         - programSubmitted
         - connected
         - lastCheckpoint
+        - damage
+        - registers
       properties:
         playerId:
           $ref: "#/components/schemas/PlayerId"
@@ -848,8 +1217,17 @@ components:
           type: boolean
         lastCheckpoint:
           $ref: '#/components/schemas/LastCheckpoint'
+        damage:
+          $ref: '#/components/schemas/Damage'
+        registers:
+          $ref: '#/components/schemas/PublicRegisters'
       description: >-
-        Public participation and submission status; never contains cards.
+        Public participation, register, and stat state for one player. Never contains
+        a hand or card instance IDs. Every player, including the owner, gets the same
+        public projection: EMPTY for unfilled slots, HIDDEN for placed unexecuted
+        cards, and REVEALED only after that register executes in the current round.
+        Draft occupancy is not an accepted program; programSubmitted changes only
+        on acceptance or a new round.
 
     PlayerJoined:
       type: object
@@ -870,8 +1248,16 @@ components:
 
     PublicGameState:
       description: >-
-        Public board, robot, player, phase, and antenna state for a game.
+        Public board, robot, player registers/stats, phase, round, and antenna state
+        for this lobby only. players contains every current member exactly once by
+        playerId, including disconnected members; departed members are absent.
+        On join or reconnect replace the old snapshot before applying ordered live
+        events. Ignore events from another game, an older round, or removed players.
+        Events for a newer round require its game.programmingStarted first; if that
+        baseline is unavailable, rejoin for a fresh snapshot rather than merge stale
+        state. Stored animation playback must not overwrite newer-round live state.
       type: object
+      additionalProperties: false
       required:
         - gameId
         - board
@@ -881,6 +1267,7 @@ components:
         - phase
         - paused
         - checkpointCount
+        - roundNumber
       properties:
         gameId:
           $ref: "#/components/schemas/GameId"
@@ -903,6 +1290,66 @@ components:
           description: Whether gameplay is paused because a game member is disconnected.
         checkpointCount:
           $ref: '#/components/schemas/CheckpointCount'
+        roundNumber:
+          $ref: '#/components/schemas/RoundNumber'
+
+    RoundNumber:
+      type: integer
+      minimum: 1
+      description: >-
+        Lobby-local round number, initially 1; increments on each new programming
+        deal. Identifies the round of snapshots, private hands, and register/stat
+        updates. Stale submissions and occupancy requests are rejected.
+
+    Damage:
+      type: integer
+      minimum: 0
+      description: Current authoritative damage count; initially 0, preserved on reconnect.
+
+    PublicRegisters:
+      type: array
+      minItems: 5
+      maxItems: 5
+      description: Five slots in zero-based register order, displayed as registers 1–5.
+      items:
+        oneOf:
+          - $ref: '#/components/schemas/EmptyRegister'
+          - $ref: '#/components/schemas/HiddenRegister'
+          - $ref: '#/components/schemas/RevealedRegister'
+
+    EmptyRegister:
+      type: object
+      additionalProperties: false
+      required: [ status ]
+      properties:
+        status:
+          type: string
+          enum: [ EMPTY ]
+      description: Unfilled slot; carries no card identity.
+
+    HiddenRegister:
+      type: object
+      additionalProperties: false
+      required: [ status ]
+      properties:
+        status:
+          type: string
+          enum: [ HIDDEN ]
+      description: >-
+        Face-down placed card. This marker is the entire slot payload: no card ID,
+        instruction, type, hash, or other card identity may be included.
+
+    RevealedRegister:
+      type: object
+      additionalProperties: false
+      required: [ status, instruction ]
+      properties:
+        status:
+          type: string
+          enum: [ REVEALED ]
+        instruction:
+          $ref: '#/components/schemas/Instruction'
+      description: Instruction made public by this owner's register execution; no instance ID.
 
     LastCheckpoint:
       type: integer

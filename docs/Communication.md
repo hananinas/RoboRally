@@ -26,7 +26,23 @@ A successful join returns:
 
 `JOINED {assignment, state, hand, programSubmitted}`
 
-The acknowledgement contains the player's current robot assignment, public game state, private hand, and program-submission status. The client must apply all JOINED data before processing later live game events. A future lobby may be inserted between login and joining without changing this model.
+The acknowledgement contains the player's current robot assignment, public game state, only that player's private hand, and program-submission status. `state.players` includes every lobby member's public registers, checkpoint progress, damage, submission status, and connection status, identified by `playerId`; disconnected members remain present. `state.roundNumber` identifies the current deal. The client must replace old state with all JOINED data before processing later live game events. A future lobby may be inserted between login and joining without changing this model.
+
+### Public registers and stats
+
+Each `PlayerState` has five `registers` in register order, `lastCheckpoint`, and a nonnegative integer `damage` count. Public slots have exactly one of these shapes:
+
+- `{status: EMPTY}`: no card is placed.
+- `{status: HIDDEN}`: a placed card, rendered as a card back. No card ID, instruction, type, hash, or other identity is allowed.
+- `{status: REVEALED, instruction}`: the instruction becomes public only when that player's register executes. Card instance IDs are never public.
+
+This projection is the same for all recipients, including the owner. The owner's private hand and local selections are separate from public register state. Other players' registers are read-only and cannot supply cards for a program.
+
+Snapshots and live register/stat events are restricted to members of `game:{gameId}:public`. Private hands go only to their owning connection in JOINED or `game:{gameId}:player:{playerId}`. No payload delivered to another player may contain that hand. `game.getLobbyDetails` continues to expose lobby metadata and player names, not registers, stats, or hands. Recovery must recheck room ownership; visibility never grants ownership.
+
+`game.playerJoined` supplies a new member's initial empty registers and zero stats. `game.playerLeft` removes their registers and stats with their membership and robot; discard queued updates for that membership. `game.playerConnectionChanged` only changes connection/pause status and retains registers and stats.
+
+Snapshot creation and live-event delivery must be ordered so no update is lost between JOINED and later events. After JOINED, do not replay events predating that snapshot; successful recovery instead replays missed events against retained state in order.
 
 ### Listing lobbies
 
@@ -92,11 +108,17 @@ sequenceDiagram
 
 During the programming phase, each player submits five distinct card IDs in register order for the current round.
 
+After each local placement or removal, the client sends `program.updateRegisters {gameId, playerId, roundNumber, occupied}`, where `occupied` is exactly five booleans in register order. This is an occupancy-only preview, not a playable program; it contains no card identity. The server checks connection-owned membership, matching game/player IDs, the current round, programming phase, pause state, and that no program was already accepted. Invalid requests leave state unchanged.
+
+An accepted update receives `program.updateRegistersResult {outcome: ACCEPTED}` through its acknowledgement and broadcasts `game.playerStateChanged {gameId, roundNumber, player}` to all connected lobby members, including the sender. The complete public `player` has HIDDEN for occupied draft slots and EMPTY otherwise. Clients replace only an existing player's state in the current round. This event also carries every damage change, including changes outside robot actions, without exposing any hand or unexecuted card.
+
+Damage caused by an action is broadcast after its `robot.actionResolved` and before subsequent actions or the next round start. All public state events share server order, so a complete player update cannot reveal a register before its execution event.
+
 The client sends:
 
-`program.submit {gameId, playerId, cardIds}`
+`program.submit {gameId, playerId, roundNumber, cardIds}`
 
-The service verifies that the submitted cards belong to the player and that the submission is valid for the current game phase.
+The service verifies that the connection owns the game/player membership, all five distinct card IDs belong to that player's current hand, and the round, phase, and pause state permit submission. Occupancy previews and public instructions never authorize submitting another player's cards.
 
 A successful submission receives:
 
@@ -104,16 +126,16 @@ A successful submission receives:
 
 The server then emits:
 
-`program.submitted {playerId}`
+`program.submitted {gameId, playerId, roundNumber, phase}`
 
-to the game's public room.
+to every connected member of the game's public room, including the submitter.
 
-This informs other players that the player has submitted their program without revealing the submitted cards. The server waits until all players have successfully submitted before beginning activation.
+This sets the player's `programSubmitted` to true and all five public registers to HIDDEN, even if no draft preview was sent. No card identity is revealed. `phase` is the authoritative phase after acceptance; accepting the final required program changes it to EXECUTING. If departure makes the remaining programs ready, the first `robot.actionResolved` establishes EXECUTING. The server waits until all remaining players have successfully submitted before beginning activation.
 
 
 ### Submission failures
 
-A submission can be rejected for a mismatched or malformed request, because the connection is not a member of the game, because the round has already moved past programming, because the player already has a stored program for this round, because the game is paused, or because of an unexpected service failure. See [AsyncAPI](asyncapi.yaml) for the exact rejection codes.
+A submission can be rejected for a mismatched or malformed request, because the connection is not a member of the game, because `roundNumber` is stale (`STALE_ROUND`), because the round has already moved past programming, because the player already has a stored program for this round, because the game is paused, or because of an unexpected service failure. See [AsyncAPI](asyncapi.yaml) for the exact rejection codes.
 
 A rejected submission does not replace or modify the player's current program.
 
@@ -126,9 +148,9 @@ Once all players have submitted, the service resolves the five registers in orde
 
 Each resolved action is emitted publicly as:
 
-`robot.actionResolved`
+`robot.actionResolved {gameId, roundNumber, playerId, robotId, registerIndex, instruction, position}`
 
-Clients must process resolved actions in the order in which they are received.
+Clients process resolved actions in received order for existing players in the current round. `playerId` matches the robot's owner. Only that owner's `registerIndex` becomes REVEALED with the executed `instruction`; every other unexecuted placed card stays HIDDEN, even in the same register index on another robot. The actor and zero-based register index identify the action being played; display registers as 1–5. These reveals persist in reconnect snapshots until the next deal.
 
 #### Activation ordering
 
@@ -155,25 +177,25 @@ After all remaining robots have acted in a register, a player completes the next
 
 When progress changes, the service broadcasts to `game:{gameId}:public`:
 
-`player.checkpointProgress {gameId, playerId, lastCheckpoint, checkpointCount}`
+`player.checkpointProgress {gameId, roundNumber, playerId, lastCheckpoint, checkpointCount}`
 
 The event follows the related `robot.actionResolved`, or `game.playerLeft` when a departure completes a register, and precedes subsequent actions or private hands. Only remaining players receive it. Unchanged progress produces no event.
 
-The client displays `lastCheckpoint/checkpointCount` for its assigned player, initially `0/x` or `0/0` without checkpoints. Apply events immediately, independently of queued movement animations. Ignore other games, unknown or removed players, and duplicate or older progress. Successful Socket.IO recovery replays missed events; failed recovery replaces progress from JOINED.
+The client displays `lastCheckpoint/checkpointCount` and `damage` for every player, initially `0/x` (or `0/0` without checkpoints) and zero damage. Apply stat events immediately, independently of queued movement animations. Ignore other games, unknown or removed players, older rounds, and duplicate or older progress. Successful Socket.IO recovery replays missed events; failed recovery replaces every player's registers and stats from JOINED.
 
 Progress updates leave robot positions, selected cards, phases, programming availability, playback, membership, pause behavior and private hands unchanged. Completing all checkpoints does not end the game.
 
 ### Dealing the next hand
 
-After all five registers have been resolved, the service deals each player a private hand for the next programming round.
+After all five registers and their stat changes have been resolved, the service broadcasts `game.programmingStarted {gameId, roundNumber}` to all connected lobby members before dealing any private hands. The round number starts at 1 and increments once per new deal. This event atomically sets phase to PROGRAMMING, clears every remaining player's five public registers to EMPTY, resets their `programSubmitted` flags, and clears the previous active register. Stats and connection state persist. Initial JOINED supplies the same baseline for round 1.
 
 Each player receives:
 
-`cards.dealt {cards}`
+`cards.dealt {gameId, playerId, roundNumber, cards}`
 
-through their private Socket.IO room.
+through only their own private Socket.IO room. Public round reset does not depend on anyone receiving a private hand.
 
-A new hand may arrive while the client is still playing animations from the previous activation. The client should store the new hand immediately but must not enable programming until all queued resolved actions have finished playing.
+Apply the hand only for the current game, own player, and current round. Duplicate or older round-start events have no effect. Discard stale draft updates and events from older rounds; a newer-round event requires its public round-start baseline first, otherwise rejoin for a fresh snapshot. A new hand may arrive while the client is still playing animations from the previous activation. Store the hand immediately, but do not enable programming until queued resolved actions finish. Old animation playback must not overwrite current-round registers or stats.
 
 ### Game sequence
 
@@ -190,15 +212,22 @@ sequenceDiagram
     participant Public as game:{gameId}:public
 
     loop Each round
-        A->>Server: program.submit {gameId, playerId, cardIds}
+        A->>Server: program.updateRegisters {gameId, playerId: A, roundNumber, occupied}
         Server-->>A: Acknowledgement: ACCEPTED
-        Server->>Public: program.submitted {playerId: A}
+        Server->>Public: game.playerStateChanged {gameId, roundNumber, player}
+        Public-->>A: game.playerStateChanged
+        Public-->>B: game.playerStateChanged
+        A->>Server: program.submit {gameId, playerId, roundNumber, cardIds}
+        Server-->>A: Acknowledgement: ACCEPTED
+        Server->>Public: program.submitted {gameId, playerId: A, roundNumber, phase}
+        Public-->>A: program.submitted
         Public-->>B: program.submitted
 
-        B->>Server: program.submit {gameId, playerId, cardIds}
+        B->>Server: program.submit {gameId, playerId, roundNumber, cardIds}
         Server-->>B: Acknowledgement: ACCEPTED
-        Server->>Public: program.submitted {playerId: B}
+        Server->>Public: program.submitted {gameId, playerId: B, roundNumber, phase}
         Public-->>A: program.submitted
+        Public-->>B: program.submitted
         loop Registers 1 through 5
             loop Eligible robots in antenna order
                 Note over Server: Execute next instruction
@@ -208,10 +237,13 @@ sequenceDiagram
             end
         end
 
-        Server->>PrivateA: cards.dealt {cards}
-        PrivateA-->>A: cards.dealt {cards}
-        Server->>PrivateB: cards.dealt {cards}
-        PrivateB-->>B: cards.dealt {cards}
+        Server->>Public: game.programmingStarted {gameId, roundNumber}
+        Public-->>A: game.programmingStarted
+        Public-->>B: game.programmingStarted
+        Server->>PrivateA: cards.dealt {gameId, playerId: A, roundNumber, cards}
+        PrivateA-->>A: cards.dealt
+        Server->>PrivateB: cards.dealt {gameId, playerId: B, roundNumber, cards}
+        PrivateB-->>B: cards.dealt
     end
 ```
 
@@ -241,7 +273,7 @@ After an unexpected connection loss, the client attempts to reconnect automatica
 #### Successful connection state recovery 
 If recovery succeeds and the client still retains its local game state, Socket.IO replays missed events.
 
-The client applies the recovered events in order and continues using its existing player and robot assignments.
+The client applies recovered events in order and continues using its existing player and robot assignments. Retained registers and stats are updated using the same round, reveal, and reset rules as live events; another player's private hand must never be replayed to this connection.
 
 ```mermaid
 sequenceDiagram
@@ -284,9 +316,9 @@ followed by:
 
 Because the user is already a game member, game.join restores the connection to the existing player and robot.
 
-The returned JOINED acknowledgement contains the current authoritative state.
+The returned JOINED acknowledgement contains the current authoritative state, including every remaining player's registers, checkpoint progress, damage, and connection status at `state.roundNumber`. Executed registers remain REVEALED; placed but unexecuted registers remain HIDDEN with no identity. Only the reconnecting player's private hand is returned.
 
-The client replaces its local game state with the returned JOINED data before processing further game events.
+The client replaces its entire local snapshot and clears obsolete queued updates before processing further game events. Do not merge registers from the previous deal.
 
 ```mermaid
 sequenceDiagram
