@@ -15,7 +15,7 @@ type LobbyScreenProps = {
 }
 
 
-const SHARED_GAME_NAME = 'Lobby 1'
+
 const MAX_PLAYERS = 6
 
 const sampleLobbies = [
@@ -117,7 +117,7 @@ function SharedLobby({ lobby, selected, disabled, onSelect }: SharedLobbyProps) 
     >
       <img className="lobby__image" src={lobby.map.icon} alt={`${lobby.map.name} preview`} />
       <span className="lobby__details">
-        <span className="lobby__name">{SHARED_GAME_NAME}</span>
+        <span className="lobby__name">{lobby.name}</span>
         <span className="lobby__map">{lobby.map.name}</span>
         <span className="lobby__players">
           {usernames.length > 0 ? usernames.join(', ') : 'No players yet'}

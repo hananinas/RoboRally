@@ -11,14 +11,14 @@ async function submitUsername(page: Page, value = username) {
 }
 
 async function joinGame(page: Page) {
-  await page.getByRole('button', { name: /Lobby 1/ }).click()
+  await page.getByRole('button', { name: /Shared game/ }).click()
   await page.getByRole('button', { name: 'Join game', exact: true }).click()
 }
 
 test('Join stays disabled until the first lobby is selected, and other lobbies cannot be selected', async ({ page }) => {
   await submitUsername(page)
   const join = page.getByRole('button', { name: 'Join game', exact: true })
-  const first = page.getByRole('button', { name: /Lobby 1/ })
+  const first = page.getByRole('button', { name: /Shared game/ })
   await expect(join).toBeDisabled()
   await expect(page.getByRole('button', { name: /Lobby 2/ })).toBeDisabled()
   await expect(page.getByRole('button', { name: /Lobby 3/ })).toBeDisabled()
@@ -29,7 +29,7 @@ test('Join stays disabled until the first lobby is selected, and other lobbies c
 
 test('viewing the lobby shows the shared game\'s real details without joining it', async ({ page, game }) => {
   await submitUsername(page)
-  const first = page.getByRole('button', { name: /Lobby 1/ })
+  const first = page.getByRole('button', { name: /Shared game/ })
   await expect(first).toContainText('DEMO MAP')
   await expect(first).toContainText('Player 2')
   await expect(first).toContainText('1/6 players')
@@ -51,19 +51,19 @@ test('shows loading, then an error with Retry, while fetching lobby details', as
   await expect.poll(async () => (await game.snapshot()).pendingLobbies).toBeGreaterThan(0)
   await game.control({ type: 'respond-lobby' })
   await expect(page.getByRole('alert')).toContainText('Could not load lobby details.')
-  await expect(page.getByRole('button', { name: /Lobby 1/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /Shared game/ })).toHaveCount(0)
 
   await game.control({ type: 'lobby', outcome: 'LOBBY_FOUND', deferred: false })
   const before = (await game.snapshot()).lobbyRequests
   await page.getByRole('button', { name: 'Retry', exact: true }).click()
-  await expect(page.getByRole('button', { name: /Lobby 1/ })).toBeEnabled()
+  await expect(page.getByRole('button', { name: /Shared game/ })).toBeEnabled()
   await expect(page.getByRole('alert')).toHaveCount(0)
   expect((await game.snapshot()).lobbyRequests).toBe(before + 1)
 })
 
 test('Refresh fetches the current lobby details', async ({ page, game }) => {
   await submitUsername(page)
-  const first = page.getByRole('button', { name: /Lobby 1/ })
+  const first = page.getByRole('button', { name: /Shared game/ })
   await expect(first).toContainText('1/6 players')
 
   const lobby = createLobby()
@@ -85,7 +85,7 @@ test('a full shared game cannot be selected', async ({ page, game }) => {
     lobbies: [{ ...lobby, map: { ...lobby.map, maxPlayers: 1 } }],
   })
   await submitUsername(page)
-  await expect(page.getByRole('button', { name: /Lobby 1/ })).toBeDisabled()
+  await expect(page.getByRole('button', { name: /Shared game/ })).toBeDisabled()
   await expect(page.getByRole('button', { name: 'Join game', exact: true })).toBeDisabled()
 })
 
@@ -108,7 +108,7 @@ test('login keeps the entry shell and waits for an explicit join', async ({ page
   const shell = await page.locator('.login-panel').elementHandle()
   await page.getByRole('textbox', { name: 'Username' }).fill(username)
   await page.getByRole('button', { name: 'Log in', exact: true }).click()
-  const firstLobby = page.getByRole('button', { name: /Lobby 1/ })
+  const firstLobby = page.getByRole('button', { name: /Shared game/ })
   await expect(firstLobby).toBeFocused()
   await expect(page.locator('input')).toHaveCount(0)
   await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
@@ -198,7 +198,7 @@ test('waits for login then JOINED on the same socket, blocking duplicate request
   await joinGame(page)
   await expect.poll(async () => (await game.snapshot()).pendingJoins).toBe(1)
   await expect(page.getByRole('button', { name: 'Joining game…' })).toBeDisabled()
-  await expect(page.getByRole('button', { name: /Lobby 1/ })).toBeDisabled()
+  await expect(page.getByRole('button', { name: /Shared game/ })).toBeDisabled()
   await page.getByRole('button', { name: 'Joining game…' }).evaluate((button: HTMLButtonElement) => { button.click(); button.click() })
   await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
   await expect(page.getByRole('region', { name: 'Programming hand' })).toHaveCount(0)

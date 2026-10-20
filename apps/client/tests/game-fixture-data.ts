@@ -28,7 +28,7 @@ export const MAP_ICON = 'data:image/svg+xml;base64,' + btoa(
 export function createLobby(): LobbyDetails {
   return {
     gameId: GAME_ID,
-    name: 'Game',
+    name: 'Shared game',
     players: [{ playerId: OTHER_PLAYER_ID, username: 'Player 2' }],
     map: { name: 'DEMO MAP', icon: MAP_ICON, maxPlayers: 6 },
   }
