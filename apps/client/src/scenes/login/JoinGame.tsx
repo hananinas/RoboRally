@@ -25,10 +25,10 @@ const sampleLobbies = [
 
 export default function JoinGame({ socket, username, pending, connected, error, onJoin }: JoinGameProps) {
   const { state: details, refresh } = useLobbyDetails(socket, connected)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedLobbyId, setSelectedLobbyId] = useState<string | null>(null)
   const lobby = details.status === 'loaded' ? details.lobby : null
   // A refresh may return another game, so only a still-listed selection counts.
-  const selected = lobby !== null && lobby.gameId === selectedId ? lobby : null
+  const selected = lobby !== null && lobby.gameId === selectedLobbyId ? lobby : null
 
   return (
     <>
@@ -56,7 +56,7 @@ export default function JoinGame({ socket, username, pending, connected, error, 
               lobby={lobby}
               selected={selected !== null}
               disabled={pending || lobby.players.length >= lobby.map.maxPlayers}
-              onSelect={() => setSelectedId(lobby.gameId)}
+              onSelect={() => setSelectedLobbyId(lobby.gameId)}
             />
           )}
         </li>
