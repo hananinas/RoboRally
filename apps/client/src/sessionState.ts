@@ -1,4 +1,5 @@
 import type {
+  GameId,
   JoinResult,
   LoginResult,
   User,
@@ -9,20 +10,16 @@ type JoinFailure = Exclude<JoinResult, { outcome: 'JOINED' }>['outcome']
 export type LoginError = LoginFailure | 'LOGIN_REQUIRED' | 'TIMEOUT'
 export type JoinError = Exclude<JoinFailure, 'LOGIN_REQUIRED'>
   | 'CONNECTION_ERROR'
-  | 'GAME_ID_MISSING'
   | 'TIMEOUT'
 
 export type SessionState =
   | { status: 'editing'; username: string; error: LoginError | null }
   | { status: 'logging-in'; username: string }
   | { status: 'ready-to-join'; user: User }
-  | { status: 'joining'; user: User }
+  | { status: 'joining'; user: User; gameId: GameId }
   | { status: 'join-failed'; user: User; error: JoinError | null }
-  | { status: 'resyncing'; user: User }
-  | {
-      status: 'joined'
-      user: User
-    }
+  | { status: 'resyncing'; user: User; gameId: GameId }
+  | { status: 'joined'; user: User; gameId: GameId }
 
 export type SessionEvent =
   | { type: 'left' }
@@ -32,7 +29,7 @@ export type SessionEvent =
   | { type: 'login-submitted' }
   | { type: 'login-result'; result: LoginResult }
   | { type: 'login-timeout' }
-  | { type: 'join-requested' }
+  | { type: 'join-requested'; gameId: GameId }
   | { type: 'join-result'; result: JoinResult }
   | { type: 'join-error'; error: JoinError }
 
@@ -40,7 +37,7 @@ export function createSessionState(): SessionState {
   return { status: 'editing', username: '', error: null }
 }
 
-type AwaitingLogin = { status: 'logging-in'; username: string } | { status: 'resyncing'; user: User }
+type AwaitingLogin = Extract<SessionState, { status: 'logging-in' | 'resyncing' }>
 
 function isAwaitingLogin(state: SessionState): state is AwaitingLogin {
   return state.status === 'logging-in' || state.status === 'resyncing'
@@ -68,7 +65,7 @@ export function sessionReducer(state: SessionState, event: SessionEvent): Sessio
       }
     case 'resync':
       return state.status === 'joined'
-        ? { status: 'resyncing', user: state.user }
+       ? { status: 'resyncing', user: state.user, gameId: state.gameId }
         : state
     case 'username-changed':
       return state.status === 'editing'
@@ -85,9 +82,12 @@ export function sessionReducer(state: SessionState, event: SessionEvent): Sessio
     case 'login-result': {
       if (!isAwaitingLogin(state)) return state
       const username = usernameOf(state)
-      return event.result.outcome === 'LOGGED_IN'
-        ? { status: state.status === 'resyncing' ? 'joining' : 'ready-to-join', user: event.result.user }
-        : { status: 'editing', username, error: event.result.outcome }
+      if (event.result.outcome !== 'LOGGED_IN') {
+        return { status: 'editing', username, error: event.result.outcome }
+      }
+      return state.status === 'resyncing'
+        ? { status: 'joining', user: event.result.user, gameId: state.gameId }
+        : { status: 'ready-to-join', user: event.result.user }
     }
     case 'login-timeout':
       return isAwaitingLogin(state)
@@ -95,7 +95,7 @@ export function sessionReducer(state: SessionState, event: SessionEvent): Sessio
         : state
     case 'join-requested':
       return state.status === 'ready-to-join' || state.status === 'join-failed'
-        ? { status: 'joining', user: state.user }
+        ? { status: 'joining', user: state.user, gameId: event.gameId }
         : state
     case 'join-error':
       return state.status === 'joining'
@@ -112,6 +112,7 @@ export function sessionReducer(state: SessionState, event: SessionEvent): Sessio
       return {
         status: 'joined',
         user: state.user,
+        gameId:state.gameId
       }
   }
 }
