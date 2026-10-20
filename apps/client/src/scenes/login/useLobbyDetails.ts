@@ -17,7 +17,7 @@ const lobbyDetailsErrors: Record<LobbyDetailsError, string> = {
 
 export type LobbyDetailsState =
   | { status: 'loading' }
-  | { status: 'loaded'; lobby: LobbyDetails | null }
+  | { status: 'loaded'; lobbies: readonly LobbyDetails[] }
   | { status: 'error'; message: string }
 
 
@@ -36,7 +36,7 @@ export default function useLobbyDetails(socket: GameSocket, connected: boolean) 
       } else if (result.outcome !== 'LOBBY_FOUND') {
         setState({ status: 'error', message: lobbyDetailsErrors[result.outcome] })
       } else {
-        setState({ status: 'loaded', lobby: result.lobbies[0] ?? null })
+        setState({ status: 'loaded', lobbies: result.lobbies })
       }
     })
   }, [socket])

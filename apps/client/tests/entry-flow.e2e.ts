@@ -103,6 +103,28 @@ test('Join sends the game ID from the lobby entry', async ({ page, game }) => {
   expect(entryRequests[1]).toEqual({ event: 'game.join', socketId: entryRequests[0].socketId, payload: { gameId: otherGameId } })
 })
 
+test('shows every lobby from the Game Service and joins the selected one', async ({ page, game }) => {
+  const secondGameId = '55555555-5555-4555-8555-555555555555'
+  await game.control({
+    type: 'lobby', outcome: 'LOBBY_FOUND', deferred: false,
+    lobbies: [createLobby(), { ...createLobby(), gameId: secondGameId, name: 'Second game', players: [] }],
+  })
+  await submitUsername(page)
+  const second = page.getByRole('button', { name: /Second game/ })
+  await expect(page.getByRole('button', { name: /Shared game/ })).toContainText('1/6 players')
+  await expect(second).toContainText('No players yet')
+  await expect(second).toContainText('0/6 players')
+
+  await second.click()
+  await expect(second).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: /Shared game/ })).toHaveAttribute('aria-pressed', 'false')
+  await page.getByRole('button', { name: 'Join game', exact: true }).click()
+  // The fixture only knows GAME_ID, so the join is rejected, but the request shows which game was chosen.
+  await expect(page.getByRole('alert')).toHaveText('This game no longer exists. Refresh the lobby and try again.')
+  const { entryRequests } = await game.snapshot()
+  expect(entryRequests[1]).toEqual({ event: 'game.join', socketId: entryRequests[0].socketId, payload: { gameId: secondGameId } })
+})
+
 test('login keeps the entry shell and waits for an explicit join', async ({ page, game }) => {
   await page.goto('/')
   const shell = await page.locator('.login-panel').elementHandle()

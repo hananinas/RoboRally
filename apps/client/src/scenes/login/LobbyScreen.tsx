@@ -14,8 +14,6 @@ type LobbyScreenProps = {
   onJoin: (gameId: GameId) => void
 }
 
-
-
 const MAX_PLAYERS = 6
 
 const sampleLobbies = [
@@ -26,19 +24,21 @@ const sampleLobbies = [
 export default function LobbyScreen({ socket, username, pending, connected, error, onJoin }: LobbyScreenProps) {
   const { state: details, refresh } = useLobbyDetails(socket, connected)
   const [selectedLobbyId, setSelectedLobbyId] = useState<string | null>(null)
-  const lobby = details.status === 'loaded' ? details.lobby : null
-  // A refresh may return another game, so only a still-listed selection counts.
-  const selected = lobby !== null && lobby.gameId === selectedLobbyId ? lobby : null
+  const lobbies = details.status === 'loaded' ? details.lobbies : []
+  // A refresh may drop the selected game, so only a still-listed selection counts.
+  const selected = lobbies.find((lobby) => lobby.gameId === selectedLobbyId) ?? null
 
   return (
     <>
       <p>{username}</p>
       <ul className="lobby-list" aria-label="Lobbies">
-        <li>
-          {details.status === 'loading' && (
+        {details.status === 'loading' && (
+          <li>
             <p className="lobby lobby--message" role="status">Loading lobby details…</p>
-          )}
-          {details.status === 'error' && (
+          </li>
+        )}
+        {details.status === 'error' && (
+          <li>
             <div className="lobby lobby--message">
               <p className="login-validation login-validation--error" role="alert">
                 Could not load lobby details. {details.message}
@@ -47,19 +47,24 @@ export default function LobbyScreen({ socket, username, pending, connected, erro
                 Retry
               </button>
             </div>
-          )}
-          {details.status === 'loaded' && lobby === null && (
+          </li>
+        )}
+        {details.status === 'loaded' && lobbies.length === 0 && (
+          <li>
             <p className="lobby lobby--message" role="status">No game is open right now.</p>
-          )}
-          {lobby && (
-            <SharedLobby
+          </li>
+        )}
+        {lobbies.map((lobby, index) => (
+          <li key={lobby.gameId}>
+            <ServerLobby
               lobby={lobby}
-              selected={selected !== null}
+              selected={lobby.gameId === selected?.gameId}
               disabled={pending || lobby.players.length >= lobby.map.maxPlayers}
+              autoFocus={index === 0}
               onSelect={() => setSelectedLobbyId(lobby.gameId)}
             />
-          )}
-        </li>
+          </li>
+        ))}
         {sampleLobbies.map((sample) => (
           <li key={sample.id}>
             <button type="button" className="lobby" aria-pressed={false} disabled>
@@ -97,14 +102,15 @@ export default function LobbyScreen({ socket, username, pending, connected, erro
   )
 }
 
-type SharedLobbyProps = {
+type ServerLobbyProps = {
   lobby: LobbyDetails
   selected: boolean
   disabled: boolean
+  autoFocus: boolean
   onSelect: () => void
 }
 
-function SharedLobby({ lobby, selected, disabled, onSelect }: SharedLobbyProps) {
+function ServerLobby({ lobby, selected, disabled, autoFocus, onSelect }: ServerLobbyProps) {
   const usernames = lobby.players.map((player) => player.username)
   return (
     <button
@@ -112,7 +118,7 @@ function SharedLobby({ lobby, selected, disabled, onSelect }: SharedLobbyProps) 
       className={selected ? 'lobby lobby--selected' : 'lobby'}
       aria-pressed={selected}
       disabled={disabled}
-      autoFocus
+      autoFocus={autoFocus}
       onClick={onSelect}
     >
       <img className="lobby__image" src={lobby.map.icon} alt={`${lobby.map.name} preview`} />
