@@ -275,6 +275,7 @@ export class Game {
     const destination = this.board.nearestFreePosition(this.rebootTile)
     if (destination === undefined) throw new Error('No safe reboot destination is available')
     this.board.relocateRobot(robot.id, destination)
+    // TODO: Add two SPAM cards and cancel this robot's remaining registers.
   }
 
   private activateBoardElements(): void {
