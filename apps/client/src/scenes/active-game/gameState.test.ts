@@ -46,6 +46,7 @@ const publicState: PublicGameState = {
   gameId: '40000000-0000-4000-8000-000000000001',
   phase: 'PROGRAMMING',
   paused: false,
+  aborted: false,
   players: [
     { playerId: '50000000-0000-4000-8000-000000000001', username: 'First', connected: true, programSubmitted: false },
     { playerId: '50000000-0000-4000-8000-000000000002', username: 'Second', connected: true, programSubmitted: false },
@@ -111,6 +112,15 @@ describe('join initialization', () => {
     })
     expect(state.phase).toBe('EXECUTING')
     expect(state.handVersion).toBe(0)
+    expect(canProgram(state)).toBe(false)
+  })
+
+  it('joins an aborted game and gameplay is disabled', () => {
+    const state = gameStateReducer(createClientGameState(), {
+      type: 'joined', result: { ...result, state: { ...publicState, aborted: true } },
+    })
+    expect(state.aborted).toBe(true)
+    expect(state.error).toBe('This game has encountered an error and cannot continue.')
     expect(canProgram(state)).toBe(false)
   })
 

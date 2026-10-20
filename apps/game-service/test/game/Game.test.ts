@@ -134,6 +134,17 @@ describe('Game programming', () => {
     expect(game.currentRegister).toBe(1)
   })
 
+  it('blocks program submission once aborted, even over a pause', () => {
+    const { player, deck, game } = createGame()
+    const validIds = deck.slice(0, 5).map((card) => card.id)
+
+    game.abort()
+    expect(game.submitProgram(player.id, validIds)._unsafeUnwrapErr()).toBe('GAME_ABORTED')
+
+    game.pause()
+    expect(game.submitProgram(player.id, validIds)._unsafeUnwrapErr()).toBe('GAME_ABORTED')
+  })
+
 })
 
 describe('Game.addPlayer', () => {

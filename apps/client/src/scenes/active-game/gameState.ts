@@ -229,6 +229,8 @@ export function gameStateReducer(
         submission: result.programSubmitted ? 'accepted' : 'idle',
         phase: snapshot.phase,
         paused: snapshot.paused,
+        aborted: snapshot.aborted,
+        error: snapshot.aborted ? 'This game has encountered an error and cannot continue.' : null,
         players: snapshot.players.map((player) => ({
           playerId: player.playerId, username: player.username, connected: player.connected,
         })),
@@ -336,6 +338,14 @@ export function gameStateReducer(
           ...state,
           submission: 'idle',
           error: 'Game paused. Your program was not submitted — try again once reconnected.',
+        }
+      }
+      if (event.result.outcome === 'GAME_ABORTED') {
+        return {
+          ...state,
+          submission: 'idle',
+          aborted: true,
+          error: 'This game has encountered an error and cannot continue.',
         }
       }
       if (event.result.outcome === 'WRONG_PHASE') {

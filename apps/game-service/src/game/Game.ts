@@ -28,6 +28,7 @@ export type NextActionResult = Readonly<{
 export type AddPlayerError = 'GAME_ALREADY_STARTED' | 'NO_SPAWN_AVAILABLE'
 
 export type SubmitProgramError =
+  | 'GAME_ABORTED'
   | 'GAME_PAUSED'
   | 'WRONG_PHASE'
   | 'PLAYER_NOT_IN_GAME'
@@ -45,6 +46,7 @@ export class Game {
   private readonly activatedRobotIds = new Set<RobotId>()
   private started = false
   private isPaused = false
+  private isAborted = false
 
   constructor(
     board: Board,
@@ -97,12 +99,20 @@ export class Game {
     return this.isPaused
   }
 
+  get aborted(): boolean {
+    return this.isAborted
+  }
+
   pause(): void {
     this.isPaused = true
   }
 
   resume(): void {
     this.isPaused = false
+  }
+
+  abort(): void {
+    this.isAborted = true
   }
 
   hasSubmittedProgram(playerId: PlayerId): boolean {
@@ -157,7 +167,8 @@ export class Game {
 
   private checkCanSubmitProgram(
     playerId: PlayerId,
-  ): Result<Player, 'GAME_PAUSED' | 'WRONG_PHASE' | 'PLAYER_NOT_IN_GAME' | 'ALREADY_SUBMITTED'> {
+  ): Result<Player, 'GAME_ABORTED' | 'GAME_PAUSED' | 'WRONG_PHASE' | 'PLAYER_NOT_IN_GAME' | 'ALREADY_SUBMITTED'> {
+    if (this.isAborted) return err('GAME_ABORTED')
     if (this.isPaused) return err('GAME_PAUSED')
     if (this.currentPhase !== 'programming') return err('WRONG_PHASE')
 

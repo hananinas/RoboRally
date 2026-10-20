@@ -76,6 +76,7 @@ export type PublicGameState = Readonly<{
   phase: GamePhase
   players: readonly PlayerState[]
   paused: boolean
+  aborted: boolean
 }>
 
 export type PlayerState = Readonly<{
@@ -116,6 +117,7 @@ export type ProgramResultOutcome =
   | 'ACCEPTED'
   | 'INVALID_PROGRAM'
   | 'GAME_PAUSED'
+  | 'GAME_ABORTED'
   | 'ALREADY_SUBMITTED'
   | 'WRONG_PHASE'
   | 'NOT_A_MEMBER'

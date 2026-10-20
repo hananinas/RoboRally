@@ -477,6 +477,26 @@ describe('game membership over Socket.IO', () => {
     expect(shared.game.phase).toBe('programming')
   })
 
+  it('aborts the game permanently on an unexpected execution failure, still tells (re)joining members, and still allows leaving', async () => {
+    const first = await connect('First')
+    const initial = await join(first)
+    const second = await connect('Second')
+    const other = await join(second)
+
+    const aborted = new Promise((resolve) => first.once('game.aborted', resolve))
+    vi.spyOn(shared.game, 'executeNextAction').mockImplementationOnce(() => { throw new Error('boom') })
+    await first.timeout(1000).emitWithAck('program.submit', submission(initial))
+    await second.timeout(1000).emitWithAck('program.submit', submission(other))
+    await aborted
+
+    expect(shared.game.aborted).toBe(true)
+    expect((await join(first)).state.aborted).toBe(true)
+    expect(await first.timeout(1000).emitWithAck('program.submit', submission(initial)))
+      .toMatchObject({ outcome: 'GAME_ABORTED' })
+    expect(await first.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId }))
+      .toEqual({ outcome: 'LEFT' })
+  })
+
   it('ignores commands without acknowledgements without creating state', async () => {
     const client = await connect()
     const emit = client.emit.bind(client) as unknown as (event: string, payload: unknown) => void

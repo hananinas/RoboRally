@@ -53,6 +53,7 @@ export function createActionScheduler(
           registerIndex: game.currentRegister,
         })
         stop()
+        game.abort()
         io.to(publicRoom).emit('game.aborted', { gameId })
       }
     })
