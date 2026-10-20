@@ -22,7 +22,6 @@ import {
 import { logError, logWarn } from '@/logger'
 import { toRejection, type Rejection } from '@/socket/utilities/rejection'
 import { presentCardsDealt, presentLobbyDetails } from '@/socket/gamePresenter'
-import { createHand } from '@/game/SinglePlayerGame'
 import type { ActionScheduler } from '@/actionScheduler'
 import type { GameSocket, GameSocketServer } from '@/socket/gameServer'
 
