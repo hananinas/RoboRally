@@ -52,6 +52,7 @@ function ActiveGame({ game, username, leaving, onLeave }: {
   const handleRedo = () => dispatch({ type: 'redo' })
   const hasHand = state.handVersion > 0
   const status = getGameStatus(state)
+  const disconnectedNames = state.players.filter((player) => !player.connected).map((player) => player.username)
   const registeredCardIds = new Set(
     state.registers.flatMap((card) => (card ? [card.id] : [])),
   )
@@ -105,7 +106,12 @@ function ActiveGame({ game, username, leaving, onLeave }: {
       {state.paused && (
         <div className="disconnect-overlay">
           <div className="disconnect-popup">
-            <h2>A player has disconnected</h2>
+            <h2>{!state.connected
+                  ? 'Connection to server lost'
+                  : disconnectedNames.length > 0
+                    ? `${disconnectedNames.join(', ')} has disconnected`
+                    : 'A player has disconnected'}
+            </h2>
             <div className="disconnect-spinner" role="status"/>
             <button
               className="game-menu__button game-menu__button--leave"
