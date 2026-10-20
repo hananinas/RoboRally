@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from './game-fixture.ts'
-import { GAME_ID, PLAYER_ID, ROBOT_ID } from './game-fixture-data.ts'
+import { createLobby,GAME_ID, PLAYER_ID, ROBOT_ID } from './game-fixture-data.ts'
 
 const username = ' Player 🤖 '
 
@@ -25,6 +25,79 @@ test('Join stays disabled until the first lobby is selected, and other lobbies c
   await first.click()
   await expect(first).toHaveAttribute('aria-pressed', 'true')
   await expect(join).toBeEnabled()
+})
+
+test('viewing the lobby shows the shared game\'s real details without joining it', async ({ page, game }) => {
+  await submitUsername(page)
+  const first = page.getByRole('button', { name: /Lobby 1/ })
+  await expect(first).toContainText('DEMO MAP')
+  await expect(first).toContainText('Player 2')
+  await expect(first).toContainText('1/6 players')
+  await expect(first.getByRole('img', { name: 'DEMO MAP preview' })).toHaveAttribute('src', createLobby().map.icon)
+  const { lobbyRequests, entryRequests } = await game.snapshot()
+  expect(lobbyRequests).toBe(1)
+  expect(entryRequests.map((request) => request.event)).toEqual(['user.login'])
+  await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
+})
+
+test('shows loading, then an error with Retry, while fetching lobby details', async ({ page, game }) => {
+  await game.control({ type: 'lobby', outcome: 'INTERNAL_ERROR', deferred: true })
+  await submitUsername(page)
+  await expect(page.getByRole('status')).toHaveText('Loading lobby details…')
+  await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Join game', exact: true })).toBeDisabled()
+
+  await expect.poll(async () => (await game.snapshot()).pendingLobbies).toBe(1)
+  await game.control({ type: 'respond-lobby' })
+  await expect(page.getByRole('alert')).toContainText('Could not load lobby details.')
+  await expect(page.getByRole('button', { name: /Lobby 1/ })).toHaveCount(0)
+
+  await game.control({ type: 'lobby', outcome: 'LOBBY_FOUND', deferred: false })
+  await page.getByRole('button', { name: 'Retry', exact: true }).click()
+  await expect(page.getByRole('button', { name: /Lobby 1/ })).toBeEnabled()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  expect((await game.snapshot()).lobbyRequests).toBe(2)
+})
+
+test('Refresh fetches the current lobby details', async ({ page, game }) => {
+  await submitUsername(page)
+  const first = page.getByRole('button', { name: /Lobby 1/ })
+  await expect(first).toContainText('1/6 players')
+
+  const lobby = createLobby()
+  await game.control({
+    type: 'lobby', outcome: 'LOBBY_FOUND', deferred: false,
+    lobbies: [{ ...lobby, players: [...lobby.players, { playerId: PLAYER_ID, username: 'Player 3' }] }],
+  })
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click()
+  await expect(first).toContainText('Player 2, Player 3')
+  await expect(first).toContainText('2/6 players')
+  expect((await game.snapshot()).lobbyRequests).toBe(2)
+})
+
+test('a full shared game cannot be selected', async ({ page, game }) => {
+  const lobby = createLobby()
+  await game.control({
+    type: 'lobby', outcome: 'LOBBY_FOUND', deferred: false,
+    lobbies: [{ ...lobby, map: { ...lobby.map, maxPlayers: 1 } }],
+  })
+  await submitUsername(page)
+  await expect(page.getByRole('button', { name: /Lobby 1/ })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Join game', exact: true })).toBeDisabled()
+})
+
+test('Join sends the game ID from the lobby entry', async ({ page, game }) => {
+  const otherGameId = '44444444-4444-4444-8444-444444444444'
+  await game.control({
+    type: 'lobby', outcome: 'LOBBY_FOUND', deferred: false,
+    lobbies: [{ ...createLobby(), gameId: otherGameId }],
+  })
+  await submitUsername(page)
+  await joinGame(page)
+  // The fixture only knows GAME_ID, so joining another game is rejected.
+  await expect(page.getByRole('alert')).toHaveText('This game no longer exists. Refresh the lobby and try again.')
+  const { entryRequests } = await game.snapshot()
+  expect(entryRequests[1]).toEqual({ event: 'game.join', socketId: entryRequests[0].socketId, payload: { gameId: otherGameId } })
 })
 
 test('login keeps the entry shell and waits for an explicit join', async ({ page, game }) => {
