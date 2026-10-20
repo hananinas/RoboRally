@@ -166,6 +166,7 @@ export class Board {
       // move the robot to the next position as it is free
       this.updateRobotPosition(robotId, nextPosition)
       stepsMoved = step + 1
+      if (this.getTile(nextPosition) instanceof PitTile) break
     }
 
     return { position: this.positionOf(robotId), stepsMoved: stepsMoved, blocked: false }

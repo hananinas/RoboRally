@@ -235,6 +235,30 @@ describe('Board robot ownership', () => {
     expect(board.occupantAt({ x: 2, y: 0 })).toBe('beta')
   })
 
+  it('stops at the first pit without crossing it or reporting a blocked move', () => {
+    const board = new Board([[new EmptyTile(), new PitTile(), new PitTile(), new EmptyTile()]])
+    board.placeRobot('alpha', { x: 0, y: 0 })
+
+    expect(board.moveRobot('alpha', Direction.EAST, 3)).toEqual({
+      position: { x: 1, y: 0 }, stepsMoved: 1, blocked: false,
+    })
+    expect(board.occupantAt({ x: 0, y: 0 })).toBeUndefined()
+    expect(board.occupantAt({ x: 1, y: 0 })).toBe('alpha')
+    expect(board.occupantAt({ x: 2, y: 0 })).toBeUndefined()
+  })
+
+  it('remains blocked by another robot before reaching a pit', () => {
+    const board = new Board([[new EmptyTile(), new EmptyTile(), new PitTile()]])
+    board.placeRobot('alpha', { x: 0, y: 0 })
+    board.placeRobot('beta', { x: 1, y: 0 })
+
+    expect(board.moveRobot('alpha', Direction.EAST, 3)).toEqual({
+      position: { x: 0, y: 0 }, stepsMoved: 0, blocked: true,
+    })
+    expect(board.occupantAt({ x: 1, y: 0 })).toBe('beta')
+    expect(board.occupantAt({ x: 2, y: 0 })).toBeUndefined()
+  })
+
   it('rejects invalid movement requests without changing state', () => {
     const board = new Board(grid())
     board.placeRobot('alpha', { x: 1, y: 1 })

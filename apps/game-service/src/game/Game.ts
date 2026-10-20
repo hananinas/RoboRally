@@ -261,10 +261,20 @@ export class Game {
     const effect = instructions[card.instruction]
     if (effect.kind === 'move') {
       const direction = effect.steps < 0 ? opposite(robot.direction) : robot.direction
-      this.board.moveRobot(robot.id, direction, Math.abs(effect.steps))
+      const movement = this.board.moveRobot(robot.id, direction, Math.abs(effect.steps))
+      if (movement.stepsMoved > 0 && this.board.getTile(movement.position) instanceof PitTile) {
+        this.rebootRobot(robot)
+      }
     } else {
       robot.turn(effect.quarterTurns)
     }
+  }
+
+  private rebootRobot(robot: Robot): void {
+    if (this.rebootTile === undefined) throw new Error('Pit reboot requires a configured reboot tile')
+    const destination = this.board.nearestFreePosition(this.rebootTile)
+    if (destination === undefined) throw new Error('No safe reboot destination is available')
+    this.board.relocateRobot(robot.id, destination)
   }
 
   private activateBoardElements(): void {
