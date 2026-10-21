@@ -40,7 +40,7 @@ test('the next member becomes owner when the creator leaves a waiting lobby', as
     await browse(page, 'Owner')
     await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
     await browse(other, 'Other')
-    await other.getByRole('list', { name: 'Lobbies' }).getByRole('button').first().click()
+    await other.getByRole('list', { name: 'Lobbies' }).getByRole('button', { disabled: false }).first().click()
     await other.getByRole('button', { name: 'Join game', exact: true }).click()
     await page.getByRole('button', { name: 'Leave lobby', exact: true }).click()
     await expect(other.getByRole('button', { name: 'Start', exact: true })).toBeEnabled()

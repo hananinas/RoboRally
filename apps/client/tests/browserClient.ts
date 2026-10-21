@@ -23,7 +23,7 @@ export async function startTogether(owner: Page, other: Page, ownerName = 'A', o
   await browse(owner, ownerName)
   await owner.getByRole('button', { name: 'Create lobby', exact: true }).click()
   await browse(other, otherName)
-  await other.getByRole('list', { name: 'Lobbies' }).getByRole('button').first().click()
+  await other.getByRole('list', { name: 'Lobbies' }).getByRole('button', { disabled: false }).first().click()
   await other.getByRole('button', { name: 'Join game', exact: true }).click()
   await expect(other.getByText('Waiting for the owner to start.', { exact: true })).toBeVisible()
   await expect(other.getByRole('button', { name: 'Start', exact: true })).toHaveCount(0)
