@@ -26,7 +26,9 @@ A successful join returns:
 
 `JOINED {assignment, state, hand, programSubmitted}`
 
-The acknowledgement contains the player's current robot assignment, public game state, private hand, and program-submission status. The client must apply all JOINED data before processing later live game events. A future lobby may be inserted between login and joining without changing this model.
+The acknowledgement contains the player's current robot assignment, public game state including every player's registers, private hand, and program-submission status. The client must apply all JOINED data before processing later live game events. A future lobby may be inserted between login and joining without changing this model.
+
+`game.playerJoined` announces the new player with five empty registers and their robot.
 
 ### Listing lobbies
 
@@ -120,13 +122,23 @@ A rejected submission does not replace or modify the player's current program.
 If the client receives no acknowledgement, the outcome is unknown. The client must not automatically resend the submission because the original request may have been accepted.
 
 
+### Public registers
+
+`PlayerState.registers` contains five slots in register order: `{status: EMPTY}`, `{status: HIDDEN}`, or `{status: REVEALED, instruction}` for an already-executed register. HIDDEN contains only its status; REVEALED contains the executed instruction without an instance ID. Each player's hand remains private.
+
+`game.updateRegisters {gameId, playerId, occupied}` sends exactly five booleans: `true` maps to HIDDEN and `false` maps to EMPTY. Its acknowledgement, `game.updateRegistersResult {outcome}`, returns `ACCEPTED`, `INVALID_REQUEST`, `NOT_A_MEMBER`, `PLAYER_ID_MISMATCH`, `WRONG_PHASE`, `ALREADY_SUBMITTED`, or `INTERNAL_ERROR`.
+
+`game.registersChanged {gameId, playerId, registers}` broadcasts that player's five public slots to `game:{gameId}:public` after an accepted occupancy update or register execution.
+
+`game.programmingStarted {gameId}` announces the start of programming to the public room and resets every player's registers to five EMPTY slots.
+
 ### Activation
 
 Once all players have submitted, the service resolves the five registers in order. Within each register, eligible robots act according to antenna priority. Priority is recalculated after each robot action before the next robot acts.
 
-Each resolved action is emitted publicly as:
+Each resolved action is emitted publicly as `robot.actionResolved`.
 
-`robot.actionResolved`
+The required `playerId` identifies whose register executed.
 
 Clients must process resolved actions in the order in which they are received.
 

@@ -24,6 +24,8 @@ channels:
         $ref: '#/components/messages/LeaveGame'
       submitProgram:
         $ref: '#/components/messages/SubmitProgram'
+      updateRegisters:
+        $ref: '#/components/messages/UpdateRegisters'
       getLobbyDetails:
         $ref: '#/components/messages/GetLobbyDetails'
 
@@ -63,6 +65,13 @@ channels:
       programResult:
         $ref: '#/components/messages/ProgramResult'
 
+  updateRegistersReplies:
+    address: null
+    description: Delivered through the acknowledgement of game.updateRegisters.
+    messages:
+      result:
+        $ref: '#/components/messages/UpdateRegistersResult'
+
   lobbyDetailsReplies:
     address: null
     description: |
@@ -93,6 +102,10 @@ channels:
         $ref: '#/components/messages/ProgramSubmitted'
       robotActionResolved:
         $ref: '#/components/messages/RobotActionResolved'
+      registersChanged:
+        $ref: '#/components/messages/RegistersChanged'
+      programmingStarted:
+        $ref: '#/components/messages/ProgrammingStarted'
       playerCheckpointProgress:
         $ref: '#/components/messages/PlayerCheckpointProgress'
       playerJoined:
@@ -158,6 +171,20 @@ operations:
         $ref: '#/channels/programReplies'
       messages:
         - $ref: '#/channels/programReplies/messages/programResult'
+      x-socketio:
+        acknowledgement: true
+
+  handleUpdateRegisters:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/updateRegisters'
+    reply:
+      channel:
+        $ref: '#/channels/updateRegistersReplies'
+      messages:
+        - $ref: '#/channels/updateRegistersReplies/messages/result'
       x-socketio:
         acknowledgement: true
 
@@ -235,9 +262,7 @@ components:
 
     JoinResult:
       name: game.joinResult
-      description: >-
-        Returns the player's assignment, game state, private hand, and submission
-        status, or a rejection.
+      description: Returns the player's assignment, public state including every player's registers, private hand, and submission status, or a rejection.
       payload:
         $ref: '#/components/schemas/JoinResult'
 
@@ -280,6 +305,12 @@ components:
                   lastCheckpoint: 0
                   programSubmitted: false
                   connected: true
+                  registers:
+                    - status: EMPTY
+                    - status: EMPTY
+                    - status: EMPTY
+                    - status: EMPTY
+                    - status: EMPTY
               paused: false
             hand:
               - id: 00000000-0000-4000-8000-000000000101
@@ -380,9 +411,33 @@ components:
 
     PlayerJoined:
       name: game.playerJoined
-      description: Announces a new player and robot to existing game participants.
+      description: Announces a new player with five empty registers and their robot to existing game participants.
       payload:
         $ref: '#/components/schemas/PlayerJoined'
+      examples:
+        - name: joined
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            player:
+              playerId: 00000000-0000-4000-8000-000000000002
+              username: Dane
+              programSubmitted: false
+              connected: true
+              lastCheckpoint: 0
+              registers:
+                - status: EMPTY
+                - status: EMPTY
+                - status: EMPTY
+                - status: EMPTY
+                - status: EMPTY
+            robot:
+              robotId: 00000000-0000-4000-8000-000000000003
+              playerId: 00000000-0000-4000-8000-000000000002
+              position:
+                coordinate:
+                  x: 0
+                  y: 0
+                orientation: NORTH
 
     GetLobbyDetails:
       name: game.getLobbyDetails
@@ -514,12 +569,107 @@ components:
             gameId: 00000000-0000-4000-8000-000000000001
             playerId: 00000000-0000-4000-8000-000000000002
 
+    UpdateRegisters:
+      name: game.updateRegisters
+      description: Updates a player's register occupancy and returns an acknowledgement outcome.
+      payload:
+        type: object
+        additionalProperties: false
+        required: [ gameId, playerId, occupied ]
+        properties:
+          gameId:
+            $ref: '#/components/schemas/GameId'
+          playerId:
+            $ref: '#/components/schemas/PlayerId'
+          occupied:
+            type: array
+            minItems: 5
+            maxItems: 5
+            items:
+              type: boolean
+            description: 'Five occupancy flags in register order: true is HIDDEN; false is EMPTY.'
+      examples:
+        - name: partiallyOccupied
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            occupied: [ true, false, true, false, false ]
+
+    UpdateRegistersResult:
+      name: game.updateRegistersResult
+      description: Acknowledges a register occupancy update with ACCEPTED or a rejection.
+      payload:
+        type: object
+        additionalProperties: false
+        required: [ outcome ]
+        properties:
+          outcome:
+            type: string
+            enum: [ ACCEPTED, INVALID_REQUEST, NOT_A_MEMBER, PLAYER_ID_MISMATCH, WRONG_PHASE, ALREADY_SUBMITTED, INTERNAL_ERROR ]
+      examples:
+        - name: accepted
+          payload:
+            outcome: ACCEPTED
+
+    RegistersChanged:
+      name: game.registersChanged
+      description: Broadcasts a player's public registers after an accepted occupancy update or register execution.
+      payload:
+        type: object
+        additionalProperties: false
+        required: [ gameId, playerId, registers ]
+        properties:
+          gameId:
+            $ref: '#/components/schemas/GameId'
+          playerId:
+            $ref: '#/components/schemas/PlayerId'
+          registers:
+            $ref: '#/components/schemas/PublicRegisters'
+      examples:
+        - name: occupancyUpdated
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            registers:
+              - status: HIDDEN
+              - status: EMPTY
+              - status: HIDDEN
+              - status: EMPTY
+              - status: EMPTY
+        - name: firstRegisterExecuted
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            registers:
+              - status: REVEALED
+                instruction: MOVE_1
+              - status: HIDDEN
+              - status: HIDDEN
+              - status: HIDDEN
+              - status: HIDDEN
+
+    ProgrammingStarted:
+      name: game.programmingStarted
+      description: Announces the start of programming with all players' registers reset to EMPTY.
+      payload:
+        type: object
+        additionalProperties: false
+        required: [ gameId ]
+        properties:
+          gameId:
+            $ref: '#/components/schemas/GameId'
+      examples:
+        - name: started
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+
     RobotActionResolved:
       name: robot.actionResolved
       payload:
         type: object
         required:
           - robotId
+          - playerId
           - instruction
           - position
           - gameId
@@ -527,6 +677,8 @@ components:
         properties:
           robotId:
             $ref: "#/components/schemas/RobotId"
+          playerId:
+            $ref: "#/components/schemas/PlayerId"
           instruction:
             $ref: "#/components/schemas/Instruction"
           position:
@@ -546,6 +698,7 @@ components:
             gameId: 00000000-0000-4000-8000-000000000001
             registerIndex: 0
             robotId: 00000000-0000-4000-8000-000000000003
+            playerId: 00000000-0000-4000-8000-000000000002
             instruction: MOVE_1
             position:
               coordinate:
@@ -837,6 +990,7 @@ components:
         - programSubmitted
         - connected
         - lastCheckpoint
+        - registers
       properties:
         playerId:
           $ref: "#/components/schemas/PlayerId"
@@ -848,8 +1002,45 @@ components:
           type: boolean
         lastCheckpoint:
           $ref: '#/components/schemas/LastCheckpoint'
+        registers:
+          $ref: '#/components/schemas/PublicRegisters'
       description: >-
-        Public participation and submission status; never contains cards.
+        Public player participation, submission status, and registers.
+
+    PublicRegisters:
+      type: array
+      minItems: 5
+      maxItems: 5
+      items:
+        $ref: '#/components/schemas/PublicRegisterSlot'
+      description: Five public slots in register order.
+
+    PublicRegisterSlot:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [ status ]
+          properties:
+            status:
+              type: string
+              enum: [ EMPTY ]
+        - type: object
+          additionalProperties: false
+          required: [ status ]
+          properties:
+            status:
+              type: string
+              enum: [ HIDDEN ]
+        - type: object
+          additionalProperties: false
+          required: [ status, instruction ]
+          properties:
+            status:
+              type: string
+              enum: [ REVEALED ]
+            instruction:
+              $ref: '#/components/schemas/Instruction'
+          description: Already-executed register instruction.
 
     PlayerJoined:
       type: object
