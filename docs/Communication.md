@@ -151,7 +151,7 @@ Entering a `PIT` stops the current movement instruction and immediately reboots 
 
 Rebooting completes before the next action. `robot.actionResolved.position` and public snapshots contain the resulting position and unchanged orientation. No new event is added.
 
-Programs and checkpoint progress are preserved; later registers continue normally. Damage, round cancellation, direction selection, board-edge falls and client rendering/animation are deferred.
+Programs and checkpoint progress are preserved; later registers continue normally. Damage, round cancellation, direction selection, board-edge falls and pit animations are deferred.
 
 ### Checkpoint progress
 
