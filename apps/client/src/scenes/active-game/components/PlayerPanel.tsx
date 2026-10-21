@@ -17,7 +17,7 @@ function PlayerPanel({ player, robotColour, checkpointCount, onLeave, leaveDisab
   return (
     <Panel className="player-panel">
       <header className="player-panel__header">
-        <h1 className="player-panel__name">
+        <h1 className="player-panel__name" aria-label={player.name}>
           {robotColour && (
             <span
               className="player-panel__colour"
