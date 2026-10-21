@@ -13,13 +13,13 @@ import { createActionScheduler } from '@/actionScheduler'
 import { handleLogin } from '@/socket/handlers/authHandlers'
 import {
   handleDisconnect,
-  handleGetLobbyDetails,
   handleJoin,
   handleLeave,
   reconnectIfRecovered,
   type GameMembership,
   type MembershipContext,
 } from '@/socket/handlers/membershipHandlers'
+import { handleGetLobbyDetails } from '@/socket/handlers/lobbyHandlers'
 import { handleSubmitProgram } from '@/socket/handlers/gameplayHandlers'
 
 export type GameSocketData = { user?: User }
