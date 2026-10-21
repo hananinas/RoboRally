@@ -13,7 +13,7 @@ export default defineConfig({
   webServer: [
     {
       command: 'pnpm dev --host 127.0.0.1 --port 4175 --strictPort',
-      env: { GAME_SERVICE_URL, VITE_GAME_ID: '00000000-0000-4000-8000-000000000001' },
+      env: { GAME_SERVICE_URL },
       url: baseURL,
       reuseExistingServer: false,
     },

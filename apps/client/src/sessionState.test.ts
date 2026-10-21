@@ -2,10 +2,13 @@ import type { JoinResult, User } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'
 import { createSessionState, sessionReducer, type SessionState } from './sessionState.ts'
 
+
 const user: User = {
   userId: '00000000-0000-4000-8000-000000000001',
   username: ' Player ',
 }
+
+const gameId = '00000000-0000-4000-8000-000000000002'
 
 const joined: Extract<JoinResult, { outcome: 'JOINED' }> = {
   outcome: 'JOINED',
@@ -38,7 +41,7 @@ function readyState(): SessionState {
 }
 
 function joiningState(): SessionState {
-  return sessionReducer(readyState(), { type: 'join-requested' })
+  return sessionReducer(readyState(), { type: 'join-requested', gameId })
 }
 
 function resyncingState(): SessionState {
@@ -58,7 +61,7 @@ describe('sessionReducer', () => {
   ])('requires fresh login after disconnect from $status', (previous) => {
     const reset = sessionReducer(previous, { type: 'disconnected' })
     expect(reset).toEqual(editing)
-    expect(sessionReducer(reset, { type: 'join-requested' })).toBe(reset)
+    expect(sessionReducer(reset, { type: 'join-requested',gameId })).toBe(reset)
     expect(sessionReducer(reset, { type: 'join-result', result: joined })).toBe(reset)
     expect(sessionReducer(reset, {
       type: 'login-result', result: { outcome: 'LOGGED_IN', user },
@@ -73,7 +76,7 @@ describe('sessionReducer', () => {
     const disconnected = sessionReducer(entered, { type: 'disconnected' })
     expect(disconnected).toBe(entered)
     expect(sessionReducer(disconnected, { type: 'login-submitted' })).toBe(disconnected)
-    expect(sessionReducer(disconnected, { type: 'join-requested' })).toBe(disconnected)
+    expect(sessionReducer(disconnected, { type: 'join-requested',gameId })).toBe(disconnected)
   })
 
   it('moves from editing through login and join while retaining the approved user', () => {
@@ -83,6 +86,7 @@ describe('sessionReducer', () => {
     expect(state).toMatchObject({
       status: 'joined',
       user,
+      gameId,
     })
   })
 
@@ -90,7 +94,7 @@ describe('sessionReducer', () => {
     const ready = readyState()
     expect(ready).toEqual({ status: 'ready-to-join', user })
     expect(sessionReducer(ready, { type: 'join-result', result: joined })).toBe(ready)
-    expect(sessionReducer(ready, { type: 'join-requested' })).toEqual({ status: 'joining', user })
+    expect(sessionReducer(ready, { type: 'join-requested',gameId })).toEqual({ status: 'joining', user, gameId })
   })
 
   it('returns to the join step after leaving without logging out or rejoining', () => {
@@ -133,9 +137,9 @@ describe('sessionReducer', () => {
       result: { outcome },
     })
     expect(state).toEqual({ status: 'join-failed', user, error: outcome })
-    state = sessionReducer(state, { type: 'join-requested' })
+    state = sessionReducer(state, { type: 'join-requested',gameId })
 
-    expect(state).toEqual({ status: 'joining', user })
+    expect(state).toEqual({ status: 'joining', user, gameId })
   })
 
   it('returns to login when joining requires it', () => {
@@ -160,12 +164,12 @@ describe('sessionReducer', () => {
   it('moves from joined to resyncing on a failed-recovery reconnect, then back to joining', () => {
     const entered = sessionReducer(joiningState(), { type: 'join-result', result: joined })
     const resyncing = sessionReducer(entered, { type: 'resync' })
-    expect(resyncing).toEqual({ status: 'resyncing', user })
+    expect(resyncing).toEqual({ status: 'resyncing', user, gameId })
 
     const state = sessionReducer(resyncing, {
       type: 'login-result', result: { outcome: 'LOGGED_IN', user },
     })
-    expect(state).toEqual({ status: 'joining', user })
+    expect(state).toEqual({ status: 'joining', user, gameId })
   })
 
   it('ignores resync outside the joined state', () => {
@@ -195,6 +199,6 @@ describe('sessionReducer', () => {
       type: 'login-result',
       result: { outcome: 'LOGGED_IN', user },
     })).toBe(joining)
-    expect(sessionReducer(joining, { type: 'join-requested' })).toBe(joining)
+    expect(sessionReducer(joining, { type: 'join-requested', gameId })).toBe(joining)
   })
 })
