@@ -16,17 +16,17 @@ channels:
     x-socketio:
       routing: client-to-server
     messages:
-      lobbyList:
+      listLobbies:
         $ref: '#/components/messages/LobbyList'
-      lobbyCreate:
+      createLobby:
         $ref: '#/components/messages/LobbyCreate'
-      lobbyJoin:
+      joinLobby:
         $ref: '#/components/messages/LobbyJoin'
-      lobbyLeave:
+      leaveLobby:
         $ref: '#/components/messages/LobbyLeave'
-      lobbyStart:
+      startLobby:
         $ref: '#/components/messages/LobbyStart'
-      sessionGet:
+      getSession:
         $ref: '#/components/messages/SessionGet'
       login:
         $ref: '#/components/messages/Login'
@@ -204,7 +204,7 @@ operations:
     channel:
       $ref: '#/channels/commands'
     messages:
-      - $ref: '#/channels/commands/messages/lobbyList'
+      - $ref: '#/channels/commands/messages/listLobbies'
     reply:
       channel:
         $ref: '#/channels/lobbyListReplies'
@@ -218,7 +218,7 @@ operations:
     channel:
       $ref: '#/channels/commands'
     messages:
-      - $ref: '#/channels/commands/messages/lobbyCreate'
+      - $ref: '#/channels/commands/messages/createLobby'
     reply:
       channel:
         $ref: '#/channels/lobbyCreateReplies'
@@ -232,7 +232,7 @@ operations:
     channel:
       $ref: '#/channels/commands'
     messages:
-      - $ref: '#/channels/commands/messages/lobbyJoin'
+      - $ref: '#/channels/commands/messages/joinLobby'
     reply:
       channel:
         $ref: '#/channels/lobbyJoinReplies'
@@ -246,7 +246,7 @@ operations:
     channel:
       $ref: '#/channels/commands'
     messages:
-      - $ref: '#/channels/commands/messages/lobbyLeave'
+      - $ref: '#/channels/commands/messages/leaveLobby'
     reply:
       channel:
         $ref: '#/channels/lobbyLeaveReplies'
@@ -260,7 +260,7 @@ operations:
     channel:
       $ref: '#/channels/commands'
     messages:
-      - $ref: '#/channels/commands/messages/lobbyStart'
+      - $ref: '#/channels/commands/messages/startLobby'
     reply:
       channel:
         $ref: '#/channels/lobbyStartReplies'
@@ -274,7 +274,7 @@ operations:
     channel:
       $ref: '#/channels/commands'
     messages:
-      - $ref: '#/channels/commands/messages/sessionGet'
+      - $ref: '#/channels/commands/messages/getSession'
     reply:
       channel:
         $ref: '#/channels/sessionGetReplies'
@@ -695,18 +695,182 @@ components:
             gameId: 00000000-0000-4000-8000-000000000001
 
   schemas:
-    EmptyRequest: {"type": "object", "additionalProperties": false, "required": [], "properties": {}}
-    LobbyRequest: {"type": "object", "additionalProperties": false, "required": ["lobbyId"], "properties": {"lobbyId": {"type": "string", "format": "uuid"}}}
-    LobbySummary: {"type": "object", "additionalProperties": false, "required": ["lobbyId", "name", "playerCount", "maxPlayers"], "properties": {"lobbyId": {"type": "string", "format": "uuid"}, "name": {"type": "string"}, "playerCount": {"type": "integer", "minimum": 0}, "maxPlayers": {"type": "integer", "minimum": 1}}}
-    LobbyState: {"type": "object", "additionalProperties": false, "required": ["lobbyId", "name", "playerCount", "maxPlayers", "ownerUserId"], "properties": {"lobbyId": {"type": "string", "format": "uuid"}, "name": {"type": "string"}, "playerCount": {"type": "integer", "minimum": 0}, "maxPlayers": {"type": "integer", "minimum": 1}, "ownerUserId": {"type": "string", "format": "uuid"}}}
-    LobbyFailure: {"type": "object", "additionalProperties": false, "required": ["outcome"], "properties": {"outcome": {"enum": ["LOGIN_REQUIRED", "INVALID_REQUEST", "INTERNAL_ERROR", "LOBBY_NOT_FOUND", "NOT_LOBBY_MEMBER", "NOT_LOBBY_OWNER", "LOBBY_FULL", "USER_ALREADY_IN_SESSION"]}}}
-    LobbyListResult: {"oneOf": [{"type": "object", "additionalProperties": false, "required": ["outcome", "lobbies"], "properties": {"outcome": {"const": "LOBBIES_FOUND"}, "lobbies": {"type": "array", "items": {"$ref": "#/components/schemas/LobbySummary"}}}}, {"$ref": "#/components/schemas/LobbyFailure"}]}
-    LobbyJoinResult: {"oneOf": [{"type": "object", "additionalProperties": false, "required": ["outcome", "lobby"], "properties": {"outcome": {"const": "LOBBY_JOINED"}, "lobby": {"$ref": "#/components/schemas/LobbyState"}}}, {"$ref": "#/components/schemas/LobbyFailure"}]}
-    LobbyLeaveResult: {"oneOf": [{"type": "object", "additionalProperties": false, "required": ["outcome"], "properties": {"outcome": {"const": "LEFT"}}}, {"$ref": "#/components/schemas/LobbyFailure"}]}
-    LobbyStartResult: {"oneOf": [{"type": "object", "additionalProperties": false, "required": ["outcome", "gameId"], "properties": {"outcome": {"const": "STARTED"}, "gameId": {"type": "string", "format": "uuid"}}}, {"$ref": "#/components/schemas/LobbyFailure"}]}
-    SessionResult: {"oneOf": [{"type": "object", "additionalProperties": false, "required": ["outcome"], "properties": {"outcome": {"const": "NO_SESSION"}}}, {"type": "object", "additionalProperties": false, "required": ["outcome", "lobby"], "properties": {"outcome": {"const": "IN_LOBBY"}, "lobby": {"$ref": "#/components/schemas/LobbyState"}}}, {"type": "object", "additionalProperties": false, "required": ["outcome", "initialization"], "properties": {"outcome": {"const": "IN_GAME"}, "initialization": {"$ref": "#/components/schemas/JoinAccepted"}}}, {"$ref": "#/components/schemas/LobbyFailure"}]}
-    LobbyUpdated: {"type": "object", "additionalProperties": false, "required": ["lobby"], "properties": {"lobby": {"$ref": "#/components/schemas/LobbyState"}}}
-    GameStarted: {"type": "object", "additionalProperties": false, "required": ["lobbyId", "initialization"], "properties": {"lobbyId": {"type": "string", "format": "uuid"}, "initialization": {"$ref": "#/components/schemas/JoinAccepted"}}}
+    EmptyRequest:
+      type: object
+      additionalProperties: false
+      required: []
+      properties: {}
+    LobbyRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - lobbyId
+      properties:
+        lobbyId:
+          type: string
+          format: uuid
+    LobbySummary:
+      type: object
+      additionalProperties: false
+      required:
+        - lobbyId
+        - name
+        - playerCount
+        - maxPlayers
+      properties:
+        lobbyId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        playerCount:
+          type: integer
+          minimum: 0
+        maxPlayers:
+          type: integer
+          minimum: 1
+    LobbyState:
+      type: object
+      additionalProperties: false
+      required:
+        - lobbyId
+        - name
+        - playerCount
+        - maxPlayers
+        - ownerUserId
+      properties:
+        lobbyId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        playerCount:
+          type: integer
+          minimum: 0
+        maxPlayers:
+          type: integer
+          minimum: 1
+        ownerUserId:
+          type: string
+          format: uuid
+    LobbyFailure:
+      type: object
+      additionalProperties: false
+      required:
+        - outcome
+      properties:
+        outcome:
+          enum:
+            - LOGIN_REQUIRED
+            - INVALID_REQUEST
+            - INTERNAL_ERROR
+            - LOBBY_NOT_FOUND
+            - NOT_LOBBY_MEMBER
+            - NOT_LOBBY_OWNER
+            - LOBBY_FULL
+            - USER_ALREADY_IN_SESSION
+    LobbyListResult:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - outcome
+            - lobbies
+          properties:
+            outcome:
+              const: LOBBIES_FOUND
+            lobbies:
+              type: array
+              items:
+                $ref: '#/components/schemas/LobbySummary'
+        - $ref: '#/components/schemas/LobbyFailure'
+    LobbyJoinResult:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - outcome
+            - lobby
+          properties:
+            outcome:
+              const: LOBBY_JOINED
+            lobby:
+              $ref: '#/components/schemas/LobbyState'
+        - $ref: '#/components/schemas/LobbyFailure'
+    LobbyLeaveResult:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - outcome
+          properties:
+            outcome:
+              const: LEFT
+        - $ref: '#/components/schemas/LobbyFailure'
+    LobbyStartResult:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - outcome
+            - gameId
+          properties:
+            outcome:
+              const: STARTED
+            gameId:
+              type: string
+              format: uuid
+        - $ref: '#/components/schemas/LobbyFailure'
+    SessionResult:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - outcome
+          properties:
+            outcome:
+              const: NO_SESSION
+        - type: object
+          additionalProperties: false
+          required:
+            - outcome
+            - lobby
+          properties:
+            outcome:
+              const: IN_LOBBY
+            lobby:
+              $ref: '#/components/schemas/LobbyState'
+        - type: object
+          additionalProperties: false
+          required:
+            - outcome
+            - initialization
+          properties:
+            outcome:
+              const: IN_GAME
+            initialization:
+              $ref: '#/components/schemas/JoinAccepted'
+        - $ref: '#/components/schemas/LobbyFailure'
+    LobbyUpdated:
+      type: object
+      additionalProperties: false
+      required:
+        - lobby
+      properties:
+        lobby:
+          $ref: '#/components/schemas/LobbyState'
+    GameStarted:
+      type: object
+      additionalProperties: false
+      required:
+        - lobbyId
+        - initialization
+      properties:
+        lobbyId:
+          type: string
+          format: uuid
+        initialization:
+          $ref: '#/components/schemas/JoinAccepted'
 
     # Login
     Username:

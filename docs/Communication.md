@@ -16,17 +16,19 @@ A successful login returns:
 
 `LOGGED_IN {user}`
 
-The client then sends `session.get {}`. `NO_SESSION` continues to lobby selection, `IN_LOBBY {lobby}` restores waiting, and `IN_GAME {initialization}` restores an existing game.
+The client then sends `session.get {}`. `NO_SESSION` continues to lobby selection, `IN_LOBBY {lobby}` confirms waiting membership on the same live connection (for example, after a command acknowledgement times out), and `IN_GAME {initialization}` restores an existing game. Disconnecting removes lobby membership; reconnecting does not rejoin that lobby.
 
 To enter a new lobby, the client sends `lobby.create {}` or `lobby.join {lobbyId}` on the same socket. Creating uses a generated name and makes the creator the owner. A successful request returns `LOBBY_JOINED {lobby}` and enters the waiting screen.
 
-Only the owner can send `lobby.start {lobbyId}`. The service creates a fresh game, moves every member into its public and private player rooms, and removes the lobby room and record. Each private room receives:
+Only the owner can send `lobby.start {lobbyId}`. The service creates a fresh game, moves every member into its public and private player rooms, and removes the lobby room and record. The service sends each player the following through their own `game:{gameId}:player:{playerId}` room:
 
 `game.started {lobbyId, initialization: {outcome: JOINED, assignment, state, hand, programSubmitted}}`
 
+The public room `game:{gameId}:public` still carries shared gameplay events. Initialization uses private rooms because it includes each player's hand.
+
 Robot colours are assigned once by the service at Start and included in public state; clients retain them across departures and reconnects.
 
-The owner also receives `STARTED {gameId}` as the command acknowledgement. The initialization contains the player's robot assignment, public state, private hand, and program-submission status. The client must apply it before processing later live game events. If a command times out, `session.get` discovers the committed session without repeating the mutation.
+The owner also receives `STARTED {gameId}` as the command acknowledgement. The service constructs each initialization with the player's robot assignment, public state, private hand, and program-submission status. The client must apply it before processing later live game events. If a command times out, `session.get` discovers the committed session without repeating the mutation.
 
 ### Listing lobbies
 
@@ -66,7 +68,6 @@ The following diagram documents logging in, listing lobbies and joining:
 sequenceDiagram
     participant Client
     participant Server as Game Service
-    participant Private as Private game rooms
     participant Others as Lobby members
 
     Client->>Server: user.login {username}
@@ -83,9 +84,9 @@ sequenceDiagram
             Note over Client,Others: Wait for the owner to start
             Client->>Server: lobby.start {lobbyId} (owner only)
             Note over Server: Move members to game rooms and remove lobby
-            Server->>Private: game.started {lobbyId, initialization} per player
-            Private-->>Client: Own initialization
-            Private-->>Others: Own initialization
+            Note over Server: Send through each game:{gameId}:player:{playerId} room
+            Server-->>Client: game.started {lobbyId, initialization}
+            Server-->>Others: game.started with each player's own initialization
             Server-->>Client: Acknowledgement: STARTED {gameId}
             Note over Client,Server: Initialize before later game events
         else Join rejected
