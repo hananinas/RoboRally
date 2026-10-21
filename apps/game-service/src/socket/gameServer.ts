@@ -1,10 +1,11 @@
-import { registerLobbyHandlers, leaveLobby, defaultGameFactory, type SessionStore, type UserSession } from '@/lobbyHandlers'
+import { registerLobbyHandlers, leaveLobby, presentLobby, defaultGameFactory, type SessionStore, type UserSession } from '@/lobbyHandlers'
 import type { Server as HttpServer } from 'node:http'
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
   User,
 } from '@robo-rally/game-events'
+import { emptyRequestSchema } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
 import type { Game } from '@/game/index'
 import { createUserRegistry } from '@/userRegistry'
@@ -63,9 +64,16 @@ export function createGameSocketServer(
 
   io.use((socket, next) => {
     if (socket.recovered && socket.data.user) {
-      const membership = currentGame(socket)?.memberships.get(socket.data.user.userId)
+      const ctx = currentGame(socket)
+      const membership = ctx?.memberships.get(socket.data.user.userId)
       if (membership?.connectionId && membership.connectionId !== socket.id) {
         next(new Error('USER_ALREADY_IN_GAME'))
+        return
+      }
+      const expectedRooms = new Set(membership && ctx
+        ? [socket.id, ctx.publicRoom, ctx.playerRoom(membership.player.id)] : [socket.id])
+      if ([...socket.rooms].some((room) => !expectedRooms.has(room))) {
+        next(new Error('SESSION_EXPIRED'))
         return
       }
     }
@@ -78,6 +86,26 @@ export function createGameSocketServer(
 
     const recoveredGame = currentGame(socket)
     if (recoveredGame) reconnectIfRecovered(recoveredGame, socket)
+
+    socket.on('session.get', (payload, acknowledge) => {
+      if (typeof acknowledge !== 'function') return
+      if (!socket.data.user) return acknowledge({ outcome: 'LOGIN_REQUIRED' })
+      if (!emptyRequestSchema.safeParse(payload).success) return acknowledge({ outcome: 'INVALID_REQUEST' })
+      const userId = socket.data.user.userId
+      const session = sessionsByUser.get(userId)
+      if (!session) return acknowledge({ outcome: 'NO_SESSION' })
+      if (session.kind === 'lobby') {
+        const lobby = store.lobbies.get(session.lobbyId)!
+        return acknowledge(lobby.members.get(userId)?.connectionId === socket.id
+          ? { outcome: 'IN_LOBBY', lobby: presentLobby(lobby) }
+          : { outcome: 'USER_ALREADY_IN_SESSION' })
+      }
+      const ctx = games.get(session.gameId)!
+      handleJoin(ctx, socket, { gameId: ctx.gameId }, (result) => {
+        if (result.outcome === 'JOINED') acknowledge({ outcome: 'IN_GAME', initialization: result })
+        else acknowledge({ outcome: result.outcome === 'USER_ALREADY_IN_GAME' ? 'USER_ALREADY_IN_SESSION' : 'INTERNAL_ERROR' })
+      })
+    })
 
     socket.on('game.join', (payload, acknowledge) => {
       if (typeof acknowledge !== 'function') return
