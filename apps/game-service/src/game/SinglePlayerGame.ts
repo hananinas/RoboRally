@@ -5,10 +5,11 @@ import type { GameId } from '@/game/ids'
 import { Player } from '@/game/Player'
 import { Robot } from '@/game/Robot'
 import { Direction } from '@/game/spatial'
-import { EmptyTile } from '@/game/Tile'
+import { EmptyTile, PitTile } from '@/game/Tile'
 
 const BOARD_WIDTH = 21
 const BOARD_HEIGHT = 15
+const REBOOT_TILE = { x: 10, y: 7 }
 
 const GAME_ID: GameId = '00000000-0000-4000-8000-000000000001'
 const SHARED_GAME_NAME = 'Shared game'
@@ -39,6 +40,9 @@ function createBoard(): Board {
   )
   tiles[6][10] = new EmptyTile([], 1)
   tiles[9][8] = new EmptyTile([], 2)
+  for (const [x, y] of [[3, 3], [16, 4], [12, 7], [18, 9], [5, 10], [12, 11]]) {
+    tiles[y][x] = new PitTile()
+  }
   return new Board(tiles)
 }
 
@@ -52,16 +56,16 @@ export function createHand(cardIds: readonly string[] = CARD_IDS): readonly Card
 }
 
 export function createSharedGame(): Readonly<{ gameId: GameId; game: Game }> {
-  return { gameId: GAME_ID, game: new Game(createBoard(), [], createHand(),undefined, SHARED_GAME_NAME) }
+  return { gameId: GAME_ID, game: new Game(createBoard(), [], createHand(), undefined, SHARED_GAME_NAME, REBOOT_TILE) }
 }
 
 export function createSinglePlayerGame(): SinglePlayerGame {
   const board = createBoard()
   const robot = new Robot(ROBOT_ID, Direction.NORTH)
-  board.placeRobot(robot.id, { x: 10, y: 7 })
+  board.placeRobot(robot.id, REBOOT_TILE)
 
   const player = new Player(PLAYER_ID, robot)
-  const game = new Game(board, [player], createHand())
+  const game = new Game(board, [player], createHand(), undefined, undefined, REBOOT_TILE)
 
   return Object.freeze({ gameId: GAME_ID, game, player })
 }
