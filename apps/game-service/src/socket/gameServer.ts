@@ -1,4 +1,4 @@
-import { registerLobbyHandlers, leaveLobby, presentLobby, defaultGameFactory, type SessionStore, type UserSession } from '@/lobbyHandlers'
+import { registerLobbyHandlers, leaveLobby, presentLobby, type SessionStore, type UserSession } from '@/lobbyHandlers'
 import type { Server as HttpServer } from 'node:http'
 import type {
   ClientToServerEvents,
@@ -9,13 +9,13 @@ import { emptyRequestSchema } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
 import type { Game } from '@/game/index'
 import { createUserRegistry } from '@/userRegistry'
-import { createGameContext } from '@/gameContext'
+import { createDefaultGame } from '@/game/SinglePlayerGame'
+import type { MembershipContext } from '@/membershipHandlers'
 import { handleLogin } from '@/authHandlers'
 import {
   handleDisconnect,
-  handleGetLobbyDetails,
   handleGetPublicGameState,
-  handleJoin,
+  reattachGame,
   handleLeave,
   reconnectIfRecovered,
 } from '@/membershipHandlers'
@@ -36,8 +36,7 @@ export type GameSession = Readonly<{ gameId: string; game: Game }>
 
 export function createGameSocketServer(
   httpServer: HttpServer,
-  initialGames: GameSession | readonly GameSession[] = [],
-  createGame: () => GameSession = defaultGameFactory,
+  createGame: () => GameSession = createDefaultGame,
 ): GameSocketServer {
   const io = new Server<
     ClientToServerEvents,
@@ -50,15 +49,13 @@ export function createGameSocketServer(
     pingTimeout: 1000,
   })
   const users = createUserRegistry()
-  const games = new Map((Array.isArray(initialGames) ? initialGames : [initialGames]).map((session: GameSession) =>
-    [session.gameId, createGameContext(io, session)]))
+  const games = new Map<string, MembershipContext>()
   const sessionsByUser = new Map<string, UserSession>()
   const store: SessionStore = { games, sessionsByUser, lobbies: new Map(), createGame }
   const currentGame = (socket: GameSocket) => {
     const session = sessionsByUser.get(socket.data.user?.userId ?? '')
     return session?.kind === 'game' ? games.get(session.gameId) : undefined
   }
-  const requestedGame = (payload: { gameId: string }) => games.get(payload?.gameId)
   httpServer.once('close', () => { for (const ctx of games.values()) ctx.actionScheduler.stop() })
 
   io.use((socket, next) => {
@@ -100,23 +97,12 @@ export function createGameSocketServer(
           : { outcome: 'USER_ALREADY_IN_SESSION' })
       }
       const ctx = games.get(session.gameId)!
-      handleJoin(ctx, socket, { gameId: ctx.gameId }, (result) => {
+      reattachGame(ctx, socket, (result) => {
         if (result.outcome === 'JOINED') acknowledge({ outcome: 'IN_GAME', initialization: result })
         else acknowledge({ outcome: result.outcome === 'USER_ALREADY_IN_GAME' ? 'USER_ALREADY_IN_SESSION' : 'INTERNAL_ERROR' })
       })
     })
 
-    socket.on('game.join', (payload, acknowledge) => {
-      if (typeof acknowledge !== 'function') return
-      const ctx = requestedGame(payload)
-      if (!ctx) return acknowledge({ outcome: socket.data.user ? 'GAME_NOT_FOUND' : 'LOGIN_REQUIRED' })
-      const existing = sessionsByUser.get(socket.data.user?.userId ?? '')
-      if (existing && (existing.kind !== 'game' || existing.gameId !== ctx.gameId)) return acknowledge({ outcome: 'USER_ALREADY_IN_GAME' })
-      handleJoin(ctx, socket, payload, (result) => {
-        if (result.outcome === 'JOINED') sessionsByUser.set(socket.data.user!.userId, { kind: 'game', gameId: ctx.gameId })
-        acknowledge(result)
-      })
-    })
     socket.on('game.leave', (payload, acknowledge) => {
       if (typeof acknowledge !== 'function') return
       const ctx = currentGame(socket)
@@ -134,10 +120,6 @@ export function createGameSocketServer(
       leaveLobby(io, store, socket)
       const ctx = currentGame(socket)
       if (ctx) handleDisconnect(ctx, socket)
-    })
-    socket.on('game.getLobbyDetails', (payload, acknowledge) => {
-      const ctx = games.values().next().value
-      if (ctx) handleGetLobbyDetails(ctx, socket, payload, acknowledge)
     })
     socket.on('game.getPublicGameState', (payload, acknowledge) => {
       if (typeof acknowledge !== 'function') return

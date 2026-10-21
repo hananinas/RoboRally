@@ -70,8 +70,7 @@ test('leaves a paused game through the disconnect overlay and returns to lobby s
   const otherContext = await browser.newContext({ baseURL })
   const other = await otherContext.newPage()
   try {
-    await login(page, 'Staying player')
-    await login(other, 'Disconnected player')
+    await startTogether(page, other, 'Staying player', 'Disconnected player')
     await expect.poll(() => robotIds(page)).toHaveLength(2)
 
     await otherContext.setOffline(true)
@@ -88,5 +87,33 @@ test('leaves a paused game through the disconnect overlay and returns to lobby s
     await expect(page.getByRole('button', { name: 'Join game', exact: true })).toBeDisabled()
   } finally {
     await otherContext.close()
+  }
+})
+
+test('a disconnected waiting owner returns to browsing while the remaining member becomes owner', async ({ browser, page, baseURL }) => {
+  const context = await browser.newContext({ baseURL })
+  const other = await context.newPage()
+  try {
+    for (const [client, username] of [[page, 'Owner'], [other, 'Other']] as const) {
+      await client.goto('/')
+      await client.getByRole('textbox', { name: 'Username' }).fill(username)
+      await client.getByRole('button', { name: 'Log in', exact: true }).click()
+      if (client === page) await client.getByRole('button', { name: 'Create lobby', exact: true }).click()
+      else {
+        await client.getByRole('list', { name: 'Lobbies' }).getByRole('button').first().click()
+        await client.getByRole('button', { name: 'Join lobby', exact: true }).click()
+      }
+    }
+    await expect(other.getByText('Waiting for the owner to start.', { exact: true })).toBeVisible()
+    await page.context().setOffline(true)
+    await expect(other.getByRole('button', { name: 'Start', exact: true })).toBeEnabled({ timeout: 10000 })
+    await page.context().setOffline(false)
+    await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeVisible({ timeout: 10000 })
+    await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
+    await page.getByRole('list', { name: 'Lobbies' }).getByRole('button').first().click()
+    await page.getByRole('button', { name: 'Join lobby', exact: true }).click()
+    await expect(page.getByText('Waiting for the owner to start.', { exact: true })).toBeVisible()
+  } finally {
+    await context.close()
   }
 })

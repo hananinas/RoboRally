@@ -21,7 +21,7 @@ export type LoginResult =
         | 'INTERNAL_ERROR'
     }>
 
-export type JoinGame = Readonly<{ gameId: GameId }>
+export type LeaveGame = Readonly<{ gameId: GameId }>
 
 export type PlayerAssignment = Readonly<{
   gameId: GameId
@@ -154,33 +154,6 @@ export type RobotActionResolved = Readonly<{
   pushedRobots: readonly Pick<Robot, 'robotId' | 'position'>[]
 }>
 
-export type GetLobbyDetails = Readonly<Record<string, never>>
-
-export type GameMap = Readonly<{
-  name: string
-  icon: string
-  maxPlayers: number
-}>
-
-export type LobbyPlayer = Readonly<{
-  playerId: PlayerId
-  username: string
-}>
-
-export type LobbyDetails = Readonly<{
-  gameId: GameId
-  name: string
-  players: readonly LobbyPlayer[]
-  map: GameMap
-}>
-
-export type LobbyDetailsResult =
-  | Readonly<{
-      outcome: 'LOBBY_FOUND'
-      lobbies: readonly LobbyDetails[]
-    }>
-  | Readonly<{
-      outcome: 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'INTERNAL_ERROR'
     }>
 
 export type JoinResult =
@@ -196,8 +169,6 @@ export type JoinResult =
         | 'LOGIN_REQUIRED'
         | 'INVALID_REQUEST'
         | 'GAME_NOT_FOUND'
-        | 'NO_SPAWN_AVAILABLE'
         | 'USER_ALREADY_IN_GAME'
-        | 'GAME_ALREADY_STARTED'
         | 'INTERNAL_ERROR'
     }>

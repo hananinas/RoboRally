@@ -2,8 +2,6 @@ import type {
   Card as CardPayload,
   CardsDealt,
   GamePhase as GamePhasePayload,
-  LobbyDetails,
-  LobbyPlayer,
   Orientation,
   PublicGameState,
   RobotActionResolved,
@@ -65,7 +63,7 @@ export function presentPublicGameState(
     gameId,
     checkpointCount: game.board.checkpointCount,
     players,
-    antenna: game.board.antenna,
+    antenna: game.antenna,
     board: {
       width: game.board.width,
       height: game.board.height,
@@ -82,24 +80,6 @@ export function presentPublicGameState(
     phase: phases[game.phase],
     paused: game.paused,
     aborted: game.aborted,
-  }
-}
-
-export function presentLobbyDetails(
-  gameId: GameId,
-  game: Game,
-  players: readonly LobbyPlayer[],
-): LobbyDetails {
-  const map = game.board.map
-  if (!map) {
-    throw new Error('Cannot present lobby details for a board without map metadata')
-  }
-
-  return {
-    gameId,
-    name: game.name,
-    players: players.map(({ playerId, username }) => ({ playerId, username })),
-    map: { name: map.name, icon: map.icon, maxPlayers: map.maxPlayers },
   }
 }
 

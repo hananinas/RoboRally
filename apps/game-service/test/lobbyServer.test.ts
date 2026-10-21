@@ -16,7 +16,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     clients = []
     factory.mockReset().mockImplementation(createDefaultGame)
     const http = createServer()
-    server = createGameSocketServer(http, [], factory)
+    server = createGameSocketServer(http, factory)
     await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve))
     url = `http://127.0.0.1:${(http.address() as AddressInfo).port}`
   })
@@ -105,7 +105,8 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(await owner.emitWithAck('lobby.list', {})).toEqual({ outcome: 'LOBBIES_FOUND', lobbies: [] })
     expect(await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'LOBBY_NOT_FOUND' })
     const outsider = await connect('Outsider')
-    expect(await outsider.emitWithAck('game.join', { gameId: first.assignment.gameId })).toEqual({ outcome: 'GAME_ALREADY_STARTED' })
+    expect(await outsider.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION' })
+    expect(await outsider.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'LOBBY_NOT_FOUND' })
     expect(await outsider.emitWithAck('program.submit', {
       gameId: first.assignment.gameId, playerId: first.assignment.playerId,
       cardIds: first.hand.slice(0, 5).map((card) => card.id) as [string, string, string, string, string],

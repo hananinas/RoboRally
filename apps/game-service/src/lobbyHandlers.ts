@@ -3,8 +3,6 @@ import {
   emptyRequestSchema, lobbyRequestSchema,
   type GameInitialization, type LobbyFailure, type LobbyState, type User,
 } from '@robo-rally/game-events'
-import { DEMO_MAP } from '@/game/index'
-import { createDefaultGame } from '@/game/SinglePlayerGame'
 import { createGameContext } from '@/gameContext'
 import { createPlayer, presentInitialization, type MembershipContext } from '@/membershipHandlers'
 import type { GameSession, GameSocket, GameSocketServer } from '@/gameServer'
@@ -22,11 +20,11 @@ export type SessionStore = {
   sessionsByUser: Map<string, UserSession>
   createGame: () => GameSession
 }
-export const defaultGameFactory = createDefaultGame
+const MAX_PLAYERS = 6
 const lobbyRoom = (id: string) => `lobby:${id}`
 export function presentLobby(lobby: Lobby): LobbyState {
   return { lobbyId: lobby.lobbyId, name: lobby.name, ownerUserId: lobby.ownerUserId,
-    playerCount: lobby.members.size, maxPlayers: DEMO_MAP.maxPlayers }
+    playerCount: lobby.members.size, maxPlayers: MAX_PLAYERS }
 }
 
 export function leaveLobby(io: GameSocketServer, store: SessionStore, socket: GameSocket): void {
@@ -95,7 +93,7 @@ export function registerLobbyHandlers(io: GameSocketServer, store: SessionStore,
         ? { outcome: 'LOBBY_JOINED', lobby: presentLobby(lobby) }
         : { outcome: 'USER_ALREADY_IN_SESSION' })
     }
-    if (lobby.members.size >= DEMO_MAP.maxPlayers) return acknowledge({ outcome: 'LOBBY_FULL' })
+    if (lobby.members.size >= MAX_PLAYERS) return acknowledge({ outcome: 'LOBBY_FULL' })
     void socket.join(lobbyRoom(lobby.lobbyId))
     lobby.members.set(user.userId, { user, connectionId: socket.id })
     store.sessionsByUser.set(user.userId, { kind: 'lobby', lobbyId: lobby.lobbyId })
@@ -133,7 +131,6 @@ export function registerLobbyHandlers(io: GameSocketServer, store: SessionStore,
     let prepared: { member: { user: User; player: ReturnType<typeof createPlayer> }; socket: GameSocket; initialization: GameInitialization }[]
     try {
       ctx = createGameContext(io, store.createGame())
-      ctx.admissionClosed = true
       for (const member of lobby.members.values()) {
         const connection = io.sockets.sockets.get(member.connectionId)
         if (!connection?.connected) throw new Error('Lobby member disconnected')

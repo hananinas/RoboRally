@@ -53,7 +53,7 @@ test('a pending login disables submission and retains the exact username', async
 })
 
 test('a committed start is recovered when its notification and acknowledgement are delayed', async ({ page, game }) => {
-  await game.control({ type: 'join', outcome: 'JOINED', deferred: true })
+  await game.control({ type: 'start', deferred: true })
   await login(page)
   await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
   await page.getByRole('button', { name: 'Start', exact: true }).click()
@@ -61,7 +61,7 @@ test('a committed start is recovered when its notification and acknowledgement a
   await expect(page.getByRole('button', { name: 'Leave lobby', exact: true })).toBeDisabled()
   await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible({ timeout: 10000 })
   await page.getByRole('region', { name: 'Programming hand' }).getByRole('button').first().click()
-  await game.control({ type: 'respond-join' })
+  await game.control({ type: 'respond-start' })
   await expect(page.getByRole('button', { name: /remove from register 1/ })).toBeVisible()
 })
 

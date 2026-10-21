@@ -2,10 +2,8 @@ import type { EmptyRequest, LobbyRequest, LobbyState, GameInitialization, LobbyL
 import type {
   CardsDealt,
   GameAborted,
-  GetLobbyDetails,
-  JoinGame,
+  LeaveGame,
   JoinResult,
-  LobbyDetailsResult,
   LoginResult,
   ProgramResult,
   ProgramSubmitted,
@@ -22,7 +20,6 @@ import type { Login } from './login.js'
 export type JoinResultAcknowledgement = (result: JoinResult) => void
 export type ProgramResultAcknowledgement = (result: ProgramResult) => void
 export type LoginAcknowledgement = (result: LoginResult) => void
-export type LobbyDetailsAcknowledgement = (result: LobbyDetailsResult) => void
 
 export interface ClientToServerEvents {
   'lobby.list': (payload: EmptyRequest, acknowledge: (result: LobbyListResult) => void) => void
@@ -31,10 +28,8 @@ export interface ClientToServerEvents {
   'lobby.leave': (payload: LobbyRequest, acknowledge: (result: LobbyLeaveResult) => void) => void
   'lobby.start': (payload: LobbyRequest, acknowledge: (result: LobbyStartResult) => void) => void
   'session.get': (payload: EmptyRequest, acknowledge: (result: SessionResult) => void) => void
-  'game.leave': (payload: JoinGame, acknowledge: (result: LeaveResult) => void) => void
-  'game.join': (payload: JoinGame, acknowledge: JoinResultAcknowledgement) => void
+  'game.leave': (payload: LeaveGame, acknowledge: (result: LeaveResult) => void) => void
   'user.login': (payload: Login, acknowledge: LoginAcknowledgement) => void
-  'game.getLobbyDetails': (payload: GetLobbyDetails, acknowledge: LobbyDetailsAcknowledgement) => void
   'program.submit': (
     payload: SubmitProgram,
     acknowledge: ProgramResultAcknowledgement,
