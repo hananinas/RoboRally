@@ -14,7 +14,6 @@ import {
   Robot,
   createGame,
   createPlayer,
-  createSharedGame,
 } from '@/game/index.ts'
 import {
   presentCardsDealt,
@@ -152,17 +151,27 @@ describe('game presenter', () => {
     })
   })
 
-  it('presents lobby details with the game name, players, and the demo map', () => {
-    const { gameId, game } = createSharedGame()
+  it.each([
+    ['empty-map', 'Empty Map'],
+    ['test-map', 'Test Map'],
+  ] as const)('presents lobby details for the %s board map', (mapName, mapLabel) => {
+    const { gameId, game } = createGame(mapName, 'Game with map')
     const players = [
       { playerId: '00000000-0000-4000-8000-000000000011', username: 'Malte' },
       { playerId: '00000000-0000-4000-8000-000000000012', username: 'Abid' },
     ]
-    expect(presentLobbyDetails(gameId, game, players)).toEqual({
+    const lobby = presentLobbyDetails(gameId, game, players)
+
+    expect(lobby).toEqual({
       gameId,
       name: game.name,
       players,
-      map: { name: 'DEMO MAP', icon: expect.stringMatching(/^data:image\/svg\+xml;base64,/), maxPlayers: 6 },
+      map: {
+        name: mapLabel,
+        icon: expect.stringMatching(/^data:image\/svg\+xml;base64,/),
+        maxPlayers: 6,
+      },
     })
+    expect(lobby.map.icon).toBe(game.board.map?.icon)
   })
 })

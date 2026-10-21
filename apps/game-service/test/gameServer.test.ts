@@ -553,7 +553,7 @@ describe('game membership over Socket.IO', () => {
       const result = await client.timeout(1000).emitWithAck('game.getLobbyDetails', {})
       return result.outcome === 'LOBBY_FOUND' ? result.lobbies : result
     }
-    const demoMap = { name: 'DEMO MAP', icon: expect.stringMatching(/^data:image\/svg\+xml;base64,/), maxPlayers: 6 }
+    const emptyMap = { name: 'Empty Map', icon: expect.stringMatching(/^data:image\/svg\+xml;base64,/), maxPlayers: 6 }
     const usernames = async (client: Client) => {
       const [lobby] = await lobbies(client) as readonly LobbyDetails[]
       return lobby!.players.map((player) => player.username)
@@ -573,7 +573,7 @@ describe('game membership over Socket.IO', () => {
       const received = vi.fn()
       reader.onAny(received)
       expect(await lobbies(reader)).toEqual([
-        { gameId: shared.gameId, name: 'Shared game', players: [], map: demoMap },
+        { gameId: shared.gameId, name: 'Shared game', players: [], map: emptyMap },
       ])
 
       const first = await connect('First')
@@ -586,7 +586,7 @@ describe('game membership over Socket.IO', () => {
           { playerId: firstJoin.assignment.playerId, username: 'First' },
           { playerId: secondJoin.assignment.playerId, username: 'Second' },
         ],
-        map: demoMap,
+        map: emptyMap,
       }])
       await first.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId })
       expect(await usernames(reader)).toEqual(['Second'])

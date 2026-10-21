@@ -43,6 +43,30 @@ describe('board factory', () => {
     }
   })
 
+  it('retains map lobby details on the created board', () => {
+    const board = createBoard('test-map')
+
+    expect(board.map).toEqual({
+      name: boardMaps['test-map'].name,
+      icon: boardMaps['test-map'].icon,
+      maxPlayers: boardMaps['test-map'].maxPlayers,
+    })
+  })
+
+  it('uses distinct map artwork for the empty and test maps', () => {
+    const emptyMapSvg = Buffer.from(
+      boardMaps['empty-map'].icon.split(',')[1],
+      'base64',
+    ).toString()
+    const testMapSvg = Buffer.from(
+      boardMaps['test-map'].icon.split(',')[1],
+      'base64',
+    ).toString()
+
+    expect(emptyMapSvg).toContain('viewBox="0 0 3 3"')
+    expect(testMapSvg).toContain('>TEST</text>')
+  })
+
   it('reads the priority antenna location from the map', () => {
     expect(createBoard('test-map').antenna).toEqual(boardMaps['test-map'].antenna)
     expect(createBoard().antenna).toEqual(boardMaps['empty-map'].antenna)

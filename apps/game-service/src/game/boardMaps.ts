@@ -1,14 +1,28 @@
-import type { Antenna } from '@/game/Board'
+import type { Antenna, BoardMap } from '@/game/Board'
 import { Direction } from '@/game/spatial'
 
 const { NORTH: N, WEST: W, SOUTH: S, EAST: E } = Direction
+
+const EMPTY_MAP_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 3">' +
+  '<rect width="3" height="3" fill="#6b7280"/>' +
+  '<path d="M1 0V3M2 0V3M0 1H3M0 2H3" stroke="#d1d5db" stroke-width="0.05"/>' +
+  '</svg>'
+
+const TEST_MAP_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3">' +
+  '<rect width="4" height="3" fill="#6b7280"/>' +
+  '<path d="M1 0V3M2 0V3M3 0V3M0 1H4M0 2H4" stroke="#d1d5db" stroke-width="0.05"/>' +
+  '<rect x="0.35" y="1.02" width="3.3" height="0.96" rx="0.12" fill="#1f2937" fill-opacity="0.88"/>' +
+  '<text x="2" y="1.72" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="0.64" font-weight="700" letter-spacing="0.04">TEST</text>' +
+  '</svg>'
 
 export type WallSpec = Readonly<{
   at: readonly [x: number, y: number]
   directions: readonly Direction[]
 }>
 
-export type MapSpec = Readonly<{
+export type MapSpec = BoardMap & Readonly<{
   width: number
   height: number
   antenna: Antenna
@@ -18,6 +32,9 @@ export type MapSpec = Readonly<{
 
 export const boardMaps = {
   'empty-map': {
+    name: 'Empty Map',
+    icon: `data:image/svg+xml;base64,${Buffer.from(EMPTY_MAP_SVG).toString('base64')}`,
+    maxPlayers: 6,
     width: 21,
     height: 15,
     antenna: { x: 10, y: 0, angle: Math.PI / 2 },
@@ -25,6 +42,9 @@ export const boardMaps = {
     checkpoints: [[10, 6], [8, 9]],
   },
   'test-map': {
+    name: 'Test Map',
+    icon: `data:image/svg+xml;base64,${Buffer.from(TEST_MAP_SVG).toString('base64')}`,
+    maxPlayers: 6,
     width: 16,
     height: 15,
     antenna: { x: 10, y: 0, angle: Math.PI / 2 },

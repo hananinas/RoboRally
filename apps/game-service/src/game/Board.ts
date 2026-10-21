@@ -10,6 +10,12 @@ export type MovementResult = Readonly<{
 
 export type Antenna = Readonly<Position & { angle: number }>
 
+export type BoardMap = Readonly<{
+  name: string
+  icon: string
+  maxPlayers: number
+}>
+
 export class Board {
   private readonly tiles: readonly (readonly Tile[])[]
   private readonly robotPositions = new Map<RobotId, Position>()
@@ -17,8 +23,9 @@ export class Board {
   readonly width: number
   readonly height: number
   readonly antenna: Antenna
+  readonly map?: BoardMap
 
-  constructor(tiles: readonly (readonly Tile[])[], antenna: Antenna) {
+  constructor(tiles: readonly (readonly Tile[])[], antenna: Antenna, map?: BoardMap) {
     const width = tiles[0]?.length ?? 0
     if (width === 0 || tiles.some((row) => row.length !== width)) {
       throw new RangeError('A board must be a non-empty rectangular tile grid')
@@ -40,6 +47,7 @@ export class Board {
       throw new RangeError('The antenna must be on the board with a finite angle')
     }
     this.antenna = Object.freeze({ ...antenna })
+    this.map = map === undefined ? undefined : Object.freeze({ ...map })
   }
 
   get checkpointCount(): number {

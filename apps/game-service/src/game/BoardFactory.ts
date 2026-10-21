@@ -44,5 +44,10 @@ export function createBoard(mapName: BoardMapName = DEFAULT_MAP): Board {
       (tileWalls, x) => new EmptyTile(tileWalls, checkpointNumbers[y][x]),
     )),
     antenna,
+    {
+      name: MAPS[mapName].name,
+      icon: MAPS[mapName].icon,
+      maxPlayers: MAPS[mapName].maxPlayers,
+    },
   )
 }
