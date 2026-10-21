@@ -49,3 +49,7 @@ export function createGame(
   const game = new Game(createBoard(mapName), [], createHand(), map.rebootTile, name)
   return { gameId: GAME_ID, game }
 }
+
+export function createDefaultGame(): Readonly<{ gameId: string; game: Game }> {
+  return { gameId: randomUUID(), game: new Game(createBoard('test-map'), [], createHand()) }
+}

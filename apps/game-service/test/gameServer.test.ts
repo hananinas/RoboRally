@@ -240,7 +240,7 @@ describe('game membership over Socket.IO', () => {
     await first.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId })
     expect(shared.game.players).toEqual([])
     expect(await first.timeout(1000).emitWithAck('game.join', { gameId: shared.gameId }))
-      .toEqual({ outcome: 'GAME_ALREADY_STARTED' })
+      .toEqual({ outcome: 'GAME_NOT_FOUND' })
   })
 
   it('keeps private next-round hands away from other members and login-only sockets', async () => {

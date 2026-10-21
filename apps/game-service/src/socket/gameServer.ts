@@ -6,21 +6,19 @@ import type {
 } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
 import type { Game } from '@/game/index'
-import { presentPublicGameState } from '@/socket/gamePresenter'
 import { createUserRegistry } from '@/userRegistry'
 import { createSharedGame } from '@/game/GameFactory'
-import { createActionScheduler } from '@/actionScheduler'
-import { handleLogin } from '@/socket/handlers/authHandlers'
+import { createGameContext } from '@/gameContext'
+import { handleLogin } from '@/authHandlers'
 import {
   handleDisconnect,
+  handleGetLobbyDetails,
+  handleGetPublicGameState,
   handleJoin,
   handleLeave,
   reconnectIfRecovered,
-  type GameMembership,
-  type MembershipContext,
-} from '@/socket/handlers/membershipHandlers'
-import { handleGetLobbyDetails } from '@/socket/handlers/lobbyHandlers'
-import { handleSubmitProgram } from '@/socket/handlers/gameplayHandlers'
+} from '@/membershipHandlers'
+import { handleSubmitProgram } from '@/gameplayHandlers'
 
 export type GameSocketData = { user?: User }
 
@@ -37,7 +35,7 @@ export type GameSession = Readonly<{ gameId: string; game: Game }>
 
 export function createGameSocketServer(
   httpServer: HttpServer,
-  sharedGame: GameSession = createSharedGame(),
+  initialGames: GameSession | readonly GameSession[] = createSharedGame(),
 ): GameSocketServer {
   const io = new Server<
     ClientToServerEvents,
@@ -50,31 +48,16 @@ export function createGameSocketServer(
     pingTimeout: 1000,
   })
   const users = createUserRegistry()
-  const { gameId, game } = sharedGame
-  const publicRoom = `game:${gameId}:public`
-  const playerRoom = (playerId: string) => `game:${gameId}:player:${playerId}`
-  const memberships = new Map<string, GameMembership>()
-  const actionScheduler = createActionScheduler({ io, game, gameId, publicRoom, playerRoom })
-
-  const publicState = () => presentPublicGameState(gameId, game,
-    [...memberships.values()].map(({ user, player, connectionId }) => ({
-      playerId: player.id,
-      lastCheckpoint: player.lastCheckpoint,
-      username: user.username,
-      programSubmitted: game.hasSubmittedProgram(player.id),
-      connected: connectionId !== null,
-    })),
-  )
-
-  const membershipContext: MembershipContext = {
-    io, game, gameId, publicRoom, playerRoom, memberships, publicState, actionScheduler,
-  }
-
-  httpServer.once('close', actionScheduler.stop)
+  const games = new Map((Array.isArray(initialGames) ? initialGames : [initialGames]).map((session: GameSession) =>
+    [session.gameId, createGameContext(io, session)]))
+  const sessionsByUser = new Map<string, string>()
+  const currentGame = (socket: GameSocket) => games.get(sessionsByUser.get(socket.data.user?.userId ?? '') ?? '')
+  const requestedGame = (payload: { gameId: string }) => games.get(payload?.gameId)
+  httpServer.once('close', () => { for (const ctx of games.values()) ctx.actionScheduler.stop() })
 
   io.use((socket, next) => {
     if (socket.recovered && socket.data.user) {
-      const membership = memberships.get(socket.data.user.userId)
+      const membership = currentGame(socket)?.memberships.get(socket.data.user.userId)
       if (membership?.connectionId && membership.connectionId !== socket.id) {
         next(new Error('USER_ALREADY_IN_GAME'))
         return
@@ -86,15 +69,53 @@ export function createGameSocketServer(
   io.on('connection', (socket) => {
     socket.on('user.login', (payload, acknowledge) => handleLogin(socket, { users }, payload, acknowledge))
 
-    reconnectIfRecovered(membershipContext, socket)
+    const recoveredGame = currentGame(socket)
+    if (recoveredGame) reconnectIfRecovered(recoveredGame, socket)
 
-    socket.on('game.join', (payload, acknowledge) => handleJoin(membershipContext, socket, payload, acknowledge))
-    socket.on('game.leave', (payload, acknowledge) => handleLeave(membershipContext, socket, payload, acknowledge))
-    socket.on('disconnect', () => handleDisconnect(membershipContext, socket))
-    socket.on('game.getLobbyDetails', (payload, acknowledge) =>
-      handleGetLobbyDetails(membershipContext, socket, payload, acknowledge))
-    socket.on('program.submit', (payload, acknowledge) =>
-      handleSubmitProgram(membershipContext, socket, payload, acknowledge))
+    socket.on('game.join', (payload, acknowledge) => {
+      if (typeof acknowledge !== 'function') return
+      const ctx = requestedGame(payload)
+      if (!ctx) return acknowledge({ outcome: socket.data.user ? 'GAME_NOT_FOUND' : 'LOGIN_REQUIRED' })
+      const existing = currentGame(socket)
+      if (existing && existing !== ctx) return acknowledge({ outcome: 'USER_ALREADY_IN_GAME' })
+      handleJoin(ctx, socket, payload, (result) => {
+        if (result.outcome === 'JOINED') sessionsByUser.set(socket.data.user!.userId, ctx.gameId)
+        acknowledge(result)
+      })
+    })
+    socket.on('game.leave', (payload, acknowledge) => {
+      if (typeof acknowledge !== 'function') return
+      const ctx = currentGame(socket)
+      if (!ctx) return acknowledge({ outcome: socket.data.user ? 'GAME_NOT_FOUND' : 'LOGIN_REQUIRED' })
+      handleLeave(ctx, socket, payload, (result) => {
+        if (result.outcome === 'LEFT') sessionsByUser.delete(socket.data.user!.userId)
+        acknowledge(result)
+      })
+      if (ctx.memberships.size === 0) {
+        ctx.actionScheduler.stop()
+        games.delete(ctx.gameId)
+      }
+    })
+    socket.on('disconnect', () => {
+      const ctx = currentGame(socket)
+      if (ctx) handleDisconnect(ctx, socket)
+    })
+    socket.on('game.getLobbyDetails', (payload, acknowledge) => {
+      const ctx = games.values().next().value
+      if (ctx) handleGetLobbyDetails(ctx, socket, payload, acknowledge)
+    })
+    socket.on('game.getPublicGameState', (payload, acknowledge) => {
+      if (typeof acknowledge !== 'function') return
+      const ctx = currentGame(socket)
+      if (ctx) handleGetPublicGameState(ctx, socket, payload, acknowledge)
+      else acknowledge({ outcome: 'GAME_NOT_FOUND' })
+    })
+    socket.on('program.submit', (payload, acknowledge) => {
+      if (typeof acknowledge !== 'function') return
+      const ctx = currentGame(socket)
+      if (ctx) handleSubmitProgram(ctx, socket, payload, acknowledge)
+      else acknowledge({ outcome: 'INVALID_PROGRAM' })
+    })
   })
 
   return io
