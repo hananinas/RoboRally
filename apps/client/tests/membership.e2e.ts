@@ -1,5 +1,6 @@
+import type { Page } from '@playwright/test'
 import { expect, test } from './real-game-fixture.ts'
-import { browse, gameStatus, robotIds, startTogether } from './browserClient.ts'
+import { browse, gameStatus, login, robotIds, startTogether } from './browserClient.ts'
 
 test('two players wait for owner Start, play a round, and leave for the lobby browser', async ({ browser, page, baseURL }) => {
   const context = await browser.newContext({ baseURL, reducedMotion: 'reduce' })
@@ -45,6 +46,32 @@ test('the next member becomes owner when the creator leaves a waiting lobby', as
     await expect(other.getByRole('button', { name: 'Start', exact: true })).toBeEnabled()
     await other.getByRole('button', { name: 'Start', exact: true }).click()
     await expect(other.getByRole('main', { name: 'Game board' })).toBeVisible()
+  } finally {
+    await context.close()
+  }
+})
+
+test('robot colours agree between clients and survive a departure followed by a reload', async ({ browser, page, baseURL }) => {
+  const context = await browser.newContext({ baseURL })
+  const other = await context.newPage()
+  const colours = (client: Page) => client.locator('[data-robot-id]').evaluateAll((elements) =>
+    Object.fromEntries(elements.map((element) => [element.getAttribute('data-robot-id'),
+      getComputedStyle(element).getPropertyValue('--tank-colour').trim()])))
+  try {
+    await startTogether(page, other, 'First', 'Second')
+    const initial = await colours(other)
+    expect(new Set(Object.values(initial)).size).toBe(2)
+    expect(await colours(page)).toEqual(initial)
+    const swatch = other.getByRole('img', { name: 'Robot colour', exact: true })
+    await expect(swatch).toHaveCSS('background-color', 'rgb(77, 141, 235)')
+    await page.getByRole('button', { name: 'Game options', exact: true }).click()
+    await page.getByRole('button', { name: 'Leave game', exact: true }).click()
+    await expect.poll(() => robotIds(other)).toHaveLength(1)
+    const remaining = await colours(other)
+    for (const [robotId, colour] of Object.entries(remaining)) expect(colour).toBe(initial[robotId])
+    await login(other, 'Second')
+    expect(await colours(other)).toEqual(remaining)
+    await expect(swatch).toHaveCSS('background-color', 'rgb(77, 141, 235)')
   } finally {
     await context.close()
   }

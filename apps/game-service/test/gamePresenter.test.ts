@@ -34,6 +34,7 @@ describe('game presenter', () => {
       robots: [
         {
           robotId: player.robot.id,
+          colour: player.robot.colour,
           playerId: player.id,
           position: {
             coordinate: { x: 10, y: 7 },

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { ROBOT_COLOURS } from '@/game/Robot'
 import {
   emptyRequestSchema, lobbyRequestSchema,
   type GameInitialization, type LobbyFailure, type LobbyState, type User,
@@ -134,7 +135,7 @@ export function registerLobbyHandlers(io: GameSocketServer, store: SessionStore,
       for (const member of lobby.members.values()) {
         const connection = io.sockets.sockets.get(member.connectionId)
         if (!connection?.connected) throw new Error('Lobby member disconnected')
-        const player = createPlayer()
+        const player = createPlayer(ROBOT_COLOURS[ctx.memberships.size])
         if (!ctx.game.addPlayer(player)) throw new Error('No spawn available')
         ctx.memberships.set(member.user.userId, { ...member, player })
       }

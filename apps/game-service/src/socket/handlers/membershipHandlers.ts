@@ -182,8 +182,8 @@ export function handleGetPublicGameState(
   acknowledge({ outcome: 'GAME_NOT_FOUND' })
 }
 
-export function createPlayer(): Player {
-  return new Player(randomUUID(), new Robot(randomUUID(), Direction.NORTH),
+export function createPlayer(colour: string): Player {
+  return new Player(randomUUID(), new Robot(randomUUID(), Direction.NORTH, colour),
     createHand(Array.from({ length: 9 }, () => randomUUID())))
 }
 

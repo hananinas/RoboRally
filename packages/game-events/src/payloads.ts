@@ -49,6 +49,7 @@ export type Position = Readonly<{
 export type Robot = Readonly<{
   robotId: RobotId
   playerId: PlayerId
+  colour: string
   position: Position
 }>
 

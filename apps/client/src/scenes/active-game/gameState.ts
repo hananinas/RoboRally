@@ -87,23 +87,6 @@ const connectErrors: Record<string, string> = {
 
 export const REGISTER_COUNT = 5
 
-const ROBOT_COLOURS = [
-  '#c74f4f', // 1. Red
-  '#4D8DEB', // 2. Blue
-  '#4CAF70', // 3. Green
-  '#E5C04D', // 4. Yellow
-  '#A66BE0', // 5. Purple
-  '#E58B4D', // 6. Orange
-  '#4DC9C0', // 7. Cyan
-  '#E56FA8', // 8. Pink
-  '#8B6548', // 9. Brown
-  '#A0A0A0', // 10. Grey
-]
-
-function getRobotColour(index: number): string {
-  return ROBOT_COLOURS[index % ROBOT_COLOURS.length]
-}
-
 function emptyRegisters(): Registers {
   return Array.from({ length: REGISTER_COUNT }, () => null)
 }
@@ -194,14 +177,13 @@ export function gameStateReducer(
       const { gameId, player, robot } = event.payload
       if (gameId !== state.assignment?.gameId || player.playerId !== robot.playerId ||
           state.players.some((candidate) => candidate.playerId === player.playerId)) return state
-      const colour = getRobotColour(state.players.length)
       return {
         ...state,
         players: [...state.players, {
           playerId: player.playerId, username: player.username, connected: player.connected,
           lastCheckpoint: player.lastCheckpoint,
         }],
-        playback: robotPlaybackReducer(state.playback, { type: 'add', robot: { ...robot, colour: colour } }),
+        playback: robotPlaybackReducer(state.playback, { type: 'add', robot }),
       }
     }
     case 'player-left': {
@@ -278,7 +260,7 @@ export function gameStateReducer(
           lastCheckpoint: player.lastCheckpoint,
         })),
         playback: createRobotPlaybackState(
-          snapshot.robots.map((robot,index) => ({ ...robot, colour: getRobotColour(index) })),
+          snapshot.robots,
         ),
         board: createBoardRenderModel(
           snapshot.board.width,
