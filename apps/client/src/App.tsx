@@ -182,7 +182,7 @@ function App() {
               onCreate={() => join(null)} onJoin={join} onRefresh={refresh} />
           : session.status === 'waiting'
             ? <WaitingLobby lobby={session.lobby} userId={session.user.userId} disabled={busy || !socket.connected} onStart={start} onLeave={leave} />
-            : <><p>Restoring session…</p><button type="button" disabled={busy || !socket.connected} onClick={() => dispatch({ type: 'sync-requested' })}>Retry</button></>}
+            : <><p>Restoring session…</p><button className="login-secondary-button" type="button" disabled={busy || !socket.connected} onClick={() => dispatch({ type: 'sync-requested' })}>Retry</button></>}
       </>}
   </EntryScreen>
 }

@@ -101,7 +101,7 @@ test('a disconnected waiting owner returns to browsing while the remaining membe
       if (client === page) await client.getByRole('button', { name: 'Create lobby', exact: true }).click()
       else {
         await client.getByRole('list', { name: 'Lobbies' }).getByRole('button').first().click()
-        await client.getByRole('button', { name: 'Join lobby', exact: true }).click()
+        await client.getByRole('button', { name: 'Join game', exact: true }).click()
       }
     }
     await expect(other.getByText('Waiting for the owner to start.', { exact: true })).toBeVisible()
@@ -111,7 +111,7 @@ test('a disconnected waiting owner returns to browsing while the remaining membe
     await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeVisible({ timeout: 10000 })
     await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
     await page.getByRole('list', { name: 'Lobbies' }).getByRole('button').first().click()
-    await page.getByRole('button', { name: 'Join lobby', exact: true }).click()
+    await page.getByRole('button', { name: 'Join game', exact: true }).click()
     await expect(page.getByText('Waiting for the owner to start.', { exact: true })).toBeVisible()
   } finally {
     await context.close()

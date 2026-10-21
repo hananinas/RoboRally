@@ -47,8 +47,8 @@ export default function JoinGame({ username, lobbies, pending, connected, error,
           </li>
         ))}
       </ul>
-      <button type="button" disabled={pending || !connected} onClick={onCreate}>Create lobby</button>
-      <button type="button" disabled={pending || !connected} onClick={onRefresh}>Refresh</button>
+      <button className="login-secondary-button" type="button" disabled={pending || !connected} onClick={onCreate}>Create lobby</button>
+      <button className="login-secondary-button" type="button" disabled={pending || !connected} onClick={onRefresh}>Refresh</button>
       {error && <p className="login-validation login-validation--error" role="alert">{error}</p>}
       <button
         className="login-primary-button"
