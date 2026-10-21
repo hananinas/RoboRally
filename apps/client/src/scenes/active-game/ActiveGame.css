@@ -193,6 +193,16 @@
   gap: 0.75rem;
 }
 
+.player-panel__colour {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  border: 1px solid #333;
+  border-radius: 0.25rem;
+  vertical-align: middle;
+}
+
 .player-panel__name,
 .register-panel__heading {
   margin: 0;
@@ -203,6 +213,9 @@
   min-width: 0;
   overflow-wrap: anywhere;
   font-size: 1.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .player-panel__details {

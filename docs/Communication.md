@@ -16,41 +16,45 @@ A successful login returns:
 
 `LOGGED_IN {user}`
 
-The client then sends:
+The client then sends `session.get {}`. `NO_SESSION` continues to lobby selection, `IN_LOBBY {lobby}` confirms waiting membership on the same live connection (for example, after a command acknowledgement times out), and `IN_GAME {initialization}` restores an existing game. Disconnecting removes lobby membership; reconnecting does not rejoin that lobby.
 
-`game.join {gameId}`
+To enter a new lobby, the client sends `lobby.create {}` or `lobby.join {lobbyId}` on the same socket. Creating uses a generated name and makes the creator the owner. A successful request returns `LOBBY_JOINED {lobby}` and enters the waiting screen.
 
-on the same socket for the configured game.
+Only the owner can send `lobby.start {lobbyId}`. The service creates a fresh game, moves every member into its public and private player rooms, and removes the lobby room and record. The service sends each player the following through their own `game:{gameId}:player:{playerId}` room:
 
-A successful join returns:
+`game.started {lobbyId, initialization: {outcome: JOINED, assignment, state, hand, programSubmitted}}`
 
-`JOINED {assignment, state, hand, programSubmitted}`
+The public room `game:{gameId}:public` still carries shared gameplay events. Initialization uses private rooms because it includes each player's hand.
 
-The acknowledgement contains the player's current robot assignment, public game state, private hand, and program-submission status. The client must apply all JOINED data before processing later live game events. A future lobby may be inserted between login and joining without changing this model.
+Robot colours are assigned once by the service at Start and included in public state; clients retain them across departures and reconnects.
+
+The owner also receives `STARTED {gameId}` as the command acknowledgement. The service constructs each initialization with the player's robot assignment, public state, private hand, and program-submission status. The client must apply it before processing later live game events. If a command times out, `session.get` discovers the committed session without repeating the mutation.
 
 ### Listing lobbies
 
 After login, the client can ask which lobbies exist:
 
-`game.getLobbyDetails`
+`lobby.list {}`
 
 A successful request returns:
 
-`LOBBY_FOUND {lobbies}`
+`LOBBIES_FOUND {lobbies}`
 
-Each lobby includes its `gameId`, which the client uses to send `game.join`. A connection that has not logged in receives `LOGIN_REQUIRED`, and a malformed request receives `INVALID_REQUEST`.
+Each lobby includes its `lobbyId`, generated name, player count, and capacity. The client uses `lobbyId` to join. Listing is refreshed on entry or through Refresh. A connection that has not logged in receives `LOGIN_REQUIRED`, and a malformed request receives `INVALID_REQUEST`.
 
 ### Membership
 
-New players may join a game until the server accepts the first program submission. Accepting that submission starts the game and permanently closes joining to new players. Later attempts by new players receive GAME_ALREADY_STARTED. 
+New players join waiting lobbies, with a capacity of six. The owner may start with one or more members. Starting closes the game roster immediately, before any program submission; there is no direct game.join command.
 
-In case of disconnection, existing members may reconnect at any time. If the tab is left open SocketIO will automatically try to reestablish the connection. In case of a closed tab, the player can reopen the webpage in another tab to reconnect. In case multiple tabs are used, the first connection to reclaim a disconnected membership becomes its owner. A later connection cannot replace that owner, even if its Socket.IO session was successfully recovered. 
+While waiting, `lobby.leave {lobbyId}` or disconnecting removes membership. Leaving returns `LEFT` and retains login. Ownership passes to the earliest remaining member, announced through `lobby.updated {lobby}`. An empty lobby is deleted. A disconnected lobby member returns to browsing after reconnecting.
 
-When an existing member sends game.join while not being connected, the server attaches the new connection to the existing player and robot and returns their current assignment and state through JOINED.
+In case of disconnection during a game, existing members may reconnect at any time. If the tab is left open SocketIO will automatically try to reestablish the connection. In case of a closed tab, the player can reopen the webpage in another tab to reconnect. In case multiple tabs are used, the first connection to reclaim a disconnected membership becomes its owner. A later connection cannot replace that owner, even if its Socket.IO session was successfully recovered.
 
-If another connection attempts to join the same game for that user, it receives:
+When an existing game member sends `session.get {}`, the server attaches the new connection to the existing player and robot and returns their current assignment and state through `IN_GAME {initialization}`.
 
-`USER_ALREADY_IN_GAME`
+If another live connection attempts to claim the same session for that user, session.get returns:
+
+`USER_ALREADY_IN_SESSION`
 
 A failed join leaves the user logged in and the client may attempt another join later.
 
@@ -64,20 +68,26 @@ The following diagram documents logging in, listing lobbies and joining:
 sequenceDiagram
     participant Client
     participant Server as Game Service
-    participant Public as game:{gameId}:public
-    participant Others as Existing members
+    participant Others as Lobby members
 
     Client->>Server: user.login {username}
     alt Valid username
         Server-->>Client: Acknowledgement: LOGGED_IN {user}
-        Client->>Server : game.getLobbyDetails
-        Server-->>Client: Acknowledgement: LOBBY_FOUND {lobbies}
-        Note over Client: Picks a lobby's gameId
-        Client->>Server: game.join {gameId}
+        Client->>Server: session.get {}
+        Server-->>Client: Acknowledgement: NO_SESSION
+        Client->>Server : lobby.list {}
+        Server-->>Client: Acknowledgement: LOBBIES_FOUND {lobbies}
+        Note over Client: Creates a lobby or picks a lobbyId
+        Client->>Server: lobby.create {} or lobby.join {lobbyId}
         alt Join accepted
-            Server-->>Client: Acknowledgement: JOINED {assignment, state, hand, programSubmitted}
-            Server->>Public: game.playerJoined {player, robot}
-            Public-->>Others: game.playerJoined {player, robot}
+            Server-->>Client: Acknowledgement: LOBBY_JOINED {lobby}
+            Note over Client,Others: Wait for the owner to start
+            Client->>Server: lobby.start {lobbyId} (owner only)
+            Note over Server: Move members to game rooms and remove lobby
+            Note over Server: Send through each game:{gameId}:player:{playerId} room
+            Server-->>Client: game.started {lobbyId, initialization}
+            Server-->>Others: game.started with each player's own initialization
+            Server-->>Client: Acknowledgement: STARTED {gameId}
             Note over Client,Server: Initialize before later game events
         else Join rejected
             Server-->>Client: Acknowledgement: rejection outcome
@@ -157,7 +167,7 @@ Programs and checkpoint progress are preserved; later registers continue normall
 
 Tiles have an optional `checkpointNumber` alongside their walls and keep type `EMPTY`. Omit the number when there is no checkpoint. Numbers are positive integers, unique and consecutive from 1. Checkpoints stay at fixed positions and remain available to every player after completion. The demo board places checkpoint 1 at `(10, 6)` and checkpoint 2 at `(8, 9)`.
 
-`PlayerState.lastCheckpoint` starts at 0 and persists across rounds and reconnections. `PublicGameState.checkpointCount` counts the checkpoint tiles. Both values are authoritative integers with `0 <= lastCheckpoint <= checkpointCount`. Clients cannot award or request changes to progress. JOINED supplies both values; `game.playerJoined` includes the new player's initial progress.
+`PlayerState.lastCheckpoint` starts at 0 and persists across rounds and reconnections. `PublicGameState.checkpointCount` counts the checkpoint tiles. Both values are authoritative integers with `0 <= lastCheckpoint <= checkpointCount`. Clients cannot award or request changes to progress. The initialization snapshot supplies both values for every player.
 
 After all remaining robots have acted in a register, a player completes the next numbered checkpoint if their robot ends on its tile. Passing over a checkpoint does not count; facing does not matter. The same check runs if a departure completes the register.
 
@@ -187,7 +197,7 @@ A new hand may arrive while the client is still playing animations from the prev
 
 The following sequence shows one complete round while the game remains connected and unpaused.
 
-Both players have already joined and received their initial hands in their JOINED acknowledgements.
+Both players have received their initial hands through game.started or session.get.
 ```mermaid
 sequenceDiagram
     participant A as Client A
@@ -230,7 +240,7 @@ A player’s game membership is independent of their connection to the server. W
 There are two possible reconnection paths:
 
 1. Socket.IO connection state recovery succeeds and missed events are replayed.
-2. Connection state recovery fails, so the client logs in and joins the game again to obtain a fresh authoritative snapshot.
+2. Connection state recovery fails, so the client logs in and calls session.get to obtain a fresh authoritative snapshot.
 
 ### Pausing on disconnection
 
@@ -288,13 +298,13 @@ Once Socket.IO has reconnected, if state recovery was unsuccessful, the client p
 
 followed by:
 
-`game.join`
+`session.get {}`
 
-Because the user is already a game member, game.join restores the connection to the existing player and robot.
+Because the user is already a game member, session.get restores the connection to the existing player and robot.
 
-The returned JOINED acknowledgement contains the current authoritative state.
+The returned `IN_GAME {initialization}` acknowledgement contains the current authoritative state.
 
-The client replaces its local game state with the returned JOINED data before processing further game events.
+The client replaces its local game state with the returned initialization before processing further game events.
 
 ```mermaid
 sequenceDiagram
@@ -318,12 +328,12 @@ sequenceDiagram
 
     A->>S: user.login {username}
     S-->>A: Acknowledgement: LOGGED_IN {user}
-    A->>S: game.join {gameId}
+    A->>S: session.get {}
     Note over A,Public: Restore public room membership
     Note over A,PrivateA: Restore private room membership
 
-    S-->>A: Acknowledgement: JOINED {assignment, state, hand, programSubmitted}
-    Note over A: Clear outdated state and apply JOINED data
+    S-->>A: Acknowledgement: IN_GAME {initialization}
+    Note over A: Clear outdated state and apply initialization
 
     S->>Public: game.playerConnectionChanged {gameId, playerId: A, connected: true, paused: false}
     Public-->>A: game.playerConnectionChanged
@@ -332,6 +342,8 @@ sequenceDiagram
     Note over S: Continue gameplay from preserved state
     Note over A,B: Unpause game
 ```
+
+Recovered lobby rooms are rejected with `SESSION_EXPIRED` because waiting disconnects remove membership. The client opens a fresh connection, logs in, and uses session.get to return to browsing or restore its current session.
 
 ### Resuming the game
 The game remains paused while any remaining player is disconnected. Once all remaining players are connected, the server announces that the game has resumed before continuing gameplay from the preserved game state.
