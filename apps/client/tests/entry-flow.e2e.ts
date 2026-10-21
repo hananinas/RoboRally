@@ -29,6 +29,8 @@ test('joining requires selection and enters the waiting screen', async ({ page }
   await expect(row.getByText('Map 1', { exact: true })).toBeVisible()
   await expect(row.getByText('1/6 players', { exact: true })).toBeVisible()
   await expect(row.getByRole('img', { name: 'Unlocked' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Lobby 2/ })).toBeDisabled()
+  await expect(page.getByRole('button', { name: /Lobby 3/ })).toBeDisabled()
   await expect(row).toBeFocused()
   await row.click()
   await expect(row).toHaveAttribute('aria-pressed', 'true')

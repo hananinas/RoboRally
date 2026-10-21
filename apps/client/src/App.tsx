@@ -4,7 +4,7 @@ import ActiveGame from './scenes/active-game/ActiveGame.tsx'
 import useGameConnection from './scenes/active-game/useGameConnection.ts'
 import Login from './scenes/login/Login.tsx'
 import EntryScreen from './scenes/login/EntryScreen.tsx'
-import JoinGame from './scenes/login/JoinGame.tsx'
+import LobbyScreen from './scenes/login/LobbyScreen.tsx'
 import WaitingLobby from './scenes/login/WaitingLobby.tsx'
 import { USER_ALREADY_IN_GAME_MESSAGE } from './scenes/active-game/gameState.ts'
 import { createSessionState, sessionReducer, type SessionEvent } from './sessionState.ts'
@@ -178,7 +178,7 @@ function App() {
       : <>
         {error && session.status !== 'browsing' && session.status !== 'joining' && <p role="alert" className="login-validation login-validation--error">{error}</p>}
         {session.status === 'browsing' || session.status === 'joining'
-          ? <JoinGame username={session.user.username} error={error} lobbies={lobbies} pending={busy || session.status === 'joining'} connected={socket.connected}
+          ? <LobbyScreen username={session.user.username} error={error} lobbies={lobbies} pending={busy || session.status === 'joining'} connected={socket.connected}
               onCreate={() => join(null)} onJoin={join} onRefresh={refresh} />
           : session.status === 'waiting'
             ? <WaitingLobby lobby={session.lobby} userId={session.user.userId} disabled={busy || !socket.connected} onStart={start} onLeave={leave} />
