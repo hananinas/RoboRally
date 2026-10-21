@@ -1,3 +1,4 @@
+import { registerLobbyHandlers, leaveLobby, defaultGameFactory, type SessionStore, type UserSession } from '@/lobbyHandlers'
 import type { Server as HttpServer } from 'node:http'
 import type {
   ClientToServerEvents,
@@ -36,6 +37,7 @@ export type GameSession = Readonly<{ gameId: string; game: Game }>
 export function createGameSocketServer(
   httpServer: HttpServer,
   initialGames: GameSession | readonly GameSession[] = createSharedGame(),
+  createGame: () => GameSession = defaultGameFactory,
 ): GameSocketServer {
   const io = new Server<
     ClientToServerEvents,
@@ -50,8 +52,12 @@ export function createGameSocketServer(
   const users = createUserRegistry()
   const games = new Map((Array.isArray(initialGames) ? initialGames : [initialGames]).map((session: GameSession) =>
     [session.gameId, createGameContext(io, session)]))
-  const sessionsByUser = new Map<string, string>()
-  const currentGame = (socket: GameSocket) => games.get(sessionsByUser.get(socket.data.user?.userId ?? '') ?? '')
+  const sessionsByUser = new Map<string, UserSession>()
+  const store: SessionStore = { games, sessionsByUser, lobbies: new Map(), createGame }
+  const currentGame = (socket: GameSocket) => {
+    const session = sessionsByUser.get(socket.data.user?.userId ?? '')
+    return session?.kind === 'game' ? games.get(session.gameId) : undefined
+  }
   const requestedGame = (payload: { gameId: string }) => games.get(payload?.gameId)
   httpServer.once('close', () => { for (const ctx of games.values()) ctx.actionScheduler.stop() })
 
@@ -67,6 +73,7 @@ export function createGameSocketServer(
   })
 
   io.on('connection', (socket) => {
+    registerLobbyHandlers(io, store, socket)
     socket.on('user.login', (payload, acknowledge) => handleLogin(socket, { users }, payload, acknowledge))
 
     const recoveredGame = currentGame(socket)
@@ -76,10 +83,10 @@ export function createGameSocketServer(
       if (typeof acknowledge !== 'function') return
       const ctx = requestedGame(payload)
       if (!ctx) return acknowledge({ outcome: socket.data.user ? 'GAME_NOT_FOUND' : 'LOGIN_REQUIRED' })
-      const existing = currentGame(socket)
-      if (existing && existing !== ctx) return acknowledge({ outcome: 'USER_ALREADY_IN_GAME' })
+      const existing = sessionsByUser.get(socket.data.user?.userId ?? '')
+      if (existing && (existing.kind !== 'game' || existing.gameId !== ctx.gameId)) return acknowledge({ outcome: 'USER_ALREADY_IN_GAME' })
       handleJoin(ctx, socket, payload, (result) => {
-        if (result.outcome === 'JOINED') sessionsByUser.set(socket.data.user!.userId, ctx.gameId)
+        if (result.outcome === 'JOINED') sessionsByUser.set(socket.data.user!.userId, { kind: 'game', gameId: ctx.gameId })
         acknowledge(result)
       })
     })
@@ -97,6 +104,7 @@ export function createGameSocketServer(
       }
     })
     socket.on('disconnect', () => {
+      leaveLobby(io, store, socket)
       const ctx = currentGame(socket)
       if (ctx) handleDisconnect(ctx, socket)
     })
