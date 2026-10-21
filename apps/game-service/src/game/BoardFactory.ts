@@ -10,7 +10,7 @@ const MAPS: Readonly<Record<BoardMapName, MapSpec>> = boardMaps
 const DEFAULT_MAP: BoardMapName = 'empty-map'
 
 export function createBoard(mapName: BoardMapName = DEFAULT_MAP): Board {
-  const { width, height, walls, antenna } = MAPS[mapName]
+  const { width, height, walls, checkpoints, antenna } = MAPS[mapName]
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
     throw new RangeError(`Map "${mapName}" must have a positive integer width and height`)
   }
@@ -26,8 +26,23 @@ export function createBoard(mapName: BoardMapName = DEFAULT_MAP): Board {
     for (const direction of directions) tile.add(direction)
   }
 
+  const checkpointNumbers = Array.from({ length: height }, () =>
+    Array<number | undefined>(width).fill(undefined),
+  )
+  checkpoints.forEach(([x, y], index) => {
+    if (!tiles[y]?.[x]) {
+      throw new RangeError(`Checkpoint at (${x}, ${y}) in map "${mapName}" is outside the board`)
+    }
+    if (checkpointNumbers[y][x] !== undefined) {
+      throw new RangeError(`Multiple checkpoints occupy (${x}, ${y}) in map "${mapName}"`)
+    }
+    checkpointNumbers[y][x] = index + 1
+  })
+
   return new Board(
-    tiles.map((row) => row.map((tileWalls) => new EmptyTile(tileWalls))),
+    tiles.map((row, y) => row.map(
+      (tileWalls, x) => new EmptyTile(tileWalls, checkpointNumbers[y][x]),
+    )),
     antenna,
   )
 }

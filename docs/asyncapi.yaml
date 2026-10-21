@@ -93,6 +93,8 @@ channels:
         $ref: '#/components/messages/ProgramSubmitted'
       robotActionResolved:
         $ref: '#/components/messages/RobotActionResolved'
+      playerCheckpointProgress:
+        $ref: '#/components/messages/PlayerCheckpointProgress'
       playerJoined:
         $ref: '#/components/messages/PlayerJoined'
       playerLeft:
@@ -250,6 +252,7 @@ components:
               robotId: 00000000-0000-4000-8000-000000000003
             state:
               gameId: 00000000-0000-4000-8000-000000000001
+              checkpointCount: 0
               board:
                 width: 1
                 height: 1
@@ -274,6 +277,7 @@ components:
               players:
                 - playerId: 00000000-0000-4000-8000-000000000002
                   username: Dane
+                  lastCheckpoint: 0
                   programSubmitted: false
                   connected: true
               paused: false
@@ -549,6 +553,35 @@ components:
                 y: 6
               orientation: NORTH
 
+    PlayerCheckpointProgress:
+      name: player.checkpointProgress
+      description: >-
+        Broadcasts changed player checkpoint progress to game:{gameId}:public after the
+        related robot.actionResolved, or game.playerLeft when a departure finishes a
+        register, and before subsequent actions or private hands. Unchanged progress
+        produces no event. Clients apply progress on receipt without changing movement
+        playback or programming availability. Replayed events must not reduce progress.
+      payload:
+        type: object
+        additionalProperties: false
+        required: [ gameId, playerId, lastCheckpoint, checkpointCount ]
+        properties:
+          gameId:
+            $ref: '#/components/schemas/GameId'
+          playerId:
+            $ref: '#/components/schemas/PlayerId'
+          lastCheckpoint:
+            $ref: '#/components/schemas/LastCheckpoint'
+          checkpointCount:
+            $ref: '#/components/schemas/CheckpointCount'
+      examples:
+        - name: firstCheckpoint
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            lastCheckpoint: 1
+            checkpointCount: 2
+
     CardsDealt:
       name: cards.dealt
       payload:
@@ -803,6 +836,7 @@ components:
         - username
         - programSubmitted
         - connected
+        - lastCheckpoint
       properties:
         playerId:
           $ref: "#/components/schemas/PlayerId"
@@ -812,6 +846,8 @@ components:
           type: boolean
         connected:
           type: boolean
+        lastCheckpoint:
+          $ref: '#/components/schemas/LastCheckpoint'
       description: >-
         Public participation and submission status; never contains cards.
 
@@ -844,6 +880,7 @@ components:
         - robots
         - phase
         - paused
+        - checkpointCount
       properties:
         gameId:
           $ref: "#/components/schemas/GameId"
@@ -864,6 +901,21 @@ components:
         paused:
           type: boolean
           description: Whether gameplay is paused because a game member is disconnected.
+        checkpointCount:
+          $ref: '#/components/schemas/CheckpointCount'
+
+    LastCheckpoint:
+      type: integer
+      minimum: 0
+      description: >-
+        Last checkpoint completed by the player in numerical order, initially 0.
+        Must not exceed checkpointCount. Persists across rounds and reconnections.
+        Completing the final checkpoint does not end the game.
+
+    CheckpointCount:
+      type: integer
+      minimum: 0
+      description: Total number of checkpoints on the board; 0 on a board without checkpoints.
 
     GetLobbyDetails:
       type: object
@@ -1056,6 +1108,13 @@ components:
           uniqueItems: true
           items:
             $ref: '#/components/schemas/Orientation'
+        checkpointNumber:
+          type: integer
+          minimum: 1
+          description: >-
+            Optional checkpoint on this tile, independent of its walls and type.
+            Omit when absent. Numbers are unique and consecutive from 1 on a board.
+            Checkpoints stay at their fixed positions and are available to every player.
     Antenna:
       type: object
       additionalProperties: false

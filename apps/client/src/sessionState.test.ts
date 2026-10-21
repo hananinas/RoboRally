@@ -22,6 +22,7 @@ const joined: Extract<JoinResult, { outcome: 'JOINED' }> = {
     players: [],
     phase: 'PROGRAMMING',
     paused: false,
+    checkpointCount: 0,
   },
   hand: [],
   programSubmitted: false,

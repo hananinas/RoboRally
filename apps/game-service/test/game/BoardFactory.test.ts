@@ -33,6 +33,16 @@ describe('board factory', () => {
     expect(board.getTile({ x: 0, y: 0 })?.walls.size).toBe(0)
   })
 
+  it('places the checkpoints specified by each map', () => {
+    for (const mapName of ['empty-map', 'test-map'] as const) {
+      const board = createBoard(mapName)
+
+      expect(board.checkpointCount).toBe(2)
+      expect(board.getTile({ x: 10, y: 6 })?.checkpointNumber).toBe(1)
+      expect(board.getTile({ x: 8, y: 9 })?.checkpointNumber).toBe(2)
+    }
+  })
+
   it('reads the priority antenna location from the map', () => {
     expect(createBoard('test-map').antenna).toEqual(boardMaps['test-map'].antenna)
     expect(createBoard().antenna).toEqual(boardMaps['empty-map'].antenna)

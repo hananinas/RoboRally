@@ -63,6 +63,30 @@ describe('createBoardRenderModel', () => {
     expect(Object.isFrozen(board.cells)).toBe(true)
   })
 
+  it('stores checkpoints on cells alongside walls and tile state', () => {
+    const board = createBoardRenderModel(2, 1, {
+      walls: [{ x: 1, y: 0, north: true }],
+      checkpoints: [{ x: 1, y: 0, checkpointNumber: 2 }],
+    })
+    expect(board.cells[0].checkpointNumber).toBeUndefined()
+    expect(board.cells[1]).toMatchObject({ tile: 'empty', checkpointNumber: 2, walls: { north: true } })
+    expect(Object.isFrozen(board.cells[1])).toBe(true)
+  })
+
+  it('rejects invalid checkpoint assignments', () => {
+    for (const checkpointNumber of [0, -1, 1.5, Infinity]) {
+      expect(() => createBoardRenderModel(1, 1, {
+        checkpoints: [{ x: 0, y: 0, checkpointNumber }],
+      })).toThrow(RangeError)
+    }
+    expect(() => createBoardRenderModel(1, 1, {
+      checkpoints: [{ x: 1, y: 0, checkpointNumber: 1 }],
+    })).toThrow(/outside the board/)
+    expect(() => createBoardRenderModel(1, 1, {
+      checkpoints: [{ x: 0, y: 0, checkpointNumber: 1 }, { x: 0, y: 0, checkpointNumber: 2 }],
+    })).toThrow(RangeError)
+  })
+
   it('rejects duplicate and off-board wall assignments', () => {
     expect(() =>
       createBoardRenderModel(1, 1, {

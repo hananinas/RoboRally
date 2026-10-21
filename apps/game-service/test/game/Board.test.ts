@@ -18,6 +18,48 @@ const steps: { direction: Direction; target: Position; opposite: Direction }[] =
 ]
 
 describe('Tile and Board layout', () => {
+  it('stores checkpoint state alongside walls and derives the total from the grid', () => {
+    const checkpoint = new EmptyTile([Direction.NORTH], 2)
+    const first = new EmptyTile([], 1)
+    const empty = new EmptyTile()
+    const board = new Board([[checkpoint, empty, first]], antenna)
+
+    expect(checkpoint.checkpointNumber).toBe(2)
+    expect(checkpoint.hasWall(Direction.NORTH)).toBe(true)
+    expect(empty.checkpointNumber).toBeUndefined()
+    expect(board.checkpointCount).toBe(2)
+    expect(new Board([[empty]], antenna).checkpointCount).toBe(0)
+    expect(board.getTile({ x: 0, y: 0 })).toBe(checkpoint)
+  })
+
+  it.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
+    'rejects invalid checkpoint number %s',
+    (number) => expect(() => new EmptyTile([], number)).toThrow(RangeError),
+  )
+
+  it('rejects duplicate or skipped checkpoint numbers', () => {
+    for (const numbers of [[1, 1], [1, 3], [2]]) {
+      expect(() => new Board(
+        [numbers.map((number) => new EmptyTile([], number))],
+        antenna,
+      )).toThrow(RangeError)
+    }
+  })
+
+  it('keeps checkpoints available when different robots occupy and leave their tiles', () => {
+    const board = new Board([[new EmptyTile([], 1), new EmptyTile([], 2)]], antenna)
+    for (const robotId of ['alpha', 'beta']) {
+      board.placeRobot(robotId, { x: 0, y: 0 })
+      expect(board.moveRobot(robotId, Direction.EAST, 1)).toEqual({
+        position: { x: 1, y: 0 }, stepsMoved: 1, blocked: false,
+      })
+      board.removeRobot(robotId)
+      expect(board.getTile({ x: 0, y: 0 })?.checkpointNumber).toBe(1)
+      expect(board.getTile({ x: 1, y: 0 })?.checkpointNumber).toBe(2)
+      expect(board.checkpointCount).toBe(2)
+    }
+  })
+
   it('keeps walls on tile edges without a separate wall tile', () => {
     const walls = new Set([Direction.NORTH])
     const tile = new EmptyTile(walls)

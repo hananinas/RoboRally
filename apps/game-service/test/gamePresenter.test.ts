@@ -38,6 +38,7 @@ describe('game presenter', () => {
     expectTypeOf(state).toEqualTypeOf<PublicGameState>()
     expect(state).toMatchObject({
       gameId,
+      checkpointCount: 2,
       board: { width: 21, height: 15 },
       phase: 'PROGRAMMING',
       robots: [
@@ -60,12 +61,16 @@ describe('game presenter', () => {
       position: { x: 20, y: 14 },
       type: 'EMPTY',
     })
+    expect(state.board.tiles.filter((tile) => tile.checkpointNumber !== undefined)).toEqual([
+      { position: { x: 10, y: 6 }, type: 'EMPTY', checkpointNumber: 1 },
+      { position: { x: 8, y: 9 }, type: 'EMPTY', checkpointNumber: 2 },
+    ])
   })
 
   it('maps tile walls and the activation phase to contract values', () => {
     const board = new Board([
       [
-        new EmptyTile([Direction.NORTH, Direction.WEST]),
+        new EmptyTile([Direction.NORTH, Direction.WEST], 1),
         new EmptyTile(),
       ],
     ], { x: 0, y: 0, angle: Math.PI / 2 })
@@ -87,6 +92,7 @@ describe('game presenter', () => {
         position: { x: 0, y: 0 },
         type: 'EMPTY',
         walls: ['NORTH', 'WEST'],
+        checkpointNumber: 1,
       },
       { position: { x: 1, y: 0 }, type: 'EMPTY' },
     ])

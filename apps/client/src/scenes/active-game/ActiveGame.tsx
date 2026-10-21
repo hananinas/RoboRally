@@ -52,6 +52,7 @@ function ActiveGame({ game, username, leaving, onLeave }: {
   const handleRedo = () => dispatch({ type: 'redo' })
   const hasHand = state.handVersion > 0
   const status = getGameStatus(state)
+  const player = state.players.find((candidate) => candidate.playerId === state.assignment?.playerId)
   const registeredCardIds = new Set(
     state.registers.flatMap((card) => (card ? [card.id] : [])),
   )
@@ -71,7 +72,12 @@ function ActiveGame({ game, username, leaving, onLeave }: {
       <div ref={overlayRef} className={overlayClassName}>
         <aside className="game-hud" aria-label="Game controls">
           <div ref={hudContentRef} className="game-hud__content">
-            <PlayerPanel player={{ name: username }} onLeave={onLeave} leaveDisabled={leaving || !state.connected} />
+            <PlayerPanel
+              player={{ name: username, lastCheckpoint: player?.lastCheckpoint ?? 0 }}
+              checkpointCount={state.checkpointCount}
+              onLeave={onLeave}
+              leaveDisabled={leaving || !state.connected}
+            />
             <RegisterPanel
               registers={state.playbackProgram ?? state.registers}
               activeRegister={state.playback.active?.registerIndex ?? null}

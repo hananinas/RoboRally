@@ -30,6 +30,7 @@ Will update with a more conceptual domain diagram which will be used for present
         class Tile {
             <<abstract>>
             +walls: Direction[] set
+            +checkpointNumber: int?
         }
 
         class EmptyTile
@@ -37,6 +38,8 @@ Will update with a more conceptual domain diagram which will be used for present
         class Player {
         -robot: Robot
         -hand: Card[] unordered
+        +lastCheckpoint: int
+        +completeCheckpoint(int number) bool
         }
 
         class Robot {
@@ -82,7 +85,7 @@ Responsible for dictating the game loop: dealing cards, taking programs, and exe
 
 Keeps track of the current phase and register. `submitProgram()` checks a player's five cards before assigning them to their Robot. During activation, Game chooses the next robot from those that have not acted yet, using current positions on Board and the priority antenna. It reads that robot's card and applies it: movement goes through Board, while turns change Robot's direction. Priority is worked out again after each robot acts.
 
-Board elements activate after the robot actions in each register. This is a no-op in V0, but leaves room for ordered board effects later. After the fifth register, Game returns to the programming phase.
+Board elements activate after the robot actions in each register. Game reads each remaining robot's final tile and asks its Player to complete that checkpoint. Player advances only to the next numbered checkpoint. Passing over one during movement does not count. This also runs when removing a player finishes a register. After the fifth register, Game returns to programming, preserving checkpoint progress; completing the course does not end the game.
 
 # Board
 
@@ -94,7 +97,9 @@ Answers position and occupancy queries, and carries out movement. Board checks w
 
 Abstract class describing what is on a board space. Walls are properties of any Tile, not a separate tile type. EmptyTile is currently the only tile type shown for V0.
 
-Tiles do not hold robots or activate themselves. Game can schedule board effects later, with Board handling the spatial checks needed to find what they affect.
+An optional `checkpointNumber` is another Tile property. A positive number identifies a checkpoint; absence means no checkpoint. Board owns its position through the tile grid, validates unique consecutive numbering from 1, and derives the checkpoint count. Checkpoints do not require a separate tile subclass and can coexist with walls.
+
+Tiles do not hold robots or activate themselves. Game runs board effects after robot actions in each register, using Board to find each robot's tile.
 
 # Robot
 
@@ -132,7 +137,7 @@ while game.currentRegister < 5:
         card = robot(robotId).getProgramCard(game.currentRegister)
         game.executeCard(robotId, card)           # Movement via Board, turning via Robot
         remaining.remove(robotId)                 # Priority is checked again for the next robot
-    game.activateBoardElements()                  # No-op in V0; ordered effects later
+    game.activateBoardElements()                  # Check final tiles for ordered checkpoints
     game.finishRegister()                         # Advance to the next register
 game.finishRound()                                # Return to programming phase
 ```

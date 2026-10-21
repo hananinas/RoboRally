@@ -13,6 +13,7 @@ export type MapSpec = Readonly<{
   height: number
   antenna: Antenna
   walls: readonly WallSpec[]
+  checkpoints: readonly (readonly [x: number, y: number])[]
 }>
 
 export const boardMaps = {
@@ -21,11 +22,13 @@ export const boardMaps = {
     height: 15,
     antenna: { x: 10, y: 0, angle: Math.PI / 2 },
     walls: [],
+    checkpoints: [[10, 6], [8, 9]],
   },
   'test-map': {
     width: 16,
     height: 15,
     antenna: { x: 10, y: 0, angle: Math.PI / 2 },
+    checkpoints: [[10, 6], [8, 9]],
     walls: [
       // TEST written top left corner of map
       { at: [1, 1], directions: [N, E] }, 
