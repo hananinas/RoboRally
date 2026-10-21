@@ -1,7 +1,6 @@
 import type {
   Card,
   CardsDealt,
-  JoinGame,
   JoinResult,
   LobbyDetails,
   LobbyDetailsResult,
@@ -99,7 +98,8 @@ export type FixtureSnapshot = {
   submissions: readonly SubmitProgram[]
   entryRequests: readonly (
     | { event: 'user.login'; socketId: string; payload: Login }
-    | { event: 'game.join'; socketId: string; payload: JoinGame }
+    | { event: 'session.get' | 'lobby.create'; socketId: string; payload: Record<string, never> }
+    | { event: 'lobby.join' | 'lobby.start'; socketId: string; payload: { lobbyId: string } }
   )[]
   pendingLogins: number
   pendingJoins: number

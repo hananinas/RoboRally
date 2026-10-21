@@ -1,202 +1,189 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { LobbySummary, ServerToClientEvents } from '@robo-rally/game-events'
 import ActiveGame from './scenes/active-game/ActiveGame.tsx'
 import useGameConnection from './scenes/active-game/useGameConnection.ts'
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import Login from './scenes/login/Login.tsx'
 import EntryScreen from './scenes/login/EntryScreen.tsx'
-import LobbyScreen from './scenes/login/LobbyScreen.tsx'
-import type { GameId } from '@robo-rally/game-events'
+import JoinGame from './scenes/login/JoinGame.tsx'
+import WaitingLobby from './scenes/login/WaitingLobby.tsx'
 import { USER_ALREADY_IN_GAME_MESSAGE } from './scenes/active-game/gameState.ts'
-import {
-  createSessionState,
-  sessionReducer,
-  type JoinError,
-  type LoginError,
-} from './sessionState.ts'
+import { createSessionState, sessionReducer, type SessionEvent } from './sessionState.ts'
 import useGameSocket, { ACKNOWLEDGEMENT_TIMEOUT_MS } from './useGameSocket.ts'
 
-const loginErrors: Record<LoginError, string> = {
-  INVALID_USERNAME: 'Username must contain 1–30 characters.',
-  INVALID_REQUEST: 'The login request was rejected. Please try again.',
-  ALREADY_LOGGED_IN: 'This connection is already logged in with another username. Retry connection to use this name.',
-  INTERNAL_ERROR: 'The Game Service could not log you in. Please try again.',
-  LOGIN_REQUIRED: 'Your login is no longer valid. Please log in again.',
-  TIMEOUT: 'The Game Service did not respond. Please try again.',
-}
-
-const joinErrors: Record<JoinError, string> = {
-  NO_SPAWN_AVAILABLE: 'The game has no available spawn position.',
-  USER_ALREADY_IN_GAME: USER_ALREADY_IN_GAME_MESSAGE,
-  GAME_ALREADY_STARTED: 'The game has already started and is no longer accepting new players.',
-  INTERNAL_ERROR: 'The Game Service could not join the game. Please try again.',
-  CONNECTION_ERROR: 'Connection lost before the game could be joined.',
-  INVALID_REQUEST: 'The join request was rejected. Refresh the lobby and try again.',
-  GAME_NOT_FOUND: 'This game no longer exists. Refresh the lobby and try again.',
-  TIMEOUT: 'The Game Service did not respond to the join request. Please try again.',
+function errorMessage(code: string): string {
+  switch (code) {
+    case 'USER_ALREADY_IN_SESSION': return USER_ALREADY_IN_GAME_MESSAGE
+    case 'INVALID_USERNAME': return 'Username must contain 1–30 characters.'
+    case 'ALREADY_LOGGED_IN': return 'This connection is already logged in with another username. Retry connection to use this name.'
+    case 'LOBBY_NOT_FOUND': return 'This lobby is no longer available. Refresh and try again.'
+    case 'LOBBY_FULL': return 'This lobby is full. Choose another lobby.'
+    case 'TIMEOUT': return 'The Game Service did not respond. Please try again.'
+    default: return `The request could not be completed (${code}). Please try again.`
+  }
 }
 
 function App() {
   const connection = useGameSocket()
-  const game = useGameConnection(connection.socket)
-  const { initialize } = game
-  const [session, dispatch] = useReducer(sessionReducer, undefined, createSessionState)
-  const sessionRef = useRef(session)
-  const loginPending = useRef(false)
-  const loginAttempt = useRef(0)
-  const joinPending = useRef(false)
-  const joinAttempt = useRef(0)
-  const [leaving, setLeaving] = useState(false)
+  const { socket } = connection
+  const game = useGameConnection(socket)
+  const { initialize, dispatch: dispatchGame } = game
+  const [session, setSession] = useState(createSessionState)
+  const current = useRef(session)
+  const generation = useRef(0)
+  const pending = useRef(false)
+  const [busy, setBusy] = useState(false)
+  const [lobbies, setLobbies] = useState<readonly LobbySummary[]>([])
+  const [listError, setListError] = useState<string | null>(null)
+  const listAttempt = useRef(0)
 
-  const sendLogin = useCallback((username: string) => {
-    loginPending.current = true
-    const attempt = ++loginAttempt.current
-    connection.socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit(
-      'user.login',
-      { username },
-      (error, result) => {
-        if (attempt !== loginAttempt.current || !connection.socket.connected) return
-        loginPending.current = false
-        dispatch(error
-          ? { type: 'login-timeout' }
-          : { type: 'login-result', result })
-      },
-    )
-  }, [connection.socket, dispatch])
+  // Update event-time state before the next Socket.IO packet is handled.
+  const dispatch = useCallback((event: SessionEvent) => {
+    const next = sessionReducer(current.current, event)
+    if (event.type === 'game-started' && next !== current.current && next.status === 'joined') initialize(event.initialization)
+    if (event.type === 'session-result' && next.status === 'joined' && event.result.outcome === 'IN_GAME') initialize(event.result.initialization)
+    if (event.type === 'left' || (event.type === 'session-result' && event.result.outcome === 'NO_SESSION')) dispatchGame({ type: 'reset' })
+    current.current = next
+    setSession(next)
+  }, [initialize, dispatchGame])
 
-  useEffect(() => {
-    sessionRef.current = session
-  }, [session])
-
-  useEffect(() => {
-    const invalidateRequests = () => {
-      loginAttempt.current += 1
-      joinAttempt.current += 1
-      loginPending.current = false
-      joinPending.current = false
-    }
-    const handleDisconnect = () => {
-      invalidateRequests()
-      dispatch({ type: 'disconnected' })
-    }
-    const handleConnect = () => {
-      if (sessionRef.current.status === 'joined' && !connection.socket.recovered) {
-        dispatch({ type: 'resync' })
+  const run = useCallback(async (operation: () => Promise<SessionEvent | undefined>, timeout: 'login' | 'sync' | 'command' | 'start' = 'command') => {
+    if (pending.current || !socket.connected) return
+    pending.current = true
+    setBusy(true)
+    const attempt = generation.current
+    try {
+      const event = await operation()
+      if (generation.current === attempt && socket.connected && event) dispatch(event)
+    } catch {
+      if (generation.current === attempt && socket.connected && !(timeout === 'start' && current.current.status === 'joined')) {
+        dispatch(timeout === 'login' ? { type: 'login-error', error: 'TIMEOUT' }
+          : timeout === 'sync' ? { type: 'error', error: 'TIMEOUT' } : { type: 'sync-requested' })
+      }
+    } finally {
+      if (generation.current === attempt) {
+        pending.current = false
+        setBusy(false)
       }
     }
-    connection.socket.on('disconnect', handleDisconnect)
-    connection.socket.on('connect', handleConnect)
+  }, [socket, dispatch])
+
+  useEffect(() => {
+    const disconnected = () => {
+      generation.current += 1
+      listAttempt.current += 1
+      pending.current = false
+      setBusy(false)
+      dispatch({ type: 'disconnected' })
+    }
+    const connected = () => {
+      if ('user' in current.current && !(current.current.status === 'joined' && socket.recovered)) dispatch({ type: 'sync-requested' })
+    }
+    const started: ServerToClientEvents['game.started'] = (payload) => {
+      if (socket.connected) dispatch({ type: 'game-started', ...payload })
+    }
+    const updated: ServerToClientEvents['lobby.updated'] = ({ lobby }) => {
+      if (socket.connected) dispatch({ type: 'lobby-updated', lobby })
+    }
+    socket.on('disconnect', disconnected)
+    socket.on('connect', connected)
+    socket.on('game.started', started)
+    socket.on('lobby.updated', updated)
     return () => {
-      connection.socket.off('disconnect', handleDisconnect)
-      connection.socket.off('connect', handleConnect)
-      invalidateRequests()
+      socket.off('disconnect', disconnected)
+      socket.off('connect', connected)
+      socket.off('game.started', started)
+      socket.off('lobby.updated', updated)
+      generation.current += 1
     }
-  }, [connection.socket])
+  }, [socket, dispatch])
 
   useEffect(() => {
-    if (session.status !== 'joining' || joinPending.current) return
-    const {gameId} = session
-    if (!connection.socket.connected) {
-      dispatch({ type: 'join-error', error: 'CONNECTION_ERROR' })
-      return
-    }
+    if (session.status !== 'resyncing' || !socket.connected || busy) return
+    const attempt = generation.current
+    void run(async () => {
+      const login = await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('user.login', { username: session.user.username })
+      if (attempt !== generation.current || !socket.connected) return
+      if (login.outcome !== 'LOGGED_IN') return { type: 'login-result', result: login }
+      const result = await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('session.get', {})
+      return { type: 'session-result', result }
+    }, 'sync')
+  }, [session, socket, connection.status, busy, run])
 
-    joinPending.current = true
-    const attempt = ++joinAttempt.current
-    connection.socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit(
-      'game.join',
-      { gameId },
-      (error, result) => {
-        if (attempt !== joinAttempt.current || !connection.socket.connected) return
-        joinPending.current = false
-        if (!error && result.outcome === 'JOINED') initialize(result)
-        dispatch(error
-          ? { type: 'join-error', error: 'TIMEOUT' }
-          : { type: 'join-result', result })
-      },
-    )
-  }, [connection.socket, connection.status, session, initialize])
-
+  const refresh = useCallback(() => {
+    if (!socket.connected) return
+    const attempt = ++listAttempt.current
+    socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit('lobby.list', {}, (error, result) => {
+      if (attempt !== listAttempt.current || !socket.connected || current.current.status !== 'browsing') return
+      if (error) setListError('TIMEOUT')
+      else if (result.outcome === 'LOBBIES_FOUND') {
+        setListError(null)
+        setLobbies(result.lobbies)
+      }
+      else setListError(result.outcome)
+    })
+  }, [socket])
   useEffect(() => {
-    if (session.status !== 'resyncing' || loginPending.current) return
-    sendLogin(session.user.username)
-  }, [connection.socket, session, sendLogin])
+    if (session.status === 'browsing') refresh()
+  }, [session.status, refresh])
 
-  const username = session.status === 'editing' || session.status === 'logging-in'
-    ? session.username
-    : session.user.username
-  const sessionError = session.status === 'editing' && session.error
-    ? loginErrors[session.error]
-    : session.status === 'join-failed' && session.error ? joinErrors[session.error] : null
-  const requiresReconnect = session.status === 'editing' && session.error === 'ALREADY_LOGGED_IN'
-
-  function submitUsername(submittedUsername: string) {
-    if (session.status !== 'editing' || loginPending.current) return
-    if (requiresReconnect) {
-      connection.socket.disconnect()
-      connection.connect()
+  function submitUsername(username: string) {
+    if (current.current.status !== 'editing' || pending.current) return
+    if (current.current.error === 'ALREADY_LOGGED_IN') {
+      socket.disconnect()
+      socket.connect()
       return
     }
-    if (!connection.socket.connected) {
-      connection.connect()
-      return
-    }
-
-    dispatch({ type: 'username-changed', username: submittedUsername })
+    if (!socket.connected) return connection.connect()
+    dispatch({ type: 'username-changed', username })
     dispatch({ type: 'login-submitted' })
-    sendLogin(submittedUsername)
+    void run(async () => ({ type: 'login-result', result: await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('user.login', { username }) }), 'login')
+  }
+  function join(lobbyId: string | null) {
+    if (pending.current || !socket.connected) return
+    dispatch({ type: 'lobby-requested', lobbyId })
+    void run(async () => ({ type: 'lobby-result', result: lobbyId === null
+      ? await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.create', {})
+      : await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.join', { lobbyId }) }))
+  }
+  function start() {
+    if (session.status !== 'waiting') return
+    const lobbyId = session.lobby.lobbyId
+    void run(async () => {
+      const result = await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.start', { lobbyId })
+      if (result.outcome === 'STARTED' && current.current.status === 'joined') return
+      return result.outcome === 'STARTED' || result.outcome === 'LOBBY_NOT_FOUND'
+        ? { type: 'sync-requested' } : { type: 'error', error: result.outcome }
+    }, 'start')
+  }
+  function leave() {
+    void run(async () => {
+      const result = session.status === 'waiting'
+        ? await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.leave', { lobbyId: session.lobby.lobbyId })
+        : game.state.assignment
+          ? await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('game.leave', { gameId: game.state.assignment.gameId }) : undefined
+      return result?.outcome === 'LEFT' || result?.outcome === 'GAME_NOT_FOUND'
+        ? { type: 'left' } : { type: 'sync-requested' }
+    })
   }
 
-  function joinGame(gameId: GameId) {
-    if (session.status !== 'ready-to-join' && session.status !== 'join-failed') return
-    if (!connection.socket.connected) return
-    dispatch({ type: 'join-requested', gameId })
+  if ((session.status === 'joined' || session.status === 'resyncing') && game.state.assignment) {
+    return <ActiveGame game={game} username={session.user.username} leaving={busy} onLeave={leave} />
   }
-
-  function leaveGame() {
-    if (leaving || !connection.socket.connected || !game.state.assignment) return
-    setLeaving(true)
-    connection.socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit(
-      'game.leave', { gameId: game.state.assignment.gameId }, (error, result) => {
-        if (!error && (result.outcome === 'LEFT' || result.outcome === 'GAME_NOT_FOUND')) {
-          game.dispatch({ type: 'reset' })
-          dispatch({ type: 'left' })
-          setLeaving(false)
-        } else {
-          game.dispatch({ type: 'error', message: 'Could not confirm leaving the game. Reload to continue.' })
-        }
-      },
-    )
-  }
-
-  if (session.status === 'joined' || session.status === 'resyncing') {
-    return <ActiveGame game={game} username={session.user.username} leaving={leaving} onLeave={leaveGame} />
-  }
-
-  return (
-    <EntryScreen>
-      {session.status === 'editing' || session.status === 'logging-in' ? (
-        <Login
-          connectionStatus={connection.status}
-          error={sessionError ?? connection.error}
-          onSubmitUsername={submitUsername}
-          onUsernameChange={(nextUsername) => dispatch({
-            type: 'username-changed', username: nextUsername,
-          })}
-          pending={session.status === 'logging-in'}
-          requiresReconnect={requiresReconnect}
-          username={username}
-        />
-      ) : (
-        <LobbyScreen
-          socket={connection.socket}
-          username={username}
-          pending={session.status === 'joining'}
-          connected={connection.status === 'connected'}
-          error={sessionError ?? connection.error}
-          onJoin={joinGame}
-        />
-      )}
-    </EntryScreen>
-  )
+  const error = 'error' in session && session.error ? errorMessage(session.error) : listError ? errorMessage(listError) : connection.error
+  return <EntryScreen>
+    {session.status === 'editing' || session.status === 'logging-in'
+      ? <Login connectionStatus={connection.status} error={error} onSubmitUsername={submitUsername}
+          onUsernameChange={(username) => dispatch({ type: 'username-changed', username })}
+          pending={session.status === 'logging-in'} requiresReconnect={session.status === 'editing' && session.error === 'ALREADY_LOGGED_IN'} username={session.username} />
+      : <>
+        {error && session.status !== 'browsing' && session.status !== 'joining' && <p role="alert" className="login-validation login-validation--error">{error}</p>}
+        {session.status === 'browsing' || session.status === 'joining'
+          ? <JoinGame username={session.user.username} error={error} lobbies={lobbies} pending={busy || session.status === 'joining'} connected={socket.connected}
+              onCreate={() => join(null)} onJoin={join} onRefresh={refresh} />
+          : session.status === 'waiting'
+            ? <WaitingLobby lobby={session.lobby} userId={session.user.userId} disabled={busy || !socket.connected} onStart={start} onLeave={leave} />
+            : <><p>Restoring session…</p><button type="button" disabled={busy || !socket.connected} onClick={() => dispatch({ type: 'sync-requested' })}>Retry</button></>}
+      </>}
+  </EntryScreen>
 }
-
 export default App

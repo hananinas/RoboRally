@@ -9,7 +9,6 @@ import { emptyRequestSchema } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
 import type { Game } from '@/game/index'
 import { createUserRegistry } from '@/userRegistry'
-import { createSharedGame } from '@/game/GameFactory'
 import { createGameContext } from '@/gameContext'
 import { handleLogin } from '@/authHandlers'
 import {
@@ -37,7 +36,7 @@ export type GameSession = Readonly<{ gameId: string; game: Game }>
 
 export function createGameSocketServer(
   httpServer: HttpServer,
-  initialGames: GameSession | readonly GameSession[] = createSharedGame(),
+  initialGames: GameSession | readonly GameSession[] = [],
   createGame: () => GameSession = defaultGameFactory,
 ): GameSocketServer {
   const io = new Server<

@@ -4,6 +4,7 @@ import type {
   Card,
   ClientToServerEvents,
   JoinResult,
+  LobbyState,
   LoginResult,
   LobbyDetails,
   LobbyDetailsResult,
@@ -41,6 +42,7 @@ type Fixture = {
   deferLogin: boolean
   deferJoin: boolean
   programSubmitted: boolean
+  started: boolean
   pendingLogins: { socket: GameSocket; respond: () => void }[]
   pendingJoins: { socket: GameSocket; respond: () => void }[]
   lobbyOutcome: LobbyDetailsResult['outcome']
@@ -201,6 +203,7 @@ const httpServer = createServer(async (request, response) => {
       deferLogin: false,
       deferJoin: false,
       programSubmitted: false,
+      started: false,
       pendingLogins: [],
       lobbyOutcome: 'LOBBY_FOUND',
       lobbies: [createLobby()],
@@ -269,28 +272,48 @@ io.on('connection', (socket) => {
     else respond()
   })
 
-  socket.on('game.join', (payload, acknowledge) => {
-    fixture.entryRequests.push({ event: 'game.join', socketId: socket.id, payload })
+  let lobby: LobbyState | undefined
+  const initialization = () => ({
+    outcome: 'JOINED' as const,
+    assignment: { gameId: GAME_ID, playerId: PLAYER_ID, robotId: ROBOT_ID },
+    state: fixture.state, hand: fixture.cards, programSubmitted: fixture.programSubmitted,
+  })
+  const lobbyState = (): LobbyState => ({ lobbyId: GAME_ID, name: 'Lobby 1', ownerUserId: user!.userId, playerCount: 1, maxPlayers: 6 })
+  socket.on('session.get', (_, acknowledge) => {
+    fixture.entryRequests.push({ event: 'session.get', socketId: socket.id, payload: {} })
+    if (!user) return acknowledge({ outcome: 'LOGIN_REQUIRED' })
+    acknowledge(fixture.started ? { outcome: 'IN_GAME', initialization: initialization() }
+      : lobby ? { outcome: 'IN_LOBBY', lobby } : { outcome: 'NO_SESSION' })
+  })
+  socket.on('lobby.list', (_, acknowledge) => acknowledge({ outcome: 'LOBBIES_FOUND', lobbies: [lobbyState()] }))
+  socket.on('lobby.create', (_, acknowledge) => {
+    fixture.entryRequests.push({ event: 'lobby.create', socketId: socket.id, payload: {} })
+    lobby = lobbyState()
+    acknowledge({ outcome: 'LOBBY_JOINED', lobby })
+  })
+  socket.on('lobby.join', (payload, acknowledge) => {
+    fixture.entryRequests.push({ event: 'lobby.join', socketId: socket.id, payload })
+    lobby = lobbyState()
+    acknowledge({ outcome: 'LOBBY_JOINED', lobby })
+  })
+  socket.on('lobby.leave', (_, acknowledge) => {
+    lobby = undefined
+    acknowledge({ outcome: 'LEFT' })
+  })
+  socket.on('lobby.start', (payload, acknowledge) => {
+    fixture.entryRequests.push({ event: 'lobby.start', socketId: socket.id, payload })
+    fixture.started = true
     const respond = () => {
-      if (!user || fixture.joinOutcome === 'LOGIN_REQUIRED') {
-        user = undefined
-        acknowledge({ outcome: 'LOGIN_REQUIRED' })
-      } else if (payload.gameId !== GAME_ID) {
-        acknowledge({ outcome: 'GAME_NOT_FOUND' })
-      } else if (fixture.joinOutcome !== 'JOINED') {
-        acknowledge({ outcome: fixture.joinOutcome })
-      } else {
-        acknowledge({
-          outcome: 'JOINED',
-          assignment: { gameId: GAME_ID, playerId: PLAYER_ID, robotId: ROBOT_ID },
-          state: fixture.state,
-          hand: fixture.cards,
-          programSubmitted: fixture.programSubmitted,
-        })
-      }
+      socket.emit('game.started', { lobbyId: GAME_ID, initialization: initialization() })
+      acknowledge({ outcome: 'STARTED', gameId: GAME_ID })
     }
     if (fixture.deferJoin) fixture.pendingJoins.push({ socket, respond })
     else respond()
+  })
+  socket.on('game.leave', (_, acknowledge) => {
+    fixture.started = false
+    lobby = undefined
+    acknowledge({ outcome: 'LEFT' })
   })
 
   socket.on('game.getLobbyDetails', (_payload, acknowledge) => {
