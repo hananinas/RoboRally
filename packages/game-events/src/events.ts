@@ -1,3 +1,4 @@
+import type { EmptyRequest, LobbyRequest, LobbyState, GameInitialization, LobbyListResult, LobbyJoinResult, LobbyLeaveResult, LobbyStartResult, SessionResult } from './lobby.js'
 import type {
   CardsDealt,
   GameAborted,
@@ -24,6 +25,12 @@ export type LoginAcknowledgement = (result: LoginResult) => void
 export type LobbyDetailsAcknowledgement = (result: LobbyDetailsResult) => void
 
 export interface ClientToServerEvents {
+  'lobby.list': (payload: EmptyRequest, acknowledge: (result: LobbyListResult) => void) => void
+  'lobby.create': (payload: EmptyRequest, acknowledge: (result: LobbyJoinResult) => void) => void
+  'lobby.join': (payload: LobbyRequest, acknowledge: (result: LobbyJoinResult) => void) => void
+  'lobby.leave': (payload: LobbyRequest, acknowledge: (result: LobbyLeaveResult) => void) => void
+  'lobby.start': (payload: LobbyRequest, acknowledge: (result: LobbyStartResult) => void) => void
+  'session.get': (payload: EmptyRequest, acknowledge: (result: SessionResult) => void) => void
   'game.leave': (payload: JoinGame, acknowledge: (result: LeaveResult) => void) => void
   'game.join': (payload: JoinGame, acknowledge: JoinResultAcknowledgement) => void
   'user.login': (payload: Login, acknowledge: LoginAcknowledgement) => void
@@ -35,6 +42,8 @@ export interface ClientToServerEvents {
 }
 
 export interface ServerToClientEvents {
+  'lobby.updated': (payload: { lobby: LobbyState }) => void
+  'game.started': (payload: { lobbyId: string; initialization: GameInitialization }) => void
   'player.checkpointProgress': (payload: PlayerCheckpointProgress) => void
   'game.playerJoined': (payload: PlayerJoined) => void
   'game.playerLeft': (payload: PlayerLeft) => void
