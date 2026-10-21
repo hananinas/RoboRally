@@ -53,6 +53,7 @@ function ActiveGame({ game, username, leaving, onLeave }: {
   const hasHand = state.handVersion > 0
   const status = getGameStatus(state)
   const player = state.players.find((candidate) => candidate.playerId === state.assignment?.playerId)
+  const robotColour = state.playback.robots.find((robot) => robot.robotId === state.assignment?.robotId)?.colour
   const registeredCardIds = new Set(
     state.registers.flatMap((card) => (card ? [card.id] : [])),
   )
@@ -74,6 +75,7 @@ function ActiveGame({ game, username, leaving, onLeave }: {
           <div ref={hudContentRef} className="game-hud__content">
             <PlayerPanel
               player={{ name: username, lastCheckpoint: player?.lastCheckpoint ?? 0 }}
+              robotColour={robotColour}
               checkpointCount={state.checkpointCount}
               onLeave={onLeave}
               leaveDisabled={leaving || !state.connected}

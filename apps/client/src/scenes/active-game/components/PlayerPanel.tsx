@@ -4,19 +4,30 @@ import Panel from './Panel.tsx'
 
 type PlayerPanelProps = {
   player: { name: string; lastCheckpoint: number }
+  robotColour?: string
   checkpointCount: number
   onLeave?: () => void
   leaveDisabled?: boolean
 }
 
 // Shows collapsible player details.
-function PlayerPanel({ player, checkpointCount, onLeave, leaveDisabled }: PlayerPanelProps) {
+function PlayerPanel({ player, robotColour, checkpointCount, onLeave, leaveDisabled }: PlayerPanelProps) {
   const [expanded, setExpanded] = useState(true)
 
   return (
     <Panel className="player-panel">
       <header className="player-panel__header">
-        <h1 className="player-panel__name">{player.name}</h1>
+        <h1 className="player-panel__name">
+          {robotColour && (
+            <span
+              className="player-panel__colour"
+              style={{ backgroundColor: robotColour }}
+              aria-label="Robot colour"
+              role="img"
+            />
+          )}
+          {player.name}
+        </h1>
         <GameMenu onLeave={onLeave} leaveDisabled={leaveDisabled} />
       </header>
       {expanded && (
