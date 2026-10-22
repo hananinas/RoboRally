@@ -25,8 +25,9 @@ import {
   type FixtureControl,
   type FixtureSnapshot,
 } from './game-fixture-data.ts'
+import type { PublicRegisterEvents } from '../src/scenes/active-game/publicRegisters.ts'
 
-type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents>
+type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents & PublicRegisterEvents>
 type Fixture = {
   id: string
   cards: readonly Card[]
@@ -97,6 +98,12 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
   switch (control.type) {
     case 'checkpoint-progress':
       for (const socket of fixture.sockets) socket.emit('player.checkpointProgress', control.progress)
+      break
+    case 'registers-changed':
+      for (const socket of fixture.sockets) socket.emit('game.registersChanged', control.payload)
+      break
+    case 'programming-started':
+      for (const socket of fixture.sockets) socket.emit('game.programmingStarted', control.payload)
       break
     case 'hand':
       for (const socket of fixture.sockets) socket.emit('cards.dealt', control.hand)
@@ -239,7 +246,7 @@ const httpServer = createServer(async (request, response) => {
   send(200, snapshot(fixture))
 })
 
-const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
+const io = new Server<ClientToServerEvents, ServerToClientEvents & PublicRegisterEvents>(httpServer, {
   cors: { origin: 'http://127.0.0.1:4173', allowedHeaders: ['x-fixture-id'] },
 })
 

@@ -8,8 +8,10 @@ import type {
   PlayerCheckpointProgress,
   PlayerId,
   PlayerJoined,
+  PlayerState,
   PlayerLeft,
   ProgramResult,
+  ProgramSubmitted,
   RobotActionResolved,
   SubmitProgram,
 } from '@robo-rally/game-events'
@@ -19,6 +21,14 @@ import {
   robotPlaybackReducer,
   type RobotPlaybackState,
 } from './board/robotPlayback.ts'
+import type {
+  OpponentPlayer,
+  ProgrammingStarted,
+  PublicPlayerState,
+  PublicRegisters,
+  PublicRobotActionResolved,
+  RegistersChanged,
+} from './publicRegisters.ts'
 
 export type ProgramCard = Card
 
@@ -29,6 +39,9 @@ export type Player = {
   lastCheckpoint: number
   username: string
   connected: boolean
+  robotId: string | null
+  programSubmitted: boolean
+  registers: PublicRegisters | null
 }
 
 export type ClientGameState = {
@@ -59,6 +72,9 @@ export type GameStateEvent =
   | { type: 'player-left'; payload: PlayerLeft }
   | { type: 'player-connection-changed'; payload: PlayerConnectionChanged }
   | { type: 'checkpoint-progress'; payload: PlayerCheckpointProgress }
+  | { type: 'registers-changed'; payload: RegistersChanged }
+  | { type: 'programming-started'; payload: ProgrammingStarted }
+  | { type: 'program-submitted'; payload: ProgramSubmitted }
   | { type: 'disconnected' }
   | { type: 'reconnected' }
   | { type: 'connect-error'; message: string }
@@ -140,6 +156,15 @@ export function canProgram(state: ClientGameState): boolean {
     state.submission === 'idle'
 }
 
+
+export function getOtherPlayers(state: ClientGameState): readonly OpponentPlayer[] {
+  return state.players.flatMap((player) => {
+    if (player.playerId === state.assignment?.playerId || !player.registers) return []
+    const robot = state.playback.robots.find((candidate) => candidate.robotId === player.robotId)
+    return robot ? [{ ...player, registers: player.registers, robotId: robot.robotId, colour: robot.colour }] : []
+  })
+}
+
 export function createSubmission(state: ClientGameState): SubmitProgram | null {
   if (!canProgram(state) || state.assignment === null) return null
   const [first, second, third, fourth, fifth] = state.registers
@@ -186,6 +211,36 @@ export function gameStateReducer(
   switch (event.type) {
     case 'error':
       return { ...state, error: event.message }
+    case 'registers-changed': {
+      const { gameId, playerId, registers } = event.payload
+      if (gameId !== state.assignment?.gameId ||
+          !state.players.some((player) => player.playerId === playerId)) return state
+      return {
+        ...state,
+        players: state.players.map((player) => player.playerId === playerId ? { ...player, registers } : player),
+      }
+    }
+    case 'program-submitted': {
+      const { gameId, playerId } = event.payload
+      if (gameId !== state.assignment?.gameId ||
+          !state.players.some((player) => player.playerId === playerId)) return state
+      return {
+        ...state,
+        players: state.players.map((player) => player.playerId === playerId ? { ...player, programSubmitted: true } : player),
+      }
+    }
+    case 'programming-started':
+      if (event.payload.gameId !== state.assignment?.gameId) return state
+      return activateHand({
+        ...state,
+        phase: 'PROGRAMMING',
+        handReady: false,
+        players: state.players.map((player) => ({
+          ...player,
+          programSubmitted: false,
+          registers: [{ status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }],
+        })),
+      })
     case 'player-joined': {
       const { gameId, player, robot } = event.payload
       if (gameId !== state.assignment?.gameId || player.playerId !== robot.playerId ||
@@ -196,6 +251,8 @@ export function gameStateReducer(
         players: [...state.players, {
           playerId: player.playerId, username: player.username, connected: player.connected,
           lastCheckpoint: player.lastCheckpoint,
+          robotId: robot.robotId, programSubmitted: player.programSubmitted,
+          registers: (player as PlayerState & Partial<Pick<PublicPlayerState, 'registers'>>).registers ?? null,
         }],
         playback: robotPlaybackReducer(state.playback, { type: 'add', robot: { ...robot, colour: colour } }),
       }
@@ -264,6 +321,9 @@ export function gameStateReducer(
         players: snapshot.players.map((player) => ({
           playerId: player.playerId, username: player.username, connected: player.connected,
           lastCheckpoint: player.lastCheckpoint,
+          robotId: snapshot.robots.find((robot) => robot.playerId === player.playerId)?.robotId ?? null,
+          programSubmitted: player.programSubmitted,
+          registers: (player as PlayerState & Partial<Pick<PublicPlayerState, 'registers'>>).registers ?? null,
         })),
         playback: createRobotPlaybackState(
           snapshot.robots.map((robot,index) => ({ ...robot, colour: getRobotColour(index) })),
@@ -296,18 +356,28 @@ export function gameStateReducer(
         pendingHand: hand,
       })
     }
-    case 'action':
+    case 'action': {
+      const actionPlayerId = (event.action as RobotActionResolved & Partial<Pick<PublicRobotActionResolved, 'playerId'>>).playerId
+      const player = state.players.find((candidate) => candidate.robotId === event.action.robotId)
       if (event.action.gameId !== state.assignment?.gameId ||
-        !state.playback.robots.some((robot) => robot.robotId === event.action.robotId)) return state
+          (actionPlayerId !== undefined && actionPlayerId !== player?.playerId) ||
+          !Number.isInteger(event.action.registerIndex) || event.action.registerIndex < 0 ||
+          event.action.registerIndex >= REGISTER_COUNT ||
+          !state.playback.robots.some((robot) => robot.robotId === event.action.robotId)) return state
+      const registers: [...PublicRegisters] | null = player?.registers ? [...player.registers] : null
+      if (registers) registers[event.action.registerIndex] = { status: 'REVEALED', instruction: event.action.instruction }
       return {
         ...state,
         phase: 'EXECUTING',
         handReady: false,
         pendingHand: null,
+        players: player ? state.players.map((candidate) => candidate.playerId === player.playerId
+          ? { ...candidate, registers } : candidate) : state.players,
         playbackProgram: state.playbackProgram ??
           (state.registers.some((card) => card !== null) ? state.registers : null),
         playback: robotPlaybackReducer(state.playback, { type: 'enqueue', action: event.action }),
       }
+    }
     case 'complete': {
       const playback = robotPlaybackReducer(state.playback, { type: 'complete' })
       if (playback.active) return { ...state, playback }

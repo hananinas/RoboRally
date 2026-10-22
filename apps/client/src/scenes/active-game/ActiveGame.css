@@ -53,6 +53,21 @@
   overflow: visible;
 }
 
+.game-overlay > .other-players {
+  z-index: 1;
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
+  min-height: 0;
+  width: min(394px, 100vw);
+  max-width: none;
+  max-height: 100%;
+  margin-left: calc(0px - var(--ui-gap));
+  padding-block: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 /* Game options: the popover uses the browser's top layer. */
 .game-menu {
   flex: none;
@@ -471,6 +486,8 @@
     grid-row: 1;
     max-height: 45dvh;
   }
+
+  .game-overlay > .other-players { grid-row: 2; }
 
   .panel {
     padding: 1rem;

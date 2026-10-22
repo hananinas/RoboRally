@@ -1,10 +1,11 @@
 import type { ClientToServerEvents, ServerToClientEvents } from '@robo-rally/game-events'
 import { useCallback, useEffect, useState } from 'react'
 import { io, type Socket } from 'socket.io-client'
+import type { PublicRegisterEvents } from './scenes/active-game/publicRegisters.ts'
 
 export const ACKNOWLEDGEMENT_TIMEOUT_MS = 5000
 
-export type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>
+export type GameSocket = Socket<ServerToClientEvents & PublicRegisterEvents, ClientToServerEvents>
 export type SocketStatus = 'connecting' | 'connected' | 'connection-error' | 'disconnected'
 
 export default function useGameSocket() {
