@@ -188,7 +188,6 @@ export function gameStateReducer(
         !state.players.some((player) => player.playerId === playerId)) return state
       return {
         ...state,
-        paused: true,
         players: state.players.filter((player) => player.playerId !== playerId),
         playback: robotPlaybackReducer(state.playback, { type: 'remove', robotId }),
       }
