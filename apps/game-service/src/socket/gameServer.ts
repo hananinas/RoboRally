@@ -9,7 +9,7 @@ import { emptyRequestSchema } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
 import type { Game } from '@/game/index'
 import { createUserRegistry } from '@/userRegistry'
-import { createDefaultGame } from '@/game/SinglePlayerGame'
+import { createDefaultGame } from '@/game/GameFactory'
 import type { MembershipContext } from '@/membershipHandlers'
 import { handleLogin } from '@/authHandlers'
 import {

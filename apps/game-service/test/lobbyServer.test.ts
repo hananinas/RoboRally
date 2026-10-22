@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net'
 import type { ClientToServerEvents, GameInitialization, LobbyState, ServerToClientEvents } from '@robo-rally/game-events'
 import { io, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createDefaultGame } from '@/game/SinglePlayerGame'
+import { createDefaultGame } from '@/game/GameFactory'
 import { createGameSocketServer, type GameSocketServer } from '@/gameServer'
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>

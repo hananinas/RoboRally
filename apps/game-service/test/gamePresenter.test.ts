@@ -12,7 +12,8 @@ import {
   Game,
   Player,
   Robot,
-  createSinglePlayerGame,
+  createGame,
+  createPlayer,
 } from '@/game/index.ts'
 import {
   presentCardsDealt,
@@ -20,9 +21,16 @@ import {
   presentRobotActionResolved,
 } from '@/gamePresenter.ts'
 
+function createGameWithPlayer() {
+  const { gameId, game } = createGame('empty-map')
+  const player = createPlayer()
+  game.addPlayer(player)
+  return { gameId, game, player }
+}
+
 describe('game presenter', () => {
   it('presents a complete public programming state in row-major order', () => {
-    const { gameId, game, player } = createSinglePlayerGame()
+    const { gameId, game, player } = createGameWithPlayer()
     const state = presentPublicGameState(gameId, game)
 
     expectTypeOf(state).toEqualTypeOf<PublicGameState>()
@@ -64,7 +72,7 @@ describe('game presenter', () => {
         new EmptyTile([Direction.NORTH, Direction.WEST], 1),
         new EmptyTile(),
       ],
-    ])
+    ], { x: 0, y: 0, angle: Math.PI / 2 })
     const robot = new Robot('robot', Direction.EAST)
     board.placeRobot(robot.id, { x: 0, y: 0 })
     const player = new Player('player', robot)
@@ -91,7 +99,7 @@ describe('game presenter', () => {
   })
 
   it('presents all dealt card instruction types without exposing domain objects', () => {
-    const { gameId, player } = createSinglePlayerGame()
+    const { gameId, player } = createGameWithPlayer()
     const dealt = presentCardsDealt(gameId, player)
 
     expectTypeOf(dealt).toEqualTypeOf<CardsDealt>()
@@ -120,7 +128,7 @@ describe('game presenter', () => {
     { cardIndex: 3, instruction: 'BACK_UP' }, { cardIndex: 4, instruction: 'TURN_LEFT' },
     { cardIndex: 5, instruction: 'TURN_RIGHT' }, { cardIndex: 6, instruction: 'U_TURN' },
   ] as const)('presents a resolved $instruction action', ({ cardIndex, instruction }) => {
-    const { player } = createSinglePlayerGame()
+    const { player } = createGameWithPlayer()
     const action = {
       robotId: player.robot.id,
       card: player.hand[cardIndex],

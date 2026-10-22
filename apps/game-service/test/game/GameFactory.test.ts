@@ -1,6 +1,7 @@
 import { Integer } from '@/numbers'
 import { submitProgramSchema } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'
+import { createDefaultGame } from '@/game/GameFactory'
 import { boardMaps } from '@/game/boardMaps'
 import { Direction, createGame, createPlayer } from '@/game/index'
 
@@ -36,6 +37,16 @@ describe('game factory', () => {
     expect(game.phase).toBe('programming')
   })
 
+  it('creates a fresh lobby game on the test map', () => {
+    const first = createDefaultGame()
+    const second = createDefaultGame()
+
+    expect(first.gameId).not.toBe(second.gameId)
+    expect(first.game.board.map?.name).toBe(boardMaps['test-map'].name)
+    expect(first.game.board.antenna).toEqual(boardMaps['test-map'].antenna)
+    expect(first.game.players).toEqual([])
+  })
+
   it('uses the antenna specified by the map', () => {
     const { game } = createGame()
 
@@ -44,9 +55,10 @@ describe('game factory', () => {
 
   it('creates players with unique ids, a north-facing robot and nine cards in a fixed order', () => {
     const first = createPlayer()
-    const second = createPlayer()
+    const second = createPlayer('#4d8deb')
     const cardIds = first.hand.map((card) => card.id)
 
+    expect(second.robot.colour).toBe('#4d8deb')
     expect(first.id).not.toBe(second.id)
     expect(first.robot.id).not.toBe(second.robot.id)
     expect(first.robot.direction).toBe(Direction.NORTH)

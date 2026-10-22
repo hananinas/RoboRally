@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto'
+import { createPlayer } from '@/game/GameFactory'
 import { ROBOT_COLOURS } from '@/game/Robot'
 import {
   emptyRequestSchema, lobbyRequestSchema,
   type GameInitialization, type LobbyFailure, type LobbyState, type User,
 } from '@robo-rally/game-events'
 import { createGameContext } from '@/gameContext'
-import { createPlayer, presentInitialization, type MembershipContext } from '@/membershipHandlers'
+import { presentInitialization, type MembershipContext } from '@/membershipHandlers'
 import type { GameSession, GameSocket, GameSocketServer } from '@/gameServer'
 
 type Lobby = {

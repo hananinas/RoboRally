@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import { err, ok, type Result } from 'neverthrow'
 import {
   leaveGameSchema,
@@ -12,14 +11,8 @@ import {
   type PublicGameStateAcknowledgement,
   type User,
 } from '@robo-rally/game-events'
-import {
-  Player,
-  Robot,
-  Direction,
-  type Game,
-} from '@/game/index'
+import type { Player, Game } from '@/game/index'
 import { presentCardsDealt } from '@/gamePresenter'
-import { createHand } from '@/game/SinglePlayerGame'
 import type { ActionScheduler } from '@/actionScheduler'
 import type { GameSocket, GameSocketServer } from '@/gameServer'
 
@@ -180,11 +173,6 @@ export function handleGetPublicGameState(
   }
 
   acknowledge({ outcome: 'GAME_NOT_FOUND' })
-}
-
-export function createPlayer(colour: string): Player {
-  return new Player(randomUUID(), new Robot(randomUUID(), Direction.NORTH, colour),
-    createHand(Array.from({ length: 9 }, () => randomUUID())))
 }
 
 export function presentInitialization(ctx: MembershipContext, membership: GameMembership): Extract<JoinResult, { outcome: 'JOINED' }> {

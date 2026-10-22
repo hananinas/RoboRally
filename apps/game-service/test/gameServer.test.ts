@@ -4,17 +4,17 @@ import { parseSubmitProgram } from '@robo-rally/game-events'
 import type { ClientToServerEvents, GameInitialization, PlayerConnectionChanged, PlayerCheckpointProgress, ServerToClientEvents } from '@robo-rally/game-events'
 import { io, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createDefaultGame } from '@/game/SinglePlayerGame'
+import { createGame } from '@/game/GameFactory'
 import { createGameSocketServer, type GameSocketServer } from '@/gameServer'
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>
 describe('started game membership over Socket.IO', () => {
   let server: GameSocketServer
-  let shared: ReturnType<typeof createDefaultGame>
+  let shared: ReturnType<typeof createGame>
   let url: string
   let clients: Client[]
   beforeEach(async () => {
-    shared = createDefaultGame()
+    shared = createGame('empty-map')
     clients = []
     const http = createServer()
     server = createGameSocketServer(http, () => shared)
