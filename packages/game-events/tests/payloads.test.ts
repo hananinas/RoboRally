@@ -3,7 +3,6 @@ import type {
   Coordinate,
   Position,
   PublicGameState,
-  PublicGameStateResult,
   Tile,
 } from '../src/index.js'
 
@@ -24,7 +23,7 @@ describe('game event payload types', () => {
     expect(pit.position).toEqual({ x: 2, y: 3 })
   })
 
-  it('distinguishes a public game state from an unknown game', () => {
+  it('constructs a public game state', () => {
     const state = {
       gameId: 'game',
       antenna: { x: 0, y: 0, angle: 0 },
@@ -33,17 +32,10 @@ describe('game event payload types', () => {
       players: [],
       phase: 'PROGRAMMING',
       paused: false,
+      aborted: false,
       checkpointCount: 0,
     } satisfies PublicGameState
-    const found = {
-      outcome: 'GAME_FOUND',
-      state,
-    } satisfies PublicGameStateResult
-    const notFound = {
-      outcome: 'GAME_NOT_FOUND',
-    } satisfies PublicGameStateResult
 
-    expect(found.state).toBe(state)
-    expect(notFound.outcome).toBe('GAME_NOT_FOUND')
+    expect(state.gameId).toBe('game')
   })
 })

@@ -1,6 +1,7 @@
 import type { Card } from '@/game/Card'
 import type { RobotId } from '@/game/ids'
 import { Direction, rotateDirection } from '@/game/spatial'
+import type { UnsignedInteger } from '@/numbers'
 
 export class Robot {
   private currentDirection: Direction
@@ -29,8 +30,8 @@ export class Robot {
     this.programmedCards = []
   }
 
-  getProgramCard(registerIndex: number): Card {
-    if (!Number.isInteger(registerIndex) || registerIndex < 0 || registerIndex >= 5) {
+  getProgramCard(registerIndex: UnsignedInteger): Card {
+    if (registerIndex >= 5) {
       throw new RangeError('Register index must be between 0 and 4')
     }
 

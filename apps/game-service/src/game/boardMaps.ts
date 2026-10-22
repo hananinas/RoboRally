@@ -1,5 +1,6 @@
 import type { Antenna, BoardMap } from '@/game/Board'
 import { Direction, type Position } from '@/game/spatial'
+import { Integer } from '@/numbers'
 
 const { NORTH: N, WEST: W, SOUTH: S, EAST: E } = Direction
 
@@ -39,7 +40,7 @@ export const boardMaps = {
     maxPlayers: 6,
     width: 21,
     height: 15,
-    antenna: { x: 10, y: 0, angle: Math.PI / 2 },
+    antenna: { x: Integer(10), y: Integer(0), angle: Math.PI / 2 },
     walls: [],
     checkpoints: [[10, 6], [8, 9]],
   },
@@ -50,8 +51,8 @@ export const boardMaps = {
     width: 16,
     height: 15,
     pits: [[3, 3], [13, 4], [12, 7], [15, 9], [5, 10], [12, 11]],
-    rebootTile: { x: 10, y: 7 },
-    antenna: { x: 10, y: 0, angle: Math.PI / 2 },
+    rebootTile: { x: Integer(10), y: Integer(7) },
+    antenna: { x: Integer(10), y: Integer(0), angle: Math.PI / 2 },
     checkpoints: [[10, 6], [8, 9]],
     walls: [
       // TEST written top left corner of map

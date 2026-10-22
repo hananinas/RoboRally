@@ -1,6 +1,7 @@
 import { type Direction, type Position, neighbour, opposite } from '@/game/spatial'
 import type { RobotId } from '@/game/ids'
 import { PitTile, type Tile } from '@/game/Tile'
+import { Integer, type PositiveInteger } from '@/numbers'
 
 export type MovementResult = Readonly<{
   position: Position
@@ -60,8 +61,6 @@ export class Board {
 
   contains(position: Position): boolean {
     return (
-      Number.isInteger(position.x) &&
-      Number.isInteger(position.y) &&
       position.x >= 0 &&
       position.x < this.width &&
       position.y >= 0 &&
@@ -107,7 +106,7 @@ export class Board {
     let nearestDistance = Infinity
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
-        const position = { x, y }
+        const position = { x: Integer(x), y: Integer(y) }
         if (this.tiles[y][x] instanceof PitTile || this.occupantAt(position) !== undefined) continue
         const distance = Math.abs(x - origin.x) + Math.abs(y - origin.y)
         if (distance < nearestDistance) {
@@ -144,12 +143,7 @@ export class Board {
     this.robotPositions.set(robotId, { ...position })
   }
 
-  moveRobot(robotId: RobotId, direction: Direction, steps: number): MovementResult {
-    // Validate input parameters
-    if (!Number.isInteger(steps) || steps <= 0) {
-      throw new RangeError('Steps must be a positive integer')
-    }
-
+  moveRobot(robotId: RobotId, direction: Direction, steps: PositiveInteger): MovementResult {
     // Verify robot is on the board
     let currentPosition = this.positionOf(robotId)
     let nextPosition: Position = currentPosition

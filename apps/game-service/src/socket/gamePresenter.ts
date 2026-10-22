@@ -21,6 +21,7 @@ import {
   type NextActionResult,
   type Player,
 } from '@/game/index'
+import { Integer } from '@/numbers'
 
 const orientations: Record<Direction, Orientation> = {
   [Direction.NORTH]: 'NORTH',
@@ -39,14 +40,14 @@ function presentCard(card: Card): CardPayload {
 }
 
 function presentTile(game: Game, x: number, y: number): TilePayload {
-  const tile = game.board.getTile({ x, y })
+  const tile = game.board.getTile({ x: Integer(x), y: Integer(y) })
   if (!(tile instanceof EmptyTile) && !(tile instanceof PitTile)) {
     throw new Error(`Unsupported tile at ${x},${y}`)
   }
 
   const walls = [...tile.walls].map((direction) => orientations[direction])
   return {
-    position: { x, y },
+    position: { x: Integer(x), y: Integer(y) },
     type: tile instanceof PitTile ? 'PIT' : 'EMPTY',
     ...(walls.length === 0 ? {} : { walls }),
     ...(tile.checkpointNumber === undefined ? {} : { checkpointNumber: tile.checkpointNumber }),
@@ -82,6 +83,7 @@ export function presentPublicGameState(
     })),
     phase: phases[game.phase],
     paused: game.paused,
+    aborted: game.aborted,
   }
 }
 

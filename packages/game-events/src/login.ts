@@ -1,3 +1,4 @@
+import { err, ok, type Result } from 'neverthrow'
 import { z } from 'zod'
 
 export const loginSchema = z
@@ -12,27 +13,17 @@ export const loginSchema = z
 export type Login = z.infer<typeof loginSchema>
 export type LoginRequestRejection = 'INVALID_REQUEST' | 'INVALID_USERNAME'
 
-export class LoginRequestError extends Error {
-  readonly outcome: LoginRequestRejection
-
-  constructor(outcome: LoginRequestRejection) {
-    super(outcome)
-    this.name = 'LoginRequestError'
-    this.outcome = outcome
-  }
-}
-
-export function parseLogin(payload: unknown): Login {
+export function parseLogin(payload: unknown): Result<Login, LoginRequestRejection> {
   if (
     typeof payload !== 'object' ||
     payload === null ||
     Array.isArray(payload) ||
     Object.keys(payload).some((key) => key !== 'username')
   ) {
-    throw new LoginRequestError('INVALID_REQUEST')
+    return err('INVALID_REQUEST')
   }
 
   const result = loginSchema.safeParse(payload)
-  if (!result.success) throw new LoginRequestError('INVALID_USERNAME')
-  return result.data
+  if (!result.success) return err('INVALID_USERNAME')
+  return ok(result.data)
 }

@@ -40,6 +40,7 @@ export function createPublicState(): PublicGameState {
     players: [{ playerId: PLAYER_ID, lastCheckpoint: 0, username: 'Player 1', programSubmitted: false, connected: true }],
     phase: 'PROGRAMMING',
     paused: false,
+    aborted: false,
     checkpointCount: 0,
     antenna: { x: 5, y: 0, angle: Math.PI / 2 },
     board: {
@@ -96,7 +97,6 @@ export type FixtureSnapshot = {
   cards: readonly Card[]
   state: PublicGameState
   submissions: readonly SubmitProgram[]
-  stateRequests: number
   entryRequests: readonly (
     | { event: 'user.login'; socketId: string; payload: Login }
     | { event: 'game.join'; socketId: string; payload: JoinGame }

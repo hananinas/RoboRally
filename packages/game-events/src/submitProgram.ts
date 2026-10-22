@@ -25,7 +25,3 @@ export const submitProgramSchema = z
 
 export type ProgramCardIds = z.infer<typeof programCardIdsSchema>
 export type SubmitProgram = z.infer<typeof submitProgramSchema>
-
-export function parseSubmitProgram(payload: unknown): SubmitProgram {
-  return submitProgramSchema.parse(payload)
-}
