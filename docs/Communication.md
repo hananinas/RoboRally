@@ -132,9 +132,11 @@ If the client receives no acknowledgement, the outcome is unknown. The client mu
 
 ### Public registers
 
-`PlayerState.registers` contains five slots in register order: `{status: EMPTY}`, `{status: HIDDEN}`, or `{status: REVEALED, instruction}` for an already-executed register. HIDDEN contains only its status; REVEALED contains the executed instruction without an instance ID. Each player's hand remains private.
+`PlayerState.registers` contains five slots in register order: `{status: EMPTY}` means no card is placed, `{status: HIDDEN}` means a card is placed without exposing its identity or instruction, and `{status: REVEALED, instruction}` shows an already-executed register. EMPTY and HIDDEN contain only their status; REVEALED contains the executed instruction without an instance ID. Each player's hand remains private.
 
 `game.updateRegisters {gameId, playerId, occupied}` sends exactly five booleans: `true` maps to HIDDEN and `false` maps to EMPTY. Its acknowledgement, `game.updateRegistersResult {outcome}`, returns `ACCEPTED`, `INVALID_REQUEST`, `NOT_A_MEMBER`, `PLAYER_ID_MISMATCH`, `WRONG_PHASE`, `ALREADY_SUBMITTED`, or `INTERNAL_ERROR`.
+
+During programming, before final submission, the client sends an occupancy update whenever a card is placed in or removed from a register. This shares only which slots are occupied; it does not submit a program. The final `program.submit {gameId, playerId, cardIds}` sends five distinct card instance IDs in register order.
 
 `game.registersChanged {gameId, playerId, registers}` broadcasts that player's five public slots to `game:{gameId}:public` after an accepted occupancy update or register execution.
 
@@ -197,9 +199,9 @@ A new hand may arrive while the client is still playing animations from the prev
 
 ### Game sequence
 
-The following sequence shows one complete round while the game remains connected and unpaused.
+The following sequence shows one complete round while the game remains connected and unpaused. It illustrates successful requests; parallel blocks do not impose relative ordering between acknowledgements and broadcasts, between action and register broadcasts, or between next-round hands and the programming-start event.
 
-Both players have received their initial hands through game.started or session.get.
+Both players have received their initial private hands through game.started or session.get. The occupancy-update flow shown for A also applies to B.
 ```mermaid
 sequenceDiagram
     participant A as Client A
@@ -210,28 +212,56 @@ sequenceDiagram
     participant Public as game:{gameId}:public
 
     loop Each round
+        Note over A,B: EMPTY = no card placed<br/>HIDDEN = occupied, card not disclosed
+        loop Each card placement or removal during programming, before submission
+            Note over A,Server: occupied is five booleans in register order, e.g. [true, false, true, false, false]
+            A->>Server: game.updateRegisters {gameId, playerId: A, occupied}
+            par Acknowledgement callback
+                Server-->>A: game.updateRegistersResult {outcome: ACCEPTED}
+            and Public occupancy broadcast
+                Note over Server,Public: true maps to {status: HIDDEN}<br/>false maps to {status: EMPTY}
+                Server->>Public: game.registersChanged {gameId, playerId: A, registers}
+                Public-->>A: game.registersChanged {gameId, playerId: A, registers}
+                Public-->>B: game.registersChanged {gameId, playerId: A, registers}
+            end
+        end
+        Note over A,Server: Occupancy updates are not final submission<br/>program.submit sends the card IDs
         A->>Server: program.submit {gameId, playerId, cardIds}
         Server-->>A: Acknowledgement: ACCEPTED
-        Server->>Public: program.submitted {playerId: A}
-        Public-->>B: program.submitted
+        Server->>Public: program.submitted {gameId, playerId: A}
+        Public-->>B: program.submitted {gameId, playerId: A}
 
         B->>Server: program.submit {gameId, playerId, cardIds}
         Server-->>B: Acknowledgement: ACCEPTED
-        Server->>Public: program.submitted {playerId: B}
-        Public-->>A: program.submitted
+        Server->>Public: program.submitted {gameId, playerId: B}
+        Public-->>A: program.submitted {gameId, playerId: B}
         loop Registers 1 through 5
             loop Eligible robots in antenna order
                 Note over Server: Execute next instruction
-                Server->>Public: robot.actionResolved
-                Public-->>A: robot.actionResolved
-                Public-->>B: robot.actionResolved
+                par Resolved action broadcast
+                    Server->>Public: robot.actionResolved
+                    Public-->>A: robot.actionResolved
+                    Public-->>B: robot.actionResolved
+                and Public register reveal
+                    Note over Server,Public: Executing player's slot becomes {status: REVEALED, instruction}, without a card ID
+                    Server->>Public: game.registersChanged {gameId, playerId, registers}
+                    Public-->>A: game.registersChanged {gameId, playerId, registers}
+                    Public-->>B: game.registersChanged {gameId, playerId, registers}
+                end
             end
         end
 
-        Server->>PrivateA: cards.dealt {cards}
-        PrivateA-->>A: cards.dealt {cards}
-        Server->>PrivateB: cards.dealt {cards}
-        PrivateB-->>B: cards.dealt {cards}
+        par Private next-round hands
+            Server->>PrivateA: cards.dealt {cards}
+            PrivateA-->>A: cards.dealt {cards}
+            Server->>PrivateB: cards.dealt {cards}
+            PrivateB-->>B: cards.dealt {cards}
+        and Next programming phase
+            Note over Server,Public: Reset every player's registers to five {status: EMPTY} slots
+            Server->>Public: game.programmingStarted {gameId}
+            Public-->>A: game.programmingStarted {gameId}
+            Public-->>B: game.programmingStarted {gameId}
+        end
     end
 ```
 
