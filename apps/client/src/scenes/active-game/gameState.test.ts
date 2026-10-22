@@ -46,6 +46,7 @@ const publicState: PublicGameState = {
   gameId: '40000000-0000-4000-8000-000000000001',
   phase: 'PROGRAMMING',
   paused: false,
+  aborted: false,
   checkpointCount: 0,
   players: [
     { playerId: '50000000-0000-4000-8000-000000000001', lastCheckpoint: 0, username: 'First', connected: true, programSubmitted: false },
@@ -112,6 +113,15 @@ describe('join initialization', () => {
     })
     expect(state.phase).toBe('EXECUTING')
     expect(state.handVersion).toBe(0)
+    expect(canProgram(state)).toBe(false)
+  })
+
+  it('joins an aborted game and gameplay is disabled', () => {
+    const state = gameStateReducer(createClientGameState(), {
+      type: 'joined', result: { ...result, state: { ...publicState, aborted: true } },
+    })
+    expect(state.aborted).toBe(true)
+    expect(state.error).toBe('This game has encountered an error and cannot continue.')
     expect(canProgram(state)).toBe(false)
   })
 
@@ -384,6 +394,35 @@ describe('client game state', () => {
 
     expect(state.submission).toBe('idle')
     expect(state.error).toBe('Game paused. Your program was not submitted — try again once reconnected.')
+    expect(createSubmission(state)).toEqual(submission)
+  })
+
+  it('treats an already-submitted rejection as accepted', () => {
+    let state = selectProgram()
+    state = gameStateReducer(state, { type: 'submit' })
+    state = gameStateReducer(state, {
+      type: 'result',
+      result: { outcome: 'ALREADY_SUBMITTED' },
+      handVersion: state.handVersion,
+    })
+
+    expect(state.submission).toBe('accepted')
+    expect(state.error).toBeNull()
+    expect(canProgram(state)).toBe(false)
+  })
+
+  it('shows the wrong-phase message when the round already moved on', () => {
+    let state = selectProgram()
+    const submission = createSubmission(state)
+    state = gameStateReducer(state, { type: 'submit' })
+    state = gameStateReducer(state, {
+      type: 'result',
+      result: { outcome: 'WRONG_PHASE' },
+      handVersion: state.handVersion,
+    })
+
+    expect(state.submission).toBe('idle')
+    expect(state.error).toBe('The round already moved on before your submission arrived.')
     expect(createSubmission(state)).toEqual(submission)
   })
 
@@ -697,6 +736,16 @@ describe('client game state', () => {
     })
     expect(resumed.paused).toBe(false)
     expect(canProgram(resumed)).toBe(true)
+  })
+
+  it('disables programming and shows an error once the game aborts', () => {
+    const state = selectProgram()
+    expect(canProgram(state)).toBe(true)
+
+    const aborted = gameStateReducer(state, { type: 'aborted' })
+    expect(aborted.aborted).toBe(true)
+    expect(aborted.error).toBe('This game has encountered an error and cannot continue.')
+    expect(canProgram(aborted)).toBe(false)
   })
 })
 

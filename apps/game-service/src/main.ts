@@ -1,6 +1,11 @@
 import { createServer } from 'node:http'
 import { parseGameServicePort } from '@/config'
-import { createGameSocketServer } from '@/gameServer'
+import { createGameSocketServer } from '@/socket/gameServer'
+import { logError } from '@/logger'
+
+process.on('uncaughtExceptionMonitor', (error, origin) => {
+  logError('Unhandled process error', error, { source: 'process', origin })
+})
 
 const host = '127.0.0.1'
 const port = parseGameServicePort(process.env.PORT)

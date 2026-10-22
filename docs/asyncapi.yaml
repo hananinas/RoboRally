@@ -502,6 +502,7 @@ components:
               - ACCEPTED
               - INVALID_PROGRAM
               - GAME_PAUSED
+              - GAME_ABORTED
               - ALREADY_SUBMITTED
               - WRONG_PHASE
               - NOT_A_MEMBER
@@ -514,6 +515,7 @@ components:
         ACCEPTED: the program was stored.
         INVALID_PROGRAM: the cards did not match the player's hand, or did not cover all five registers.
         GAME_PAUSED: rejected because the game is paused.
+        GAME_ABORTED: rejected because the game has stopped irrecoverably after an unexpected service failure.
         ALREADY_SUBMITTED: this player already has a stored program for the current round; it is unchanged.
         WRONG_PHASE: the round had already moved into activation before this submission arrived.
         NOT_A_MEMBER: this connection does not own a membership for this game.
@@ -1059,6 +1061,7 @@ components:
         - robots
         - phase
         - paused
+        - aborted
         - checkpointCount
       properties:
         gameId:
@@ -1080,6 +1083,9 @@ components:
         paused:
           type: boolean
           description: Whether gameplay is paused because a game member is disconnected.
+        aborted:
+          type: boolean
+          description: Whether gameplay has stopped irrecoverably after an unexpected service failure.
         checkpointCount:
           $ref: '#/components/schemas/CheckpointCount'
 

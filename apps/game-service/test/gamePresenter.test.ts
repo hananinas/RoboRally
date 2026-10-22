@@ -13,19 +13,18 @@ import {
   Player,
   Robot,
   createGame,
-  createPlayer,
 } from '@/game/index.ts'
 import {
   presentCardsDealt,
   presentLobbyDetails,
   presentPublicGameState,
   presentRobotActionResolved,
-} from '@/gamePresenter.ts'
+} from '@/socket/gamePresenter.ts'
+import { Integer } from '@/numbers'
 
 function createGameWithPlayer() {
   const { gameId, game } = createGame('empty-map')
-  const player = createPlayer()
-  game.addPlayer(player)
+  const player = game.addPlayer()._unsafeUnwrap()
   return { gameId, game, player }
 }
 
@@ -72,16 +71,16 @@ describe('game presenter', () => {
         new EmptyTile([Direction.NORTH, Direction.WEST], 1),
         new EmptyTile(),
       ],
-    ], { x: 0, y: 0, angle: Math.PI / 2 })
+    ], { x: Integer(0), y: Integer(0), angle: Math.PI / 2 })
     const robot = new Robot('robot', Direction.EAST)
-    board.placeRobot(robot.id, { x: 0, y: 0 })
+    board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })
     const player = new Player('player', robot)
     const cards = Array.from(
       { length: 5 },
       (_, index) => new Card(`card-${index}`, 'MOVE_1'),
     )
     const game = new Game(board, [player], cards)
-    game.submitProgram(player.id, cards)
+    game.submitProgram(player.id, cards.map((card) => card.id))
 
     const state = presentPublicGameState('game', game)
 
@@ -132,7 +131,7 @@ describe('game presenter', () => {
     const action = {
       robotId: player.robot.id,
       card: player.hand[cardIndex],
-      position: { x: 4, y: 5 },
+      position: { x: Integer(4), y: Integer(5) },
       direction: Direction.SOUTH,
     }
 

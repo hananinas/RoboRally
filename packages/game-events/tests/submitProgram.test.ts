@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseSubmitProgram } from '../src/index.js'
+import { submitProgramSchema } from '../src/index.js'
 
 const gameId = '00000000-0000-4000-8000-000000000000'
 const playerId = '00000000-0000-4000-8000-000000000099'
@@ -13,9 +13,9 @@ const cardIds = [
 
 const validPayload = { gameId, playerId, cardIds }
 
-describe('parseSubmitProgram', () => {
+describe('submitProgramSchema', () => {
   it('accepts five distinct card IDs in register order', () => {
-    expect(parseSubmitProgram(validPayload)).toEqual(validPayload)
+    expect(submitProgramSchema.parse(validPayload)).toEqual(validPayload)
   })
 
   it.each([
@@ -60,6 +60,6 @@ describe('parseSubmitProgram', () => {
     ],
     ['an extra property', { ...validPayload, extra: true }],
   ])('rejects %s', (_description, payload) => {
-    expect(() => parseSubmitProgram(payload)).toThrow()
+    expect(() => submitProgramSchema.parse(payload)).toThrow()
   })
 })

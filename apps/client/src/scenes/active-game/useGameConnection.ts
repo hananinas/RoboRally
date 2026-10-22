@@ -1,5 +1,6 @@
 import type {
   CardsDealt,
+  GameAborted,
   JoinResult,
   PlayerConnectionChanged,
   PlayerCheckpointProgress,
@@ -63,6 +64,7 @@ export default function useGameConnection(socket: GameSocket) {
     const handlePlayerLeft = (payload: PlayerLeft) => receive({ type: 'player-left', payload })
     const handlePlayerConnectionChanged = (payload: PlayerConnectionChanged) =>
       receive({ type: 'player-connection-changed', payload })
+    const handleAborted = (_payload: GameAborted) => receive({ type: 'aborted' })
     const handleCheckpointProgress = (payload: PlayerCheckpointProgress) =>
       receive({ type: 'checkpoint-progress', payload })
     const handleRegistersChanged = (payload: RegistersChanged) => receive({ type: 'registers-changed', payload })
@@ -77,6 +79,7 @@ export default function useGameConnection(socket: GameSocket) {
     socket.on('game.playerJoined', handlePlayerJoined)
     socket.on('game.playerLeft', handlePlayerLeft)
     socket.on('game.playerConnectionChanged', handlePlayerConnectionChanged)
+    socket.on('game.aborted', handleAborted)
     socket.on('player.checkpointProgress', handleCheckpointProgress)
     socket.on('game.registersChanged', handleRegistersChanged)
     socket.on('game.programmingStarted', handleProgrammingStarted)
@@ -91,6 +94,7 @@ export default function useGameConnection(socket: GameSocket) {
       socket.off('game.playerJoined', handlePlayerJoined)
       socket.off('game.playerLeft', handlePlayerLeft)
       socket.off('game.playerConnectionChanged', handlePlayerConnectionChanged)
+      socket.off('game.aborted', handleAborted)
       socket.off('player.checkpointProgress', handleCheckpointProgress)
       socket.off('game.registersChanged', handleRegistersChanged)
       socket.off('game.programmingStarted', handleProgrammingStarted)
