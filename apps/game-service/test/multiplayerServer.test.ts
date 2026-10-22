@@ -4,13 +4,14 @@ import type { CardsDealt, ClientToServerEvents, ServerToClientEvents, SubmitProg
 import { io as connectSocket, type Socket } from 'socket.io-client'
 import { expect, it } from 'vitest'
 import { Board, Card, EmptyTile, Game, type Player } from '@/game/index.ts'
-import { createGameSocketServer } from '@/gameServer.ts'
+import { createGameSocketServer } from '@/socket/gameServer.ts'
+import { Integer } from '@/numbers'
 
 it('waits for the roster, broadcasts register-major actions, and deals two private next rounds', async () => {
   const gameId = '00000000-0000-4000-8000-000000000001'
   const players: Player[] = []
   const board = new Board(Array.from({ length: 3 }, () =>
-    Array.from({ length: 3 }, () => new EmptyTile())))
+    Array.from({ length: 3 }, () => new EmptyTile())), { x: Integer(1), y: Integer(0), angle: Math.PI / 2 })
   const deck = Array.from({ length: 5 }, (_, index) =>
     new Card(`00000000-0000-4000-8000-00000000010${index}`, 'TURN_LEFT'))
   const game = new Game(board, players, deck)
@@ -39,11 +40,13 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
         `00000000-0000-4000-8000-00000000${index + 2}${cardIndex.toString().padStart(3, '0')}`, 'TURN_LEFT',
       )))
       board.removeRobot(player.robot.id)
-      board.placeRobot(player.robot.id, index === 0 ? { x: 0, y: 2 } : { x: 1, y: 1 })
+      board.placeRobot(player.robot.id, index === 0
+        ? { x: Integer(0), y: Integer(2) }
+        : { x: Integer(1), y: Integer(1) })
     }
 
     for (const socket of clients) {
-      await socket.timeout(1000).emitWithAck('game.getPublicGameState', { gameId })
+      await socket.timeout(1000).emitWithAck('game.join', { gameId })
     }
     events[0] = []
     events[1] = []
@@ -55,19 +58,19 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
       }))
       expect(await clients[0].timeout(1000).emitWithAck('program.submit', submissions[0]))
         .toEqual({ outcome: 'ACCEPTED' })
-      // State acknowledgements fence each connection's earlier deliveries.
+      // Join acknowledgements fence each connection's earlier deliveries.
       for (const socket of clients) {
-        const waiting = await socket.timeout(1000).emitWithAck('game.getPublicGameState', { gameId })
-        expect(waiting).toMatchObject({ outcome: 'GAME_FOUND', state: { phase: 'PROGRAMMING' } })
+        const waiting = await socket.timeout(1000).emitWithAck('game.join', { gameId })
+        expect(waiting).toMatchObject({ outcome: 'JOINED', state: { phase: 'PROGRAMMING' } })
       }
       expect(events[0]).toEqual([])
       expect(events[1]).toEqual([{
         name: 'program.submitted', payload: { gameId, playerId: players[0].id },
       }])
       expect(await clients[0].timeout(1000).emitWithAck('program.submit', submissions[0]))
-        .toEqual({ outcome: 'INVALID_PROGRAM' })
+        .toEqual({ outcome: 'ALREADY_SUBMITTED' })
       expect(await clients[0].timeout(1000).emitWithAck('program.submit', submissions[1]))
-        .toEqual({ outcome: 'INVALID_PROGRAM' })
+        .toEqual({ outcome: 'PLAYER_ID_MISMATCH' })
 
       const nextHands = clients.map((socket) => new Promise<CardsDealt>((resolve) =>
         socket.once('cards.dealt', resolve)))

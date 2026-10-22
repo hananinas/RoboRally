@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Direction, Card, Player, Robot, createSinglePlayerGame } from '@/game/index'
+import { Direction, Card, Player, Robot, createGame } from '@/game/index'
 
 describe('Player', () => {
   it('keeps its robot and copies assigned hands', () => {
@@ -56,11 +56,12 @@ describe('Player', () => {
   )
 
   it('preserves checkpoint progress across rounds and program clearing', () => {
-    const { game, player } = createSinglePlayerGame()
+    const { game } = createGame('empty-map')
+    const player = game.addPlayer()._unsafeUnwrap()
     player.completeCheckpoint(1)
 
     for (let round = 0; round < 2; round++) {
-      game.submitProgram(player.id, player.hand.slice(0, 5))
+      game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
       for (let register = 0; register < 5; register++) game.executeNextAction()
 
       expect(game.phase).toBe('programming')

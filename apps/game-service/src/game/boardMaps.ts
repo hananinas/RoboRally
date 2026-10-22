@@ -1,0 +1,103 @@
+import type { Antenna, BoardMap } from '@/game/Board'
+import { Direction } from '@/game/spatial'
+import { Integer } from '@/numbers'
+
+const { NORTH: N, WEST: W, SOUTH: S, EAST: E } = Direction
+
+const EMPTY_MAP_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 3">' +
+  '<rect width="3" height="3" fill="#6b7280"/>' +
+  '<path d="M1 0V3M2 0V3M0 1H3M0 2H3" stroke="#d1d5db" stroke-width="0.05"/>' +
+  '</svg>'
+
+const TEST_MAP_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3">' +
+  '<rect width="4" height="3" fill="#6b7280"/>' +
+  '<path d="M1 0V3M2 0V3M3 0V3M0 1H4M0 2H4" stroke="#d1d5db" stroke-width="0.05"/>' +
+  '<rect x="0.35" y="1.02" width="3.3" height="0.96" rx="0.12" fill="#1f2937" fill-opacity="0.88"/>' +
+  '<text x="2" y="1.72" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="0.64" font-weight="700" letter-spacing="0.04">TEST</text>' +
+  '</svg>'
+
+export type WallSpec = Readonly<{
+  at: readonly [x: number, y: number]
+  directions: readonly Direction[]
+}>
+
+export type MapSpec = BoardMap & Readonly<{
+  width: number
+  height: number
+  antenna: Antenna
+  walls: readonly WallSpec[]
+  checkpoints: readonly (readonly [x: number, y: number])[]
+}>
+
+export const boardMaps = {
+  'empty-map': {
+    name: 'Empty Map',
+    icon: `data:image/svg+xml;base64,${Buffer.from(EMPTY_MAP_SVG).toString('base64')}`,
+    maxPlayers: 6,
+    width: 21,
+    height: 15,
+    antenna: { x: Integer(10), y: Integer(0), angle: Math.PI / 2 },
+    walls: [],
+    checkpoints: [[10, 6], [8, 9]],
+  },
+  'test-map': {
+    name: 'Test Map',
+    icon: `data:image/svg+xml;base64,${Buffer.from(TEST_MAP_SVG).toString('base64')}`,
+    maxPlayers: 6,
+    width: 16,
+    height: 15,
+    antenna: { x: Integer(10), y: Integer(0), angle: Math.PI / 2 },
+    checkpoints: [[10, 6], [8, 9]],
+    walls: [
+      // TEST written top left corner of map
+      { at: [1, 1], directions: [N, E] }, 
+      { at: [1, 2], directions: [E] },
+      { at: [2, 1], directions: [N] },
+      { at: [4, 1], directions: [N, W] },
+      { at: [4, 2], directions: [N, W, S] },
+      { at: [6, 1], directions: [N, W, S] },
+      { at: [6, 2], directions: [S, E] },
+      { at: [8, 1], directions: [N, E] },
+      { at: [8, 2], directions: [E] },
+      { at: [9, 1], directions: [N] },
+
+      // Wall blocking test in front of robots
+      // Can check if wall on current tile, on next tile or on both blocks movement
+      { at: [8, 5], directions: [S] },
+      { at: [7, 6], directions: [N] },
+      { at: [6, 5], directions: [S] },
+      { at: [6, 6], directions: [N] },
+
+      // Walls leading to a dead end below the robot spawn area
+      { at: [8, 10], directions: [W, E] },
+      { at: [8, 11], directions: [W, E] },
+      { at: [8, 12], directions: [W, S, E] },
+
+      // Showcase of all the different wall configurations on the right side of the map
+      { at: [12, 0], directions: [] },
+      { at: [12, 1], directions: [N] },
+      { at: [12, 2], directions: [W] },
+      { at: [12, 3], directions: [S] },
+      { at: [12, 5], directions: [E] },
+      { at: [12, 7], directions: [N, W] },
+      { at: [12, 9], directions: [W, S] },
+      { at: [12, 11], directions: [S, E] },
+      { at: [12, 13], directions: [N, E] },
+      { at: [14, 1], directions: [N, W, S, E] },
+      { at: [14, 3], directions: [N, S] },
+      { at: [14, 5], directions: [W, E] },
+      { at: [14, 7], directions: [W, S, E] },
+      { at: [14, 9], directions: [N, S, E] },
+      { at: [14, 11], directions: [N, W, S] },
+      { at: [14, 13], directions: [N, W, E] },
+
+      // Loss
+      { at: [1, 10], directions: [W] },
+      { at: [3, 10], directions: [W, E] },
+      { at: [1, 12], directions: [W, E] },
+      { at: [3, 12], directions: [W, S] },
+    ],
+  },
+} as const satisfies Record<string, MapSpec>

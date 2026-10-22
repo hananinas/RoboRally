@@ -1,13 +1,14 @@
 import type { Instruction } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'
 import { Board, Direction, EmptyTile, Game, Card, Player, Robot } from '@/game/index'
+import { Integer } from '@/numbers'
 
 function createGame(deck: Card[]) {
   const board = new Board(Array.from({ length: 3 }, () =>
     Array.from({ length: 3 }, () => new EmptyTile()),
-  ))
+  ), { x: Integer(1), y: Integer(0), angle: Math.PI / 2 })
   const robot = new Robot('robot-1', Direction.EAST)
-  board.placeRobot(robot.id, { x: 1, y: 1 })
+  board.placeRobot(robot.id, { x: Integer(1), y: Integer(1) })
   const player = new Player('player-1', robot)
   const game = new Game(board, [player], deck)
   return { board, robot, player, game }
@@ -18,7 +19,7 @@ describe('Game activation loop', () => {
     const deck = Array.from({ length: 5 }, (_, index) => new Card(`left-${index}`, 'TURN_LEFT'))
     const { robot, player, game } = createGame(deck)
     expect(() => game.executeNextAction()).toThrow()
-    game.submitProgram(player.id, deck)
+    game.submitProgram(player.id, deck.map((card) => card.id))
 
     const directions = [
       Direction.NORTH,
@@ -46,7 +47,7 @@ describe('Game activation loop', () => {
     expect(player.hand).toEqual(deck)
     expect(() => game.executeNextAction()).toThrow()
 
-    game.submitProgram(player.id, deck)
+    game.submitProgram(player.id, deck.map((card) => card.id))
     expect(game.executeNextAction()).toMatchObject({ registerIndex: 0 })
     expect(robot.direction).toBe(Direction.WEST)
   })
@@ -60,7 +61,7 @@ describe('Game activation loop', () => {
       new Card('left-4', 'TURN_LEFT'),
     ]
     const { board, player, game } = createGame(deck)
-    game.submitProgram(player.id, deck)
+    game.submitProgram(player.id, deck.map((card) => card.id))
 
     game.executeNextAction()
     const result = game.executeNextAction()
@@ -75,7 +76,7 @@ describe('Game activation loop', () => {
   it('reports the position reached by movement', () => {
     const deck = Array.from({ length: 5 }, (_, index) => new Card(`move-${index}`, 'MOVE_1'))
     const { board, player, game } = createGame(deck)
-    game.submitProgram(player.id, deck)
+    game.submitProgram(player.id, deck.map((card) => card.id))
 
     const result = game.executeNextAction()
 
@@ -85,13 +86,13 @@ describe('Game activation loop', () => {
 })
 
 function resolveCard(instruction: Instruction, direction: Direction, tiles: EmptyTile[][]) {
-  const board = new Board(tiles)
+  const board = new Board(tiles, { x: Integer(3), y: Integer(0), angle: Math.PI / 2 })
   const robot = new Robot('robot', direction)
-  board.placeRobot(robot.id, { x: 3, y: 3 })
+  board.placeRobot(robot.id, { x: Integer(3), y: Integer(3) })
   const player = new Player('player', robot)
   const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, instruction))
   const game = new Game(board, [player], cards)
-  game.submitProgram(player.id, cards)
+  game.submitProgram(player.id, cards.map((card) => card.id))
   return game.executeNextAction().action
 }
 

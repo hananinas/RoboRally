@@ -6,22 +6,21 @@ import type {
 } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
 import type { Game } from '@/game/index'
-import { presentPublicGameState } from '@/gamePresenter'
+import { presentPublicGameState } from '@/socket/gamePresenter'
 import { createUserRegistry } from '@/userRegistry'
-import { createSharedGame } from '@/game/SinglePlayerGame'
+import { createSharedGame } from '@/game/GameFactory'
 import { createActionScheduler } from '@/actionScheduler'
-import { handleLogin } from '@/authHandlers'
+import { handleLogin } from '@/socket/handlers/authHandlers'
 import {
   handleDisconnect,
-  handleGetLobbyDetails,
-  handleGetPublicGameState,
   handleJoin,
   handleLeave,
   reconnectIfRecovered,
   type GameMembership,
   type MembershipContext,
-} from '@/membershipHandlers'
-import { handleSubmitProgram } from '@/gameplayHandlers'
+} from '@/socket/handlers/membershipHandlers'
+import { handleGetLobbyDetails } from '@/socket/handlers/lobbyHandlers'
+import { handleSubmitProgram } from '@/socket/handlers/gameplayHandlers'
 
 export type GameSocketData = { user?: User }
 
@@ -94,8 +93,6 @@ export function createGameSocketServer(
     socket.on('disconnect', () => handleDisconnect(membershipContext, socket))
     socket.on('game.getLobbyDetails', (payload, acknowledge) =>
       handleGetLobbyDetails(membershipContext, socket, payload, acknowledge))
-    socket.on('game.getPublicGameState', (payload, acknowledge) =>
-      handleGetPublicGameState(membershipContext, socket, payload, acknowledge))
     socket.on('program.submit', (payload, acknowledge) =>
       handleSubmitProgram(membershipContext, socket, payload, acknowledge))
   })

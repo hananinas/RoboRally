@@ -1,11 +1,20 @@
 import { type Direction, type Position, neighbour, opposite } from '@/game/spatial'
 import type { RobotId } from '@/game/ids'
 import type { Tile } from '@/game/Tile'
+import type { PositiveInteger } from '@/numbers'
 
 export type MovementResult = Readonly<{
   position: Position
   stepsMoved: number
   blocked: boolean
+}>
+
+export type Antenna = Readonly<Position & { angle: number }>
+
+export type BoardMap = Readonly<{
+  name: string
+  icon: string
+  maxPlayers: number
 }>
 
 export class Board {
@@ -14,8 +23,10 @@ export class Board {
   private readonly checkpointTotal: number
   readonly width: number
   readonly height: number
+  readonly antenna: Antenna
+  readonly map?: BoardMap
 
-  constructor(tiles: readonly (readonly Tile[])[]) {
+  constructor(tiles: readonly (readonly Tile[])[], antenna: Antenna, map?: BoardMap) {
     const width = tiles[0]?.length ?? 0
     if (width === 0 || tiles.some((row) => row.length !== width)) {
       throw new RangeError('A board must be a non-empty rectangular tile grid')
@@ -32,6 +43,12 @@ export class Board {
     this.width = width
     this.height = tiles.length
     this.tiles = tiles.map((row) => [...row])
+
+    if (!this.contains(antenna) || !Number.isFinite(antenna.angle)) {
+      throw new RangeError('The antenna must be on the board with a finite angle')
+    }
+    this.antenna = Object.freeze({ ...antenna })
+    this.map = map === undefined ? undefined : Object.freeze({ ...map })
   }
 
   get checkpointCount(): number {
@@ -40,8 +57,6 @@ export class Board {
 
   contains(position: Position): boolean {
     return (
-      Number.isInteger(position.x) &&
-      Number.isInteger(position.y) &&
       position.x >= 0 &&
       position.x < this.width &&
       position.y >= 0 &&
@@ -92,12 +107,7 @@ export class Board {
     this.robotPositions.set(robotId, { ...position })
   }
 
-  moveRobot(robotId: RobotId, direction: Direction, steps: number): MovementResult {
-    // Validate input parameters
-    if (!Number.isInteger(steps) || steps <= 0) {
-      throw new RangeError('Steps must be a positive integer')
-    }
-
+  moveRobot(robotId: RobotId, direction: Direction, steps: PositiveInteger): MovementResult {
     // Verify robot is on the board
     let currentPosition = this.positionOf(robotId)
     let nextPosition: Position = currentPosition

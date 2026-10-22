@@ -1,10 +1,13 @@
+import { randomUUID } from 'node:crypto'
+import { err, ok, type Result } from 'neverthrow'
 import type { Board } from '@/game/Board'
 import { instructions } from '@robo-rally/game-events'
-import type { Card } from '@/game/Card'
-import type { PlayerId, RobotId } from '@/game/ids'
-import type { Player } from '@/game/Player'
-import type { Robot } from '@/game/Robot'
-import { opposite, type Direction, type Position } from '@/game/spatial'
+import { Card } from '@/game/Card'
+import type { CardId, PlayerId, RobotId } from '@/game/ids'
+import { Player } from '@/game/Player'
+import { Robot } from '@/game/Robot'
+import { Direction, opposite, type Position } from '@/game/spatial'
+import { Integer, PositiveInteger, UnsignedInteger } from '@/numbers'
 
 export type GamePhase = 'programming' | 'activation'
 
@@ -15,20 +18,26 @@ export type RobotActionResult = Readonly<{
   direction: Direction
 }>
 
-export type Antenna = Readonly<Position & { angle: number }>
-
 export type NextActionResult = Readonly<{
   registerIndex: number
   action: RobotActionResult
 }>
 
+export type AddPlayerError = 'GAME_ALREADY_STARTED' | 'NO_SPAWN_AVAILABLE'
+
+export type SubmitProgramError =
+  | 'GAME_ABORTED'
+  | 'GAME_PAUSED'
+  | 'WRONG_PHASE'
+  | 'PLAYER_NOT_IN_GAME'
+  | 'ALREADY_SUBMITTED'
+  | 'INVALID_PROGRAM'
 export const DEFAULT_GAME_NAME = 'Game'
 
 export class Game {
-  readonly name: string  
+  readonly name: string
   readonly board: Board
   private readonly roster: Player[]
-  readonly antenna: Antenna
   private readonly deck: readonly Card[]
   private currentPhase: GamePhase = 'programming'
   private registerIndex = 0
@@ -36,19 +45,16 @@ export class Game {
   private readonly activatedRobotIds = new Set<RobotId>()
   private started = false
   private isPaused = false
+  private isAborted = false
 
   constructor(
     board: Board,
     players: readonly Player[],
     deck: readonly Card[],
-    antenna: Antenna = { x: Math.floor(board.width / 2), y: 0, angle: Math.PI / 2 },
     name: string = DEFAULT_GAME_NAME,
   ) {
     if (deck.length < 5 || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')
-    }
-    if (!board.contains(antenna) || !Number.isFinite(antenna.angle)) {
-      throw new RangeError('The antenna must be on the board with a finite angle')
     }
 
     const playerIds = new Set<PlayerId>()
@@ -65,7 +71,6 @@ export class Game {
     this.board = board
     this.name = name
     this.roster = [...players]
-    this.antenna = Object.freeze({ ...antenna })
     this.deck = [...deck]
     this.dealCards()
   }
@@ -90,6 +95,10 @@ export class Game {
     return this.isPaused
   }
 
+  get aborted(): boolean {
+    return this.isAborted
+  }
+
   pause(): void {
     this.isPaused = true
   }
@@ -98,24 +107,39 @@ export class Game {
     this.isPaused = false
   }
 
+  abort(): void {
+    this.isAborted = true
+  }
+
   hasSubmittedProgram(playerId: PlayerId): boolean {
     return this.submittedPlayerIds.has(playerId)
   }
 
-  addPlayer(player: Player): boolean {
-    if (this.started) throw new Error('Game has already started')
-    if (this.roster.some((member) => member.id === player.id || member.robot.id === player.robot.id)) {
-      throw new Error('Player or robot is already in the game')
-    }
+  private checkCanAddPlayer(): Result<void, 'GAME_ALREADY_STARTED'> {
+    if (this.started) return err('GAME_ALREADY_STARTED')
+    return ok(undefined)
+  }
+
+  private findSpawn(): Result<Position, 'NO_SPAWN_AVAILABLE'> {
     const { width, height } = this.board
     const y = Math.floor(height / 2)
     let x = Math.floor(width / 2)
-    while (x >= 0 && this.board.occupantAt({ x, y }) !== undefined) x--
-    if (x < 0) return false
-    this.board.placeRobot(player.robot.id, { x, y })
-    if (player.hand.length === 0) player.setHand(this.deck)
-    this.roster.push(player)
-    return true
+    while (x >= 0 && this.board.occupantAt({ x: Integer(x), y: Integer(y) }) !== undefined) x--
+    if (x < 0) return err('NO_SPAWN_AVAILABLE')
+    return ok({ x: Integer(x), y: Integer(y) })
+  }
+
+  addPlayer(): Result<Player, AddPlayerError> {
+    return this.checkCanAddPlayer().andThen(() =>
+      this.findSpawn().map((position) => {
+        const robot = new Robot(randomUUID(), Direction.NORTH)
+        const hand = this.deck.map((card) => new Card(randomUUID(), card.instruction))
+        const player = new Player(randomUUID(), robot, hand)
+        this.board.placeRobot(robot.id, position)
+        this.roster.push(player)
+        return player
+      }),
+    )
   }
 
   removePlayer(playerId: PlayerId): void {
@@ -137,34 +161,41 @@ export class Game {
     this.recheckProgrammingPhase()
   }
 
-  submitProgram(playerId: PlayerId, program: readonly Card[]): void {
-    if (this.isPaused) {
-      throw new Error('Programs cannot be submitted while the game is paused')
-    }
-    if (this.currentPhase !== 'programming') {
-      throw new Error('Programs can only be submitted during programming')
-    }
+  private checkCanSubmitProgram(
+    playerId: PlayerId,
+  ): Result<Player, 'GAME_ABORTED' | 'GAME_PAUSED' | 'WRONG_PHASE' | 'PLAYER_NOT_IN_GAME' | 'ALREADY_SUBMITTED'> {
+    if (this.isAborted) return err('GAME_ABORTED')
+    if (this.isPaused) return err('GAME_PAUSED')
+    if (this.currentPhase !== 'programming') return err('WRONG_PHASE')
 
     const player = this.players.find((candidate) => candidate.id === playerId)
-    if (!player) {
-      throw new Error(`Player ${playerId} is not in this game`)
-    }
-    if (this.submittedPlayerIds.has(playerId)) {
-      throw new Error(`Player ${playerId} has already submitted a program`)
-    }
-    if (program.length !== 5 || new Set(program.map((card) => card.id)).size !== 5) {
-      throw new RangeError('A program must contain five distinct cards')
-    }
+    if (!player) return err('PLAYER_NOT_IN_GAME')
+    if (this.submittedPlayerIds.has(playerId)) return err('ALREADY_SUBMITTED')
 
+    return ok(player)
+  }
+
+  private checkProgram(player: Player, cardIds: readonly CardId[]): Result<readonly Card[], 'INVALID_PROGRAM'> {
+    if (cardIds.length !== 5 || new Set(cardIds).size !== 5) {
+      return err('INVALID_PROGRAM')
+    }
     const hand = new Map(player.hand.map((card) => [card.id, card]))
-    if (program.some((card) => hand.get(card.id) !== card)) {
-      throw new Error('Every program card must come from the player hand')
+    const program = cardIds.map((id) => hand.get(id))
+    if (!program.every((card): card is Card => card !== undefined)) {
+      return err('INVALID_PROGRAM')
     }
+    return ok(program)
+  }
 
-    player.robot.setProgram(program)
-    this.started = true
-    this.submittedPlayerIds.add(playerId)
-    this.recheckProgrammingPhase()
+  submitProgram(playerId: PlayerId, cardIds: readonly CardId[]): Result<void, SubmitProgramError> {
+    return this.checkCanSubmitProgram(playerId).andThen((player) =>
+      this.checkProgram(player, cardIds).map((program) => {
+        player.robot.setProgram(program)
+        this.started = true
+        this.submittedPlayerIds.add(playerId)
+        this.recheckProgrammingPhase()
+      }),
+    )
   }
 
   recheckProgrammingPhase(): void {
@@ -186,7 +217,7 @@ export class Game {
     if (!robot) throw new Error('No robots remain to activate')
 
     const registerIndex = this.registerIndex
-    const card = robot.getProgramCard(registerIndex)
+    const card = robot.getProgramCard(UnsignedInteger(registerIndex))
     this.executeCard(robot, card)
     this.activatedRobotIds.add(robot.id)
     const action: RobotActionResult = {
@@ -221,15 +252,16 @@ export class Game {
     let nearestDistance = Infinity
     let smallestOffset = Infinity
     const fullTurn = 2 * Math.PI
-    const antennaAngle = this.antenna.angle % fullTurn
+    const antenna = this.board.antenna
+    const antennaAngle = antenna.angle % fullTurn
 
     // Radians start east and increase clockwise because board y increases south.
     // Recheck current positions every action; exact ties retain roster order.
     for (const { robot } of this.players) {
       if (this.activatedRobotIds.has(robot.id)) continue
       const position = this.board.positionOf(robot.id)
-      const dx = position.x - this.antenna.x
-      const dy = position.y - this.antenna.y
+      const dx = position.x - antenna.x
+      const dy = position.y - antenna.y
       const distance = Math.abs(dx) + Math.abs(dy)
       if (distance > nearestDistance) continue
       const angle = Math.atan2(dy, dx)
@@ -247,7 +279,7 @@ export class Game {
     const effect = instructions[card.instruction]
     if (effect.kind === 'move') {
       const direction = effect.steps < 0 ? opposite(robot.direction) : robot.direction
-      this.board.moveRobot(robot.id, direction, Math.abs(effect.steps))
+      this.board.moveRobot(robot.id, direction, PositiveInteger(Math.abs(effect.steps)))
     } else {
       robot.turn(effect.quarterTurns)
     }

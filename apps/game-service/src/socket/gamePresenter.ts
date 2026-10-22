@@ -19,8 +19,8 @@ import {
   type GamePhase,
   type NextActionResult,
   type Player,
-  DEMO_MAP,
 } from '@/game/index'
+import { Integer } from '@/numbers'
 
 const orientations: Record<Direction, Orientation> = {
   [Direction.NORTH]: 'NORTH',
@@ -39,14 +39,14 @@ function presentCard(card: Card): CardPayload {
 }
 
 function presentTile(game: Game, x: number, y: number): TilePayload {
-  const tile = game.board.getTile({ x, y })
+  const tile = game.board.getTile({ x: Integer(x), y: Integer(y) })
   if (!(tile instanceof EmptyTile)) {
     throw new Error(`Unsupported tile at ${x},${y}`)
   }
 
   const walls = [...tile.walls].map((direction) => orientations[direction])
   return {
-    position: { x, y },
+    position: { x: Integer(x), y: Integer(y) },
     type: 'EMPTY',
     ...(walls.length === 0 ? {} : { walls }),
     ...(tile.checkpointNumber === undefined ? {} : { checkpointNumber: tile.checkpointNumber }),
@@ -66,7 +66,7 @@ export function presentPublicGameState(
     gameId,
     checkpointCount: game.board.checkpointCount,
     players,
-    antenna: game.antenna,
+    antenna: game.board.antenna,
     board: {
       width: game.board.width,
       height: game.board.height,
@@ -82,6 +82,7 @@ export function presentPublicGameState(
     })),
     phase: phases[game.phase],
     paused: game.paused,
+    aborted: game.aborted,
   }
 }
 
@@ -90,11 +91,16 @@ export function presentLobbyDetails(
   game: Game,
   players: readonly LobbyPlayer[],
 ): LobbyDetails {
+  const map = game.board.map
+  if (!map) {
+    throw new Error('Cannot present lobby details for a board without map metadata')
+  }
+
   return {
     gameId,
     name: game.name,
     players: players.map(({ playerId, username }) => ({ playerId, username })),
-    map: { name: DEMO_MAP.name, icon: DEMO_MAP.icon, maxPlayers: DEMO_MAP.maxPlayers },
+    map: { name: map.name, icon: map.icon, maxPlayers: map.maxPlayers },
   }
 }
 
