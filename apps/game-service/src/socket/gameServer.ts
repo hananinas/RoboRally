@@ -1,4 +1,4 @@
-import { registerLobbyHandlers, leaveLobby, presentLobby, type SessionStore, type UserSession } from '@/lobbyHandlers'
+import { registerLobbyHandlers, leaveLobby, presentLobby, type SessionStore, type UserSession } from '@/socket/handlers/lobbyHandlers'
 import type { Server as HttpServer } from 'node:http'
 import type {
   ClientToServerEvents,
@@ -10,16 +10,15 @@ import { Server, type Socket } from 'socket.io'
 import type { Game } from '@/game/index'
 import { createUserRegistry } from '@/userRegistry'
 import { createDefaultGame } from '@/game/GameFactory'
-import type { MembershipContext } from '@/membershipHandlers'
-import { handleLogin } from '@/authHandlers'
+import type { MembershipContext } from '@/socket/handlers/membershipHandlers'
+import { handleLogin } from '@/socket/handlers/authHandlers'
 import {
   handleDisconnect,
-  handleGetPublicGameState,
   reattachGame,
   handleLeave,
   reconnectIfRecovered,
-} from '@/membershipHandlers'
-import { handleSubmitProgram } from '@/gameplayHandlers'
+} from '@/socket/handlers/membershipHandlers'
+import { handleSubmitProgram } from '@/socket/handlers/gameplayHandlers'
 
 export type GameSocketData = { user?: User }
 
@@ -121,17 +120,11 @@ export function createGameSocketServer(
       const ctx = currentGame(socket)
       if (ctx) handleDisconnect(ctx, socket)
     })
-    socket.on('game.getPublicGameState', (payload, acknowledge) => {
-      if (typeof acknowledge !== 'function') return
-      const ctx = currentGame(socket)
-      if (ctx) handleGetPublicGameState(ctx, socket, payload, acknowledge)
-      else acknowledge({ outcome: 'GAME_NOT_FOUND' })
-    })
     socket.on('program.submit', (payload, acknowledge) => {
       if (typeof acknowledge !== 'function') return
       const ctx = currentGame(socket)
       if (ctx) handleSubmitProgram(ctx, socket, payload, acknowledge)
-      else acknowledge({ outcome: 'INVALID_PROGRAM' })
+      else acknowledge({ outcome: 'NOT_A_MEMBER' })
     })
   })
 

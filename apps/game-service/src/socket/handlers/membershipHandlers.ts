@@ -1,20 +1,21 @@
+import type { ZodError } from 'zod'
+import { withAcknowledgeOnce } from '@/socket/utilities/acknowledgeOnce'
+import { toRejection, type Rejection } from '@/socket/utilities/rejection'
+import { logError, logWarn } from '@/logger'
 import { err, ok, type Result } from 'neverthrow'
 import {
   leaveGameSchema,
-  parseGetPublicGameState,
-  type GetPublicGameState,
   type LeaveGame,
   type JoinResult,
   type JoinResultAcknowledgement,
   type LeaveResult,
   type PublicGameState,
-  type PublicGameStateAcknowledgement,
   type User,
 } from '@robo-rally/game-events'
 import type { Player, Game } from '@/game/index'
-import { presentCardsDealt } from '@/gamePresenter'
+import { presentCardsDealt } from '@/socket/gamePresenter'
 import type { ActionScheduler } from '@/actionScheduler'
-import type { GameSocket, GameSocketServer } from '@/gameServer'
+import type { GameSocket, GameSocketServer } from '@/socket/gameServer'
 
 export type GameMembership = {
   user: User
@@ -54,15 +55,20 @@ function notifyReconnected(ctx: MembershipContext, playerId: string): void {
   ctx.actionScheduler.scheduleNextAction()
 }
 
+type ValidateMembershipRequestError =
+  | 'LOGIN_REQUIRED'
+  | 'GAME_NOT_FOUND'
+  | Rejection<'INVALID_REQUEST', ZodError>
+
 function validateMembershipRequest(
   ctx: MembershipContext,
   schema: typeof leaveGameSchema,
   payload: unknown,
   user: User | undefined,
-): Result<User, 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND'> {
+): Result<User, ValidateMembershipRequestError> {
   if (!user) return err('LOGIN_REQUIRED')
   const parsed = schema.safeParse(payload)
-  if (!parsed.success) return err('INVALID_REQUEST')
+  if (!parsed.success) return err({ outcome: 'INVALID_REQUEST', detail: parsed.error })
   if (parsed.data.gameId !== ctx.gameId) return err('GAME_NOT_FOUND')
   return ok(user)
 }
@@ -117,62 +123,56 @@ export function handleLeave(
   payload: LeaveGame,
   acknowledge: (result: LeaveResult) => void,
 ): void {
-  if (typeof acknowledge !== 'function') return
   const { io, game, gameId, memberships, publicRoom, playerRoom, actionScheduler } = ctx
-  const verdict = validateMembershipRequest(ctx, leaveGameSchema, payload, socket.data.user)
-  if (verdict.isErr()) return acknowledge({ outcome: verdict.error })
-  const membership = ownedMembership(ctx, socket)
-  if (!membership) {
-    acknowledge({ outcome: 'GAME_NOT_FOUND' })
-    return
-  }
-  const { player, user } = membership
-  const phaseBeforeLeave = game.phase
-  game.removePlayer(player.id)
-  memberships.delete(user.userId)
-  void socket.leave(publicRoom)
-  void socket.leave(playerRoom(player.id))
-  acknowledge({ outcome: 'LEFT' })
-  io.to(publicRoom).emit('game.playerLeft', {
-    gameId, playerId: player.id, robotId: player.robot.id,
+  let playerId: string | undefined
+
+  withAcknowledgeOnce(acknowledge, (ack) => {
+    const result = validateMembershipRequest(ctx, leaveGameSchema, payload, socket.data.user)
+      .andThen(() => {
+        const membership = ownedMembership(ctx, socket)
+        return membership ? ok(membership) : err('GAME_NOT_FOUND' as const)
+      })
+      .mapErr(toRejection)
+    if (result.isErr()) {
+      const { outcome, detail } = result.error
+      logWarn('Rejected game.leave request', { command: 'game.leave', gameId, outcome, detail, payload })
+      ack({ outcome })
+      return
+    }
+    const { player, user } = result.value
+    playerId = player.id
+
+    const phaseBeforeLeave = game.phase
+    game.removePlayer(player.id)
+    memberships.delete(user.userId)
+    void socket.leave(publicRoom)
+    void socket.leave(playerRoom(player.id))
+    ack({ outcome: 'LEFT' })
+    io.to(publicRoom).emit('game.playerLeft', {
+      gameId, playerId: player.id, robotId: player.robot.id,
+    })
+    actionScheduler.broadcastCheckpointProgress()
+    if (phaseBeforeLeave === 'activation' && game.phase === 'programming') actionScheduler.dealHands()
+    actionScheduler.scheduleNextAction()
+  }, (error) => {
+    logError('Failed to process player leaving', error, { command: 'game.leave', gameId, playerId })
+    return { outcome: 'INTERNAL_ERROR' } as const
   })
-  actionScheduler.broadcastCheckpointProgress()
-  if (phaseBeforeLeave === 'activation' && game.phase === 'programming') actionScheduler.dealHands()
-  actionScheduler.scheduleNextAction()
 }
 
 export function handleDisconnect(ctx: MembershipContext, socket: GameSocket): void {
   const membership = ownedMembership(ctx, socket)
   if (!membership) return
-  membership.connectionId = null
-  ctx.game.pause()
-  ctx.io.to(ctx.publicRoom).emit('game.playerConnectionChanged', {
-    gameId: ctx.gameId, playerId: membership.player.id, connected: false, paused: ctx.game.paused,
-  })
-}
-
-export function handleGetPublicGameState(
-  ctx: MembershipContext,
-  socket: GameSocket,
-  payload: GetPublicGameState,
-  acknowledge: PublicGameStateAcknowledgement,
-): void {
-  if (typeof acknowledge !== 'function') return
 
   try {
-    const request = parseGetPublicGameState(payload)
-    if (request.gameId === ctx.gameId && ownedMembership(ctx, socket)) {
-      acknowledge({
-        outcome: 'GAME_FOUND',
-        state: ctx.publicState(),
-      })
-      return
-    }
-  } catch {
-    // Invalid requests receive the same non-disclosing result as unknown games.
+    membership.connectionId = null
+    ctx.game.pause()
+    ctx.io.to(ctx.publicRoom).emit('game.playerConnectionChanged', {
+      gameId: ctx.gameId, playerId: membership.player.id, connected: false, paused: ctx.game.paused,
+    })
+  } catch (error) {
+    logError('Failed to process player disconnect', error, { command: 'disconnect', gameId: ctx.gameId, playerId: membership.player.id })
   }
-
-  acknowledge({ outcome: 'GAME_NOT_FOUND' })
 }
 
 export function presentInitialization(ctx: MembershipContext, membership: GameMembership): Extract<JoinResult, { outcome: 'JOINED' }> {

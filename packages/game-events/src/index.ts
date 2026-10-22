@@ -41,7 +41,6 @@ export type {
 } from './payloads.js'
 export { loginSchema, parseLogin } from './login.js'
 export type { Login, LoginRequestRejection } from './login.js'
-  LeaveGame,
 export { leaveGameSchema } from './leaveGame.js'
 export { submitProgramSchema } from './submitProgram.js'
 export type { ProgramCardIds, SubmitProgram } from './submitProgram.js'

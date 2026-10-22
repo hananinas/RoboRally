@@ -1,11 +1,12 @@
+import { Integer } from '@/numbers'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { parseSubmitProgram } from '@robo-rally/game-events'
+import { submitProgramSchema } from '@robo-rally/game-events'
 import type { ClientToServerEvents, GameInitialization, PlayerConnectionChanged, PlayerCheckpointProgress, ServerToClientEvents } from '@robo-rally/game-events'
 import { io, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createGame } from '@/game/GameFactory'
-import { createGameSocketServer, type GameSocketServer } from '@/gameServer'
+import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>
 describe('started game membership over Socket.IO', () => {
@@ -55,7 +56,7 @@ describe('started game membership over Socket.IO', () => {
     else client.disconnect()
     await closed
   }
-  const submission = (initial: GameInitialization) => parseSubmitProgram({
+  const submission = (initial: GameInitialization) => submitProgramSchema.parse({
     gameId: initial.assignment.gameId, playerId: initial.assignment.playerId,
     cardIds: initial.hand.slice(0, 5).map((card) => card.id),
   })
@@ -84,8 +85,8 @@ describe('started game membership over Socket.IO', () => {
   it('rejects nonmember, other-player and foreign-hand submissions', async () => {
     const { members: [first, second], initializations: [initial, other] } = await startGame(['First', 'Second'])
     const outsider = await connect('Outside')
-    expect(await outsider.emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'INVALID_PROGRAM' })
-    expect(await second.emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'INVALID_PROGRAM' })
+    expect(await outsider.emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'NOT_A_MEMBER' })
+    expect(await second.emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'PLAYER_ID_MISMATCH' })
     expect(await first.emitWithAck('program.submit', { ...submission(other), playerId: initial.assignment.playerId })).toEqual({ outcome: 'INVALID_PROGRAM' })
     expect(await first.emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'ACCEPTED' })
     expect((await snapshot(first)).programSubmitted).toBe(true)
@@ -97,11 +98,10 @@ describe('started game membership over Socket.IO', () => {
     expect(await raw(first, 'game.leave', { gameId: shared.gameId, extra: true })).toEqual({ outcome: 'INVALID_REQUEST' })
     expect(await first.emitWithAck('game.leave', { gameId: shared.gameId })).toEqual({ outcome: 'LEFT' })
     expect(await left).toEqual({ gameId: shared.gameId, playerId: initial.assignment.playerId, robotId: initial.assignment.robotId })
-    expect(shared.game.board.occupantAt({ x: 10, y: 7 })).toBeUndefined()
+    expect(shared.game.board.occupantAt({ x: Integer(10), y: Integer(7) })).toBeUndefined()
     expect(server.sockets.sockets.get(first.id!)!.rooms).toEqual(new Set([first.id]))
     expect(await first.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION' })
-    expect(await first.emitWithAck('game.getPublicGameState', { gameId: shared.gameId })).toEqual({ outcome: 'GAME_NOT_FOUND' })
-    expect(await first.emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'INVALID_PROGRAM' })
+    expect(await first.emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'NOT_A_MEMBER' })
   })
   it('completes the programming barrier when an unsubmitted member leaves', async () => {
     const { members: [first, second], initializations: [initial] } = await startGame(['First', 'Second'])
@@ -130,12 +130,12 @@ describe('started game membership over Socket.IO', () => {
     const restoredSecond = await snapshot(returnedSecond)
     expect(restoredSecond.assignment).toEqual(other.assignment)
     expect(restoredSecond.state.paused).toBe(false)
-    await witness.emitWithAck('game.getPublicGameState', { gameId: shared.gameId })
+    await witness.emitWithAck('session.get', {})
     expect(changed.map((event) => [event.connected, event.paused])).toEqual([[false, true], [false, true], [true, true], [true, false]])
   })
   it('resumes mid-activation after reattaching the last disconnected member', async () => {
     const { members: [first, second] } = await startGame(['First', 'Second'])
-    for (const player of shared.game.players) shared.game.submitProgram(player.id, player.hand.slice(0, 5))
+    for (const player of shared.game.players) shared.game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
     for (let action = 0; action < 9; action++) shared.game.executeNextAction()
     await disconnect(first)
     const actions: unknown[] = []
@@ -181,12 +181,12 @@ describe('started game membership over Socket.IO', () => {
   })
   it('broadcasts checkpoint progress before next hands when a departure completes the final register', async () => {
     const { members: [first, second], initializations: [initial] } = await startGame(['First', 'Second'])
-    for (const player of shared.game.players) shared.game.submitProgram(player.id, player.hand.slice(0, 5))
+    for (const player of shared.game.players) shared.game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
     for (let action = 0; action < 9; action++) shared.game.executeNextAction()
     const player = shared.game.players[0]
     expect(player.lastCheckpoint).toBe(1)
     shared.game.board.removeRobot(player.robot.id)
-    shared.game.board.placeRobot(player.robot.id, { x: 8, y: 9 })
+    shared.game.board.placeRobot(player.robot.id, { x: Integer(8), y: Integer(9) })
     const events: string[] = []
     first.onAny((name) => { if (['game.playerLeft', 'player.checkpointProgress', 'cards.dealt'].includes(name)) events.push(name) })
     const progress = new Promise<PlayerCheckpointProgress>((resolve) => first.once('player.checkpointProgress', resolve))

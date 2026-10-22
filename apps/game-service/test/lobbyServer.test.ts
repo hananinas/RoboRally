@@ -4,7 +4,7 @@ import type { ClientToServerEvents, GameInitialization, LobbyState, ServerToClie
 import { io, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDefaultGame } from '@/game/GameFactory'
-import { createGameSocketServer, type GameSocketServer } from '@/gameServer'
+import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>
 describe('lobby lifecycle over Socket.IO', () => {
@@ -114,7 +114,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(await outsider.emitWithAck('program.submit', {
       gameId: first.assignment.gameId, playerId: first.assignment.playerId,
       cardIds: first.hand.slice(0, 5).map((card) => card.id) as [string, string, string, string, string],
-    })).toEqual({ outcome: 'INVALID_PROGRAM' })
+    })).toEqual({ outcome: 'NOT_A_MEMBER' })
     expect(factory).toHaveBeenCalledTimes(1)
   })
   it('transfers ownership in join order and removes the last waiting member on disconnect', async () => {
@@ -155,9 +155,9 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(initializations[0].assignment.gameId).not.toBe(initializations[1].assignment.gameId)
     const foreignEvents = vi.fn()
     owners[1].onAny(foreignEvents)
-    expect(await owners[0].emitWithAck('game.getPublicGameState', { gameId: initializations[1].assignment.gameId })).toEqual({ outcome: 'GAME_NOT_FOUND' })
+    expect(await owners[0].emitWithAck('game.leave', { gameId: initializations[1].assignment.gameId })).toEqual({ outcome: 'GAME_NOT_FOUND' })
     expect(await owners[0].emitWithAck('game.leave', { gameId: initializations[0].assignment.gameId })).toEqual({ outcome: 'LEFT' })
-    await owners[1].emitWithAck('game.getPublicGameState', { gameId: initializations[1].assignment.gameId })
+    await owners[1].emitWithAck('session.get', {})
     expect(foreignEvents).not.toHaveBeenCalled()
     expect(server.sockets.sockets.get(owners[0].id!)!.rooms).toEqual(new Set([owners[0].id]))
     expect((await create(owners[0])).name).toMatch(/^Lobby /)

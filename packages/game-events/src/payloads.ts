@@ -155,8 +155,6 @@ export type RobotActionResolved = Readonly<{
   pushedRobots: readonly Pick<Robot, 'robotId' | 'position'>[]
 }>
 
-    }>
-
 export type JoinResult =
   | Readonly<{
       outcome: 'JOINED'

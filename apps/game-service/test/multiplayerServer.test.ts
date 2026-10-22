@@ -50,7 +50,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
     }
 
     for (const socket of clients) {
-      await socket.timeout(1000).emitWithAck('game.join', { gameId })
+      await socket.timeout(1000).emitWithAck('session.get', {})
     }
     events[0] = []
     events[1] = []
@@ -62,10 +62,10 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
       }))
       expect(await clients[0].timeout(1000).emitWithAck('program.submit', submissions[0]))
         .toEqual({ outcome: 'ACCEPTED' })
-      // Join acknowledgements fence each connection's earlier deliveries.
+      // Session acknowledgements fence each connection's earlier deliveries.
       for (const socket of clients) {
-        const waiting = await socket.timeout(1000).emitWithAck('game.join', { gameId })
-        expect(waiting).toMatchObject({ outcome: 'JOINED', state: { phase: 'PROGRAMMING' } })
+        const waiting = await socket.timeout(1000).emitWithAck('session.get', {})
+        expect(waiting).toMatchObject({ outcome: 'IN_GAME', initialization: { state: { phase: 'PROGRAMMING' } } })
       }
       expect(events[0]).toEqual([])
       expect(events[1]).toEqual([{

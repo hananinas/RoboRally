@@ -17,7 +17,6 @@ test('login browses real results and creation waits for explicit Start', async (
   await page.getByRole('button', { name: 'Start', exact: true }).click()
   await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
   expect((await game.snapshot()).entryRequests.map((request) => request.event)).toContain('lobby.create')
-  expect((await game.snapshot()).stateRequests).toBe(0)
 })
 
 test('joining requires selection and enters the waiting screen', async ({ page }) => {

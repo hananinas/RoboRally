@@ -1,7 +1,7 @@
-import type { GameSocketServer, GameSession } from '@/gameServer'
-import { presentPublicGameState } from '@/gamePresenter'
+import type { GameSocketServer, GameSession } from '@/socket/gameServer'
+import { presentPublicGameState } from '@/socket/gamePresenter'
 import { createActionScheduler } from '@/actionScheduler'
-import type { GameMembership, MembershipContext } from '@/membershipHandlers'
+import type { GameMembership, MembershipContext } from '@/socket/handlers/membershipHandlers'
 
 export function createGameContext(io: GameSocketServer, session: GameSession): MembershipContext {
   const { gameId, game } = session
