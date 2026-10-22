@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Board, Direction, EmptyTile, PitTile, Game, Card, Player, Robot } from '@/game/index'
 
 function createGame() {
-  const board = new Board([[new EmptyTile(), new EmptyTile()]])
+  const board = new Board([[new EmptyTile(), new EmptyTile()]], { x: 1, y: 0, angle: Math.PI / 2 })
   const robot = new Robot('robot-1', Direction.EAST)
   board.placeRobot(robot.id, { x: 0, y: 0 })
   const player = new Player('player-1', robot)
@@ -22,7 +22,7 @@ describe('Game programming', () => {
   it('executes the additional card types from main in register order', () => {
     const board = new Board(Array.from({ length: 15 }, () =>
       Array.from({ length: 15 }, () => new EmptyTile()),
-    ))
+    ), { x: 7, y: 0, angle: Math.PI / 2 })
     const robot = new Robot('robot-1', Direction.EAST)
     board.placeRobot(robot.id, { x: 5, y: 5 })
     const player = new Player('player-1', robot)
@@ -136,7 +136,12 @@ describe('Game programming', () => {
   it('has a name, which defaults when none is given', () => {
     const { game, deck } = createGame()
     expect(game.name).toBe('Game')
-    const named = new Game(new Board([[new EmptyTile()]]), [], deck, undefined, 'Shared game')
+    const named = new Game(
+      new Board([[new EmptyTile()]], { x: 0, y: 0, angle: Math.PI / 2 }),
+      [],
+      deck,
+      'Shared game',
+    )
     expect(named.name).toBe('Shared game')
   })
 
@@ -145,20 +150,20 @@ describe('Game programming', () => {
 describe('Game reboot configuration and spawning', () => {
   it('requires explicit reboot configuration only when the board contains pits', () => {
     const { game, deck } = createGame()
-    const board = new Board([[new EmptyTile(), new PitTile()]])
+    const board = new Board([[new EmptyTile(), new PitTile()]], { x: 0, y: 0, angle: Math.PI / 2 })
 
     expect(game.rebootTile).toBeUndefined()
     expect(() => new Game(board, [], deck)).toThrow('requires a reboot tile')
-    expect(() => new Game(board, [], deck, undefined, undefined, { x: 0, y: 0 })).not.toThrow()
+    expect(() => new Game(board, [], deck, undefined, { x: 0, y: 0 })).not.toThrow()
   })
 
   it('copies and freezes a valid reboot tile, even when occupied', () => {
     const { deck } = createGame()
-    const board = new Board([[new EmptyTile(), new PitTile()]])
+    const board = new Board([[new EmptyTile(), new PitTile()]], { x: 0, y: 0, angle: Math.PI / 2 })
     const player = new Player('player', new Robot('robot', Direction.NORTH))
     board.placeRobot(player.robot.id, { x: 0, y: 0 })
     const rebootTile = { x: 0, y: 0 }
-    const game = new Game(board, [player], deck, undefined, undefined, rebootTile)
+    const game = new Game(board, [player], deck, undefined, rebootTile)
     rebootTile.x = 1
 
     expect(game.rebootTile).toEqual({ x: 0, y: 0 })
@@ -169,29 +174,29 @@ describe('Game reboot configuration and spawning', () => {
 
   it('rejects reboot coordinates outside the board, between tiles or on pits', () => {
     const { deck } = createGame()
-    const board = new Board([[new EmptyTile(), new PitTile()]])
+    const board = new Board([[new EmptyTile(), new PitTile()]], { x: 0, y: 0, angle: Math.PI / 2 })
     for (const rebootTile of [
       { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0.5, y: 0 }, { x: NaN, y: 0 }, { x: 1, y: 0 },
     ]) {
-      expect(() => new Game(board, [], deck, undefined, undefined, rebootTile)).toThrow(RangeError)
+      expect(() => new Game(board, [], deck, undefined, rebootTile)).toThrow(RangeError)
     }
   })
 
   it('rejects a roster whose robot is already standing on a pit', () => {
     const { deck } = createGame()
-    const board = new Board([[new EmptyTile(), new PitTile()]])
+    const board = new Board([[new EmptyTile(), new PitTile()]], { x: 0, y: 0, angle: Math.PI / 2 })
     const player = new Player('player', new Robot('robot', Direction.EAST))
     board.placeRobot(player.robot.id, { x: 0, y: 0 })
     board.moveRobot(player.robot.id, Direction.EAST, 1)
 
-    expect(() => new Game(board, [player], deck, undefined, undefined, { x: 0, y: 0 }))
+    expect(() => new Game(board, [player], deck, undefined, { x: 0, y: 0 }))
       .toThrow('Robots cannot start on pits')
   })
 
   it('skips pits in the existing join order and returns false when no safe spawn remains', () => {
     const { deck } = createGame()
-    const board = new Board([[new EmptyTile(), new PitTile(), new EmptyTile()]])
-    const game = new Game(board, [], deck, undefined, undefined, { x: 0, y: 0 })
+    const board = new Board([[new EmptyTile(), new PitTile(), new EmptyTile()]], { x: 0, y: 0, angle: Math.PI / 2 })
+    const game = new Game(board, [], deck, undefined, { x: 0, y: 0 })
     const first = new Player('first', new Robot('first-robot', Direction.NORTH))
     const second = new Player('second', new Robot('second-robot', Direction.NORTH))
 

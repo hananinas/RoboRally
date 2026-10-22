@@ -8,7 +8,7 @@ import type {
 import { io as createClient, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Board, EmptyTile, PitTile, Game, Card } from '@/game/index.ts'
-import { createHand, createSharedGame } from '@/game/SinglePlayerGame.ts'
+import { createGame, createHand } from '@/game/GameFactory.ts'
 import { createGameSocketServer, type GameSocketServer } from '@/gameServer.ts'
 import * as gamePresenter from '@/gamePresenter.ts'
 
@@ -17,12 +17,12 @@ type Joined = Extract<JoinResult, { outcome: 'JOINED' }>
 
 describe('game membership over Socket.IO', () => {
   let server: GameSocketServer
-  let shared: ReturnType<typeof createSharedGame>
+  let shared: ReturnType<typeof createGame>
   let url: string
   let clients: Client[]
 
   beforeEach(async () => {
-    shared = createSharedGame()
+    shared = createGame('empty-map', 'Shared game')
     clients = []
     await start()
   })
@@ -179,7 +179,8 @@ describe('game membership over Socket.IO', () => {
 
   it('rejects exhausted spawns without leaving a membership or room', async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()))
-    shared = { gameId: shared.gameId, game: new Game(new Board([[new EmptyTile()]]), [],
+    shared = { gameId: shared.gameId, game: new Game(
+      new Board([[new EmptyTile()]], { x: 0, y: 0, angle: Math.PI / 2 }), [],
       Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))) }
     await start()
     await join(await connect('First'))
@@ -564,7 +565,7 @@ describe('game membership over Socket.IO', () => {
       tiles[4][0] = new EmptyTile([], 2)
       shared = {
         gameId: shared.gameId,
-        game: new Game(new Board(tiles), [], createHand(), undefined, undefined, { x: 4, y: 4 }),
+        game: new Game(new Board(tiles, { x: 2, y: 0, angle: Math.PI / 2 }), [], createHand(), undefined, { x: 4, y: 4 }),
       }
       await start()
     })
@@ -693,7 +694,7 @@ describe('game membership over Socket.IO', () => {
       const result = await client.timeout(1000).emitWithAck('game.getLobbyDetails', {})
       return result.outcome === 'LOBBY_FOUND' ? result.lobbies : result
     }
-    const demoMap = { name: 'DEMO MAP', icon: expect.stringMatching(/^data:image\/svg\+xml;base64,/), maxPlayers: 6 }
+    const emptyMap = { name: 'Empty Map', icon: expect.stringMatching(/^data:image\/svg\+xml;base64,/), maxPlayers: 6 }
     const usernames = async (client: Client) => {
       const [lobby] = await lobbies(client) as readonly LobbyDetails[]
       return lobby!.players.map((player) => player.username)
@@ -713,7 +714,7 @@ describe('game membership over Socket.IO', () => {
       const received = vi.fn()
       reader.onAny(received)
       expect(await lobbies(reader)).toEqual([
-        { gameId: shared.gameId, name: 'Shared game', players: [], map: demoMap },
+        { gameId: shared.gameId, name: 'Shared game', players: [], map: emptyMap },
       ])
 
       const first = await connect('First')
@@ -726,7 +727,7 @@ describe('game membership over Socket.IO', () => {
           { playerId: firstJoin.assignment.playerId, username: 'First' },
           { playerId: secondJoin.assignment.playerId, username: 'Second' },
         ],
-        map: demoMap,
+        map: emptyMap,
       }])
       await first.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId })
       expect(await usernames(reader)).toEqual(['Second'])

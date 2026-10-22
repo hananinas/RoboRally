@@ -9,7 +9,7 @@ function createGame(
 ) {
   const tiles = Array.from({ length: 3 }, () => Array.from({ length: 5 }, () => new EmptyTile()))
   tiles[pit.y][pit.x] = new PitTile(walls)
-  const board = new Board(tiles)
+  const board = new Board(tiles, { x: 2, y: 0, angle: Math.PI / 2 })
   const robot = new Robot('robot', Direction.EAST)
   board.placeRobot(robot.id, { x: 0, y: 1 })
   const player = new Player('player', robot)
@@ -22,7 +22,7 @@ function createGame(
     TURN_RIGHT: new Card('right', 'TURN_RIGHT'),
     U_TURN: new Card('uturn', 'U_TURN'),
   }
-  const game = new Game(board, [player], Object.values(cards), undefined, undefined, rebootTile)
+  const game = new Game(board, [player], Object.values(cards), undefined, rebootTile)
   return { board, robot, player, cards, game }
 }
 
@@ -121,14 +121,14 @@ describe('pit entry and rebooting', () => {
     const board = new Board([
       [new EmptyTile(), new EmptyTile([], 2), new PitTile()],
       [new EmptyTile(), new EmptyTile([], 1), new EmptyTile()],
-    ])
+    ], { x: 1, y: 0, angle: Math.PI / 2 })
     const robot = new Robot('robot', Direction.EAST)
     board.placeRobot(robot.id, { x: 0, y: 0 })
     const player = new Player('player', robot)
     player.completeCheckpoint(1)
     const instructions: Instruction[] = ['MOVE_3', 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'BACK_UP']
     const program = instructions.map((instruction, index) => new Card(`card-${index}`, instruction))
-    const game = new Game(board, [player], program, undefined, undefined, rebootTile)
+    const game = new Game(board, [player], program, undefined, rebootTile)
     game.submitProgram(player.id, program)
 
     expect(game.executeNextAction().action.position).toEqual(rebootTile)

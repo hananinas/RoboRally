@@ -13,7 +13,8 @@ import {
   PitTile,
   Player,
   Robot,
-  createSinglePlayerGame,
+  createGame,
+  createPlayer,
 } from '@/game/index.ts'
 import {
   presentCardsDealt,
@@ -22,6 +23,13 @@ import {
   presentRobotActionResolved,
 } from '@/gamePresenter.ts'
 
+function createGameWithPlayer() {
+  const { gameId, game } = createGame('empty-map')
+  const player = createPlayer()
+  game.addPlayer(player)
+  return { gameId, game, player }
+}
+
 describe('game presenter', () => {
   it('serializes pits alongside empty tiles, walls and checkpoints', () => {
     const board = new Board([[
@@ -29,9 +37,9 @@ describe('game presenter', () => {
       new PitTile(),
       new PitTile([Direction.NORTH, Direction.WEST]),
       new EmptyTile([Direction.SOUTH], 1),
-    ]])
+    ]], { x: 2, y: 0, angle: Math.PI / 2 })
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
-    const game = new Game(board, [], cards, undefined, undefined, { x: 0, y: 0 })
+    const game = new Game(board, [], cards, undefined, { x: 0, y: 0 })
     const state = presentPublicGameState('game', game)
 
     expect(state.checkpointCount).toBe(1)
@@ -44,7 +52,7 @@ describe('game presenter', () => {
   })
 
   it('presents a complete public programming state in row-major order', () => {
-    const { gameId, game, player } = createSinglePlayerGame()
+    const { gameId, game, player } = createGameWithPlayer()
     const state = presentPublicGameState(gameId, game)
 
     expectTypeOf(state).toEqualTypeOf<PublicGameState>()
@@ -85,7 +93,7 @@ describe('game presenter', () => {
         new EmptyTile([Direction.NORTH, Direction.WEST], 1),
         new EmptyTile(),
       ],
-    ])
+    ], { x: 0, y: 0, angle: Math.PI / 2 })
     const robot = new Robot('robot', Direction.EAST)
     board.placeRobot(robot.id, { x: 0, y: 0 })
     const player = new Player('player', robot)
@@ -112,7 +120,7 @@ describe('game presenter', () => {
   })
 
   it('presents all dealt card instruction types without exposing domain objects', () => {
-    const { gameId, player } = createSinglePlayerGame()
+    const { gameId, player } = createGameWithPlayer()
     const dealt = presentCardsDealt(gameId, player)
 
     expectTypeOf(dealt).toEqualTypeOf<CardsDealt>()
@@ -141,7 +149,7 @@ describe('game presenter', () => {
     { cardIndex: 3, instruction: 'BACK_UP' }, { cardIndex: 4, instruction: 'TURN_LEFT' },
     { cardIndex: 5, instruction: 'TURN_RIGHT' }, { cardIndex: 6, instruction: 'U_TURN' },
   ] as const)('presents a resolved $instruction action', ({ cardIndex, instruction }) => {
-    const { player } = createSinglePlayerGame()
+    const { player } = createGameWithPlayer()
     const action = {
       robotId: player.robot.id,
       card: player.hand[cardIndex],
@@ -164,17 +172,27 @@ describe('game presenter', () => {
     })
   })
 
-  it('presents lobby details with the game name, players, and the demo map', () => {
-    const { gameId, game } = createSinglePlayerGame()
+  it.each([
+    ['empty-map', 'Empty Map'],
+    ['test-map', 'Test Map'],
+  ] as const)('presents lobby details for the %s board map', (mapName, mapLabel) => {
+    const { gameId, game } = createGame(mapName, 'Game with map')
     const players = [
       { playerId: '00000000-0000-4000-8000-000000000011', username: 'Malte' },
       { playerId: '00000000-0000-4000-8000-000000000012', username: 'Abid' },
     ]
-    expect(presentLobbyDetails(gameId, game, players)).toEqual({
+    const lobby = presentLobbyDetails(gameId, game, players)
+
+    expect(lobby).toEqual({
       gameId,
       name: game.name,
       players,
-      map: { name: 'DEMO MAP', icon: expect.stringMatching(/^data:image\/svg\+xml;base64,/), maxPlayers: 6 },
+      map: {
+        name: mapLabel,
+        icon: expect.stringMatching(/^data:image\/svg\+xml;base64,/),
+        maxPlayers: 6,
+      },
     })
+    expect(lobby.map.icon).toBe(game.board.map?.icon)
   })
 })
