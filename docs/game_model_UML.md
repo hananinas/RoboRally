@@ -97,54 +97,38 @@ Will update with a more conceptual domain diagram which will be used for present
 
 # Game
 
-Responsible for dictating the game loop: dealing cards, taking programs, and executing their registers.
+Game deals cards, accepts programs, and executes five registers. `submitProgram()` validates five distinct card IDs against the player's hand. Each action selects a pending robot using current Board positions and antenna priority. Movement uses `Game.moveRobot()`; turns change Robot's direction.
 
-Keeps track of the current phase and register. `submitProgram()` checks five distinct card IDs against the player's hand before assigning their cards to the Robot. During activation, Game chooses the next robot from those that have not acted yet, using current positions on Board and the priority antenna. It reads that robot's card and applies it: movement uses `Game.moveRobot()`, while turns change Robot's direction. Priority is worked out again after each robot acts, using any completed reboot position.
+`Game.moveRobot(robot, direction, steps)` attempts one Board step at a time and resolves entry effects after each successful step. Blocked steps stop movement without an effect. The resolver returns `continue` or `stop`; rebooting relocates immediately and discards the remaining steps. Each programmed action reports the final position and orientation before priority is recalculated.
 
-`Game.moveRobot(robot, direction, steps)` is the shared gameplay movement operation. It asks Board to attempt one step, stops if blocked, and resolves the entered tile's declared effect after each successful step. The entry resolver returns `continue` or `stop`. A `reboot` effect relocates the robot immediately and stops the rest of that movement instruction. The resulting action contains the final position and unchanged orientation; spatial steps do not produce separate action results.
-
-Direct callers can reuse this movement operation without submitting or executing a card. The caller chooses when movement happens: the operation does not start a round, consume a program card, advance a register, mark a robot as activated, award checkpoints, or emit network events. Existing program/submission state and orientation are preserved.
-
-Board elements activate after the robot actions in each register. Game reads each remaining robot's final tile and asks its Player to complete that checkpoint. Player advances only to the next numbered checkpoint. Passing over one during movement does not count. This also runs when removing a player finishes a register. After the fifth register, Game returns to programming, preserving checkpoint progress; completing the course does not end the game.
+Direct movement preserves orientation, programs, submissions, and register state. It neither starts a round nor marks an action complete, awards checkpoints, or emits events. Checkpoints are evaluated at final positions when all remaining robots finish a register, including when a departure completes it. Only the next numbered checkpoint counts; passing over one does not. After register five, Game returns to programming with progress preserved. Completing the course does not end the game.
 
 # Board
 
-Has the Tile grid and keeps track of each Robot's position in a map from RobotId to Position. Tile and Robot do not hold references to one another.
+Board owns the tile grid, antenna, and RobotId-to-Position map. `Board.moveRobot()` checks both sides of walls, board edges, and robot occupancy, without executing tile effects. Gameplay displacement, including future pushing, goes through Game's movement operation.
 
-Answers position and occupancy queries, and carries out spatial movement. Board checks walls on both sides of each boundary, board edges, and other robots before moving anything. `Board.moveRobot()` does not execute entry effects or stop specifically at pits: gameplay callers use `Game.moveRobot()` so effects are resolved before another step. Future pushing may reuse Board's collision logic, but displaced robots must still pass through Game's movement and effect timing.
-
-Initial placement, safe relocation, and nearest-free-position selection use each tile definition's `canOccupy` rule. Bounds and robot occupancy remain separate Board checks. Placement suitability does not restrict movement into a tile: entering a pit is necessary for its reboot effect to happen. Relocation validates its destination without resolving another entry effect. Reboot search uses Manhattan distance, breaking ties top to bottom and then left to right, even when walls enclose a candidate tile.
-
-Game reads Board positions and antenna state to work out priority, but Board does not sort robots or execute their programs. `hasEntryEffect('reboot')` inspects tile definitions so Game can require a configured reboot destination for boards that need one.
+Placement, relocation, and safe-destination search use `allowsPlacement()` for tile suitability, with bounds and occupancy checked separately. Pits remain enterable during movement. Relocation does not trigger entry effects. Reboot search uses Manhattan distance, then top-to-bottom and left-to-right tie-breaking; enclosing walls do not exclude a destination. `hasEntryEffect('reboot')` lets Game require reboot configuration where needed.
 
 # Tile
 
-Abstract class describing what is on a board space. Every tile exposes a readonly `kind` from the domain `TileKind` union. The current classes are EmptyTile (`EMPTY`) and PitTile (`PIT`). Walls are properties of any Tile, not a separate tile type.
-
-The exhaustively typed `tileDefinitions` table in `apps/game-service/src/game/Tile.ts` declares placement suitability and an optional entry effect:
+Tile is descriptive data with a readonly `TileKind`: EmptyTile uses `EMPTY`, and PitTile uses `PIT`. The exhaustive `tileDefinitions` table declares:
 
 | Kind | `canOccupy` for placement/reboot | `entryEffect` |
 | --- | --- | --- |
 | `EMPTY` | true | absent |
 | `PIT` | false | `reboot` |
 
-Definitions are descriptive data, with no callbacks or references to Game. Walls, checkpoint numbers, and future settings such as conveyor direction belong to tile instances.
-
-An optional `checkpointNumber` is another Tile property. A positive number identifies a checkpoint; absence means no checkpoint. Board owns its position through the tile grid, validates unique consecutive numbering from 1, and derives the checkpoint count. Checkpoints do not require a separate tile subclass and can coexist with walls.
-
-Tiles do not hold robots or activate themselves. Game resolves entry effects during movement and checks checkpoints after all remaining robots have acted in a register. Moving or rebooting onto a checkpoint does not award it immediately; the robot must still end the register there. Rebooting preserves checkpoint progress, orientation, and the program; later registers continue normally.
+Definitions contain no callbacks. Walls, optional checkpoint numbers, and future settings such as conveyor direction belong to instances. Board validates unique checkpoint numbers consecutive from 1 and derives their count. Checkpoints can coexist with walls without a separate subclass. Tiles hold neither robots nor activation logic.
 
 ## Extending tiles
 
-1. Add a domain tile kind and a Tile subclass with any required instance data. Keep existing tile classes; a new hierarchy or plugin framework is unnecessary.
-2. Add its definition to `tileDefinitions`, declaring placement suitability and any entry effect. Existing effects can be reused directly.
-3. If a new entry effect is required, add its value to `TileEntryEffect` and implement it in Game's exhaustive entry resolver. Return whether the current movement continues or stops. Collision logic and movement-card interpretation do not need tile-specific branches.
-4. Construct the tile through `boardMaps.ts` and `BoardFactory.ts`. For a new publicly visible kind, update the shared tile-type union, AsyncAPI, the client's board adapter, and rendering as needed. The presenter serializes `tile.kind` directly; type checks keep domain and public kind unions aligned. The current refactor retains the existing `EMPTY`/`PIT` payloads.
-5. Test observable movement and timing through `Game.moveRobot()` and card execution, plus placement, map construction, and public presentation where relevant. The existing coverage is in `Movement.test.ts`, `Pits.test.ts`, Board/Game tests, and presenter/socket tests under `apps/game-service/test`.
+1. Add a tile kind and subclass with its instance data.
+2. Declare placement suitability and any entry effect in `tileDefinitions`.
+3. Reuse an effect or extend `TileEntryEffect` and Game's exhaustive resolver. Leave collision logic and card interpretation generic.
+4. Add map construction and, for public kinds, shared types, AsyncAPI, the board adapter, and rendering. The presenter serializes `tile.kind` directly.
+5. Test placement, movement, effect timing, and presentation through public APIs.
 
-A tile that acts at register end should introduce its required ordered phase when implemented. Do not force register-end behavior into the entry resolver or add an unused dispatcher ahead of a concrete requirement. Conveyors and pushing still need their own scheduling and collision design.
-
-Pit animations, damage, cancellation of remaining registers, direction selection, and board-edge falls remain future work. Board edges currently block movement. The internal refactor adds no socket events or payload fields; see [Pits and rebooting](Communication.md#pits-and-rebooting) for the public guarantees.
+Register-end effects need their own ordered phase when implemented. Conveyors and pushing still need scheduling and collision design. Pit animations, damage, register cancellation, direction selection, and board-edge falls remain deferred.
 
 # Robot
 

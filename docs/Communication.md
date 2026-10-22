@@ -157,13 +157,11 @@ If an unexpected service failure makes gameplay unrecoverable, members receive `
 
 ### Pits and rebooting
 
-Entering a `PIT` stops the current movement instruction and immediately reboots the robot at the configured reboot tile. If occupied, use the nearest free, non-pit tile by Manhattan distance, breaking ties top to bottom, then left to right.
+Entering a `PIT` stops the current movement instruction and immediately reboots the robot at the configured reboot tile. Blocked movement produces no entry effect. If the reboot tile is occupied, use the nearest free, non-pit tile by Manhattan distance, breaking ties top to bottom, then left to right.
 
 Rebooting completes before the next action. `robot.actionResolved.position` and public snapshots contain the resulting position and unchanged orientation. No new event is added.
 
 Programs and checkpoint progress are preserved; later registers continue normally. Damage, round cancellation, direction selection, board-edge falls and pit animations are deferred.
-
-The service resolves tile entry after every successful step through its shared gameplay movement operation. A blocked step produces no entry effect. Rebooting onto a checkpoint does not award progress immediately; checkpoint evaluation remains at register end. This internal timing adds no payload fields or events. See the [tile extension pattern](game_model_UML.md#extending-tiles) for domain ownership and implementation guidance.
 
 ### Checkpoint progress
 
