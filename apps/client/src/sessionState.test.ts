@@ -4,27 +4,28 @@ import { createSessionState, sessionReducer, type SessionState } from './session
 
 
 const user: User = {
-  userId: '00000000-0000-4000-8000-000000000001',
-  username: ' Player ',
+userId: '00000000-0000-4000-8000-000000000001',
+username: ' Player ',
 }
 
 const gameId = '00000000-0000-4000-8000-000000000002'
 
 const joined: Extract<JoinResult, { outcome: 'JOINED' }> = {
-  outcome: 'JOINED',
-  assignment: {
-    gameId: '00000000-0000-4000-8000-000000000002',
-    playerId: '00000000-0000-4000-8000-000000000003',
-    robotId: '00000000-0000-4000-8000-000000000004',
-  },
-  state: {
-    gameId: '00000000-0000-4000-8000-000000000002',
-    antenna: { x: 0, y: 0, angle: Math.PI / 2 },
-    board: { width: 1, height: 1, tiles: [] },
-    robots: [],
-    players: [],
-    phase: 'PROGRAMMING',
-    paused: false,
+outcome: 'JOINED',
+assignment: {
+  gameId: '00000000-0000-4000-8000-000000000002',
+  playerId: '00000000-0000-4000-8000-000000000003',
+  robotId: '00000000-0000-4000-8000-000000000004',
+},
+state: {
+  gameId: '00000000-0000-4000-8000-000000000002',
+  antenna: { x: 0, y: 0, angle: Math.PI / 2 },
+  board: { width: 1, height: 1, tiles: [] },
+  robots: [],
+  players: [],
+  phase: 'PROGRAMMING',
+  paused: false,
+    aborted: false,
     checkpointCount: 0,
   },
   hand: [],

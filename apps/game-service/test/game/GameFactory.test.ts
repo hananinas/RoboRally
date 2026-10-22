@@ -1,4 +1,4 @@
-import { parseSubmitProgram } from '@robo-rally/game-events'
+import { submitProgramSchema } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'
 import { boardMaps } from '@/game/boardMaps'
 import { Direction, createGame, createPlayer } from '@/game/index'
@@ -34,7 +34,7 @@ describe('game factory', () => {
       'MOVE_1', 'MOVE_2', 'MOVE_3', 'BACK_UP', 'TURN_LEFT',
       'TURN_RIGHT', 'U_TURN', 'MOVE_1', 'TURN_LEFT',
     ])
-    expect(parseSubmitProgram({
+    expect(submitProgramSchema.parse({
       gameId: '00000000-0000-4000-8000-000000000001',
       playerId: first.id,
       cardIds: cardIds.slice(0, 5),
@@ -43,9 +43,8 @@ describe('game factory', () => {
 
   it('places an added player at the centre of the board', () => {
     const { game } = createGame('empty-map')
-    const player = createPlayer()
+    const player = game.addPlayer()._unsafeUnwrap()
 
-    expect(game.addPlayer(player)).toBe(true)
     expect(game.board.positionOf(player.robot.id)).toEqual({ x: 10, y: 7 })
   })
 

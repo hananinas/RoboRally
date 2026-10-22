@@ -50,6 +50,7 @@ export type ClientGameState = {
   handReady: boolean
   pendingHand: CardsDealt | null
   submission: 'idle' | 'pending' | 'accepted' | 'uncertain'
+  aborted: boolean
   error: string | null
 }
 
@@ -62,6 +63,7 @@ export type GameStateEvent =
   | { type: 'disconnected' }
   | { type: 'reconnected' }
   | { type: 'connect-error'; message: string }
+  | { type: 'aborted' }
   | { type: 'dealt'; hand: CardsDealt }
   | { type: 'reset' }
   | { type: 'error'; message: string }
@@ -125,6 +127,7 @@ export function createClientGameState(): ClientGameState {
     handReady: false,
     pendingHand: null,
     submission: 'idle',
+    aborted: false,
     error: null,
   }
 }
@@ -132,6 +135,7 @@ export function createClientGameState(): ClientGameState {
 export function canProgram(state: ClientGameState): boolean {
   return state.connected &&
     !state.paused &&
+    !state.aborted &&
     state.assignment !== null &&
     state.phase === 'PROGRAMMING' &&
     state.handReady &&
@@ -245,6 +249,12 @@ export function gameStateReducer(
       const message = connectErrors[event.message]
       return message ? { ...state, error: message } : state
     }
+    case 'aborted':
+      return {
+        ...state,
+        aborted: true,
+        error: 'This game has encountered an error and cannot continue.',
+      }
     case 'reset':
       return createClientGameState()
     case 'joined': {
@@ -260,6 +270,8 @@ export function gameStateReducer(
         submission: result.programSubmitted ? 'accepted' : 'idle',
         phase: snapshot.phase,
         paused: snapshot.paused,
+        aborted: snapshot.aborted,
+        error: snapshot.aborted ? 'This game has encountered an error and cannot continue.' : null,
         checkpointCount: snapshot.checkpointCount,
         players: snapshot.players.map((player) => ({
           playerId: player.playerId, username: player.username, connected: player.connected,
@@ -374,13 +386,32 @@ export function gameStateReducer(
       return createSubmission(state) ? { ...state, submission: 'pending', error: null } : state
     case 'result': {
       if (event.handVersion !== state.handVersion || state.submission !== 'pending') return state
-      if (event.result.outcome === 'ACCEPTED') {
+      if (event.result.outcome === 'ACCEPTED' || event.result.outcome === 'ALREADY_SUBMITTED') {
         return { ...state, submission: 'accepted', error: null }
       }
-      const error = event.result.outcome === 'GAME_PAUSED'
-        ? 'Game paused. Your program was not submitted — try again once reconnected.'
-        : 'Program rejected. Adjust your selection and try again.'
-      return { ...state, submission: 'idle', error }
+      if (event.result.outcome === 'GAME_PAUSED') {
+        return {
+          ...state,
+          submission: 'idle',
+          error: 'Game paused. Your program was not submitted — try again once reconnected.',
+        }
+      }
+      if (event.result.outcome === 'GAME_ABORTED') {
+        return {
+          ...state,
+          submission: 'idle',
+          aborted: true,
+          error: 'This game has encountered an error and cannot continue.',
+        }
+      }
+      if (event.result.outcome === 'WRONG_PHASE') {
+        return {
+          ...state,
+          submission: 'idle',
+          error: 'The round already moved on before your submission arrived.',
+        }
+      }
+      return { ...state, submission: 'idle', error: 'Program rejected. Adjust your selection and try again.' }
     }
     case 'submission-unknown':
       if (event.handVersion !== state.handVersion || state.submission !== 'pending') return state

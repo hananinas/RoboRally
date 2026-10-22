@@ -78,6 +78,7 @@ export type PublicGameState = Readonly<{
   phase: GamePhase
   players: readonly PlayerState[]
   paused: boolean
+  aborted: boolean
 }>
 
 export type PlayerState = Readonly<{
@@ -96,6 +97,7 @@ export type PlayerJoined = Readonly<{
 
 export type PlayerLeft = Readonly<{ gameId: GameId; playerId: PlayerId; robotId: RobotId }>
 
+export type GameAborted = Readonly<{ gameId: GameId }>
 export type PlayerCheckpointProgress = Readonly<{
   gameId: GameId
   playerId: PlayerId
@@ -120,7 +122,19 @@ export type CardsDealt = Readonly<{
   cards: readonly Card[]
 }>
 
-export type ProgramResultOutcome = 'ACCEPTED' | 'INVALID_PROGRAM' | 'GAME_PAUSED'
+export type ProgramResultOutcome =
+  | 'ACCEPTED'
+  | 'INVALID_PROGRAM'
+  | 'GAME_PAUSED'
+  | 'GAME_ABORTED'
+  | 'ALREADY_SUBMITTED'
+  | 'WRONG_PHASE'
+  | 'NOT_A_MEMBER'
+  | 'INVALID_REQUEST'
+  | 'GAME_ID_MISMATCH'
+  | 'PLAYER_ID_MISMATCH'
+  | 'PLAYER_NOT_IN_GAME'
+  | 'INTERNAL_ERROR'
 
 export type ProgramResult = Readonly<{
   outcome: ProgramResultOutcome
@@ -138,19 +152,6 @@ export type RobotActionResolved = Readonly<{
   instruction: Instruction
   position: Position
 }>
-
-export type GetPublicGameState = Readonly<{
-  gameId: GameId
-}>
-
-export type PublicGameStateResult =
-  | Readonly<{
-      outcome: 'GAME_FOUND'
-      state: PublicGameState
-    }>
-  | Readonly<{
-      outcome: 'GAME_NOT_FOUND'
-    }>
 
 export type GetLobbyDetails = Readonly<Record<string, never>>
 

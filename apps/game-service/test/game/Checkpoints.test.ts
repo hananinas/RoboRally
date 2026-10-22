@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { Board, Card, Direction, EmptyTile, Game, Player, Robot } from '@/game/index'
+import { Integer } from '@/numbers'
 
 function createGame(starts = [{ x: 0, y: 1, direction: Direction.EAST }]) {
   const tiles = Array.from({ length: 3 }, () => Array.from({ length: 5 }, () => new EmptyTile()))
   tiles[1][1] = new EmptyTile([], 1)
   tiles[1][3] = new EmptyTile([], 2)
-  const board = new Board(tiles, { x: 0, y: 0, angle: 0 })
+  const board = new Board(tiles, { x: Integer(0), y: Integer(0), angle: 0 })
   const players = starts.map(({ x, y, direction }, index) => {
     const robot = new Robot(`robot-${index}`, direction)
-    board.placeRobot(robot.id, { x, y })
+    board.placeRobot(robot.id, { x: Integer(x), y: Integer(y) })
     return new Player(`player-${index}`, robot)
   })
   const cards = {
@@ -30,7 +31,7 @@ describe('checkpoint activation', () => {
       { x: 0, y: 1, direction: Direction.EAST },
       { x: 4, y: 2, direction: Direction.NORTH },
     ])
-    for (const player of players) game.submitProgram(player.id, [c.step, c.left, c.right, c.uturn, c.back])
+    for (const player of players) game.submitProgram(player.id, [c.step, c.left, c.right, c.uturn, c.back].map((card) => card.id))
 
     expect(game.executeNextAction().action.robotId).toBe(players[0].robot.id)
     expect(players[0].lastCheckpoint).toBe(0)
@@ -42,17 +43,17 @@ describe('checkpoint activation', () => {
   it('ignores passed checkpoints, completes the course in order and continues into another round', () => {
     const { board, players: [player], cards: c, game } = createGame()
     const program = [c.move2, c.back, c.step, c.stepAgain, c.left]
-    game.submitProgram(player.id, program)
+    game.submitProgram(player.id, program.map((card) => card.id))
     const progress = program.map(() => {
       game.executeNextAction()
       return player.lastCheckpoint
     })
 
     expect(progress).toEqual([0, 1, 1, 2, 2])
-    expect(board.getTile({ x: 1, y: 1 })?.checkpointNumber).toBe(1)
-    expect(board.getTile({ x: 3, y: 1 })?.checkpointNumber).toBe(2)
+    expect(board.getTile({ x: Integer(1), y: Integer(1) })?.checkpointNumber).toBe(1)
+    expect(board.getTile({ x: Integer(3), y: Integer(1) })?.checkpointNumber).toBe(2)
     expect(game.phase).toBe('programming')
-    game.submitProgram(player.id, program)
+    game.submitProgram(player.id, program.map((card) => card.id))
     expect(game.phase).toBe('activation')
     game.executeNextAction()
     expect(player.lastCheckpoint).toBe(2)
@@ -60,7 +61,7 @@ describe('checkpoint activation', () => {
 
   it('does not award a later checkpoint before the next required checkpoint', () => {
     const { players: [player], cards: c, game } = createGame([{ x: 2, y: 1, direction: Direction.EAST }])
-    game.submitProgram(player.id, [c.step, c.left, c.right, c.uturn, c.back])
+    game.submitProgram(player.id, [c.step, c.left, c.right, c.uturn, c.back].map((card) => card.id))
     for (let register = 0; register < 4; register++) {
       game.executeNextAction()
       expect(player.lastCheckpoint).toBe(0)
@@ -70,7 +71,7 @@ describe('checkpoint activation', () => {
   it('awards a checkpoint under a stationary robot after a turn, irrespective of facing', () => {
     const { players: [player], cards: c, game } = createGame([{ x: 1, y: 1, direction: Direction.EAST }])
     expect(player.lastCheckpoint).toBe(0)
-    game.submitProgram(player.id, [c.left, c.right, c.uturn, c.step, c.back])
+    game.submitProgram(player.id, [c.left, c.right, c.uturn, c.step, c.back].map((card) => card.id))
     expect(player.lastCheckpoint).toBe(0)
     for (let register = 0; register < 3; register++) {
       game.executeNextAction()
@@ -83,7 +84,7 @@ describe('checkpoint activation', () => {
       { x: 0, y: 1, direction: Direction.EAST },
       { x: 1, y: 2, direction: Direction.NORTH },
     ])
-    for (const player of players) game.submitProgram(player.id, [c.step, c.stepAgain, c.left, c.right, c.uturn])
+    for (const player of players) game.submitProgram(player.id, [c.step, c.stepAgain, c.left, c.right, c.uturn].map((card) => card.id))
     game.executeNextAction()
     game.executeNextAction()
     expect(players.map((player) => player.lastCheckpoint)).toEqual([1, 0])
@@ -97,7 +98,7 @@ describe('checkpoint activation', () => {
       { x: 0, y: 1, direction: Direction.EAST },
       { x: 4, y: 2, direction: Direction.NORTH },
     ])
-    for (const player of players) game.submitProgram(player.id, [c.step, c.left, c.right, c.uturn, c.back])
+    for (const player of players) game.submitProgram(player.id, [c.step, c.left, c.right, c.uturn, c.back].map((card) => card.id))
     game.executeNextAction()
     expect(players[0].lastCheckpoint).toBe(0)
     game.removePlayer(players[1].id)

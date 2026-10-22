@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { boardMaps } from '@/game/boardMaps'
 import { Direction, EmptyTile, createBoard } from '@/game/index'
+import { Integer } from '@/numbers'
 
 describe('board factory', () => {
   it('creates the empty map with the size specified by the map and no walls', () => {
@@ -8,13 +9,13 @@ describe('board factory', () => {
 
     expect(board.width).toBe(boardMaps['empty-map'].width)
     expect(board.height).toBe(boardMaps['empty-map'].height)
-    expect(board.getTile({ x: 0, y: 0 })).toBeInstanceOf(EmptyTile)
-    expect(board.getTile({ x: board.width - 1, y: board.height - 1 })).toBeInstanceOf(EmptyTile)
-    expect(board.getTile({ x: 1, y: 1 })?.walls.size).toBe(0)
+    expect(board.getTile({ x: Integer(0), y: Integer(0) })).toBeInstanceOf(EmptyTile)
+    expect(board.getTile({ x: Integer(board.width - 1), y: Integer(board.height - 1) })).toBeInstanceOf(EmptyTile)
+    expect(board.getTile({ x: Integer(1), y: Integer(1) })?.walls.size).toBe(0)
   })
 
   it('defaults to the empty map', () => {
-    expect(createBoard().getTile({ x: 1, y: 1 })?.walls.size).toBe(0)
+    expect(createBoard().getTile({ x: Integer(1), y: Integer(1) })?.walls.size).toBe(0)
   })
 
   it('applies the walls specified by the map', () => {
@@ -22,15 +23,15 @@ describe('board factory', () => {
 
     expect(board.width).toBe(boardMaps['test-map'].width)
     expect(board.height).toBe(boardMaps['test-map'].height)
-    expect(board.getTile({ x: 1, y: 1 })?.walls).toEqual(new Set([Direction.NORTH, Direction.EAST]))
-    expect(board.getTile({ x: 4, y: 2 })?.walls).toEqual(
+    expect(board.getTile({ x: Integer(1), y: Integer(1) })?.walls).toEqual(new Set([Direction.NORTH, Direction.EAST]))
+    expect(board.getTile({ x: Integer(4), y: Integer(2) })?.walls).toEqual(
       new Set([Direction.NORTH, Direction.WEST, Direction.SOUTH]),
     )
-    expect(board.getTile({ x: 14, y: 1 })?.walls).toEqual(
+    expect(board.getTile({ x: Integer(14), y: Integer(1) })?.walls).toEqual(
       new Set([Direction.NORTH, Direction.WEST, Direction.SOUTH, Direction.EAST]),
     )
-    expect(board.getTile({ x: 12, y: 0 })?.walls.size).toBe(0)
-    expect(board.getTile({ x: 0, y: 0 })?.walls.size).toBe(0)
+    expect(board.getTile({ x: Integer(12), y: Integer(0) })?.walls.size).toBe(0)
+    expect(board.getTile({ x: Integer(0), y: Integer(0) })?.walls.size).toBe(0)
   })
 
   it('places the checkpoints specified by each map', () => {
@@ -38,8 +39,8 @@ describe('board factory', () => {
       const board = createBoard(mapName)
 
       expect(board.checkpointCount).toBe(2)
-      expect(board.getTile({ x: 10, y: 6 })?.checkpointNumber).toBe(1)
-      expect(board.getTile({ x: 8, y: 9 })?.checkpointNumber).toBe(2)
+      expect(board.getTile({ x: Integer(10), y: Integer(6) })?.checkpointNumber).toBe(1)
+      expect(board.getTile({ x: Integer(8), y: Integer(9) })?.checkpointNumber).toBe(2)
     }
   })
 
