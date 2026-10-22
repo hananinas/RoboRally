@@ -6,7 +6,7 @@ import { Card } from '@/game/Card'
 import type { CardId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
 import { Robot } from '@/game/Robot'
-import { PitTile, tileDefinitions } from '@/game/Tile'
+import { tileDefinitions, type Tile } from '@/game/Tile'
 import { Direction, opposite, type Position } from '@/game/spatial'
 import { Integer, PositiveInteger, UnsignedInteger } from '@/numbers'
 
@@ -229,6 +229,18 @@ export class Game {
     }
   }
 
+  // Gameplay movement resolves entry effects; Board movement only changes positions.
+  moveRobot(robot: Robot, direction: Direction, steps: PositiveInteger): void {
+    for (let step = 0; step < steps; step++) {
+      const movement = this.board.moveRobot(robot.id, direction, PositiveInteger(1))
+      if (movement.stepsMoved === 0) return
+
+      const tile = this.board.getTile(movement.position)
+      if (tile === undefined) throw new Error('Robot entered a missing tile')
+      if (this.resolveTileEntry(robot, tile) === 'stop') return
+    }
+  }
+
   executeNextAction(): NextActionResult {
     if (this.currentPhase !== 'activation') {
       throw new Error('Robot actions can only execute during activation')
@@ -300,12 +312,24 @@ export class Game {
     const effect = instructions[card.instruction]
     if (effect.kind === 'move') {
       const direction = effect.steps < 0 ? opposite(robot.direction) : robot.direction
-      const movement = this.board.moveRobot(robot.id, direction, PositiveInteger(Math.abs(effect.steps)))
-      if (movement.stepsMoved > 0 && this.board.getTile(movement.position) instanceof PitTile) {
-        this.rebootRobot(robot)
-      }
+      this.moveRobot(robot, direction, PositiveInteger(Math.abs(effect.steps)))
     } else {
       robot.turn(effect.quarterTurns)
+    }
+  }
+
+  private resolveTileEntry(robot: Robot, tile: Tile): 'continue' | 'stop' {
+    const effect = tileDefinitions[tile.kind].entryEffect
+    switch (effect) {
+      case undefined:
+        return 'continue'
+      case 'reboot':
+        this.rebootRobot(robot)
+        return 'stop'
+      default: {
+        const unexpectedEffect: never = effect
+        throw new Error(`Unsupported tile entry effect: ${String(unexpectedEffect)}`)
+      }
     }
   }
 

@@ -289,16 +289,17 @@ describe('Board robot ownership', () => {
     expect(board.occupantAt({ x: Integer(2), y: Integer(0) })).toBe('beta')
   })
 
-  it('stops at the first pit without crossing it or reporting a blocked move', () => {
+  it('moves spatially across pits without resolving entry effects', () => {
     const board = new Board([[new EmptyTile(), new PitTile(), new PitTile(), new EmptyTile()]], antenna)
     board.placeRobot('alpha', { x: Integer(0), y: Integer(0) })
 
     expect(board.moveRobot('alpha', Direction.EAST, PositiveInteger(3))).toEqual({
-      position: { x: 1, y: 0 }, stepsMoved: 1, blocked: false,
+      position: { x: 3, y: 0 }, stepsMoved: 3, blocked: false,
     })
     expect(board.occupantAt({ x: Integer(0), y: Integer(0) })).toBeUndefined()
-    expect(board.occupantAt({ x: Integer(1), y: Integer(0) })).toBe('alpha')
+    expect(board.occupantAt({ x: Integer(1), y: Integer(0) })).toBeUndefined()
     expect(board.occupantAt({ x: Integer(2), y: Integer(0) })).toBeUndefined()
+    expect(board.occupantAt({ x: Integer(3), y: Integer(0) })).toBe('alpha')
   })
 
   it('remains blocked by another robot before reaching a pit', () => {

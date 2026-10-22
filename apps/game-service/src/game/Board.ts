@@ -1,6 +1,6 @@
 import { type Direction, type Position, neighbour, opposite } from '@/game/spatial'
 import type { RobotId } from '@/game/ids'
-import { PitTile, tileDefinitions, type Tile, type TileEntryEffect } from '@/game/Tile'
+import { tileDefinitions, type Tile, type TileEntryEffect } from '@/game/Tile'
 import { Integer, type PositiveInteger } from '@/numbers'
 
 export type MovementResult = Readonly<{
@@ -178,7 +178,6 @@ export class Board {
       // move the robot to the next position as it is free
       this.updateRobotPosition(robotId, nextPosition)
       stepsMoved = step + 1
-      if (this.getTile(nextPosition) instanceof PitTile) break
     }
 
     return { position: this.positionOf(robotId), stepsMoved: stepsMoved, blocked: false }

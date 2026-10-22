@@ -7,8 +7,10 @@ function createGame(
   pit = { x: Integer(1), y: Integer(1) },
   rebootTile = { x: Integer(0), y: Integer(2) },
   walls: readonly Direction[] = [],
+  startWalls: readonly Direction[] = [],
 ) {
   const tiles: Tile[][] = Array.from({ length: 3 }, () => Array.from({ length: 5 }, () => new EmptyTile()))
+  tiles[1][0] = new EmptyTile(startWalls)
   tiles[pit.y][pit.x] = new PitTile(walls)
   const board = new Board(tiles, { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
   const robot = new Robot('robot', Direction.EAST)
@@ -54,12 +56,39 @@ describe('pit entry and rebooting', () => {
     expect(game.currentRegister).toBe(1)
   })
 
-  it('does not reboot when a wall blocks pit entry', () => {
-    const { board, robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, undefined, [Direction.WEST])
+  it.each([
+    { wall: 'source', pitWalls: [], startWalls: [Direction.EAST] },
+    { wall: 'destination', pitWalls: [Direction.WEST], startWalls: [] },
+  ])('does not reboot when the $wall wall blocks pit entry', ({ pitWalls, startWalls }) => {
+    const { board, robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, undefined, pitWalls, startWalls)
     game.submitProgram(player.id, [c.MOVE_3, c.MOVE_1, c.TURN_LEFT, c.TURN_RIGHT, c.BACK_UP].map((card) => card.id))._unsafeUnwrap()
 
     expect(game.executeNextAction().action.position).toEqual({ x: Integer(0), y: Integer(1) })
     expect(board.positionOf(robot.id)).toEqual({ x: Integer(0), y: Integer(1) })
+    expect(board.occupantAt({ x: Integer(1), y: Integer(1) })).toBeUndefined()
+  })
+
+  it('stops at an occupied tile after a successful step without reaching the pit', () => {
+    const { board, robot, player, cards: c, game } = createGame({ x: Integer(3), y: Integer(1) })
+    const other = game.addPlayer()._unsafeUnwrap()
+    game.submitProgram(player.id, [c.MOVE_3, c.MOVE_1, c.TURN_LEFT, c.TURN_RIGHT, c.BACK_UP].map((card) => card.id))._unsafeUnwrap()
+    game.submitProgram(other.id, [4, 5, 6, 0, 1].map((index) => other.hand[index].id))._unsafeUnwrap()
+
+    expect(game.executeNextAction().action.robotId).toBe(other.robot.id)
+    expect(game.executeNextAction().action.position).toEqual({ x: Integer(1), y: Integer(1) })
+    expect(board.positionOf(robot.id)).toEqual({ x: Integer(1), y: Integer(1) })
+    expect(board.positionOf(other.robot.id)).toEqual({ x: Integer(2), y: Integer(1) })
+    expect(board.occupantAt({ x: Integer(3), y: Integer(1) })).toBeUndefined()
+  })
+
+  it('stops at the board boundary without rebooting', () => {
+    const { board, robot, player, cards: c, game } = createGame()
+    robot.turn(2)
+    game.submitProgram(player.id, [c.MOVE_3, c.MOVE_1, c.TURN_LEFT, c.TURN_RIGHT, c.BACK_UP].map((card) => card.id))._unsafeUnwrap()
+
+    expect(game.executeNextAction().action.position).toEqual({ x: Integer(0), y: Integer(1) })
+    expect(board.positionOf(robot.id)).toEqual({ x: Integer(0), y: Integer(1) })
+    expect(robot.direction).toBe(Direction.WEST)
     expect(board.occupantAt({ x: Integer(1), y: Integer(1) })).toBeUndefined()
   })
 
