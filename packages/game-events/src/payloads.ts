@@ -21,7 +21,7 @@ export type LoginResult =
         | 'INTERNAL_ERROR'
     }>
 
-export type JoinGame = Readonly<{ gameId: GameId }>
+export type LeaveGame = Readonly<{ gameId: GameId }>
 
 export type PlayerAssignment = Readonly<{
   gameId: GameId
@@ -49,6 +49,7 @@ export type Position = Readonly<{
 export type Robot = Readonly<{
   robotId: RobotId
   playerId: PlayerId
+  colour: string
   position: Position
 }>
 
@@ -87,6 +88,7 @@ export type PlayerState = Readonly<{
   username: string
   programSubmitted: boolean
   connected: boolean
+  registers: PublicRegisters
 }>
 
 export type PlayerJoined = Readonly<{
@@ -149,54 +151,98 @@ export type RobotActionResolved = Readonly<{
   gameId: GameId
   registerIndex: number
   robotId: RobotId
+  playerId: PlayerId
   instruction: Instruction
   position: Position
 }>
 
-export type GetLobbyDetails = Readonly<Record<string, never>>
+export type PublicRegisterSlot =
+  | Readonly<{ status: 'EMPTY' }>
+  | Readonly<{ status: 'HIDDEN' }>
+  | Readonly<{ status: 'REVEALED'; instruction: Instruction }>
 
-export type GameMap = Readonly<{
+export type PublicRegisters = readonly [
+  PublicRegisterSlot,
+  PublicRegisterSlot,
+  PublicRegisterSlot,
+  PublicRegisterSlot,
+  PublicRegisterSlot,
+]
+
+export type UpdateRegistersResult = Readonly<{
+  outcome:
+    | 'ACCEPTED'
+    | 'INVALID_REQUEST'
+    | 'NOT_A_MEMBER'
+    | 'PLAYER_ID_MISMATCH'
+    | 'WRONG_PHASE'
+    | 'ALREADY_SUBMITTED'
+    | 'INTERNAL_ERROR'
+}>
+
+export type RegistersChanged = Readonly<{
+  gameId: GameId
+  playerId: PlayerId
+  registers: PublicRegisters
+}>
+
+export type ProgrammingStarted = Readonly<{ gameId: GameId }>
+
+export type JoinAccepted = Readonly<{
+  outcome: 'JOINED'
+  assignment: PlayerAssignment
+  state: PublicGameState
+  hand: readonly Card[]
+  programSubmitted: boolean
+}>
+
+export type JoinResult = JoinAccepted
+
+export type LobbyId = string
+
+export type LobbySummary = Readonly<{
+  lobbyId: LobbyId
   name: string
-  icon: string
+  playerCount: number
   maxPlayers: number
 }>
 
-export type LobbyPlayer = Readonly<{
-  playerId: PlayerId
-  username: string
+export type LobbyState = Readonly<LobbySummary & { ownerUserId: UserId }>
+
+export type LobbyFailure = Readonly<{
+  outcome:
+    | 'LOGIN_REQUIRED'
+    | 'INVALID_REQUEST'
+    | 'INTERNAL_ERROR'
+    | 'LOBBY_NOT_FOUND'
+    | 'NOT_LOBBY_MEMBER'
+    | 'NOT_LOBBY_OWNER'
+    | 'LOBBY_FULL'
+    | 'USER_ALREADY_IN_SESSION'
 }>
 
-export type LobbyDetails = Readonly<{
-  gameId: GameId
-  name: string
-  players: readonly LobbyPlayer[]
-  map: GameMap
+export type LobbyListResult =
+  | Readonly<{ outcome: 'LOBBIES_FOUND'; lobbies: readonly LobbySummary[] }>
+  | LobbyFailure
+
+export type LobbyJoinResult =
+  | Readonly<{ outcome: 'LOBBY_JOINED'; lobby: LobbyState }>
+  | LobbyFailure
+
+export type LobbyLeaveResult = Readonly<{ outcome: 'LEFT' }> | LobbyFailure
+
+export type LobbyStartResult =
+  | Readonly<{ outcome: 'STARTED'; gameId: GameId }>
+  | LobbyFailure
+
+export type SessionResult =
+  | Readonly<{ outcome: 'NO_SESSION' }>
+  | Readonly<{ outcome: 'IN_LOBBY'; lobby: LobbyState }>
+  | Readonly<{ outcome: 'IN_GAME'; initialization: JoinAccepted }>
+  | LobbyFailure
+
+export type LobbyUpdated = Readonly<{ lobby: LobbyState }>
+export type GameStarted = Readonly<{
+  lobbyId: LobbyId
+  initialization: JoinAccepted
 }>
-
-export type LobbyDetailsResult =
-  | Readonly<{
-      outcome: 'LOBBY_FOUND'
-      lobbies: readonly LobbyDetails[]
-    }>
-  | Readonly<{
-      outcome: 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'INTERNAL_ERROR'
-    }>
-
-export type JoinResult =
-  | Readonly<{
-      outcome: 'JOINED'
-      assignment: PlayerAssignment
-      state: PublicGameState
-      hand: readonly Card[]
-      programSubmitted: boolean
-    }>
-  | Readonly<{
-      outcome:
-        | 'LOGIN_REQUIRED'
-        | 'INVALID_REQUEST'
-        | 'GAME_NOT_FOUND'
-        | 'NO_SPAWN_AVAILABLE'
-        | 'USER_ALREADY_IN_GAME'
-        | 'GAME_ALREADY_STARTED'
-        | 'INTERNAL_ERROR'
-    }>

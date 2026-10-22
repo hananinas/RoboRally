@@ -28,14 +28,41 @@ describe('game event payload types', () => {
       gameId: 'game',
       antenna: { x: 0, y: 0, angle: 0 },
       board: { width: 1, height: 1, tiles: [] },
-      robots: [],
-      players: [],
+      robots: [{
+        robotId: 'robot',
+        playerId: 'player',
+        colour: 'red',
+        position: { coordinate: { x: 0, y: 0 }, orientation: 'NORTH' },
+      }],
+      players: [{
+        playerId: 'player',
+        username: 'Ada',
+        connected: true,
+        programSubmitted: false,
+        lastCheckpoint: 0,
+        registers: [
+          { status: 'REVEALED', instruction: 'MOVE_1' },
+          { status: 'HIDDEN' },
+          { status: 'EMPTY' },
+          { status: 'EMPTY' },
+          { status: 'EMPTY' },
+        ],
+      }],
       phase: 'PROGRAMMING',
       paused: false,
       aborted: false,
       checkpointCount: 0,
     } satisfies PublicGameState
 
-    expect(state.gameId).toBe('game')
+    expect(state.robots[0]?.colour).toBe('red')
+    expect(state.players[0]?.registers).toEqual([
+      { status: 'REVEALED', instruction: 'MOVE_1' },
+      { status: 'HIDDEN' },
+      { status: 'EMPTY' },
+      { status: 'EMPTY' },
+      { status: 'EMPTY' },
+    ])
+    expect(JSON.stringify(state)).not.toContain('hand')
+    expect(JSON.stringify(state)).not.toContain('cardId')
   })
 })
