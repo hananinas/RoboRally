@@ -8,7 +8,7 @@ import type {
 } from '@robo-rally/game-events'
 import { io as createClient, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Board, EmptyTile, PitTile, Game, Card } from '@/game/index.ts'
+import { Board, EmptyTile, PitTile, Game, Card, type Tile } from '@/game/index.ts'
 import { createGame, createHand } from '@/game/GameFactory.ts'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer.ts'
 import * as gamePresenter from '@/socket/gamePresenter.ts'
@@ -593,7 +593,7 @@ describe('game membership over Socket.IO', () => {
   describe('pit results over Socket.IO', () => {
     beforeEach(async () => {
       await new Promise<void>((resolve) => server.close(() => resolve()))
-      const tiles = Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => new EmptyTile()))
+      const tiles: Tile[][] = Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => new EmptyTile()))
       tiles[1][2] = new PitTile()
       tiles[4][4] = new EmptyTile([], 1)
       tiles[4][0] = new EmptyTile([], 2)

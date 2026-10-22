@@ -12,8 +12,6 @@ import type {
 } from '@robo-rally/game-events'
 import {
   Direction,
-  EmptyTile,
-  PitTile,
   type Card,
   type Game,
   type GameId,
@@ -41,14 +39,14 @@ function presentCard(card: Card): CardPayload {
 
 function presentTile(game: Game, x: number, y: number): TilePayload {
   const tile = game.board.getTile({ x: Integer(x), y: Integer(y) })
-  if (!(tile instanceof EmptyTile) && !(tile instanceof PitTile)) {
-    throw new Error(`Unsupported tile at ${x},${y}`)
+  if (tile === undefined) {
+    throw new Error(`Missing tile at ${x},${y}`)
   }
 
   const walls = [...tile.walls].map((direction) => orientations[direction])
   return {
     position: { x: Integer(x), y: Integer(y) },
-    type: tile instanceof PitTile ? 'PIT' : 'EMPTY',
+    type: tile.kind,
     ...(walls.length === 0 ? {} : { walls }),
     ...(tile.checkpointNumber === undefined ? {} : { checkpointNumber: tile.checkpointNumber }),
   }

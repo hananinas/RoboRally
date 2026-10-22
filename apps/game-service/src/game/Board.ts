@@ -1,6 +1,6 @@
 import { type Direction, type Position, neighbour, opposite } from '@/game/spatial'
 import type { RobotId } from '@/game/ids'
-import { PitTile, type Tile } from '@/game/Tile'
+import { PitTile, tileDefinitions, type Tile, type TileEntryEffect } from '@/game/Tile'
 import { Integer, type PositiveInteger } from '@/numbers'
 
 export type MovementResult = Readonly<{
@@ -55,8 +55,8 @@ export class Board {
     return this.checkpointTotal
   }
 
-  get hasPits(): boolean {
-    return this.tiles.some((row) => row.some((tile) => tile instanceof PitTile))
+  hasEntryEffect(effect: TileEntryEffect): boolean {
+    return this.tiles.some((row) => row.some((tile) => tileDefinitions[tile.kind].entryEffect === effect))
   }
 
   contains(position: Position): boolean {
@@ -73,10 +73,11 @@ export class Board {
   }
 
   placeRobot(robotId: RobotId, position: Position): void {
-    if (!this.contains(position)) {
+    const tile = this.getTile(position)
+    if (tile === undefined) {
       throw new RangeError('Robot position must be on the board')
     }
-    if (this.getTile(position) instanceof PitTile) {
+    if (!tileDefinitions[tile.kind].canOccupy) {
       throw new RangeError('Robots cannot be placed on pits')
     }
     if (this.robotPositions.has(robotId)) {
@@ -91,7 +92,8 @@ export class Board {
 
   relocateRobot(robotId: RobotId, position: Position): void {
     this.positionOf(robotId)
-    if (!this.contains(position) || this.getTile(position) instanceof PitTile) {
+    const tile = this.getTile(position)
+    if (tile === undefined || !tileDefinitions[tile.kind].canOccupy) {
       throw new RangeError('Robot destination must be a non-pit tile on the board')
     }
     const occupant = this.occupantAt(position)
@@ -107,7 +109,7 @@ export class Board {
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
         const position = { x: Integer(x), y: Integer(y) }
-        if (this.tiles[y][x] instanceof PitTile || this.occupantAt(position) !== undefined) continue
+        if (!tileDefinitions[this.tiles[y][x].kind].canOccupy || this.occupantAt(position) !== undefined) continue
         const distance = Math.abs(x - origin.x) + Math.abs(y - origin.y)
         if (distance < nearestDistance) {
           nearest = position

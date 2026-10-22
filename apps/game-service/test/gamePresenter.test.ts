@@ -3,6 +3,7 @@ import type {
   CardsDealt,
   PublicGameState,
   RobotActionResolved,
+  Tile as TilePayload,
 } from '@robo-rally/game-events'
 import {
   Board,
@@ -14,6 +15,7 @@ import {
   Player,
   Robot,
   createGame,
+  type TileKind,
 } from '@/game/index.ts'
 import {
   presentCardsDealt,
@@ -30,6 +32,10 @@ function createGameWithPlayer() {
 }
 
 describe('game presenter', () => {
+  it('keeps domain tile kinds exhaustively compatible with public tile types', () => {
+    expectTypeOf<TileKind>().toEqualTypeOf<TilePayload['type']>()
+  })
+
   it('serializes pits alongside empty tiles, walls and checkpoints', () => {
     const board = new Board([[
       new EmptyTile(),

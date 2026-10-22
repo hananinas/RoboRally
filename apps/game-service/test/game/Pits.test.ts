@@ -1,14 +1,14 @@
 import { Integer } from '@/numbers'
 import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
-import { Board, Card, Direction, EmptyTile, Game, PitTile, Player, Robot } from '@/game/index'
+import { Board, Card, Direction, EmptyTile, Game, PitTile, Player, Robot, type Tile } from '@/game/index'
 
 function createGame(
   pit = { x: Integer(1), y: Integer(1) },
   rebootTile = { x: Integer(0), y: Integer(2) },
   walls: readonly Direction[] = [],
 ) {
-  const tiles = Array.from({ length: 3 }, () => Array.from({ length: 5 }, () => new EmptyTile()))
+  const tiles: Tile[][] = Array.from({ length: 3 }, () => Array.from({ length: 5 }, () => new EmptyTile()))
   tiles[pit.y][pit.x] = new PitTile(walls)
   const board = new Board(tiles, { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
   const robot = new Robot('robot', Direction.EAST)

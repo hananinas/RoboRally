@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { Board, Direction, EmptyTile, PitTile } from '@/game/index.ts'
-import type { Position } from '@/game/index.ts'
+import type { Position, Tile, TileKind } from '@/game/index.ts'
 import { Integer, PositiveInteger } from '@/numbers'
 
 const antenna = { x: Integer(0), y: Integer(0), angle: Math.PI / 2 }
 
-function grid(width = 3, height = 3): EmptyTile[][] {
+function grid(width = 3, height = 3): Tile[][] {
   return Array.from({ length: height }, () =>
     Array.from({ length: width }, () => new EmptyTile()),
   )
@@ -138,6 +138,34 @@ describe('Tile and Board layout', () => {
 })
 
 describe('Board robot ownership', () => {
+  const destinations: Record<TileKind, { tile: Tile; canOccupy: boolean; entryEffect?: 'reboot' }> = {
+    EMPTY: { tile: new EmptyTile(), canOccupy: true },
+    PIT: { tile: new PitTile(), canOccupy: false, entryEffect: 'reboot' },
+  }
+
+  it.each(Object.entries(destinations))('uses %s rules for placement, relocation and safe destinations', (kind, { tile, canOccupy, entryEffect }) => {
+    const board = new Board([[new EmptyTile(), tile]], antenna)
+    const start = { x: Integer(0), y: Integer(0) }
+    const destination = { x: Integer(1), y: Integer(0) }
+    board.placeRobot('alpha', start)
+
+    expect(tile.kind).toBe(kind)
+    expect(board.hasEntryEffect('reboot')).toBe(entryEffect === 'reboot')
+    expect(board.nearestFreePosition(destination)).toEqual(canOccupy ? destination : undefined)
+    if (canOccupy) {
+      board.placeRobot('beta', destination)
+      board.removeRobot('beta')
+      board.relocateRobot('alpha', destination)
+      expect(board.positionOf('alpha')).toEqual(destination)
+      expect(board.occupantAt(start)).toBeUndefined()
+    } else {
+      expect(() => board.placeRobot('beta', destination)).toThrow(RangeError)
+      expect(() => board.relocateRobot('alpha', destination)).toThrow(RangeError)
+      expect(board.positionOf('alpha')).toEqual(start)
+      expect(board.occupantAt(destination)).toBeUndefined()
+    }
+  })
+
   it('rejects initial placement on pits without adding the robot', () => {
     const board = new Board([[new PitTile(), new EmptyTile()]], antenna)
 

@@ -6,7 +6,7 @@ import { Card } from '@/game/Card'
 import type { CardId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
 import { Robot } from '@/game/Robot'
-import { PitTile } from '@/game/Tile'
+import { PitTile, tileDefinitions } from '@/game/Tile'
 import { Direction, opposite, type Position } from '@/game/spatial'
 import { Integer, PositiveInteger, UnsignedInteger } from '@/numbers'
 
@@ -59,12 +59,14 @@ export class Game {
     if (deck.length < 5 || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')
     }
-    if (board.hasPits && rebootTile === undefined) {
+    if (board.hasEntryEffect('reboot') && rebootTile === undefined) {
       throw new RangeError('A board with pits requires a reboot tile')
     }
-    if (rebootTile !== undefined &&
-        (!board.contains(rebootTile) || board.getTile(rebootTile) instanceof PitTile)) {
-      throw new RangeError('Reboot tile must be a non-pit tile on the board')
+    if (rebootTile !== undefined) {
+      const tile = board.getTile(rebootTile)
+      if (tile === undefined || !tileDefinitions[tile.kind].canOccupy) {
+        throw new RangeError('Reboot tile must be a non-pit tile on the board')
+      }
     }
 
     const playerIds = new Set<PlayerId>()
@@ -73,7 +75,8 @@ export class Game {
       if (playerIds.has(player.id) || robotIds.has(player.robot.id)) {
         throw new RangeError('Players and robots must have unique IDs')
       }
-      if (board.getTile(board.positionOf(player.robot.id)) instanceof PitTile) {
+      const tile = board.getTile(board.positionOf(player.robot.id))
+      if (tile === undefined || !tileDefinitions[tile.kind].canOccupy) {
         throw new RangeError('Robots cannot start on pits')
       }
       playerIds.add(player.id)
@@ -137,10 +140,14 @@ export class Game {
     const { width, height } = this.board
     const y = Math.floor(height / 2)
     let x = Math.floor(width / 2)
-    while (x >= 0 && (this.board.getTile({ x: Integer(x), y: Integer(y) }) instanceof PitTile ||
-      this.board.occupantAt({ x: Integer(x), y: Integer(y) }) !== undefined)) x--
-    if (x < 0) return err('NO_SPAWN_AVAILABLE')
-    return ok({ x: Integer(x), y: Integer(y) })
+    while (x >= 0) {
+      const position = { x: Integer(x), y: Integer(y) }
+      const tile = this.board.getTile(position)
+      if (tile !== undefined && tileDefinitions[tile.kind].canOccupy &&
+          this.board.occupantAt(position) === undefined) return ok(position)
+      x--
+    }
+    return err('NO_SPAWN_AVAILABLE')
   }
 
   addPlayer(): Result<Player, AddPlayerError> {
