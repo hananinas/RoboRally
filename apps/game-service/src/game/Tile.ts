@@ -14,6 +14,11 @@ export const tileDefinitions: Readonly<Record<TileKind, TileDefinition>> = {
   PIT: { canOccupy: false, entryEffect: 'reboot' },
 }
 
+// Tile suitability only; Board checks robot occupancy separately.
+export function allowsPlacement(tile: Tile | undefined): boolean {
+  return tile !== undefined && tileDefinitions[tile.kind].canOccupy
+}
+
 export abstract class Tile {
   abstract readonly kind: TileKind
   private readonly wallDirections: Set<Direction>

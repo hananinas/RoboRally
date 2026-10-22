@@ -6,7 +6,7 @@ import { Card } from '@/game/Card'
 import type { CardId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
 import { Robot } from '@/game/Robot'
-import { tileDefinitions, type Tile } from '@/game/Tile'
+import { allowsPlacement, tileDefinitions, type Tile } from '@/game/Tile'
 import { Direction, opposite, type Position } from '@/game/spatial'
 import { Integer, PositiveInteger, UnsignedInteger } from '@/numbers'
 
@@ -62,11 +62,8 @@ export class Game {
     if (board.hasEntryEffect('reboot') && rebootTile === undefined) {
       throw new RangeError('A board with pits requires a reboot tile')
     }
-    if (rebootTile !== undefined) {
-      const tile = board.getTile(rebootTile)
-      if (tile === undefined || !tileDefinitions[tile.kind].canOccupy) {
-        throw new RangeError('Reboot tile must be a non-pit tile on the board')
-      }
+    if (rebootTile !== undefined && !allowsPlacement(board.getTile(rebootTile))) {
+      throw new RangeError('Reboot tile must be a non-pit tile on the board')
     }
 
     const playerIds = new Set<PlayerId>()
@@ -75,8 +72,7 @@ export class Game {
       if (playerIds.has(player.id) || robotIds.has(player.robot.id)) {
         throw new RangeError('Players and robots must have unique IDs')
       }
-      const tile = board.getTile(board.positionOf(player.robot.id))
-      if (tile === undefined || !tileDefinitions[tile.kind].canOccupy) {
+      if (!allowsPlacement(board.getTile(board.positionOf(player.robot.id)))) {
         throw new RangeError('Robots cannot start on pits')
       }
       playerIds.add(player.id)
@@ -142,8 +138,7 @@ export class Game {
     let x = Math.floor(width / 2)
     while (x >= 0) {
       const position = { x: Integer(x), y: Integer(y) }
-      const tile = this.board.getTile(position)
-      if (tile !== undefined && tileDefinitions[tile.kind].canOccupy &&
+      if (allowsPlacement(this.board.getTile(position)) &&
           this.board.occupantAt(position) === undefined) return ok(position)
       x--
     }

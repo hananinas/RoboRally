@@ -1,6 +1,6 @@
 import { type Direction, type Position, neighbour, opposite } from '@/game/spatial'
 import type { RobotId } from '@/game/ids'
-import { tileDefinitions, type Tile, type TileEntryEffect } from '@/game/Tile'
+import { allowsPlacement, tileDefinitions, type Tile, type TileEntryEffect } from '@/game/Tile'
 import { Integer, type PositiveInteger } from '@/numbers'
 
 export type MovementResult = Readonly<{
@@ -77,7 +77,7 @@ export class Board {
     if (tile === undefined) {
       throw new RangeError('Robot position must be on the board')
     }
-    if (!tileDefinitions[tile.kind].canOccupy) {
+    if (!allowsPlacement(tile)) {
       throw new RangeError('Robots cannot be placed on pits')
     }
     if (this.robotPositions.has(robotId)) {
@@ -92,8 +92,7 @@ export class Board {
 
   relocateRobot(robotId: RobotId, position: Position): void {
     this.positionOf(robotId)
-    const tile = this.getTile(position)
-    if (tile === undefined || !tileDefinitions[tile.kind].canOccupy) {
+    if (!allowsPlacement(this.getTile(position))) {
       throw new RangeError('Robot destination must be a non-pit tile on the board')
     }
     const occupant = this.occupantAt(position)
@@ -109,7 +108,7 @@ export class Board {
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
         const position = { x: Integer(x), y: Integer(y) }
-        if (!tileDefinitions[this.tiles[y][x].kind].canOccupy || this.occupantAt(position) !== undefined) continue
+        if (!allowsPlacement(this.tiles[y][x]) || this.occupantAt(position) !== undefined) continue
         const distance = Math.abs(x - origin.x) + Math.abs(y - origin.y)
         if (distance < nearestDistance) {
           nearest = position
