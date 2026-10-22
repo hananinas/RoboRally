@@ -123,7 +123,7 @@ it('starts a fixed roster, broadcasts register-major actions, and deals two priv
   } finally {
     for (const socket of clients) socket.disconnect()
     const closed = Promise.withResolvers<void>()
-    server.close(() => closed.resolve())
+    void server.close(() => closed.resolve())
     await closed.promise
   }
 })

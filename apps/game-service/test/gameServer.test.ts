@@ -230,7 +230,7 @@ describe('lobby and game sessions over Socket.IO', () => {
     const first = await connect('Same')
     const second = await connect('Same')
     const results = await Promise.all([first, second].map((client) => client.timeout(1000).emitWithAck('lobby.create', {})))
-    expect(results.map((result) => result.outcome).sort()).toEqual(['LOBBY_JOINED', 'USER_ALREADY_IN_SESSION'])
+    expect(results.map((result) => result.outcome).sort((a, b) => a.localeCompare(b))).toEqual(['LOBBY_JOINED', 'USER_ALREADY_IN_SESSION'])
     const loser = results[0].outcome === 'LOBBY_JOINED' ? second : first
     expect(server.sockets.sockets.get(loser.id!)?.rooms).toEqual(new Set([loser.id]))
   })
