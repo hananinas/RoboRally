@@ -163,6 +163,8 @@ Rebooting completes before the next action. `robot.actionResolved.position` and 
 
 Programs and checkpoint progress are preserved; later registers continue normally. Damage, round cancellation, direction selection, board-edge falls and pit animations are deferred.
 
+The service resolves tile entry after every successful step through its shared gameplay movement operation. A blocked step produces no entry effect. Rebooting onto a checkpoint does not award progress immediately; checkpoint evaluation remains at register end. This internal timing adds no payload fields or events. See the [tile extension pattern](game_model_UML.md#extending-tiles) for domain ownership and implementation guidance.
+
 ### Checkpoint progress
 
 Tiles have an optional `checkpointNumber` alongside their walls and keep type `EMPTY`. Omit the number when there is no checkpoint. Numbers are positive integers, unique and consecutive from 1. Checkpoints stay at fixed positions and remain available to every player after completion. The demo board places checkpoint 1 at `(10, 6)` and checkpoint 2 at `(8, 9)`.
