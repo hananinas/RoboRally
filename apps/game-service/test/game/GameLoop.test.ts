@@ -32,8 +32,12 @@ describe('Game activation loop', () => {
       const result = game.executeNextAction()
       expect(result).toEqual({
         registerIndex,
+        registers: Array.from({ length: 5 }, (_, index) => index <= registerIndex
+          ? { status: 'REVEALED', instruction: 'TURN_LEFT' }
+          : { status: 'EMPTY' }),
         action: {
           robotId: robot.id,
+          playerId: player.id,
           card: deck[registerIndex],
           position: { x: 1, y: 1 },
           direction: directions[registerIndex],

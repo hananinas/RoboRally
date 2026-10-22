@@ -1,5 +1,8 @@
 import {
   submitProgramSchema,
+  updateRegistersSchema,
+  type UpdateRegisters,
+  type UpdateRegistersResult,
   type ProgramResultAcknowledgement,
   type SubmitProgram,
 } from '@robo-rally/game-events'
@@ -68,6 +71,41 @@ export function handleSubmitProgram(
     ctx.actionScheduler.scheduleNextAction()
   }, (error) => {
     logError('Failed to process program submission', error, { command: 'program.submit', gameId: ctx.gameId, playerId, payload })
+    return { outcome: 'INTERNAL_ERROR' } as const
+  })
+}
+
+export function handleUpdateRegisters(
+  ctx: MembershipContext,
+  socket: GameSocket,
+  payload: UpdateRegisters,
+  acknowledge: (result: UpdateRegistersResult) => void,
+): void {
+  withAcknowledgeOnce(acknowledge, (ack) => {
+    const parsed = updateRegistersSchema.safeParse(payload)
+    if (!parsed.success) {
+      ack({ outcome: 'INVALID_REQUEST' })
+      return
+    }
+    const membership = ownedMembership(ctx, socket)
+    if (!membership || parsed.data.gameId !== ctx.gameId) {
+      ack({ outcome: 'NOT_A_MEMBER' })
+      return
+    }
+    const { player } = membership
+    if (parsed.data.playerId !== player.id) {
+      ack({ outcome: 'PLAYER_ID_MISMATCH' })
+      return
+    }
+    const result = ctx.game.updateRegisters(player.id, parsed.data.occupied)
+    ack(result)
+    if (result.outcome === 'ACCEPTED') {
+      ctx.io.to(ctx.publicRoom).emit('game.registersChanged', {
+        gameId: ctx.gameId, playerId: player.id, registers: player.registers,
+      })
+    }
+  }, (error) => {
+    logError('Failed to update registers', error, { command: 'game.updateRegisters', gameId: ctx.gameId })
     return { outcome: 'INTERNAL_ERROR' } as const
   })
 }

@@ -44,19 +44,25 @@ export function createActionScheduler(
     for (const player of game.players) {
       io.to(playerRoom(player.id)).emit('cards.dealt', presentCardsDealt(gameId, player))
     }
+    io.to(publicRoom).emit('game.programmingStarted', { gameId })
   }
 
   function scheduleNextAction(): void {
     if (closed || game.phase !== 'activation' || scheduledAction || game.paused) return
     scheduledAction = setImmediate(() => {
       scheduledAction = undefined
-      if (closed || game.phase !== 'activation') return
+      if (closed || game.phase !== 'activation' || game.paused || game.aborted) return
       try {
         const result = game.executeNextAction()
         io.to(publicRoom).emit(
           'robot.actionResolved',
           presentRobotActionResolved(gameId, result),
         )
+        io.to(publicRoom).emit('game.registersChanged', {
+          gameId,
+          playerId: result.action.playerId,
+          registers: result.registers,
+        })
         broadcastCheckpointProgress()
         if (game.phase === 'activation') {
           scheduleNextAction()

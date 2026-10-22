@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { err, ok, type Result } from 'neverthrow'
 import type { Board } from '@/game/Board'
-import { instructions } from '@robo-rally/game-events'
+import { instructions, type PublicRegisters, type RegisterOccupancy, type UpdateRegistersResult } from '@robo-rally/game-events'
 import { Card } from '@/game/Card'
 import type { CardId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
@@ -14,6 +14,7 @@ export type GamePhase = 'programming' | 'activation'
 
 export type RobotActionResult = Readonly<{
   robotId: RobotId
+  playerId: PlayerId
   card: Card
   position: Position
   direction: Direction
@@ -22,6 +23,7 @@ export type RobotActionResult = Readonly<{
 export type NextActionResult = Readonly<{
   registerIndex: number
   action: RobotActionResult
+  registers: PublicRegisters
 }>
 
 export type AddPlayerError = 'GAME_ALREADY_STARTED' | 'NO_SPAWN_AVAILABLE'
@@ -103,6 +105,10 @@ export class Game {
     return this.started
   }
 
+  start(): void {
+    this.started = true
+  }
+
   get paused(): boolean {
     return this.isPaused
   }
@@ -150,7 +156,10 @@ export class Game {
       this.findSpawn().map((position) => {
         const robot = new Robot(randomUUID(), Direction.NORTH)
         const hand = this.deck.map((card) => new Card(randomUUID(), card.instruction))
-        const player = new Player(randomUUID(), robot, hand)
+        const colours = ['red', 'blue', 'green', 'yellow', 'purple', 'orange']
+        const colour = colours.find((candidate) => !this.roster.some((member) => member.colour === candidate))
+        if (!colour) throw new Error('No robot colour available')
+        const player = new Player(randomUUID(), robot, hand, colour)
         this.board.placeRobot(robot.id, position)
         this.roster.push(player)
         return player
@@ -214,6 +223,19 @@ export class Game {
     )
   }
 
+  updateRegisters(playerId: PlayerId, occupied: RegisterOccupancy): UpdateRegistersResult {
+    const player = this.roster.find((candidate) => candidate.id === playerId)
+    if (!player) return { outcome: 'NOT_A_MEMBER' }
+    // The occupancy contract has no paused/aborted outcomes: only writable
+    // programming accepts updates, including when the nominal phase is preserved.
+    if (this.isPaused || this.isAborted || this.currentPhase !== 'programming') {
+      return { outcome: 'WRONG_PHASE' }
+    }
+    if (this.submittedPlayerIds.has(playerId)) return { outcome: 'ALREADY_SUBMITTED' }
+    player.updateRegisters(occupied)
+    return { outcome: 'ACCEPTED' }
+  }
+
   recheckProgrammingPhase(): void {
     if (
       this.currentPhase === 'programming' &&
@@ -248,8 +270,11 @@ export class Game {
     const card = robot.getProgramCard(UnsignedInteger(registerIndex))
     this.executeCard(robot, card)
     this.activatedRobotIds.add(robot.id)
+    const player = this.roster.find((candidate) => candidate.robot === robot)!
+    const registers = player.revealRegister(registerIndex, card.instruction)
     const action: RobotActionResult = {
       robotId: robot.id,
+      playerId: player.id,
       card,
       position: this.board.positionOf(robot.id),
       direction: robot.direction,
@@ -259,7 +284,7 @@ export class Game {
       this.activateBoardElements()
       this.finishRegister()
     }
-    return { registerIndex, action }
+    return { registerIndex, action, registers }
   }
 
   private dealCards(): void {
@@ -351,7 +376,10 @@ export class Game {
   }
 
   private finishRound(): void {
-    for (const player of this.players) player.robot.clearProgram()
+    for (const player of this.players) {
+      player.robot.clearProgram()
+      player.resetRegisters()
+    }
     this.submittedPlayerIds.clear()
     this.registerIndex = 0
     this.dealCards()

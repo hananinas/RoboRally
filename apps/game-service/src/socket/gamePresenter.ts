@@ -2,8 +2,6 @@ import type {
   Card as CardPayload,
   CardsDealt,
   GamePhase as GamePhasePayload,
-  LobbyDetails,
-  LobbyPlayer,
   Orientation,
   PublicGameState,
   RobotActionResolved,
@@ -74,6 +72,7 @@ export function presentPublicGameState(
     robots: game.players.map((player) => ({
       robotId: player.robot.id,
       playerId: player.id,
+      colour: player.colour,
       position: {
         coordinate: game.board.positionOf(player.robot.id),
         orientation: orientations[player.robot.direction],
@@ -85,23 +84,6 @@ export function presentPublicGameState(
   }
 }
 
-export function presentLobbyDetails(
-  gameId: GameId,
-  game: Game,
-  players: readonly LobbyPlayer[],
-): LobbyDetails {
-  const map = game.board.map
-  if (!map) {
-    throw new Error('Cannot present lobby details for a board without map metadata')
-  }
-
-  return {
-    gameId,
-    name: game.name,
-    players: players.map(({ playerId, username }) => ({ playerId, username })),
-    map: { name: map.name, icon: map.icon, maxPlayers: map.maxPlayers },
-  }
-}
 
 export function presentCardsDealt(
   gameId: GameId,
@@ -112,13 +94,14 @@ export function presentCardsDealt(
 
 export function presentRobotActionResolved(
   gameId: GameId,
-  result: NextActionResult,
+  result: Pick<NextActionResult, 'action' | 'registerIndex'>,
 ): RobotActionResolved {
   const { action, registerIndex } = result
   return {
     gameId,
     registerIndex,
     robotId: action.robotId,
+    playerId: action.playerId,
     instruction: action.card.instruction,
     position: {
       coordinate: action.position,
