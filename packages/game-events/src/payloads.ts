@@ -196,8 +196,6 @@ export type JoinAccepted = Readonly<{
   programSubmitted: boolean
 }>
 
-export type JoinResult = JoinAccepted
-
 export type LobbyId = string
 
 export type LobbySummary = Readonly<{

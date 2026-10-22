@@ -16,7 +16,6 @@ export type {
   GamePhase,
   GameStarted,
   JoinAccepted,
-  JoinResult,
   LeaveGame,
   LeaveResult,
   LobbyFailure,

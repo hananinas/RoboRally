@@ -8,8 +8,6 @@ import { Player } from '@/game/Player'
 import { Robot } from '@/game/Robot'
 import { Direction } from '@/game/spatial'
 
-const GAME_ID: GameId = '00000000-0000-4000-8000-000000000001'
-const SHARED_GAME_NAME = 'Shared game'
 
 const CARD_IDS = [
   '00000000-0000-4000-8000-000000000101',
@@ -37,9 +35,6 @@ export function createPlayer(): Player {
   return new Player(randomUUID(), new Robot(randomUUID(), Direction.NORTH), createHand(cardIds))
 }
 
-export function createSharedGame(): Readonly<{ gameId: GameId; game: Game }> {
-  return createGame('test-map', SHARED_GAME_NAME)
-}
 
 export function createGame(
   mapName: BoardMapName = 'test-map',
@@ -47,5 +42,5 @@ export function createGame(
 ): Readonly<{ gameId: GameId; game: Game }> {
   const map: MapSpec = boardMaps[mapName]
   const game = new Game(createBoard(mapName), [], createHand(), name, map.rebootTile)
-  return { gameId: GAME_ID, game }
+  return { gameId: randomUUID(), game }
 }

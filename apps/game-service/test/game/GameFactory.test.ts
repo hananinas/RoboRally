@@ -16,9 +16,8 @@ describe('game factory', () => {
   })
 
   it('creates a programming-phase game on the map-sized board with no players', () => {
-    const { gameId, game } = createGame()
+    const { game } = createGame()
 
-    expect(gameId).toBe('00000000-0000-4000-8000-000000000001')
     expect(game.players).toEqual([])
     expect(game.board.width).toBe(boardMaps['test-map'].width)
     expect(game.board.height).toBe(boardMaps['test-map'].height)
@@ -63,6 +62,7 @@ describe('game factory', () => {
     const first = createGame()
     const second = createGame()
 
+    expect(first.gameId).not.toBe(second.gameId)
     expect(first.game).not.toBe(second.game)
     expect(first.game.board).not.toBe(second.game.board)
   })
