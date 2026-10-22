@@ -3,7 +3,7 @@ import { Board, Direction, EmptyTile, Game, Card, Player, Robot } from '@/game/i
 import { Integer } from '@/numbers'
 
 function createGame() {
-  const board = new Board([[new EmptyTile(), new EmptyTile()]])
+  const board = new Board([[new EmptyTile(), new EmptyTile()]], { x: Integer(1), y: Integer(0), angle: Math.PI / 2 })
   const robot = new Robot('robot-1', Direction.EAST)
   board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })
   const player = new Player('player-1', robot)
@@ -23,7 +23,7 @@ describe('Game programming', () => {
   it('executes the additional card types from main in register order', () => {
     const board = new Board(Array.from({ length: 15 }, () =>
       Array.from({ length: 15 }, () => new EmptyTile()),
-    ))
+    ), { x: Integer(7), y: Integer(0), angle: Math.PI / 2 })
     const robot = new Robot('robot-1', Direction.EAST)
     board.placeRobot(robot.id, { x: Integer(5), y: Integer(5) })
     const player = new Player('player-1', robot)
@@ -149,7 +149,7 @@ describe('Game programming', () => {
 
 describe('Game.addPlayer', () => {
   function createEmptyGame(width = 3) {
-    const board = new Board([Array.from({ length: width }, () => new EmptyTile())])
+    const board = new Board([Array.from({ length: width }, () => new EmptyTile())], { x: Integer(0), y: Integer(0), angle: Math.PI / 2 })
     const deck = [
       new Card('move-1', 'MOVE_1'),
       new Card('left-1', 'TURN_LEFT'),
@@ -206,7 +206,12 @@ describe('Game.addPlayer', () => {
   it('has a name, which defaults when none is given', () => {
     const { game, deck } = createGame()
     expect(game.name).toBe('Game')
-    const named = new Game(new Board([[new EmptyTile()]]), [], deck, undefined, 'Shared game')
+    const named = new Game(
+      new Board([[new EmptyTile()]], { x: Integer(0), y: Integer(0), angle: Math.PI / 2 }),
+      [],
+      deck,
+      'Shared game',
+    )
     expect(named.name).toBe('Shared game')
   })
 

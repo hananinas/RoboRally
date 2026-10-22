@@ -3,7 +3,8 @@ import useGameConnection from './scenes/active-game/useGameConnection.ts'
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import Login from './scenes/login/Login.tsx'
 import EntryScreen from './scenes/login/EntryScreen.tsx'
-import JoinGame from './scenes/login/JoinGame.tsx'
+import LobbyScreen from './scenes/login/LobbyScreen.tsx'
+import type { GameId } from '@robo-rally/game-events'
 import { USER_ALREADY_IN_GAME_MESSAGE } from './scenes/active-game/gameState.ts'
 import {
   createSessionState,
@@ -23,14 +24,13 @@ const loginErrors: Record<LoginError, string> = {
 }
 
 const joinErrors: Record<JoinError, string> = {
-  INVALID_REQUEST: 'The configured game ID is invalid.',
-  GAME_NOT_FOUND: 'The configured game could not be found.',
   NO_SPAWN_AVAILABLE: 'The game has no available spawn position.',
   USER_ALREADY_IN_GAME: USER_ALREADY_IN_GAME_MESSAGE,
   GAME_ALREADY_STARTED: 'The game has already started and is no longer accepting new players.',
   INTERNAL_ERROR: 'The Game Service could not join the game. Please try again.',
   CONNECTION_ERROR: 'Connection lost before the game could be joined.',
-  GAME_ID_MISSING: 'Set VITE_GAME_ID to the shared game ID and restart the client.',
+  INVALID_REQUEST: 'The join request was rejected. Refresh the lobby and try again.',
+  GAME_NOT_FOUND: 'This game no longer exists. Refresh the lobby and try again.',
   TIMEOUT: 'The Game Service did not respond to the join request. Please try again.',
 }
 
@@ -93,11 +93,7 @@ function App() {
 
   useEffect(() => {
     if (session.status !== 'joining' || joinPending.current) return
-    const gameId = import.meta.env.VITE_GAME_ID
-    if (!gameId) {
-      dispatch({ type: 'join-error', error: 'GAME_ID_MISSING' })
-      return
-    }
+    const {gameId} = session
     if (!connection.socket.connected) {
       dispatch({ type: 'join-error', error: 'CONNECTION_ERROR' })
       return
@@ -117,7 +113,7 @@ function App() {
           : { type: 'join-result', result })
       },
     )
-  }, [connection.socket, connection.status, session.status, initialize])
+  }, [connection.socket, connection.status, session, initialize])
 
   useEffect(() => {
     if (session.status !== 'resyncing' || loginPending.current) return
@@ -149,10 +145,10 @@ function App() {
     sendLogin(submittedUsername)
   }
 
-  function joinGame() {
+  function joinGame(gameId: GameId) {
     if (session.status !== 'ready-to-join' && session.status !== 'join-failed') return
     if (!connection.socket.connected) return
-    dispatch({ type: 'join-requested' })
+    dispatch({ type: 'join-requested', gameId })
   }
 
   function leaveGame() {
@@ -190,7 +186,8 @@ function App() {
           username={username}
         />
       ) : (
-        <JoinGame
+        <LobbyScreen
+          socket={connection.socket}
           username={username}
           pending={session.status === 'joining'}
           connected={connection.status === 'connected'}

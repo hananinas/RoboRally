@@ -8,7 +8,7 @@ function createMultiplayerGame(
   antenna: Antenna = { x: Integer(4), y: Integer(4), angle: Math.PI / 2 },
   board = new Board(Array.from({ length: 9 }, () =>
     Array.from({ length: 9 }, () => new EmptyTile()),
-  )),
+  ), antenna),
   deck: readonly Card[] = Array.from({ length: 6 }, (_, index) => new Card(`left-${index}`, 'TURN_LEFT')),
 ) {
   const players = positions.map((position, index) => {
@@ -16,7 +16,7 @@ function createMultiplayerGame(
     board.placeRobot(robot.id, position)
     return new Player(`player-${index}`, robot)
   })
-  const game = new Game(board, players, deck, antenna)
+  const game = new Game(board, players, deck)
   return { board, players, deck, game }
 }
 
@@ -77,22 +77,11 @@ describe('Game fixed-roster programming', () => {
     expect(() => new Game(board, [new Player('unplaced', new Robot('unplaced', Direction.NORTH))], deck)).toThrow()
   })
 
-  it('validates and freezes an independent positioned antenna', () => {
+  it('exposes the antenna of its board', () => {
     const antenna = { x: Integer(4), y: Integer(4), angle: Math.PI / 2 }
-    const { board, players, deck, game } = createMultiplayerGame([{ x: Integer(4), y: Integer(5) }], antenna)
-    antenna.x = Integer(0)
-    antenna.angle = 0
-    expect(game.antenna).toEqual({ x: 4, y: 4, angle: Math.PI / 2 })
-    expect(() => Object.assign(game.antenna, { angle: 0 })).toThrow()
-    expect(new Game(board, players, deck).antenna).toEqual({ x: 4, y: 0, angle: Math.PI / 2 })
-    for (const invalid of [
-      { x: Integer(-1), y: Integer(0), angle: 0 },
-      { x: Integer(0), y: Integer(board.height), angle: 0 },
-      { x: Integer(0), y: Integer(0), angle: Infinity },
-      { x: Integer(0), y: Integer(0), angle: NaN },
-    ]) {
-      expect(() => new Game(board, players, deck, invalid)).toThrow(RangeError)
-    }
+    const { board, game } = createMultiplayerGame([{ x: Integer(4), y: Integer(5) }], antenna)
+    expect(game.board.antenna).toEqual(antenna)
+    expect(game.board.antenna).toBe(board.antenna)
   })
 })
 
@@ -195,7 +184,7 @@ describe('Game multiplayer activation', () => {
     }
     const board = new TiedPositionBoard(Array.from({ length: 9 }, () =>
       Array.from({ length: 9 }, () => new EmptyTile()),
-    ))
+    ), { x: Integer(4), y: Integer(4), angle: Math.PI / 2 })
     const { players, deck, game } = createMultiplayerGame(
       [{ x: Integer(4), y: Integer(5) }, { x: Integer(5), y: Integer(4) }], undefined, board,
     )
@@ -214,7 +203,7 @@ describe('Game multiplayer activation', () => {
     }
     const board = new DisplacingBoard(Array.from({ length: 9 }, () =>
       Array.from({ length: 9 }, () => new EmptyTile()),
-    ))
+    ), { x: Integer(4), y: Integer(4), angle: Math.PI / 2 })
     const deck = Array.from({ length: 5 }, (_, index) => new Card(`move-${index}`, 'MOVE_1'))
     const { players, game } = createMultiplayerGame(
       [{ x: Integer(4), y: Integer(5) }, { x: Integer(4), y: Integer(6) }, { x: Integer(6), y: Integer(4) }], undefined, board, deck,

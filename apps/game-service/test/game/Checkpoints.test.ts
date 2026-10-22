@@ -6,7 +6,7 @@ function createGame(starts = [{ x: 0, y: 1, direction: Direction.EAST }]) {
   const tiles = Array.from({ length: 3 }, () => Array.from({ length: 5 }, () => new EmptyTile()))
   tiles[1][1] = new EmptyTile([], 1)
   tiles[1][3] = new EmptyTile([], 2)
-  const board = new Board(tiles)
+  const board = new Board(tiles, { x: Integer(0), y: Integer(0), angle: 0 })
   const players = starts.map(({ x, y, direction }, index) => {
     const robot = new Robot(`robot-${index}`, direction)
     board.placeRobot(robot.id, { x: Integer(x), y: Integer(y) })
@@ -21,7 +21,7 @@ function createGame(starts = [{ x: 0, y: 1, direction: Direction.EAST }]) {
     right: new Card('right', 'TURN_RIGHT'),
     uturn: new Card('uturn', 'U_TURN'),
   }
-  const game = new Game(board, players, Object.values(cards), { x: Integer(0), y: Integer(0), angle: 0 })
+  const game = new Game(board, players, Object.values(cards))
   return { board, players, cards, game }
 }
 

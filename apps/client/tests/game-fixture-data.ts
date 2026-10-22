@@ -3,6 +3,8 @@ import type {
   CardsDealt,
   JoinGame,
   JoinResult,
+  LobbyDetails,
+  LobbyDetailsResult,
   Login,
   LoginResult,
   PlayerCheckpointProgress,
@@ -19,6 +21,18 @@ export const PLAYER_ID = '22222222-2222-4222-8222-222222222222'
 export const ROBOT_ID = '33333333-3333-4333-8333-333333333333'
 export const OTHER_PLAYER_ID = '22222222-2222-4222-8222-222222222223'
 export const OTHER_ROBOT_ID = '33333333-3333-4333-8333-333333333334'
+export const MAP_ICON = 'data:image/svg+xml;base64,' + btoa(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><rect width="4" height="3" fill="#6b7280"/></svg>',
+)
+
+export function createLobby(): LobbyDetails {
+  return {
+    gameId: GAME_ID,
+    name: 'Shared game',
+    players: [{ playerId: OTHER_PLAYER_ID, username: 'Player 2' }],
+    map: { name: 'DEMO MAP', icon: MAP_ICON, maxPlayers: 6 },
+  }
+}
 
 export function createPublicState(): PublicGameState {
   return {
@@ -74,7 +88,8 @@ export type FixtureControl =
   | { type: 'early-hand'; cards: readonly Card[] }
   | { type: 'login'; outcome: LoginResult['outcome']; deferred: boolean }
   | { type: 'join'; outcome: JoinResult['outcome']; deferred: boolean }
-  | { type: 'respond-login' | 'respond-join' }
+  | { type: 'lobby'; outcome: LobbyDetailsResult['outcome']; deferred: boolean; lobbies?: readonly LobbyDetails[] }
+  | { type: 'respond-login' | 'respond-join' | 'respond-lobby' }
   | { type: 'joined-state'; state: PublicGameState; hand: readonly Card[]; programSubmitted: boolean }
 
 export type FixtureSnapshot = {
@@ -88,4 +103,6 @@ export type FixtureSnapshot = {
   )[]
   pendingLogins: number
   pendingJoins: number
+  lobbyRequests: number
+  pendingLobbies: number
 }

@@ -6,7 +6,7 @@ import { Integer } from '@/numbers'
 function createGame(deck: Card[]) {
   const board = new Board(Array.from({ length: 3 }, () =>
     Array.from({ length: 3 }, () => new EmptyTile()),
-  ))
+  ), { x: Integer(1), y: Integer(0), angle: Math.PI / 2 })
   const robot = new Robot('robot-1', Direction.EAST)
   board.placeRobot(robot.id, { x: Integer(1), y: Integer(1) })
   const player = new Player('player-1', robot)
@@ -86,7 +86,7 @@ describe('Game activation loop', () => {
 })
 
 function resolveCard(instruction: Instruction, direction: Direction, tiles: EmptyTile[][]) {
-  const board = new Board(tiles)
+  const board = new Board(tiles, { x: Integer(3), y: Integer(0), angle: Math.PI / 2 })
   const robot = new Robot('robot', direction)
   board.placeRobot(robot.id, { x: Integer(3), y: Integer(3) })
   const player = new Player('player', robot)
