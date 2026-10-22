@@ -5,7 +5,7 @@ import { Board, Direction, EmptyTile, Game, Card, Player, Robot } from '@/game/i
 function createGame(deck: Card[]) {
   const board = new Board(Array.from({ length: 3 }, () =>
     Array.from({ length: 3 }, () => new EmptyTile()),
-  ))
+  ), { x: 1, y: 0, angle: Math.PI / 2 })
   const robot = new Robot('robot-1', Direction.EAST)
   board.placeRobot(robot.id, { x: 1, y: 1 })
   const player = new Player('player-1', robot)
@@ -85,7 +85,7 @@ describe('Game activation loop', () => {
 })
 
 function resolveCard(instruction: Instruction, direction: Direction, tiles: EmptyTile[][]) {
-  const board = new Board(tiles)
+  const board = new Board(tiles, { x: 3, y: 0, angle: Math.PI / 2 })
   const robot = new Robot('robot', direction)
   board.placeRobot(robot.id, { x: 3, y: 3 })
   const player = new Player('player', robot)

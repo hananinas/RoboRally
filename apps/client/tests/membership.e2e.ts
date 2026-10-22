@@ -15,7 +15,7 @@ test('two real clients see joins and leaves without losing the first player’s 
   try {
     await login(page, 'First')
     const [firstRobot] = await robotIds(page)
-    await expect(page.locator(`[data-robot-id="${firstRobot}"]`).first()).toHaveAttribute('data-board-tile', '10,7')
+    await expect(page.locator(`[data-robot-id="${firstRobot}"]`).first()).toHaveAttribute('data-board-tile', '8,7')
     await page.getByRole('region', { name: 'Programming hand' }).getByRole('button').first().click()
     const selected = page.getByRole('button', { name: 'Move 1, remove from register 1', exact: true })
     await expect(selected).toBeVisible()
@@ -24,7 +24,7 @@ test('two real clients see joins and leaves without losing the first player’s 
     await expect.poll(() => robotIds(page)).toHaveLength(2)
     expect(await robotIds(other)).toEqual(await robotIds(page))
     const secondRobot = (await robotIds(other)).find((id) => id !== firstRobot)!
-    await expect(page.locator(`[data-robot-id="${secondRobot}"]`).first()).toHaveAttribute('data-board-tile', '9,7')
+    await expect(page.locator(`[data-robot-id="${secondRobot}"]`).first()).toHaveAttribute('data-board-tile', '7,7')
     await expect(selected).toBeVisible()
 
     await leave(other)
@@ -39,7 +39,7 @@ test('two real clients see joins and leaves without losing the first player’s 
     await expect.poll(() => robotIds(page)).toHaveLength(2)
     const replacementRobot = (await robotIds(other)).find((id) => id !== firstRobot)!
     expect(replacementRobot).not.toBe(secondRobot)
-    await expect(page.locator(`[data-robot-id="${replacementRobot}"]`).first()).toHaveAttribute('data-board-tile', '9,7')
+    await expect(page.locator(`[data-robot-id="${replacementRobot}"]`).first()).toHaveAttribute('data-board-tile', '7,7')
     await expect(selected).toBeVisible()
     await leave(other)
     await leave(page)

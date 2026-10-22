@@ -8,7 +8,7 @@ import { Server, type Socket } from 'socket.io'
 import type { Game } from '@/game/index'
 import { presentPublicGameState } from '@/gamePresenter'
 import { createUserRegistry } from '@/userRegistry'
-import { createSharedGame } from '@/game/SinglePlayerGame'
+import { createSharedGame } from '@/game/GameFactory'
 import { createActionScheduler } from '@/actionScheduler'
 import { handleLogin } from '@/authHandlers'
 import {

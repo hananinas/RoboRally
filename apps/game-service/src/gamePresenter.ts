@@ -19,7 +19,6 @@ import {
   type GamePhase,
   type NextActionResult,
   type Player,
-  DEMO_MAP,
 } from '@/game/index'
 
 const orientations: Record<Direction, Orientation> = {
@@ -66,7 +65,7 @@ export function presentPublicGameState(
     gameId,
     checkpointCount: game.board.checkpointCount,
     players,
-    antenna: game.antenna,
+    antenna: game.board.antenna,
     board: {
       width: game.board.width,
       height: game.board.height,
@@ -90,11 +89,16 @@ export function presentLobbyDetails(
   game: Game,
   players: readonly LobbyPlayer[],
 ): LobbyDetails {
+  const map = game.board.map
+  if (!map) {
+    throw new Error('Cannot present lobby details for a board without map metadata')
+  }
+
   return {
     gameId,
     name: game.name,
     players: players.map(({ playerId, username }) => ({ playerId, username })),
-    map: { name: DEMO_MAP.name, icon: DEMO_MAP.icon, maxPlayers: DEMO_MAP.maxPlayers },
+    map: { name: map.name, icon: map.icon, maxPlayers: map.maxPlayers },
   }
 }
 

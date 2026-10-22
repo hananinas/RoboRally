@@ -15,8 +15,6 @@ export type RobotActionResult = Readonly<{
   direction: Direction
 }>
 
-export type Antenna = Readonly<Position & { angle: number }>
-
 export type NextActionResult = Readonly<{
   registerIndex: number
   action: RobotActionResult
@@ -25,10 +23,9 @@ export type NextActionResult = Readonly<{
 export const DEFAULT_GAME_NAME = 'Game'
 
 export class Game {
-  readonly name: string  
+  readonly name: string
   readonly board: Board
   private readonly roster: Player[]
-  readonly antenna: Antenna
   private readonly deck: readonly Card[]
   private currentPhase: GamePhase = 'programming'
   private registerIndex = 0
@@ -41,14 +38,10 @@ export class Game {
     board: Board,
     players: readonly Player[],
     deck: readonly Card[],
-    antenna: Antenna = { x: Math.floor(board.width / 2), y: 0, angle: Math.PI / 2 },
     name: string = DEFAULT_GAME_NAME,
   ) {
     if (deck.length < 5 || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')
-    }
-    if (!board.contains(antenna) || !Number.isFinite(antenna.angle)) {
-      throw new RangeError('The antenna must be on the board with a finite angle')
     }
 
     const playerIds = new Set<PlayerId>()
@@ -65,7 +58,6 @@ export class Game {
     this.board = board
     this.name = name
     this.roster = [...players]
-    this.antenna = Object.freeze({ ...antenna })
     this.deck = [...deck]
     this.dealCards()
   }
@@ -221,15 +213,16 @@ export class Game {
     let nearestDistance = Infinity
     let smallestOffset = Infinity
     const fullTurn = 2 * Math.PI
-    const antennaAngle = this.antenna.angle % fullTurn
+    const antenna = this.board.antenna
+    const antennaAngle = antenna.angle % fullTurn
 
     // Radians start east and increase clockwise because board y increases south.
     // Recheck current positions every action; exact ties retain roster order.
     for (const { robot } of this.players) {
       if (this.activatedRobotIds.has(robot.id)) continue
       const position = this.board.positionOf(robot.id)
-      const dx = position.x - this.antenna.x
-      const dy = position.y - this.antenna.y
+      const dx = position.x - antenna.x
+      const dy = position.y - antenna.y
       const distance = Math.abs(dx) + Math.abs(dy)
       if (distance > nearestDistance) continue
       const angle = Math.atan2(dy, dx)

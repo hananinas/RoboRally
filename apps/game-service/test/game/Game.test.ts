@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Board, Direction, EmptyTile, Game, Card, Player, Robot } from '@/game/index'
 
 function createGame() {
-  const board = new Board([[new EmptyTile(), new EmptyTile()]])
+  const board = new Board([[new EmptyTile(), new EmptyTile()]], { x: 1, y: 0, angle: Math.PI / 2 })
   const robot = new Robot('robot-1', Direction.EAST)
   board.placeRobot(robot.id, { x: 0, y: 0 })
   const player = new Player('player-1', robot)
@@ -22,7 +22,7 @@ describe('Game programming', () => {
   it('executes the additional card types from main in register order', () => {
     const board = new Board(Array.from({ length: 15 }, () =>
       Array.from({ length: 15 }, () => new EmptyTile()),
-    ))
+    ), { x: 7, y: 0, angle: Math.PI / 2 })
     const robot = new Robot('robot-1', Direction.EAST)
     board.placeRobot(robot.id, { x: 5, y: 5 })
     const player = new Player('player-1', robot)
@@ -136,7 +136,12 @@ describe('Game programming', () => {
   it('has a name, which defaults when none is given', () => {
     const { game, deck } = createGame()
     expect(game.name).toBe('Game')
-    const named = new Game(new Board([[new EmptyTile()]]), [], deck, undefined, 'Shared game')
+    const named = new Game(
+      new Board([[new EmptyTile()]], { x: 0, y: 0, angle: Math.PI / 2 }),
+      [],
+      deck,
+      'Shared game',
+    )
     expect(named.name).toBe('Shared game')
   })
 
