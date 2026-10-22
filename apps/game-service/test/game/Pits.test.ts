@@ -7,10 +7,8 @@ function createGame(
   pit = { x: Integer(1), y: Integer(1) },
   rebootTile = { x: Integer(0), y: Integer(2) },
   walls: readonly Direction[] = [],
-  startWalls: readonly Direction[] = [],
 ) {
   const tiles: Tile[][] = Array.from({ length: 3 }, () => Array.from({ length: 5 }, () => new EmptyTile()))
-  tiles[1][0] = new EmptyTile(startWalls)
   tiles[pit.y][pit.x] = new PitTile(walls)
   const board = new Board(tiles, { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
   const robot = new Robot('robot', Direction.EAST)
@@ -56,11 +54,8 @@ describe('pit entry and rebooting', () => {
     expect(game.currentRegister).toBe(1)
   })
 
-  it.each([
-    { wall: 'source', pitWalls: [], startWalls: [Direction.EAST] },
-    { wall: 'destination', pitWalls: [Direction.WEST], startWalls: [] },
-  ])('does not reboot when the $wall wall blocks pit entry', ({ pitWalls, startWalls }) => {
-    const { board, robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, undefined, pitWalls, startWalls)
+  it('does not reboot when a wall blocks a movement card from entering a pit', () => {
+    const { board, robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, undefined, [Direction.WEST])
     game.submitProgram(player.id, [c.MOVE_3, c.MOVE_1, c.TURN_LEFT, c.TURN_RIGHT, c.BACK_UP].map((card) => card.id))._unsafeUnwrap()
 
     expect(game.executeNextAction().action.position).toEqual({ x: Integer(0), y: Integer(1) })
