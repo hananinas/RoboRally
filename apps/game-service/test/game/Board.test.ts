@@ -160,18 +160,11 @@ describe('Board robot ownership', () => {
       expect(board.occupantAt(start)).toBeUndefined()
     } else {
       expect(() => board.placeRobot('beta', destination)).toThrow(RangeError)
+      expect(() => board.positionOf('beta')).toThrow()
       expect(() => board.relocateRobot('alpha', destination)).toThrow(RangeError)
       expect(board.positionOf('alpha')).toEqual(start)
       expect(board.occupantAt(destination)).toBeUndefined()
     }
-  })
-
-  it('rejects initial placement on pits without adding the robot', () => {
-    const board = new Board([[new PitTile(), new EmptyTile()]], antenna)
-
-    expect(() => board.placeRobot('alpha', { x: Integer(0), y: Integer(0) })).toThrow(RangeError)
-    expect(board.occupantAt({ x: Integer(0), y: Integer(0) })).toBeUndefined()
-    expect(() => board.positionOf('alpha')).toThrow()
   })
 
   it('relocates a robot without retaining its old occupancy or the supplied position', () => {
