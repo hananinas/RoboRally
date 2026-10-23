@@ -133,3 +133,7 @@ As a player, I want to resume a saved game after a server restart, so that I can
 ### V2-07 - Game animations
 
 As a player, I want to see robot movements, rotations, and board effects animated, so that I can more easily follow what happens during each register.
+
+### V2-08 - Browse available games
+
+As a user, I want to see a list of available games to join, so that I can choose which game to play.
