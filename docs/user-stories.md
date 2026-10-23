@@ -124,7 +124,7 @@ As a user, I want to register and log in using an external identity provider, so
 
 ### V2-05 - Pick a game and board
 
-As a player, I want to choose from available games and different boards, so that I can participate in a race on my preferred board.
+As a player, I want to configure my game, so that I can play how I like.
 
 ### V2-06 - Resume a saved game
 
