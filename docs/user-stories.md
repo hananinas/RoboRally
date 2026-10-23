@@ -91,22 +91,45 @@ As a player, I want to program my own robot independently, so that my decisions 
 
 As a player, I want all participants to observe the same resolved actions, so that we play a consistent shared game.
 
-### V1-05 - Push other robots
+### V1-05 - Navigate walls and obstacles
 
-As a player, I want my robot to push another robot, so that my movement can affect another player's position.
+As a player, I want walls to block my robot's movement, so that I must plan my route around obstacles on the board.
 
-### V1-06 - Navigate board effects
+### V1-06 - Resolve falls consistently
 
-As a player, I want conveyor belts and gears to affect my robot, so that I must account for board elements when programming.
+As a player, I want pits and board edges to have consistent consequences, so that I can anticipate the risks of movement.
 
-### V1-07 - Resolve falls consistently
-
-As a player, I want pits and board edges to have consistent consequences, so that I can anticipate the risks of movement and pushing.
-
-### V1-08 - Track checkpoint progress
+### V1-07 - Track checkpoint progress
 
 As a player, I want to see my robot's checkpoint progress, so that I can plan my route through the racing course.
 
 
 ## V2
 
+### V2-01 - Win the race
+
+As a player, I want the game to end when a robot reaches the final checkpoint, so that the winner is clearly determined and visible to everyone.
+
+### V2-02 - Board effects and push
+
+As a player, I want conveyor belts and robot pushing to affect robot positions consistently, so that I can predict how my robot interacts with the board and other players.
+
+### V2-03 - Interactive commands
+
+As a player, I want to choose the effect of interactive commands during activation, so that I can make decisions that influence my robot's actions.
+
+### V2-04 - Sign up and log in
+
+As a user, I want to register and log in using an external identity provider, so that I can participate under my own authenticated identity.
+
+### V2-05 - Pick a game and board
+
+As a player, I want to choose from available games and different boards, so that I can participate in a race on my preferred board.
+
+### V2-06 - Resume a saved game
+
+As a player, I want to resume a saved game after a server restart, so that I can continue playing without losing my progress.
+
+### V2-07 - Game animations
+
+As a player, I want to see robot movements, rotations, and board effects animated, so that I can more easily follow what happens during each register.
