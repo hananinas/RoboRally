@@ -109,7 +109,7 @@ function ActiveGame({ game, username, leaving, onLeave }: {
           />
         )}
       </div>
-      {state.paused || !state.connected && (
+      {(state.paused || !state.connected) && (
         <div className="disconnect-overlay">
           <div className="disconnect-popup">
             <h2>{!state.connected

@@ -1,6 +1,7 @@
 import type { Dialog, Page } from '@playwright/test'
 import { expect, openGame, test } from './game-fixture.ts'
 import { GAME_ID, OTHER_PLAYER_ID, OTHER_ROBOT_ID, PLAYER_ID, ROBOT_ID, ROUND_ACTIONS } from './game-fixture-data.ts'
+import { gameStatus } from './browserClient.ts'
 async function fillProgram(page: Page, indices = [0, 1, 2, 3, 4]) {
   const cards = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
   for (const index of indices) await cards.nth(index).click()
@@ -645,7 +646,12 @@ for (const submitting of [false, true]) {
     }
 
     await game.control({ type: 'disconnect' })
-    await expect(page.getByRole('status')).toHaveText('Not connected')
+    await expect(gameStatus(page)).toHaveText('Not connected')
+    const overlay = page.locator('.disconnect-overlay')
+    await expect(overlay).toBeVisible()
+    await expect(overlay.getByRole('heading', {name: 'Connection to server lost', exact: true,})).toBeVisible()
+    await expect(overlay.getByRole('status')).toBeVisible()
+    await expect(overlay.getByRole('button', {name: 'Leave game', exact: true,})).toBeDisabled()
     await expect(page.getByRole('alert')).toContainText('Connection lost. Reconnecting… Your program was not resent.')
     await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
     await expect(page.getByRole('textbox', { name: 'Username' })).toHaveCount(0)
