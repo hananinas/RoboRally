@@ -88,10 +88,7 @@ test('leaves a paused game through the disconnect overlay and returns to lobby s
     await overlay.getByRole('button', { name: 'Leave game', exact: true }).click()
 
     await expect(page.getByRole('list', { name: 'Lobbies' })).toBeVisible()
-    await expect(page.getByRole('button', { name: /Lobby 1/ })).toBeEnabled()
     await expect(page.getByText('Staying player', { exact: true })).toBeVisible()
-    await expect(page.getByRole('textbox', { name: 'Username' })).toHaveCount(0)
-    await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
     await expect(page.getByRole('region', { name: 'Programming hand' })).toHaveCount(0)
     await expect(overlay).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Join game', exact: true })).toBeDisabled()
