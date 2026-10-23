@@ -75,6 +75,37 @@ As a player, I want to create another program after the current one has finished
 
 ## V1
 
+### V1-01 - Register as a user
+
+As a user, I want to create an account, so that I can participate under a recognized identity.
+
+### V1-02 - Prepare a shared game
+
+As a player, I want to join a lobby and see the game setup, so that I can start a game with other participants.
+
+### V1-03 - Control my own robot
+
+As a player, I want to program my own robot independently, so that my decisions determine its actions.
+
+### V1-04 - Resolve a shared round
+
+As a player, I want all participants to observe the same resolved actions, so that we play a consistent shared game.
+
+### V1-05 - Push other robots
+
+As a player, I want my robot to push another robot, so that my movement can affect another player's position.
+
+### V1-06 - Navigate board effects
+
+As a player, I want conveyor belts and gears to affect my robot, so that I must account for board elements when programming.
+
+### V1-07 - Resolve falls consistently
+
+As a player, I want pits and board edges to have consistent consequences, so that I can anticipate the risks of movement and pushing.
+
+### V1-08 - Track checkpoint progress
+
+As a player, I want to see my robot's checkpoint progress, so that I can plan my route through the racing course.
 
 
 ## V2
