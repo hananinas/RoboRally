@@ -3,6 +3,7 @@ import type {
   CardsDealt,
   PublicGameState,
   RobotActionResolved,
+  Tile as TilePayload,
 } from '@robo-rally/game-events'
 import {
   Board,
@@ -10,9 +11,11 @@ import {
   Direction,
   EmptyTile,
   Game,
+  PitTile,
   Player,
   Robot,
   createGame,
+  type TileKind,
 } from '@/game/index.ts'
 import {
   presentCardsDealt,
@@ -29,6 +32,30 @@ function createGameWithPlayer() {
 }
 
 describe('game presenter', () => {
+  it('keeps domain tile kinds exhaustively compatible with public tile types', () => {
+    expectTypeOf<TileKind>().toEqualTypeOf<TilePayload['type']>()
+  })
+
+  it('serializes pits alongside empty tiles, walls and checkpoints', () => {
+    const board = new Board([[
+      new EmptyTile(),
+      new PitTile(),
+      new PitTile([Direction.NORTH, Direction.WEST]),
+      new EmptyTile([Direction.SOUTH], 1),
+    ]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
+    const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
+    const game = new Game(board, [], cards, undefined, { x: Integer(0), y: Integer(0) })
+    const state = presentPublicGameState('game', game)
+
+    expect(state.checkpointCount).toBe(1)
+    expect(state.board.tiles).toEqual([
+      { position: { x: 0, y: 0 }, type: 'EMPTY' },
+      { position: { x: 1, y: 0 }, type: 'PIT' },
+      { position: { x: 2, y: 0 }, type: 'PIT', walls: ['NORTH', 'WEST'] },
+      { position: { x: 3, y: 0 }, type: 'EMPTY', walls: ['SOUTH'], checkpointNumber: 1 },
+    ])
+  })
+
   it('presents a complete public programming state in row-major order', () => {
     const { gameId, game, player } = createGameWithPlayer()
     const state = presentPublicGameState(gameId, game)

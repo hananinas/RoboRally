@@ -1,7 +1,7 @@
 import { type Direction, type Position, neighbour, opposite } from '@/game/spatial'
 import type { RobotId } from '@/game/ids'
-import type { Tile } from '@/game/Tile'
-import type { PositiveInteger } from '@/numbers'
+import { allowsPlacement, tileDefinitions, type Tile, type TileEntryEffect } from '@/game/Tile'
+import { Integer, type PositiveInteger } from '@/numbers'
 
 export type MovementResult = Readonly<{
   position: Position
@@ -55,6 +55,10 @@ export class Board {
     return this.checkpointTotal
   }
 
+  hasEntryEffect(effect: TileEntryEffect): boolean {
+    return this.tiles.some((row) => row.some((tile) => tileDefinitions[tile.kind].entryEffect === effect))
+  }
+
   contains(position: Position): boolean {
     return (
       position.x >= 0 &&
@@ -69,8 +73,12 @@ export class Board {
   }
 
   placeRobot(robotId: RobotId, position: Position): void {
-    if (!this.contains(position)) {
+    const tile = this.getTile(position)
+    if (tile === undefined) {
       throw new RangeError('Robot position must be on the board')
+    }
+    if (!allowsPlacement(tile)) {
+      throw new RangeError('Robots cannot be placed on pits')
     }
     if (this.robotPositions.has(robotId)) {
       throw new Error(`Robot ${robotId} is already on the board`)
@@ -80,6 +88,35 @@ export class Board {
     }
 
     this.robotPositions.set(robotId, { ...position })
+  }
+
+  relocateRobot(robotId: RobotId, position: Position): void {
+    this.positionOf(robotId)
+    if (!allowsPlacement(this.getTile(position))) {
+      throw new RangeError('Robot destination must be a non-pit tile on the board')
+    }
+    const occupant = this.occupantAt(position)
+    if (occupant !== undefined && occupant !== robotId) {
+      throw new Error('Tile is already occupied')
+    }
+    this.updateRobotPosition(robotId, position)
+  }
+
+  nearestFreePosition(origin: Position): Position | undefined {
+    let nearest: Position | undefined
+    let nearestDistance = Infinity
+    for (let y = 0; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        const position = { x: Integer(x), y: Integer(y) }
+        if (!allowsPlacement(this.tiles[y][x]) || this.occupantAt(position) !== undefined) continue
+        const distance = Math.abs(x - origin.x) + Math.abs(y - origin.y)
+        if (distance < nearestDistance) {
+          nearest = position
+          nearestDistance = distance
+        }
+      }
+    }
+    return nearest
   }
 
   positionOf(robotId: RobotId): Position {
