@@ -232,4 +232,48 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect([...server.sockets.adapter.rooms.keys()].some((room) => room.startsWith('game:'))).toBe(false)
   })
 
+  it('returns an internal error without retaining a failed lobby creation', async () => {
+    const owner = await connect('Owner')
+    const connection = server.sockets.sockets.get(owner.id!)!
+    vi.spyOn(connection, 'join').mockImplementationOnce(() => { throw new Error('Room failure') })
+    expect(await owner.emitWithAck('lobby.create', {})).toEqual({ outcome: 'INTERNAL_ERROR' })
+    expect(await owner.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION' })
+    expect(await owner.emitWithAck('lobby.list', {})).toEqual({ outcome: 'LOBBIES_FOUND', lobbies: [] })
+    expect(connection.rooms).toEqual(new Set([owner.id]))
+    expect((await create(owner)).playerCount).toBe(1)
+  })
+
+  it('keeps a lobby available for retry after game creation fails', async () => {
+    const owner = await connect('Owner')
+    const lobby = await create(owner)
+    factory.mockImplementationOnce(() => { throw new Error('Factory failure') })
+    expect(await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'INTERNAL_ERROR' })
+    expect(await owner.emitWithAck('session.get', {})).toEqual({ outcome: 'IN_LOBBY', lobby })
+    const ready = started(owner)
+    expect((await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })).outcome).toBe('STARTED')
+    await ready
+  })
+
+  it('restores membership and rooms when reattaching a game fails partway through', async () => {
+    const owner = await connect('Owner')
+    const lobby = await create(owner)
+    const ready = started(owner)
+    await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })
+    const initialization = await ready
+    await disconnect(owner)
+    const returned = await connect('Owner')
+    const connection = server.sockets.sockets.get(returned.id!)!
+    const join = connection.join.bind(connection)
+    vi.spyOn(connection, 'join').mockImplementationOnce((rooms) => {
+      void join(Array.isArray(rooms) ? rooms[0] : rooms)
+      throw new Error('Room failure')
+    })
+    expect(await returned.emitWithAck('session.get', {})).toEqual({ outcome: 'INTERNAL_ERROR' })
+    expect(connection.rooms).toEqual(new Set([returned.id]))
+    const restored = await returned.emitWithAck('session.get', {})
+    expect(restored).toMatchObject({
+      outcome: 'IN_GAME', initialization: { assignment: initialization.assignment, state: { paused: false } },
+    })
+  })
+
 })

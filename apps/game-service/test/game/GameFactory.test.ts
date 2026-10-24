@@ -56,10 +56,9 @@ describe('game factory', () => {
 
   it('creates players with unique ids, a north-facing robot and nine cards in a fixed order', () => {
     const first = createPlayer()
-    const second = createPlayer('#4d8deb')
+    const second = createPlayer()
     const cardIds = first.hand.map((card) => card.id)
 
-    expect(second.robot.colour).toBe('#4d8deb')
     expect(first.id).not.toBe(second.id)
     expect(first.robot.id).not.toBe(second.robot.id)
     expect(first.robot.direction).toBe(Direction.NORTH)
@@ -78,8 +77,9 @@ describe('game factory', () => {
 
   it('places an added player at the centre of the board', () => {
     const { game } = createGame('empty-map')
-    const player = game.addPlayer()._unsafeUnwrap()
+    const player = game.addPlayer('#4d8deb')._unsafeUnwrap()
 
+    expect(player.robot.colour).toBe('#4d8deb')
     expect(game.board.positionOf(player.robot.id)).toEqual({ x: 10, y: 7 })
   })
 

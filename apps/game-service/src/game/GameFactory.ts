@@ -5,7 +5,7 @@ import { boardMaps, type MapSpec } from '@/game/boardMaps'
 import { Game } from '@/game/Game'
 import type { GameId } from '@/game/ids'
 import { Player } from '@/game/Player'
-import { ROBOT_COLOURS, Robot } from '@/game/Robot'
+import { Robot } from '@/game/Robot'
 import { Direction } from '@/game/spatial'
 
 const GAME_ID: GameId = '00000000-0000-4000-8000-000000000001'
@@ -32,9 +32,9 @@ export function createHand(cardIds: readonly string[] = CARD_IDS): readonly Card
   return cardIds.map((id, index) => new Card(id, HAND_INSTRUCTIONS[index]))
 }
 
-export function createPlayer(colour: string = ROBOT_COLOURS[0]): Player {
+export function createPlayer(): Player {
   const cardIds = HAND_INSTRUCTIONS.map(() => randomUUID())
-  return new Player(randomUUID(), new Robot(randomUUID(), Direction.NORTH, colour), createHand(cardIds))
+  return new Player(randomUUID(), new Robot(randomUUID(), Direction.NORTH), createHand(cardIds))
 }
 
 export function createSharedGame(): Readonly<{ gameId: GameId; game: Game }> {

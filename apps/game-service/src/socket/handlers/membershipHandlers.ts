@@ -100,6 +100,7 @@ export function reattachGame(
   if (membership.connectionId && membership.connectionId !== socket.id) {
     return acknowledge({ outcome: 'USER_ALREADY_IN_GAME' })
   }
+  const previousRooms = new Set(socket.rooms)
   const previousConnectionId = membership.connectionId
   const wasPaused = ctx.game.paused
   const reconnected = reattachMembership(membership, socket.id)
@@ -108,7 +109,11 @@ export function reattachGame(
   try {
     initialization = presentInitialization(ctx, membership)
     void socket.join([ctx.publicRoom, ctx.playerRoom(membership.player.id)])
-  } catch {
+  } catch (error) {
+    for (const room of [ctx.publicRoom, ctx.playerRoom(membership.player.id)]) {
+      if (!previousRooms.has(room)) void socket.leave(room)
+    }
+    logError('Failed to reattach game membership', error, { command: 'session.get', gameId: ctx.gameId })
     membership.connectionId = previousConnectionId
     if (wasPaused) ctx.game.pause()
     return acknowledge({ outcome: 'INTERNAL_ERROR' })
