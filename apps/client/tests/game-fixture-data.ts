@@ -73,7 +73,7 @@ export type FixtureControl =
   | { type: 'submitted'; submission: ProgramSubmitted }
   | { type: 'early-hand'; cards: readonly Card[] }
   | { type: 'login'; outcome: LoginResult['outcome']; deferred: boolean }
-  | { type: 'start'; deferred: boolean }
+  | { type: 'start'; deferred: boolean; outcome?: 'STARTED' | 'LOBBY_MEMBER_DISCONNECTED' }
   | { type: 'respond-login' | 'respond-start' }
   | { type: 'joined-state'; state: PublicGameState; hand: readonly Card[]; programSubmitted: boolean }
 

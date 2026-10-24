@@ -1,3 +1,4 @@
+import { err, ok, type Result } from 'neverthrow'
 import { randomUUID } from 'node:crypto'
 import type { Player } from '@/game/Player'
 import type { Lobby, SessionContext } from '@/socket/sessionContext'
@@ -116,6 +117,18 @@ export function handleLeaveLobby(
   })
 }
 
+type ConnectedLobbyMember = { user: User; connectionId: string; socket: GameSocket }
+
+function getConnectedMembers(context: SessionContext, lobby: Lobby): Result<ConnectedLobbyMember[], 'LOBBY_MEMBER_DISCONNECTED'> {
+  const members: ConnectedLobbyMember[] = []
+  for (const member of lobby.members.values()) {
+    const socket = context.io.sockets.sockets.get(member.connectionId)
+    if (!socket?.connected) return err('LOBBY_MEMBER_DISCONNECTED')
+    members.push({ ...member, socket })
+  }
+  return ok(members)
+}
+
 export function handleStartLobby(
   context: SessionContext,
   socket: GameSocket,
@@ -129,6 +142,9 @@ export function handleStartLobby(
     if (lobby.members.get(user.userId)?.connectionId !== socket.id) return ack({ outcome: 'NOT_LOBBY_MEMBER' })
     if (lobby.members.keys().next().value !== user.userId) return ack({ outcome: 'NOT_LOBBY_OWNER' })
 
+    const connected = getConnectedMembers(context, lobby)
+    if (connected.isErr()) return ack({ outcome: connected.error })
+
     // The in-memory adapter joins synchronously. Prepare everything before publishing
     // or notifying clients; no event-loop yield can change the roster mid-transition.
     let gameContext: MembershipContext | undefined
@@ -136,9 +152,7 @@ export function handleStartLobby(
     try {
       const preparedContext = createGameContext(io, context.createGame())
       gameContext = preparedContext
-      const members = [...lobby.members.values()].map((member) => {
-        const connection = io.sockets.sockets.get(member.connectionId)
-        if (!connection?.connected) throw new Error('Lobby member disconnected')
+      const members = connected.value.map(({ socket: connection, ...member }) => {
         const result = preparedContext.game.addPlayer(ROBOT_COLOURS[preparedContext.memberships.size])
         if (result.isErr()) throw new Error(result.error)
         const membership = { ...member, player: result.value }

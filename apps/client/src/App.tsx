@@ -13,6 +13,7 @@ function errorMessage(code: string): string {
     case 'INVALID_USERNAME': return 'Username must contain 1–30 characters.'
     case 'ALREADY_LOGGED_IN': return 'This connection is already logged in with another username. Retry connection to use this name.'
     case 'LOBBY_NOT_FOUND': return 'This lobby is no longer available. Refresh and try again.'
+    case 'LOBBY_MEMBER_DISCONNECTED': return 'A player disconnected before the game could start. Please try again.'
     case 'LOBBY_FULL': return 'This lobby is full. Choose another lobby.'
     case 'TIMEOUT': return 'The Game Service did not respond. Please try again.'
     default: return 'The request could not be completed. Please try again.'

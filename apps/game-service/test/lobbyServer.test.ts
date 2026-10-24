@@ -117,6 +117,30 @@ describe('lobby lifecycle over Socket.IO', () => {
     })).toEqual({ outcome: 'NOT_A_MEMBER' })
     expect(factory).toHaveBeenCalledTimes(1)
   })
+  it.each(['missing', 'disconnected'] as const)('keeps the lobby retryable when a member is %s before start', async (state) => {
+    const owner = await connect('Owner')
+    const lobby = await create(owner)
+    const other = await connect('Other')
+    await other.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })
+    const connection = server.sockets.sockets.get(other.id!)!
+    if (state === 'missing') server.sockets.sockets.delete(other.id!)
+    else connection.connected = false
+    try {
+      expect(await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId }))
+        .toEqual({ outcome: 'LOBBY_MEMBER_DISCONNECTED' })
+      expect(factory).not.toHaveBeenCalled()
+      expect(await owner.emitWithAck('session.get', {}))
+        .toMatchObject({ outcome: 'IN_LOBBY', lobby: { lobbyId: lobby.lobbyId, playerCount: 2 } })
+      expect([...server.sockets.adapter.rooms.keys()].some((room) => room.startsWith('game:'))).toBe(false)
+    } finally {
+      server.sockets.sockets.set(other.id!, connection)
+      connection.connected = true
+    }
+    const ready = started(owner)
+    expect((await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })).outcome).toBe('STARTED')
+    expect((await ready).state.players).toHaveLength(2)
+  })
+
   it('transfers ownership in join order and removes the last waiting member on disconnect', async () => {
     const owner = await connect('Owner')
     const lobby = await create(owner)

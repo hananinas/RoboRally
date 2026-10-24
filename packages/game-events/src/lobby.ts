@@ -21,7 +21,10 @@ export type LobbyFailure = Readonly<{
 export type LobbyListResult = Readonly<{ outcome: 'LOBBIES_FOUND'; lobbies: readonly LobbySummary[] }> | LobbyFailure
 export type LobbyJoinResult = Readonly<{ outcome: 'LOBBY_JOINED'; lobby: LobbyState }> | LobbyFailure
 export type LobbyLeaveResult = Readonly<{ outcome: 'LEFT' }> | LobbyFailure
-export type LobbyStartResult = Readonly<{ outcome: 'STARTED'; gameId: string }> | LobbyFailure
+export type LobbyStartResult =
+  | Readonly<{ outcome: 'STARTED'; gameId: string }>
+  | Readonly<{ outcome: 'LOBBY_MEMBER_DISCONNECTED' }>
+  | LobbyFailure
 export type SessionResult =
   | Readonly<{ outcome: 'NO_SESSION' }>
   | Readonly<{ outcome: 'IN_LOBBY'; lobby: LobbyState }>

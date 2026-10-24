@@ -36,6 +36,7 @@ type Fixture = {
   loginOutcome: LoginResult['outcome']
   deferLogin: boolean
   deferStart: boolean
+  startOutcome: 'STARTED' | 'LOBBY_MEMBER_DISCONNECTED'
   programSubmitted: boolean
   started: boolean
   pendingLogins: { socket: GameSocket; respond: () => void }[]
@@ -111,6 +112,7 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
       fixture.deferLogin = control.deferred
       break
     case 'start':
+      fixture.startOutcome = control.outcome ?? 'STARTED'
       fixture.deferStart = control.deferred
       break
     case 'respond-login':
@@ -180,6 +182,7 @@ const httpServer = createServer(async (request, response) => {
       loginOutcome: 'LOGGED_IN',
       deferLogin: false,
       deferStart: false,
+      startOutcome: 'STARTED',
       programSubmitted: false,
       started: false,
       pendingLogins: [],
@@ -275,6 +278,7 @@ io.on('connection', (socket) => {
   })
   socket.on('lobby.start', (payload, acknowledge) => {
     fixture.entryRequests.push({ event: 'lobby.start', socketId: socket.id, payload })
+    if (fixture.startOutcome !== 'STARTED') return acknowledge({ outcome: fixture.startOutcome })
     fixture.started = true
     const respond = () => {
       socket.emit('game.started', { lobbyId: GAME_ID, initialization: initialization() })

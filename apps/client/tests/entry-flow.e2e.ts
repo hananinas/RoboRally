@@ -55,6 +55,21 @@ test('a pending login disables submission and retains the exact username', async
   await expect(page.getByText(' Player 🤖 ', { exact: true })).toBeVisible()
 })
 
+test('a disconnected member during Start leaves the owner waiting and able to retry', async ({ page, game }) => {
+  await game.control({ type: 'start', deferred: false, outcome: 'LOBBY_MEMBER_DISCONNECTED' })
+  await login(page)
+  await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
+  const start = page.getByRole('button', { name: 'Start', exact: true })
+  await start.click()
+  await expect(page.getByRole('alert')).toHaveText('A player disconnected before the game could start. Please try again.')
+  await expect(start).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Leave lobby', exact: true })).toBeEnabled()
+  await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
+  await game.control({ type: 'start', deferred: false, outcome: 'STARTED' })
+  await start.click()
+  await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
+})
+
 test('a committed start is recovered when its notification and acknowledgement are delayed', async ({ page, game }) => {
   await game.control({ type: 'start', deferred: true })
   await login(page)
