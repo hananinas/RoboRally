@@ -155,19 +155,10 @@ export type RobotActionResolved = Readonly<{
   pushedRobots: readonly Pick<Robot, 'robotId' | 'position'>[]
 }>
 
-export type JoinResult =
-  | Readonly<{
-      outcome: 'JOINED'
-      assignment: PlayerAssignment
-      state: PublicGameState
-      hand: readonly Card[]
-      programSubmitted: boolean
-    }>
-  | Readonly<{
-      outcome:
-        | 'LOGIN_REQUIRED'
-        | 'INVALID_REQUEST'
-        | 'GAME_NOT_FOUND'
-        | 'USER_ALREADY_IN_GAME'
-        | 'INTERNAL_ERROR'
-    }>
+export type GameInitialization = Readonly<{
+  outcome: 'JOINED'
+  assignment: PlayerAssignment
+  state: PublicGameState
+  hand: readonly Card[]
+  programSubmitted: boolean
+}>

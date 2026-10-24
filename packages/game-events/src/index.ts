@@ -1,6 +1,5 @@
 export type {
   ClientToServerEvents,
-  JoinResultAcknowledgement,
   LoginAcknowledgement,
   ProgramResultAcknowledgement,
   ServerToClientEvents,
@@ -16,7 +15,7 @@ export type {
   GameId,
   GamePhase,
   LeaveGame,
-  JoinResult,
+  GameInitialization,
   LoginResult,
   Orientation,
   PlayerAssignment,

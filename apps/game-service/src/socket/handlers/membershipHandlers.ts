@@ -6,8 +6,8 @@ import { err, ok, type Result } from 'neverthrow'
 import {
   leaveGameSchema,
   type LeaveGame,
-  type JoinResult,
-  type JoinResultAcknowledgement,
+  type GameInitialization,
+  type SessionResult,
   type LeaveResult,
   type PublicGameState,
   type User,
@@ -88,24 +88,24 @@ export function reconnectIfRecovered(ctx: MembershipContext, socket: GameSocket)
 }
 
 // Published games have a fixed roster. Only an existing member can reattach.
-export function reattachGame(
+export function handleReattachGame(
   ctx: MembershipContext,
   socket: GameSocket,
-  acknowledge: JoinResultAcknowledgement,
+  acknowledge: (result: SessionResult) => void,
 ): void {
   const user = socket.data.user
   if (!user) return acknowledge({ outcome: 'LOGIN_REQUIRED' })
   const membership = ctx.memberships.get(user.userId)
-  if (!membership) return acknowledge({ outcome: 'GAME_NOT_FOUND' })
+  if (!membership) return acknowledge({ outcome: 'INTERNAL_ERROR' })
   if (membership.connectionId && membership.connectionId !== socket.id) {
-    return acknowledge({ outcome: 'USER_ALREADY_IN_GAME' })
+    return acknowledge({ outcome: 'USER_ALREADY_IN_SESSION' })
   }
   const previousRooms = new Set(socket.rooms)
   const previousConnectionId = membership.connectionId
   const wasPaused = ctx.game.paused
   const reconnected = reattachMembership(membership, socket.id)
   resumeUnlessStillDisconnected(ctx)
-  let initialization: Extract<JoinResult, { outcome: 'JOINED' }>
+  let initialization: GameInitialization
   try {
     initialization = presentInitialization(ctx, membership)
     void socket.join([ctx.publicRoom, ctx.playerRoom(membership.player.id)])
@@ -118,7 +118,7 @@ export function reattachGame(
     if (wasPaused) ctx.game.pause()
     return acknowledge({ outcome: 'INTERNAL_ERROR' })
   }
-  acknowledge(initialization)
+  acknowledge({ outcome: 'IN_GAME', initialization })
   if (reconnected) notifyReconnected(ctx, membership.player.id)
 }
 
@@ -180,7 +180,7 @@ export function handleDisconnect(ctx: MembershipContext, socket: GameSocket): vo
   }
 }
 
-export function presentInitialization(ctx: MembershipContext, membership: GameMembership): Extract<JoinResult, { outcome: 'JOINED' }> {
+export function presentInitialization(ctx: MembershipContext, membership: GameMembership): GameInitialization {
   const { player } = membership
   return {
     outcome: 'JOINED',

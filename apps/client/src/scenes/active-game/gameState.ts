@@ -2,7 +2,7 @@ import type {
   Card,
   CardsDealt,
   GamePhase,
-  JoinResult,
+  GameInitialization,
   PlayerAssignment,
   PlayerConnectionChanged,
   PlayerCheckpointProgress,
@@ -55,7 +55,7 @@ export type ClientGameState = {
 }
 
 export type GameStateEvent =
-  | { type: 'joined'; result: Extract<JoinResult, { outcome: 'JOINED' }> }
+  | { type: 'joined'; result: GameInitialization }
   | { type: 'player-joined'; payload: PlayerJoined }
   | { type: 'player-left'; payload: PlayerLeft }
   | { type: 'player-connection-changed'; payload: PlayerConnectionChanged }

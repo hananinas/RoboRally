@@ -2,7 +2,7 @@ import { emptyRequestSchema, type EmptyRequest, type SessionResult } from '@robo
 import type { GameSocket } from '@/socket/gameServer'
 import type { SessionContext } from '@/socket/sessionContext'
 import { presentLobby } from '@/socket/handlers/lobbyHandlers'
-import { reattachGame } from '@/socket/handlers/membershipHandlers'
+import { handleReattachGame } from '@/socket/handlers/membershipHandlers'
 import { withSessionRequest } from '@/socket/utilities/withSessionRequest'
 
 export function handleGetSession(
@@ -23,10 +23,6 @@ export function handleGetSession(
     }
     const game = context.games.get(session.gameId)
     if (!game) throw new Error('Session references a missing game')
-    reattachGame(game, socket, (result) => {
-      ack(result.outcome === 'JOINED'
-        ? { outcome: 'IN_GAME', initialization: result }
-        : { outcome: result.outcome === 'USER_ALREADY_IN_GAME' ? 'USER_ALREADY_IN_SESSION' : 'INTERNAL_ERROR' })
-    })
+    handleReattachGame(game, socket, ack)
   })
 }

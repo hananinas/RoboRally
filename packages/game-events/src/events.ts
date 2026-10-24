@@ -1,9 +1,9 @@
-import type { EmptyRequest, LobbyRequest, LobbyState, GameInitialization, LobbyListResult, LobbyJoinResult, LobbyLeaveResult, LobbyStartResult, SessionResult } from './lobby.js'
+import type { EmptyRequest, LobbyRequest, LobbyState, LobbyListResult, LobbyJoinResult, LobbyLeaveResult, LobbyStartResult, SessionResult } from './lobby.js'
 import type {
   CardsDealt,
   GameAborted,
   LeaveGame,
-  JoinResult,
+  GameInitialization,
   LoginResult,
   ProgramResult,
   ProgramSubmitted,
@@ -17,7 +17,6 @@ import type {
 import type { SubmitProgram } from './submitProgram.js'
 import type { Login } from './login.js'
 
-export type JoinResultAcknowledgement = (result: JoinResult) => void
 export type ProgramResultAcknowledgement = (result: ProgramResult) => void
 export type LoginAcknowledgement = (result: LoginResult) => void
 

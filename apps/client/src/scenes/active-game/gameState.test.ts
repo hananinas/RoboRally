@@ -1,6 +1,6 @@
 import type {
   Card,
-  JoinResult,
+  GameInitialization,
   ProgramCardIds,
   PublicGameState,
   RobotActionResolved,
@@ -85,7 +85,7 @@ const actions: readonly RobotActionResolved[] = [
 ]
 const hand = { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, cards }
 
-const result: Extract<JoinResult, { outcome: 'JOINED' }> = {
+const result: GameInitialization = {
   outcome: 'JOINED',
   assignment: { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, robotId },
   state: publicState,

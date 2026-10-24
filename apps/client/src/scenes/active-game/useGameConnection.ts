@@ -1,7 +1,7 @@
 import type {
   CardsDealt,
   GameAborted,
-  JoinResult,
+  GameInitialization,
   PlayerConnectionChanged,
   PlayerCheckpointProgress,
   RobotActionResolved,
@@ -33,7 +33,7 @@ export default function useGameConnection(socket: GameSocket) {
     setState(next)
   }, [])
 
-  const initialize = useCallback((result: Extract<JoinResult, { outcome: 'JOINED' }>) => {
+  const initialize = useCallback((result: GameInitialization) => {
     generation.current += 1
     dispatch({ type: 'joined', result })
   }, [dispatch])

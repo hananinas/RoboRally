@@ -1,4 +1,4 @@
-import type { JoinResult, User } from '@robo-rally/game-events'
+import type { GameInitialization, User } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'
 import { sessionReducer, type SessionState } from './sessionState.ts'
 
@@ -7,7 +7,7 @@ const user: User = {
   username: ' Player ',
 }
 
-const joined: Extract<JoinResult, { outcome: 'JOINED' }> = {
+const joined: GameInitialization = {
   outcome: 'JOINED',
   assignment: {
     gameId: '00000000-0000-4000-8000-000000000002',

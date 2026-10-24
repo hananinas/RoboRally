@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { JoinResult } from './payloads.js'
+import type { GameInitialization } from './payloads.js'
 
 export const emptyRequestSchema = z.strictObject({}).readonly()
 export const lobbyRequestSchema = z.strictObject({ lobbyId: z.uuid() }).readonly()
@@ -13,7 +13,6 @@ export type LobbySummary = Readonly<{
   maxPlayers: number
 }>
 export type LobbyState = LobbySummary & Readonly<{ ownerUserId: string }>
-export type GameInitialization = Extract<JoinResult, { outcome: 'JOINED' }>
 export type LobbyFailure = Readonly<{
   outcome: 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'INTERNAL_ERROR'
     | 'LOBBY_NOT_FOUND' | 'NOT_LOBBY_MEMBER' | 'NOT_LOBBY_OWNER'
