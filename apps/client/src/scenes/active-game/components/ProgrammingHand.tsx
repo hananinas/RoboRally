@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent, type Ref } from 'react'
 import type { ProgramCard as Card } from '../gameState.ts'
 import ProgramCard from './ProgramCard.tsx'
+import { cardPresentation } from './cardInstructions.ts'
 
 type CardDrag = {
   card: Card
@@ -154,11 +155,21 @@ function ProgrammingHand({
           />
         )
       })}
-      {drag?.moved && (
+            {drag?.moved && (
         <div
           className={`program-card program-card--${drag.overRegister === null ? 'hand' : 'register'} dragged-card`}
           style={{ left: drag.x, top: drag.y }}
-        />
+        >
+          <img
+            src={cardPresentation[drag.card.instruction].icon}
+            alt=""
+            className="program-card__icon"
+            draggable={false}
+          />
+          <span className="program-card__label">
+            {cardPresentation[drag.card.instruction].label}
+          </span>
+        </div>
       )}
     </section>
   )
