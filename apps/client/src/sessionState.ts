@@ -7,7 +7,7 @@ export type SessionState =
   | { status: 'joining'; user: User; lobbyId: string | null }
   | { status: 'waiting'; user: User; lobby: LobbyState; error: string | null }
   | { status: 'joined'; user: User; gameId: string }
-  | { status: 'resyncing'; user: User }
+  | { status: 'resyncing'; user: User; requiresLogin: boolean }
   | { status: 'sync-failed'; user: User; error: string }
 
 export type SessionEvent =
@@ -19,7 +19,7 @@ export type SessionEvent =
   | { type: 'lobby-result'; result: LobbyJoinResult }
   | { type: 'lobby-updated'; lobby: LobbyState }
   | { type: 'game-started'; lobbyId: string; initialization: GameInitialization }
-  | { type: 'sync-requested' }
+  | { type: 'sync-requested'; requiresLogin?: boolean }
   | { type: 'session-result'; result: SessionResult }
   | { type: 'error'; error: string }
   | { type: 'left' }
@@ -39,7 +39,7 @@ export function sessionReducer(state: SessionState, event: SessionEvent): Sessio
       if (state.status !== 'logging-in' && state.status !== 'resyncing') return state
       const username = state.status === 'logging-in' ? state.username : state.user.username
       return event.result.outcome === 'LOGGED_IN'
-        ? { status: 'resyncing', user: event.result.user }
+        ? { status: 'resyncing', user: event.result.user, requiresLogin: false }
         : { status: 'editing', username, error: event.result.outcome }
     }
     case 'login-error':
@@ -59,7 +59,8 @@ export function sessionReducer(state: SessionState, event: SessionEvent): Sessio
         || (state.status === 'joining' && state.lobbyId === event.lobbyId)
         ? { status: 'joined', user: state.user, gameId: event.initialization.assignment.gameId } : state
     case 'sync-requested':
-      return 'user' in state ? { status: 'resyncing', user: state.user } : state
+      return 'user' in state ? { status: 'resyncing', user: state.user,
+        requiresLogin: event.requiresLogin ?? (state.status === 'sync-failed' || (state.status === 'resyncing' && state.requiresLogin)) } : state
     case 'session-result': {
       if (state.status !== 'resyncing') return state
       const result = event.result
@@ -77,7 +78,7 @@ export function sessionReducer(state: SessionState, event: SessionEvent): Sessio
       return 'user' in state ? { status: 'browsing', user: state.user, error: null } : state
     case 'disconnected':
       if (state.status === 'joined') return state
-      if ('user' in state) return { status: 'resyncing', user: state.user }
+      if ('user' in state) return { status: 'resyncing', user: state.user, requiresLogin: true }
       return { status: 'editing', username: state.username, error: null }
   }
 }

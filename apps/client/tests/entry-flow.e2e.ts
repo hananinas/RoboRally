@@ -16,7 +16,9 @@ test('login browses real results and creation waits for explicit Start', async (
   await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Start', exact: true }).click()
   await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
-  expect((await game.snapshot()).entryRequests.map((request) => request.event)).toContain('lobby.create')
+  const requests = (await game.snapshot()).entryRequests.map((request) => request.event)
+  expect(requests).toContain('lobby.create')
+  expect(requests.filter((event) => event === 'user.login')).toHaveLength(1)
 })
 
 test('joining requires selection and enters the waiting screen', async ({ page }) => {
@@ -64,6 +66,7 @@ test('a committed start is recovered when its notification and acknowledgement a
   await page.getByRole('region', { name: 'Programming hand' }).getByRole('button').first().click()
   await game.control({ type: 'respond-start' })
   await expect(page.getByRole('button', { name: /remove from register 1/ })).toBeVisible()
+  expect((await game.snapshot()).entryRequests.filter((request) => request.event === 'user.login')).toHaveLength(1)
 })
 
 for (const outcome of ['INVALID_USERNAME', 'INTERNAL_ERROR'] as const) {
