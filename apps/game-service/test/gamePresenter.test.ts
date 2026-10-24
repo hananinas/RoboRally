@@ -1,9 +1,9 @@
-import { Integer } from '@/numbers'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import type {
   CardsDealt,
   PublicGameState,
   RobotActionResolved,
+  Tile as TilePayload,
 } from '@robo-rally/game-events'
 import {
   Board,
@@ -11,15 +11,18 @@ import {
   Direction,
   EmptyTile,
   Game,
+  PitTile,
   Player,
   Robot,
   createGame,
+  type TileKind,
 } from '@/game/index.ts'
 import {
   presentCardsDealt,
   presentPublicGameState,
   presentRobotActionResolved,
 } from '@/socket/gamePresenter.ts'
+import { Integer } from '@/numbers'
 
 function createGameWithPlayer() {
   const { gameId, game } = createGame('empty-map')
@@ -28,6 +31,30 @@ function createGameWithPlayer() {
 }
 
 describe('game presenter', () => {
+  it('keeps domain tile kinds exhaustively compatible with public tile types', () => {
+    expectTypeOf<TileKind>().toEqualTypeOf<TilePayload['type']>()
+  })
+
+  it('serializes pits alongside empty tiles, walls and checkpoints', () => {
+    const board = new Board([[
+      new EmptyTile(),
+      new PitTile(),
+      new PitTile([Direction.NORTH, Direction.WEST]),
+      new EmptyTile([Direction.SOUTH], 1),
+    ]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
+    const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
+    const game = new Game(board, [], cards, undefined, { x: Integer(0), y: Integer(0) })
+    const state = presentPublicGameState('game', game)
+
+    expect(state.checkpointCount).toBe(1)
+    expect(state.board.tiles).toEqual([
+      { position: { x: 0, y: 0 }, type: 'EMPTY' },
+      { position: { x: 1, y: 0 }, type: 'PIT' },
+      { position: { x: 2, y: 0 }, type: 'PIT', walls: ['NORTH', 'WEST'] },
+      { position: { x: 3, y: 0 }, type: 'EMPTY', walls: ['SOUTH'], checkpointNumber: 1 },
+    ])
+  })
+
   it('presents a complete public programming state in row-major order', () => {
     const { gameId, game, player } = createGameWithPlayer()
     const state = presentPublicGameState(gameId, game)
@@ -44,7 +71,7 @@ describe('game presenter', () => {
           colour: player.robot.colour,
           playerId: player.id,
           position: {
-            coordinate: { x: Integer(10), y: Integer(7) },
+            coordinate: { x: 10, y: 7 },
             orientation: 'NORTH',
           },
         },
@@ -52,16 +79,16 @@ describe('game presenter', () => {
     })
     expect(state.board.tiles).toHaveLength(315)
     expect(state.board.tiles[0]).toEqual({
-      position: { x: Integer(0), y: Integer(0) },
+      position: { x: 0, y: 0 },
       type: 'EMPTY',
     })
     expect(state.board.tiles.at(-1)).toEqual({
-      position: { x: Integer(20), y: Integer(14) },
+      position: { x: 20, y: 14 },
       type: 'EMPTY',
     })
     expect(state.board.tiles.filter((tile) => tile.checkpointNumber !== undefined)).toEqual([
-      { position: { x: Integer(10), y: Integer(6) }, type: 'EMPTY', checkpointNumber: 1 },
-      { position: { x: Integer(8), y: Integer(9) }, type: 'EMPTY', checkpointNumber: 2 },
+      { position: { x: 10, y: 6 }, type: 'EMPTY', checkpointNumber: 1 },
+      { position: { x: 8, y: 9 }, type: 'EMPTY', checkpointNumber: 2 },
     ])
   })
 
@@ -87,12 +114,12 @@ describe('game presenter', () => {
     expect(state.phase).toBe('EXECUTING')
     expect(state.board.tiles).toEqual([
       {
-        position: { x: Integer(0), y: Integer(0) },
+        position: { x: 0, y: 0 },
         type: 'EMPTY',
         walls: ['NORTH', 'WEST'],
         checkpointNumber: 1,
       },
-      { position: { x: Integer(1), y: Integer(0) }, type: 'EMPTY' },
+      { position: { x: 1, y: 0 }, type: 'EMPTY' },
     ])
     expect(state.robots[0].position.orientation).toBe('EAST')
   })
@@ -144,7 +171,7 @@ describe('game presenter', () => {
       robotId: player.robot.id,
       instruction,
       position: {
-        coordinate: { x: Integer(4), y: Integer(5) },
+        coordinate: { x: 4, y: 5 },
         orientation: 'SOUTH',
       },
     })

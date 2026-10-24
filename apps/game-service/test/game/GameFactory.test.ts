@@ -18,7 +18,7 @@ describe('game factory', () => {
   })
 
   it('uses the map reboot tile when a robot enters a test pit', () => {
-    const { game } = createGame('test-map')
+    const { game } = createDefaultGame()
     const player = game.addPlayer()._unsafeUnwrap()
     game.board.relocateRobot(player.robot.id, { x: Integer(5), y: Integer(11) })
     game.submitProgram(player.id, [0, 4, 5, 3, 6].map((index) => player.hand[index].id))._unsafeUnwrap()
@@ -44,6 +44,7 @@ describe('game factory', () => {
     expect(first.gameId).not.toBe(second.gameId)
     expect(first.game.board.map?.name).toBe(boardMaps['test-map'].name)
     expect(first.game.board.antenna).toEqual(boardMaps['test-map'].antenna)
+    expect(first.game.rebootTile).toEqual(boardMaps['test-map'].rebootTile)
     expect(first.game.players).toEqual([])
   })
 

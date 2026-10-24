@@ -51,5 +51,5 @@ export function createGame(
 }
 
 export function createDefaultGame(): Readonly<{ gameId: string; game: Game }> {
-  return { gameId: randomUUID(), game: new Game(createBoard('test-map'), [], createHand()) }
+  return { ...createGame(), gameId: randomUUID() }
 }
