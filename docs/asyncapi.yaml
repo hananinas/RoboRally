@@ -838,6 +838,14 @@ components:
             gameId:
               type: string
               format: uuid
+        - type: object
+          additionalProperties: false
+          description: A listed player disconnected before Start. Remain in the lobby and retry.
+          required:
+            - outcome
+          properties:
+            outcome:
+              const: LOBBY_MEMBER_DISCONNECTED
         - $ref: '#/components/schemas/LobbyFailure'
     SessionResult:
       oneOf:
