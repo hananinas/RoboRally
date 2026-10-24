@@ -198,6 +198,51 @@ test('drags a card into a register and ignores outside drops', async ({
   await expect(registeredCards).toHaveCount(1)
 })
 
+test('drags a card out of a register to remove it', async ({ page }) => {
+  await openGame(page)
+  await fillProgram(page, [0, 1])
+
+  const handCards = page
+    .getByRole('region', { name: 'Programming hand' })
+    .getByRole('button')
+  const registeredCards = page.getByRole('button', {
+    name: /remove from register/,
+  })
+  await expect(registeredCards).toHaveCount(2)
+  await expect(handCards.first()).toBeDisabled()
+
+  async function dragRegisterCard(registerNumber: number, x: number, y: number) {
+    const card = page.getByRole('button', {
+      name: new RegExp(`remove from register ${registerNumber}$`),
+    })
+    const box = await card.boundingBox()
+    if (!box) throw new Error('Card position is unavailable')
+
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(x, y, { steps: 5 })
+  }
+
+  // Dropping back on its own register keeps the card.
+  const ownSlot = await page.locator('[data-register-index="0"]').boundingBox()
+  if (!ownSlot) throw new Error('Register position is unavailable')
+  await dragRegisterCard(1, ownSlot.x + 4, ownSlot.y + 4)
+  await expect(page.locator('.dragged-card')).toHaveCount(1)
+  await page.mouse.move(ownSlot.x + ownSlot.width / 2, ownSlot.y + ownSlot.height / 2)
+  await page.mouse.up()
+  await expect(registeredCards).toHaveCount(2)
+
+  // Dropping outside every register removes it and frees the hand card.
+  await dragRegisterCard(1, 300, 200)
+  await expect(page.locator('.dragged-card')).toHaveCount(1)
+  await page.mouse.up()
+
+  await expect(registeredCards).toHaveCount(1)
+  await expect(page.getByRole('button', { name: /remove from register 2$/ })).toBeVisible()
+  await expect(page.locator('.dragged-card')).toHaveCount(0)
+  await expect(handCards.first()).toBeEnabled()
+})
+
 test('navigates the hand with h/l, wrapping around and skipping registered cards', async ({ page }) => {
   await openGame(page)
   const handCards = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')

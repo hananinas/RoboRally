@@ -389,6 +389,7 @@
   width: var(--ui-register-card-width);
   height: var(--ui-register-card-height);
   border-radius: var(--ui-register-card-radius);
+  touch-action: none;
 }
 
 .program-card--selected {
