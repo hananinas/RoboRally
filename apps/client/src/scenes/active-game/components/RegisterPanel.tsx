@@ -20,6 +20,7 @@ type RegisterPanelProps = {
   status: string
   error: string | null
   onRemove: (registerIndex: number) => void
+  onMove: (fromIndex: number, toIndex: number) => void
   onConfirm: () => void
 }
 
@@ -95,6 +96,7 @@ function RegisterPanel({
   status,
   error,
   onRemove,
+  onMove,
   onConfirm,
 }: RegisterPanelProps) {
   const registerOf = (card: Card) =>
@@ -102,8 +104,11 @@ function RegisterPanel({
   const { drag, dragHandlers, isDragging } = useCardDrag({
     onTap: (card) => onRemove(registerOf(card)),
     onDrop: (card, registerIndex) => {
+      const fromIndex = registerOf(card)
       // Dropped outside every register: take the card out.
-      if (registerIndex === null) onRemove(registerOf(card))
+      if (registerIndex === null) onRemove(fromIndex)
+      // Dropped on another register: swap the two cards.
+      else if (registerIndex !== fromIndex) onMove(fromIndex, registerIndex)
     },
   })
 

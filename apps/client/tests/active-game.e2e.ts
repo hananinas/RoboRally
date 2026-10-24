@@ -197,6 +197,28 @@ test('drags a card into a register and ignores outside drops', async ({
 
   await expect(registeredCards).toHaveCount(1)
 })
+test('swaps two register cards by dragging one onto the other', async ({ page }) => {
+  await openGame(page)
+  await fillProgram(page)
+
+  const firstSlotCard = page.getByRole('button', { name: 'Move 1, remove from register 1' })
+  await expect(firstSlotCard).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Turn Left, remove from register 5' })).toBeVisible()
+
+  const source = await firstSlotCard.boundingBox()
+  const target = await page.locator('[data-register-index="4"]').boundingBox()
+  if (!source || !target) throw new Error('Register positions are unavailable')
+
+  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 5 })
+  await page.mouse.up()
+
+  await expect(page.getByRole('button', { name: 'Turn Left, remove from register 1' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Move 1, remove from register 5' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /remove from register/ })).toHaveCount(5)
+  await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeEnabled()
+})
 
 test('drags a card out of a register to remove it', async ({ page }) => {
   await openGame(page)

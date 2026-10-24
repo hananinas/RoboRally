@@ -13,6 +13,7 @@ import {
   type ResolvedRobotAction,
 } from '../src/scenes/active-game/board/robotPlayback.ts'
 import {
+  moveCard,
   placeCard,
   registersAreFilled,
   removeCard,
@@ -58,6 +59,13 @@ export default function BoardHarness() {
   }
   const handleRemove = (index: number) => {
     const next = removeCard(registers, index)
+    if (next === registers) return
+    setRegistersPast((past) => [...past, registers])
+    setRegistersFuture([])
+    setRegisters(next)
+  }
+  const handleMove = (fromIndex: number, toIndex: number) => {
+    const next = moveCard(registers, fromIndex, toIndex)
     if (next === registers) return
     setRegistersPast((past) => [...past, registers])
     setRegistersFuture([])
@@ -111,6 +119,7 @@ export default function BoardHarness() {
               status="Programming"
               error={null}
               onRemove={handleRemove}
+              onMove={handleMove}
               onConfirm={handleSubmit}
             />
           </div>
