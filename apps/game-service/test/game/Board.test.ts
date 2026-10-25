@@ -140,19 +140,18 @@ describe('Tile and Board layout', () => {
 })
 
 describe('Board robot ownership', () => {
-  const destinations: Record<TileKind, { tile: Tile; canOccupy: boolean; entryEffect?: 'reboot' }> = {
+  const destinations: Record<TileKind, { tile: Tile; canOccupy: boolean }> = {
     EMPTY: { tile: new EmptyTile(), canOccupy: true },
-    PIT: { tile: new PitTile(), canOccupy: false, entryEffect: 'reboot' },
+    PIT: { tile: new PitTile(), canOccupy: false },
   }
 
-  it.each(Object.entries(destinations))('uses %s rules for placement, relocation and safe destinations', (kind, { tile, canOccupy, entryEffect }) => {
+  it.each(Object.entries(destinations))('uses %s rules for placement, relocation and safe destinations', (kind, { tile, canOccupy }) => {
     const board = new Board([[new EmptyTile(), tile, new EmptyTile()]], { ...antenna, x: Integer(2) })
     const start = { x: Integer(0), y: Integer(0) }
     const destination = { x: Integer(1), y: Integer(0) }
     board.placeRobot('alpha', start)
 
     expect(tile.kind).toBe(kind)
-    expect(board.hasEntryEffect('reboot')).toBe(entryEffect === 'reboot')
     expect(board.nearestFreePosition(destination)).toEqual(canOccupy ? destination : undefined)
     if (canOccupy) {
       board.placeRobot('beta', destination)

@@ -31,7 +31,6 @@ Will update with a more conceptual domain diagram which will be used for present
         +placeRobot(RobotId robotId, Position position)
         +relocateRobot(RobotId robotId, Position position)
         +nearestFreePosition(Position origin) Position?
-        +hasEntryEffect(TileEntryEffect effect) bool
         +pushRobot(RobotId robotId, Direction direction) RobotId[]
         }
 

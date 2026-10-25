@@ -1,6 +1,6 @@
 import { type Direction, type Position, neighbour, opposite } from '@/game/spatial'
 import type { RobotId } from '@/game/ids'
-import { allowsPlacement, tileDefinitions, type Tile, type TileEntryEffect } from '@/game/Tile'
+import { allowsPlacement, type Tile } from '@/game/Tile'
 import { Integer } from '@/numbers'
 
 export type Antenna = Readonly<Position & { angle: number }>
@@ -47,10 +47,6 @@ export class Board {
 
   get checkpointCount(): number {
     return this.checkpointTotal
-  }
-
-  hasEntryEffect(effect: TileEntryEffect): boolean {
-    return this.tiles.some((row) => row.some((tile) => tileDefinitions[tile.kind].entryEffect === effect))
   }
 
   contains(position: Position): boolean {
