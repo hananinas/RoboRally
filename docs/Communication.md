@@ -5,6 +5,14 @@ Client requests receive acknowledgement callbacks. Game state changes and gamepl
 This document describes the v0.6 communication flow. [AsyncAPI](asyncapi.yaml) defines the exact payloads and rejection codes, with a [rendered reference](asyncapi.html).
 
 
+## Rooms
+
+The service broadcasts lobby and gameplay events through three kinds of Socket.IO rooms:
+
+- `lobby:{lobbyId}` — every connection currently waiting in that lobby.
+- `game:{gameId}:public` — every connection currently a member of that game.
+- `game:{gameId}:player:{playerId}` — only the connection currently attached to that player.
+
 ## Authentication
 Authentication is handled using OpenID Connect (OIDC) with Rauthy. The Game Service acts as the Backend for Frontend (BFF) and maintains the authenticated browser session.
 
@@ -84,7 +92,7 @@ Both `lobby.join` and `lobby.create` acknowledge with `LOBBY_JOINED {lobby}` aft
 Once a game has successfully started , the onber receives `STARTED {gameId}` as the command acknowledgement. How the game is initialised is described in [Initialization](#initialization).
 
 ### Lobby Membership
-While waiting, `lobby.leave {lobbyId}` or disconnecting removes membership. Leaving returns `LEFT`. Ownership passes to the earliest remaining member, announced through `lobby.updated {lobby}`. An empty lobby is deleted. A disconnected lobby member returns to browsing after reconnecting.
+While waiting, `lobby.leave {lobbyId}` or disconnecting removes membership. Leaving returns `LEFT`. Ownership passes to the earliest remaining member, announced to the [lobby room](#rooms) through `lobby.updated {lobby}`. An empty lobby is deleted. A disconnected lobby member returns to browsing after reconnecting.
 
 The following diagram documents the lobby lifecycle:
 
@@ -139,7 +147,7 @@ The server then emits:
 
 `program.submitted {playerId}`
 
-to the game's public room.
+to the [public room](#rooms).
 
 This informs other players that the player has submitted their program without revealing the submitted cards. The server waits until all players have successfully submitted before beginning activation.
 
@@ -149,7 +157,7 @@ This informs other players that the player has submitted their program without r
 
 Once all players have submitted, the service resolves the five registers in order. Within each register, eligible robots act according to antenna priority. Priority is recalculated after each robot action before the next robot acts.
 
-Each resolved action is emitted publicly as:
+Each resolved action is emitted to the [public room](#rooms) as:
 
 `robot.actionResolved`
 
@@ -186,7 +194,7 @@ Each player receives:
 
 `cards.dealt {cards}`
 
-through their private Socket.IO room.
+through the player's [private room](#rooms).
 
 A new hand may arrive while the client is still playing animations from the previous activation. The client should store the new hand immediately but must not enable programming until all queued resolved actions have finished playing.
 
@@ -242,7 +250,7 @@ If another live connection attempts to claim the same session for that user, ses
 
 A `session.get` rejected with `USER_ALREADY_IN_SESSION` leaves the authenticated session unaffected, and the client may call `session.get` again later.
 
-An explicit `game.leave {gameId}` removes the owning connection's player and robot, frees the occupied tile, and revokes its public/private room access. Remaining members receive `game.playerLeft {gameId, playerId, robotId}`. A disconnected player remains a member. Disconnecting is not leaving.
+An explicit `game.leave {gameId}` removes the owning connection's player and robot, frees the occupied tile, and revokes its public/private room access. Remaining members receive `game.playerLeft {gameId, playerId, robotId}` through the [public room](#rooms). A disconnected player remains a member. Disconnecting is not leaving.
 
 A player’s game membership is independent of their Socket.IO connection to the server. The authenticated browser session is also independent of the Socket.IO connection. When the connection is lost, the client must indicate that it is disconnected and prevent gameplay submissions until the connection and game state have been restored.
 
@@ -254,7 +262,7 @@ There are two possible reconnection paths:
 #### Pausing on disconnection
 When the server detects that a player has disconnected, it pauses the game. An action already in progress completes, but no subsequent action is executed. The current game state is preserved.
 
-The server announces this to the game's public room:
+The server announces this to the [public room](#rooms):
 
 `game.playerConnectionChanged {gameId, playerId, connected: false, paused: true}`
 
@@ -356,5 +364,5 @@ The game remains paused while any remaining player is disconnected. Once all rem
 
 Most commands acknowledge failures with a specific outcome string rather than throwing. See [AsyncAPI](asyncapi.yaml), with a [rendered reference](asyncapi.html), for the exact payload shapes and the full set of rejection codes per command.
 
-If an unexpected service failure makes gameplay unrecoverable, members receive `game.aborted {gameId}` and the game ends permanently.
+If an unexpected service failure makes gameplay unrecoverable, members receive `game.aborted {gameId}` through the [public room](#rooms), and the game ends permanently.
 
