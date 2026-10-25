@@ -138,9 +138,9 @@ If the client receives no acknowledgement, the outcome is unknown. The client mu
 
 During programming, before final submission, the client sends an occupancy update whenever a card is placed in or removed from a register. This shares only which slots are occupied; it does not submit a program. The final `program.submit {gameId, playerId, cardIds}` sends five distinct card instance IDs in register order.
 
-`game.registersChanged {gameId, playerId, registers}` broadcasts that player's five public slots to `game:{gameId}:public` after an accepted occupancy update or register execution.
+`game.updated {gameId, state}` broadcasts the shared game state to `game:{gameId}:public` after an accepted occupancy update, when activation begins, and after each register execution. `state` carries the players, robots, phase, and antenna; clients keep the board from `game.started` or `session.get`.
 
-`game.programmingStarted {gameId}` announces the start of programming to the public room and resets every player's registers to five EMPTY slots.
+`game.programmingStarted {gameId}` announces the start of programming to the public room and resets every player's registers to five EMPTY slots. The cleared registers arrive in the `game.updated` sent with it, and revealed slots stay published until then.
 
 ### Activation
 
@@ -220,9 +220,9 @@ sequenceDiagram
                 Server-->>A: game.updateRegistersResult {outcome: ACCEPTED}
             and Public occupancy broadcast
                 Note over Server,Public: true maps to {status: HIDDEN}<br/>false maps to {status: EMPTY}
-                Server->>Public: game.registersChanged {gameId, playerId: A, registers}
-                Public-->>A: game.registersChanged {gameId, playerId: A, registers}
-                Public-->>B: game.registersChanged {gameId, playerId: A, registers}
+                Server->>Public: game.updated {gameId, state}
+                Public-->>A: game.updated {gameId, state}
+                Public-->>B: game.updated {gameId, state}
             end
         end
         Note over A,Server: Occupancy updates are not final submission<br/>program.submit sends the card IDs
@@ -235,6 +235,10 @@ sequenceDiagram
         Server-->>B: Acknowledgement: ACCEPTED
         Server->>Public: program.submitted {gameId, playerId: B}
         Public-->>A: program.submitted {gameId, playerId: B}
+        Note over Server,Public: Activation begins and the phase becomes EXECUTING
+        Server->>Public: game.updated {gameId, state}
+        Public-->>A: game.updated {gameId, state}
+        Public-->>B: game.updated {gameId, state}
         loop Registers 1 through 5
             loop Eligible robots in antenna order
                 Note over Server: Execute next instruction
@@ -244,9 +248,9 @@ sequenceDiagram
                     Public-->>B: robot.actionResolved
                 and Public register reveal
                     Note over Server,Public: Executing player's slot becomes {status: REVEALED, instruction}, without a card ID
-                    Server->>Public: game.registersChanged {gameId, playerId, registers}
-                    Public-->>A: game.registersChanged {gameId, playerId, registers}
-                    Public-->>B: game.registersChanged {gameId, playerId, registers}
+                    Server->>Public: game.updated {gameId, state}
+                    Public-->>A: game.updated {gameId, state}
+                    Public-->>B: game.updated {gameId, state}
                 end
             end
         end

@@ -145,8 +145,8 @@ channels:
         $ref: '#/components/messages/ProgramSubmitted'
       robotActionResolved:
         $ref: '#/components/messages/RobotActionResolved'
-      registersChanged:
-        $ref: '#/components/messages/RegistersChanged'
+      gameUpdated:
+        $ref: '#/components/messages/GameUpdated'
       programmingStarted:
         $ref: '#/components/messages/ProgrammingStarted'
       playerCheckpointProgress:
@@ -712,42 +712,81 @@ components:
           payload:
             outcome: ACCEPTED
 
-    RegistersChanged:
-      name: game.registersChanged
-      description: Broadcasts a player's public registers after an accepted occupancy update or register execution.
+    GameUpdated:
+      name: game.updated
+      description: Carries the shared game state after a change to it. Clients merge it into the state they hold from game.started or session.get.
       payload:
-        type: object
-        additionalProperties: false
-        required: [ gameId, playerId, registers ]
-        properties:
-          gameId:
-            $ref: '#/components/schemas/GameId'
-          playerId:
-            $ref: '#/components/schemas/PlayerId'
-          registers:
-            $ref: '#/components/schemas/PublicRegisters'
+        $ref: '#/components/schemas/GameUpdated'
       examples:
-        - name: occupancyUpdated
+        - name: occupancyChanged
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
-            playerId: 00000000-0000-4000-8000-000000000002
-            registers:
-              - status: HIDDEN
-              - status: EMPTY
-              - status: HIDDEN
-              - status: EMPTY
-              - status: EMPTY
-        - name: firstRegisterExecuted
+            state:
+              gameId: 00000000-0000-4000-8000-000000000001
+              checkpointCount: 2
+              antenna:
+                x: 10
+                y: 0
+                angle: 1.5707963267948966
+              players:
+                - playerId: 00000000-0000-4000-8000-000000000002
+                  username: Ada
+                  programSubmitted: false
+                  connected: true
+                  lastCheckpoint: 0
+                  registers:
+                    - status: HIDDEN
+                    - status: EMPTY
+                    - status: HIDDEN
+                    - status: EMPTY
+                    - status: EMPTY
+              robots:
+                - robotId: 00000000-0000-4000-8000-000000000003
+                  playerId: 00000000-0000-4000-8000-000000000002
+                  colour: red
+                  position:
+                    coordinate:
+                      x: 10
+                      y: 7
+                    orientation: NORTH
+              phase: PROGRAMMING
+              paused: false
+              aborted: false
+        - name: registerExecuted
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
-            playerId: 00000000-0000-4000-8000-000000000002
-            registers:
-              - status: REVEALED
-                instruction: MOVE_1
-              - status: HIDDEN
-              - status: HIDDEN
-              - status: HIDDEN
-              - status: HIDDEN
+            state:
+              gameId: 00000000-0000-4000-8000-000000000001
+              checkpointCount: 2
+              antenna:
+                x: 10
+                y: 0
+                angle: 1.5707963267948966
+              players:
+                - playerId: 00000000-0000-4000-8000-000000000002
+                  username: Ada
+                  programSubmitted: true
+                  connected: true
+                  lastCheckpoint: 0
+                  registers:
+                    - status: REVEALED
+                      instruction: MOVE_1
+                    - status: HIDDEN
+                    - status: HIDDEN
+                    - status: HIDDEN
+                    - status: HIDDEN
+              robots:
+                - robotId: 00000000-0000-4000-8000-000000000003
+                  playerId: 00000000-0000-4000-8000-000000000002
+                  colour: red
+                  position:
+                    coordinate:
+                      x: 10
+                      y: 6
+                    orientation: NORTH
+              phase: EXECUTING
+              paused: false
+              aborted: false
 
     ProgrammingStarted:
       name: game.programmingStarted
@@ -1328,6 +1367,57 @@ components:
           $ref: "#/components/schemas/GameId"
         board:
           $ref: "#/components/schemas/Board"
+        robots:
+          type: array
+          items:
+            $ref: "#/components/schemas/Robot"
+        phase:
+          $ref: "#/components/schemas/GamePhase"
+        antenna:
+          $ref: "#/components/schemas/Antenna"
+        players:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlayerState"
+        paused:
+          type: boolean
+          description: Whether gameplay is paused because a game member is disconnected.
+        aborted:
+          type: boolean
+          description: Whether gameplay has stopped irrecoverably after an unexpected service failure.
+        checkpointCount:
+          $ref: '#/components/schemas/CheckpointCount'
+
+    GameUpdated:
+      type: object
+      additionalProperties: false
+      required:
+        - gameId
+        - state
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+        state:
+          $ref: '#/components/schemas/PublicGameStateUpdate'
+
+    PublicGameStateUpdate:
+      description: >-
+        Public robot, player, phase, and antenna state for a running game.
+        Clients keep the board from game.started or session.get.
+      type: object
+      additionalProperties: false
+      required:
+        - gameId
+        - antenna
+        - players
+        - robots
+        - phase
+        - paused
+        - aborted
+        - checkpointCount
+      properties:
+        gameId:
+          $ref: "#/components/schemas/GameId"
         robots:
           type: array
           items:
