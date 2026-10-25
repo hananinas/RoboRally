@@ -6,7 +6,7 @@ import { Card } from '@/game/Card'
 import type { CardId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
 import { Robot } from '@/game/Robot'
-import { allowsPlacement, tileDefinitions, type Tile } from '@/game/Tile'
+import { tileDefinitions, type Tile } from '@/game/Tile'
 import { Direction, opposite, type Position } from '@/game/spatial'
 import { Integer, PositiveInteger, UnsignedInteger } from '@/numbers'
 
@@ -62,8 +62,8 @@ export class Game {
     if (board.hasEntryEffect('reboot') && rebootTile === undefined) {
       throw new RangeError('A board with pits requires a reboot tile')
     }
-    if (rebootTile !== undefined && !allowsPlacement(board.getTile(rebootTile))) {
-      throw new RangeError('Reboot tile must be a non-pit tile on the board')
+    if (rebootTile !== undefined && !board.allowsPlacement(rebootTile)) {
+      throw new RangeError('Reboot tile must be a non-pit tile on the board outside the priority antenna')
     }
 
     const playerIds = new Set<PlayerId>()
@@ -72,8 +72,8 @@ export class Game {
       if (playerIds.has(player.id) || robotIds.has(player.robot.id)) {
         throw new RangeError('Players and robots must have unique IDs')
       }
-      if (!allowsPlacement(board.getTile(board.positionOf(player.robot.id)))) {
-        throw new RangeError('Robots cannot start on pits')
+      if (!board.allowsPlacement(board.positionOf(player.robot.id))) {
+        throw new RangeError('Robots cannot start on pits or the priority antenna')
       }
       playerIds.add(player.id)
       robotIds.add(player.robot.id)
@@ -138,7 +138,7 @@ export class Game {
     let x = Math.floor(width / 2)
     while (x >= 0) {
       const position = { x: Integer(x), y: Integer(y) }
-      if (allowsPlacement(this.board.getTile(position)) &&
+      if (this.board.allowsPlacement(position) &&
           this.board.occupantAt(position) === undefined) return ok(position)
       x--
     }

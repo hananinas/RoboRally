@@ -105,9 +105,9 @@ Direct movement preserves orientation, programs, submissions, and register state
 
 # Board
 
-Board owns the tile grid, antenna, and RobotId-to-Position map. `Board.moveRobot()` checks both sides of walls, board edges, and robot occupancy, without executing tile effects. Gameplay displacement, including future pushing, goes through Game's movement operation.
+Board owns the tile grid, antenna, and RobotId-to-Position map. `Board.moveRobot()` checks both sides of walls, board edges, the priority antenna, and robot occupancy, without executing tile effects. The antenna square is impassable. Gameplay displacement, including future pushing, goes through Game's movement operation.
 
-Placement, relocation, and safe-destination search use `allowsPlacement()` for tile suitability, with bounds and occupancy checked separately. Pits remain enterable during movement. Relocation does not trigger entry effects. Reboot search uses Manhattan distance, then top-to-bottom and left-to-right tie-breaking; enclosing walls do not exclude a destination. `hasEntryEffect('reboot')` lets Game require reboot configuration where needed.
+Placement, relocation, spawning, reboot configuration, and safe-destination search use `Board.allowsPlacement()` to check bounds, tile suitability, and exclusion of the antenna. Robot occupancy is checked separately. Pits remain enterable during movement. Relocation does not trigger entry effects. Reboot search uses Manhattan distance, then top-to-bottom and left-to-right tie-breaking; enclosing walls do not exclude a destination. `hasEntryEffect('reboot')` lets Game require reboot configuration where needed.
 
 # Tile
 

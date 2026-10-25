@@ -219,7 +219,7 @@ describe('Game multiplayer activation', () => {
   it('reports blocked actions and keeps earlier position snapshots independent', () => {
     const deck = Array.from({ length: 5 }, (_, index) => new Card(`move-${index}`, 'MOVE_1'))
     const { board, players, game } = createMultiplayerGame(
-      [{ x: Integer(7), y: Integer(4) }, { x: Integer(6), y: Integer(4) }], { x: Integer(8), y: Integer(4), angle: 0 }, undefined, deck,
+      [{ x: Integer(7), y: Integer(4) }, { x: Integer(6), y: Integer(4) }], { x: Integer(8), y: Integer(2), angle: 0 }, undefined, deck,
     )
     for (const player of players) game.submitProgram(player.id, deck.map((card) => card.id))
     const first = game.executeNextAction()

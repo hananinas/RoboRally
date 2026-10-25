@@ -178,7 +178,7 @@ describe('game membership over Socket.IO', () => {
   it('rejects exhausted spawns without leaving a membership or room', async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()))
     shared = { gameId: shared.gameId, game: new Game(
-      new Board([[new EmptyTile()]], { x: Integer(0), y: Integer(0), angle: Math.PI / 2 }), [],
+      new Board([[new EmptyTile(), new EmptyTile()]], { x: Integer(1), y: Integer(0), angle: Math.PI / 2 }), [],
       Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))) }
     await start()
     await join(await connect('First'))

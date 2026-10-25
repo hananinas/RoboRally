@@ -6,7 +6,7 @@ import { Integer } from '@/numbers'
 function createGame(deck: Card[]) {
   const board = new Board(Array.from({ length: 3 }, () =>
     Array.from({ length: 3 }, () => new EmptyTile()),
-  ), { x: Integer(1), y: Integer(0), angle: Math.PI / 2 })
+  ), { x: Integer(0), y: Integer(0), angle: Math.PI / 2 })
   const robot = new Robot('robot-1', Direction.EAST)
   board.placeRobot(robot.id, { x: Integer(1), y: Integer(1) })
   const player = new Player('player-1', robot)

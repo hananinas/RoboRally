@@ -123,7 +123,7 @@ describe('pit entry and rebooting', () => {
     expect(game.phase).toBe('programming')
   })
 
-  it('uses a free fallback when another player occupies the reboot tile', () => {
+  it('skips the antenna when choosing a fallback for an occupied reboot tile', () => {
     const { board, robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, { x: Integer(2), y: Integer(1) })
     const other = game.addPlayer()._unsafeUnwrap()
     other.robot.turn(1)
@@ -133,9 +133,10 @@ describe('pit entry and rebooting', () => {
 
     const { action } = game.executeNextAction()
     expect(action.robotId).toBe(robot.id)
-    expect(action.position).toEqual({ x: Integer(2), y: Integer(0) })
+    expect(action.position).toEqual({ x: Integer(3), y: Integer(1) })
     expect(board.occupantAt({ x: Integer(2), y: Integer(1) })).toBe(other.robot.id)
-    expect(board.occupantAt({ x: Integer(2), y: Integer(0) })).toBe(robot.id)
+    expect(board.occupantAt({ x: Integer(2), y: Integer(0) })).toBeUndefined()
+    expect(board.occupantAt({ x: Integer(3), y: Integer(1) })).toBe(robot.id)
     expect(board.occupantAt({ x: Integer(1), y: Integer(1) })).toBeUndefined()
   })
 
@@ -146,7 +147,7 @@ describe('pit entry and rebooting', () => {
     const board = new Board([
       [new EmptyTile(), new EmptyTile([], 2), new PitTile()],
       [new EmptyTile(), new EmptyTile([], 1), new EmptyTile()],
-    ], { x: Integer(1), y: Integer(0), angle: Math.PI / 2 })
+    ], { x: Integer(2), y: Integer(1), angle: Math.PI / 2 })
     const robot = new Robot('robot', Direction.EAST)
     board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })
     const player = new Player('player', robot)

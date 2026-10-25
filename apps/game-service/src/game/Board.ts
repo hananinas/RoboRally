@@ -72,13 +72,22 @@ export class Board {
     return this.contains(position) ? this.tiles[position.y][position.x] : undefined
   }
 
+  // Tile and obstacle suitability; robot occupancy is checked separately.
+  allowsPlacement(position: Position): boolean {
+    return allowsPlacement(this.getTile(position)) && !this.isAntenna(position)
+  }
+
+  private isAntenna(position: Position): boolean {
+    return position.x === this.antenna.x && position.y === this.antenna.y
+  }
+
   placeRobot(robotId: RobotId, position: Position): void {
     const tile = this.getTile(position)
     if (tile === undefined) {
       throw new RangeError('Robot position must be on the board')
     }
-    if (!allowsPlacement(tile)) {
-      throw new RangeError('Robots cannot be placed on pits')
+    if (!this.allowsPlacement(position)) {
+      throw new RangeError('Robots cannot be placed on pits or the priority antenna')
     }
     if (this.robotPositions.has(robotId)) {
       throw new Error(`Robot ${robotId} is already on the board`)
@@ -92,8 +101,8 @@ export class Board {
 
   relocateRobot(robotId: RobotId, position: Position): void {
     this.positionOf(robotId)
-    if (!allowsPlacement(this.getTile(position))) {
-      throw new RangeError('Robot destination must be a non-pit tile on the board')
+    if (!this.allowsPlacement(position)) {
+      throw new RangeError('Robot destination must be a non-pit tile on the board outside the priority antenna')
     }
     const occupant = this.occupantAt(position)
     if (occupant !== undefined && occupant !== robotId) {
@@ -108,7 +117,7 @@ export class Board {
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
         const position = { x: Integer(x), y: Integer(y) }
-        if (!allowsPlacement(this.tiles[y][x]) || this.occupantAt(position) !== undefined) continue
+        if (!this.allowsPlacement(position) || this.occupantAt(position) !== undefined) continue
         const distance = Math.abs(x - origin.x) + Math.abs(y - origin.y)
         if (distance < nearestDistance) {
           nearest = position
@@ -166,6 +175,10 @@ export class Board {
 
       if (!this.contains(nextPosition)) {
         // robot hits board edge
+        return { position: currentPosition, stepsMoved: step, blocked: true }
+      }
+
+      if (this.isAntenna(nextPosition)) {
         return { position: currentPosition, stepsMoved: step, blocked: true }
       }
       
