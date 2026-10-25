@@ -139,13 +139,9 @@ Each `NextActionResult` captures the acting robot and a `pushedRobots` list of o
 
 Client playback applies the acting robot's result and all pushed results together when that queued action starts, preserving each robot's reported orientation and the existing card timing. A push does not create extra programmed actions. Departed robots are not recreated, and queued pushes to surviving robots are retained when the acting robot leaves.
 
-## Pushing validation
+## Pushing tests
 
-Game tests cover directional chains, walls on either side of every boundary, antenna blocking, multi-step movement, falls, rebooted robots, pending actions, priority, and checkpoints. Socket tests check that all members receive the same resolved push, including reboot destinations. Browser tests cover queued playback and player departures.
-
-`apps/client/tests/pushing-multiplayer.e2e.ts` connects three browser clients to the real Game Service code on controlled test boards. It checks successful chains, wall-blocked chains, pit and board-edge reboots, preserved facing, later programmed actions, and agreement with a fresh snapshot after reloading. The test server is isolated from production setup and exposes no test commands.
-
-Build the service before running these browser scenarios:
+Build and run the multiplayer push tests:
 
 ```sh
 pnpm build
