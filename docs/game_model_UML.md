@@ -133,7 +133,13 @@ Definitions contain no callbacks. Walls, optional checkpoint numbers, and future
 4. Add map construction and, for public kinds, shared types, AsyncAPI, the board adapter, and rendering. The presenter serializes `tile.kind` directly.
 5. Test placement, movement, effect timing, and presentation through public APIs.
 
-Register-end effects need their own ordered phase when implemented. Conveyors and push panels remain unimplemented. Publishing all pushed robots' positions to clients is a separate integration step. Pit animations, damage, register cancellation, and direction selection remain deferred.
+Register-end effects need their own ordered phase when implemented. Conveyors and push panels remain unimplemented. Pit animations, damage, register cancellation, and direction selection remain deferred.
+
+## Action playback
+
+Each `NextActionResult` captures the acting robot and a `pushedRobots` list of other robots whose final positions changed during the card. These snapshots include completed reboots and remain independent of later movement. The presenter includes this list in the existing `robot.actionResolved` event; ordinary turns and blocked movements send an empty list.
+
+Client playback applies the acting robot's result and all pushed results together when that queued action starts, preserving each robot's reported orientation and the existing card timing. A push does not create extra programmed actions. Departed robots are not recreated, and queued pushes to surviving robots are retained when the acting robot leaves.
 
 # Robot
 

@@ -556,6 +556,7 @@ components:
           - position
           - gameId
           - registerIndex
+          - pushedRobots
         properties:
           robotId:
             $ref: "#/components/schemas/RobotId"
@@ -563,6 +564,17 @@ components:
             $ref: "#/components/schemas/Instruction"
           position:
             $ref: "#/components/schemas/Position"
+          pushedRobots:
+            type: array
+            description: Final states of other robots displaced by this instruction, after all movement steps and reboots. Empty when no other robot changed position.
+            items:
+              type: object
+              required: [robotId, position]
+              properties:
+                robotId:
+                  $ref: "#/components/schemas/RobotId"
+                position:
+                  $ref: "#/components/schemas/Position"
           gameId:
             $ref: "#/components/schemas/GameId"
           registerIndex:
@@ -572,8 +584,9 @@ components:
             description: Zero-based register index; display 1–5. Multiple robot actions can share one index.
       description: >-
         Reports the resulting robot state after one programmed instruction.
-        position is authoritative after any pit reboot; the reboot completes
-        before this event and before selecting the next robot by antenna priority.
+        position and pushedRobots are authoritative after any pit or board-edge
+        reboots. Apply them together as one action. Reboots complete before this
+        event and before selecting the next robot by antenna priority.
       examples:
         - name: firstRegister
           payload:
@@ -581,6 +594,7 @@ components:
             registerIndex: 0
             robotId: 00000000-0000-4000-8000-000000000003
             instruction: MOVE_1
+            pushedRobots: []
             position:
               coordinate:
                 x: 10

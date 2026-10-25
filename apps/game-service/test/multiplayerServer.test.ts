@@ -89,6 +89,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
         expect(actions.map((event) => event.payload)).toEqual(
           Array.from({ length: 5 }, (_, registerIndex) => [1, 0].map((playerIndex) => ({
             gameId, registerIndex,
+            pushedRobots: [],
             robotId: players[playerIndex].robot.id,
             instruction: 'TURN_LEFT',
             position: {

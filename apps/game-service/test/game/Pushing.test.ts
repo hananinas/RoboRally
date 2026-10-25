@@ -31,6 +31,24 @@ function createGame(
 }
 
 describe('robot pushing', () => {
+  it('captures final pushed positions after every step and reboot, independently of later movement', () => {
+    const tiles = grid()
+    tiles[3][8] = new PitTile()
+    const { robots, players, cards, game, reboot } = createGame([position(5), position(6), position(7)], tiles)
+    const move = cards.find((card) => card.instruction === 'MOVE_2')!
+    const program = [move, ...cards.filter((card) => card !== move).slice(0, 4)]
+    for (const player of players) game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
+
+    const result = game.executeNextAction()
+    const expected = [
+      { robotId: robots[1].id, position: position(0, 4), direction: Direction.NORTH },
+      { robotId: robots[2].id, position: reboot, direction: Direction.WEST },
+    ]
+    expect(result.pushedRobots).toEqual(expected)
+    game.moveRobot(robots[1], Direction.NORTH, PositiveInteger(1))
+    expect(result.pushedRobots).toEqual(expected)
+  })
+
   it.each([
     { direction: Direction.NORTH, starts: [position(4, 4), position(4, 3), position(4, 2)], ends: [position(4, 3), position(4, 2), position(4, 1)] },
     { direction: Direction.EAST, starts: [position(1), position(2), position(3)], ends: [position(2), position(3), position(4)] },

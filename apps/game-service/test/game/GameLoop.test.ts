@@ -32,6 +32,7 @@ describe('Game activation loop', () => {
       const result = game.executeNextAction()
       expect(result).toEqual({
         registerIndex,
+        pushedRobots: [],
         action: {
           robotId: robot.id,
           card: deck[registerIndex],

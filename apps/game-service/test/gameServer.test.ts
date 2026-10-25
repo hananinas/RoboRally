@@ -612,6 +612,41 @@ describe('game membership over Socket.IO', () => {
       })
     }
 
+    it('broadcasts a chain push and its rebooted robot to every client in one action', async () => {
+      const members: { client: Client; joined: Joined }[] = []
+      for (const username of ['Pusher', 'Pushed', 'Falling']) {
+        const client = await connect(username)
+        members.push({ client, joined: await join(client) })
+      }
+      const robotIds = members.map(({ joined }) => joined.assignment.robotId)
+      shared.game.board.relocateRobot(robotIds[0], { x: Integer(2), y: Integer(2) })
+      shared.game.board.relocateRobot(robotIds[1], { x: Integer(3), y: Integer(2) })
+      shared.game.board.relocateRobot(robotIds[2], { x: Integer(4), y: Integer(2) })
+      shared.game.players[0].robot.turn(3)
+      shared.game.players[1].robot.turn(2)
+      shared.game.players[2].robot.turn(1)
+      const actions: RobotActionResolved[][] = members.map(() => [])
+      members.forEach(({ client }, index) => client.on('robot.actionResolved', (action) => actions[index].push(action)))
+      const hands = members.map(({ client }) => new Promise<CardsDealt>((resolve) => client.once('cards.dealt', resolve)))
+      for (const [index, { client, joined }] of members.entries()) {
+        const indices = index === 0 ? [0, 4, 5, 6, 8] : [4, 5, 6, 8, 3]
+        expect(await client.timeout(1000).emitWithAck('program.submit', program(joined, indices))).toEqual({ outcome: 'ACCEPTED' })
+      }
+      await Promise.all(hands)
+
+      expect(actions[0][0]).toEqual({
+        gameId: shared.gameId, registerIndex: 0, robotId: robotIds[0], instruction: 'MOVE_1',
+        position: { coordinate: { x: 3, y: 2 }, orientation: 'EAST' },
+        pushedRobots: [
+          { robotId: robotIds[1], position: { coordinate: { x: 4, y: 2 }, orientation: 'SOUTH' } },
+          { robotId: robotIds[2], position: { coordinate: { x: 4, y: 4 }, orientation: 'WEST' } },
+        ],
+      })
+      expect(actions[0]).toHaveLength(15)
+      expect(actions[1]).toEqual(actions[0])
+      expect(actions[2]).toEqual(actions[0])
+    })
+
     it('broadcasts rebooted positions before progress and hands and restores them on rejoining', async () => {
       const client = await connect('First')
       const initial = await join(client)
@@ -641,6 +676,7 @@ describe('game membership over Socket.IO', () => {
         { coordinate: { x: 4, y: 4 }, orientation: 'NORTH' },
       ].map((position, registerIndex) => ({
         gameId: shared.gameId, registerIndex, robotId: initial.assignment.robotId,
+        pushedRobots: [],
         instruction: initial.hand[[2, 0, 4, 5, 3][registerIndex]].instruction, position,
       })))
       expect(progress).toEqual([{
@@ -701,6 +737,7 @@ describe('game membership over Socket.IO', () => {
       expect(actions[2]).toEqual(actions[0])
       expect(actions[0][0]).toEqual({
         gameId: shared.gameId, registerIndex: 0, robotId: robotIds[0], instruction: 'MOVE_3',
+        pushedRobots: [],
         position: { coordinate: { x: 4, y: 3 }, orientation: 'NORTH' },
       })
       expect(actions[0].slice(0, 3).map((action) => action.robotId)).toEqual([robotIds[0], robotIds[2], robotIds[1]])

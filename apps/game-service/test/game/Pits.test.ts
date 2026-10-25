@@ -46,6 +46,7 @@ describe('pit entry and rebooting', () => {
 
     expect(game.executeNextAction()).toEqual({
       registerIndex: 0,
+      pushedRobots: [],
       action: { robotId: robot.id, card: first, position: { x: Integer(0), y: Integer(2) }, direction },
     })
     expect(board.positionOf(robot.id)).toEqual({ x: Integer(0), y: Integer(2) })

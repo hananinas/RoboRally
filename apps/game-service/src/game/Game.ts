@@ -22,6 +22,11 @@ export type RobotActionResult = Readonly<{
 export type NextActionResult = Readonly<{
   registerIndex: number
   action: RobotActionResult
+  pushedRobots: readonly Readonly<{
+    robotId: RobotId
+    position: Position
+    direction: Direction
+  }>[]
 }>
 
 export type AddPlayerError = 'GAME_ALREADY_STARTED' | 'NO_SPAWN_AVAILABLE'
@@ -249,6 +254,7 @@ export class Game {
 
     const registerIndex = this.registerIndex
     const card = robot.getProgramCard(UnsignedInteger(registerIndex))
+    const previousPositions = this.roster.map((player) => this.board.positionOf(player.robot.id))
     this.executeCard(robot, card)
     this.activatedRobotIds.add(robot.id)
     const action: RobotActionResult = {
@@ -257,12 +263,19 @@ export class Game {
       position: this.board.positionOf(robot.id),
       direction: robot.direction,
     }
+    const pushedRobots = this.roster.flatMap(({ robot: other }, index) => {
+      if (other.id === robot.id) return []
+      const position = this.board.positionOf(other.id)
+      const previous = previousPositions[index]
+      if (position.x === previous.x && position.y === previous.y) return []
+      return [{ robotId: other.id, position, direction: other.direction }]
+    })
 
     if (this.activatedRobotIds.size === this.players.length) {
       this.activateBoardElements()
       this.finishRegister()
     }
-    return { registerIndex, action }
+    return { registerIndex, action, pushedRobots }
   }
 
   private dealCards(): void {

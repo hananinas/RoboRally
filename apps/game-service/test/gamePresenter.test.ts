@@ -32,6 +32,23 @@ function createGameWithPlayer() {
 }
 
 describe('game presenter', () => {
+  it('serializes pushed robot positions and orientations alongside the acting robot', () => {
+    const { player } = createGameWithPlayer()
+    const resolved = presentRobotActionResolved('game', {
+      registerIndex: 0,
+      action: { robotId: player.robot.id, card: player.hand[0], position: { x: Integer(2), y: Integer(3) }, direction: Direction.EAST },
+      pushedRobots: [
+        { robotId: 'pushed', position: { x: Integer(3), y: Integer(3) }, direction: Direction.NORTH },
+        { robotId: 'rebooted', position: { x: Integer(0), y: Integer(0) }, direction: Direction.WEST },
+      ],
+    })
+
+    expect(resolved.pushedRobots).toEqual([
+      { robotId: 'pushed', position: { coordinate: { x: 3, y: 3 }, orientation: 'NORTH' } },
+      { robotId: 'rebooted', position: { coordinate: { x: 0, y: 0 }, orientation: 'WEST' } },
+    ])
+  })
+
   it('keeps domain tile kinds exhaustively compatible with public tile types', () => {
     expectTypeOf<TileKind>().toEqualTypeOf<TilePayload['type']>()
   })
@@ -162,7 +179,7 @@ describe('game presenter', () => {
       direction: Direction.SOUTH,
     }
 
-    const resolved = presentRobotActionResolved('game', { registerIndex: 4, action })
+    const resolved = presentRobotActionResolved('game', { registerIndex: 4, action, pushedRobots: [] })
 
     expectTypeOf(resolved).toEqualTypeOf<RobotActionResolved>()
     expect(resolved).toEqual({
@@ -170,6 +187,7 @@ describe('game presenter', () => {
       registerIndex: 4,
       robotId: player.robot.id,
       instruction,
+      pushedRobots: [],
       position: {
         coordinate: { x: 4, y: 5 },
         orientation: 'SOUTH',

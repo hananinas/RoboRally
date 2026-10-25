@@ -77,6 +77,7 @@ describe('board-edge falls', () => {
 
     expect(result).toEqual({
       registerIndex: 0,
+      pushedRobots: [],
       action: { robotId: robot.id, card: program[0], position: reboot, direction },
     })
     expect(board.positionOf(robot.id)).toEqual(reboot)
