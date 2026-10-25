@@ -1,6 +1,7 @@
 [
   {
     "id": "game-service",
+    "name": "RoboRally",
     "secret": "generate",
     "redirect_uris": [
       "http://localhost:8080/auth/callback"

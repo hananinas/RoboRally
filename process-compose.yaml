@@ -12,6 +12,12 @@ processes:
       reset-rauthy-db:
         condition: process_completed_successfully
 
+  apply-rauthy-theme:
+    command: "bash infra/rauthy/apply-theme.sh"
+    depends_on:
+      rauthy:
+        condition: process_started
+
   build-game-events:
     command: "pnpm --filter @robo-rally/game-events run build"
 
