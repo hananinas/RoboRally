@@ -199,9 +199,52 @@ A new hand may arrive while the client is still playing animations from the prev
 
 ### Game sequence
 
-The following sequence shows one complete round while the game remains connected and unpaused. It illustrates successful requests; parallel blocks do not impose relative ordering between acknowledgements and broadcasts, between action and register broadcasts, or between next-round hands and the programming-start event.
+A round runs in two phases, so it is shown as two sequences. Both cover a connected, unpaused game and only successful requests. Parallel blocks do not impose an order between their branches.
 
-Both players have received their initial private hands through game.started or session.get. The occupancy-update flow shown for A also applies to B.
+Both players have received their initial private hands through `game.started` or `session.get`. The occupancy update is shown for A, and B follows the same flow.
+
+#### Programming
+
+```mermaid
+sequenceDiagram
+    participant A as Client A
+    participant B as Client B
+    participant Server as Game Service
+    participant Public as game:{gameId}:public
+
+    Note over A,B: EMPTY = no card placed<br/>HIDDEN = occupied, card not disclosed
+    loop Each card placement or removal before submission
+        Note over A,Server: occupied is five booleans in register order, e.g. [true, false, true, false, false]
+        A->>Server: game.updateRegisters {gameId, playerId: A, occupied}
+        par Acknowledgement
+            Server-->>A: game.updateRegistersResult {outcome: ACCEPTED}
+        and Occupancy broadcast
+            Note over Server,Public: true maps to {status: HIDDEN}<br/>false maps to {status: EMPTY}
+            Server->>Public: game.updated {gameId, state}
+            Public-->>A: game.updated {gameId, state}
+            Public-->>B: game.updated {gameId, state}
+        end
+    end
+
+    Note over A,Server: Occupancy updates are not submission<br/>program.submit sends the card IDs
+    A->>Server: program.submit {gameId, playerId: A, cardIds}
+    Server-->>A: ACCEPTED
+    Server->>Public: program.submitted {gameId, playerId: A}
+    Public-->>B: program.submitted {gameId, playerId: A}
+
+    B->>Server: program.submit {gameId, playerId: B, cardIds}
+    Server-->>B: ACCEPTED
+    Server->>Public: program.submitted {gameId, playerId: B}
+    Public-->>A: program.submitted {gameId, playerId: B}
+
+    Note over Server,Public: The last submission starts activation and the phase becomes EXECUTING
+    Server->>Public: game.updated {gameId, state}
+    Public-->>A: game.updated {gameId, state}
+    Public-->>B: game.updated {gameId, state}
+```
+
+#### Activation
+
 ```mermaid
 sequenceDiagram
     participant A as Client A
@@ -211,64 +254,37 @@ sequenceDiagram
     participant PrivateB as game:{gameId}:player:{B}
     participant Public as game:{gameId}:public
 
-    loop Each round
-        Note over A,B: EMPTY = no card placed<br/>HIDDEN = occupied, card not disclosed
-        loop Each card placement or removal during programming, before submission
-            Note over A,Server: occupied is five booleans in register order, e.g. [true, false, true, false, false]
-            A->>Server: game.updateRegisters {gameId, playerId: A, occupied}
-            par Acknowledgement callback
-                Server-->>A: game.updateRegistersResult {outcome: ACCEPTED}
-            and Public occupancy broadcast
-                Note over Server,Public: true maps to {status: HIDDEN}<br/>false maps to {status: EMPTY}
+    loop Registers 1 through 5
+        loop Eligible robots in antenna order
+            Note over Server: Execute next instruction
+            par Resolved action
+                Server->>Public: robot.actionResolved
+                Public-->>A: robot.actionResolved
+                Public-->>B: robot.actionResolved
+            and Register reveal
+                Note over Server,Public: Executing player's slot becomes {status: REVEALED, instruction}, without a card ID
                 Server->>Public: game.updated {gameId, state}
                 Public-->>A: game.updated {gameId, state}
                 Public-->>B: game.updated {gameId, state}
             end
         end
-        Note over A,Server: Occupancy updates are not final submission<br/>program.submit sends the card IDs
-        A->>Server: program.submit {gameId, playerId, cardIds}
-        Server-->>A: Acknowledgement: ACCEPTED
-        Server->>Public: program.submitted {gameId, playerId: A}
-        Public-->>B: program.submitted {gameId, playerId: A}
+    end
 
-        B->>Server: program.submit {gameId, playerId, cardIds}
-        Server-->>B: Acknowledgement: ACCEPTED
-        Server->>Public: program.submitted {gameId, playerId: B}
-        Public-->>A: program.submitted {gameId, playerId: B}
-        Note over Server,Public: Activation begins and the phase becomes EXECUTING
+    par Next-round hands
+        Server->>PrivateA: cards.dealt {cards}
+        PrivateA-->>A: cards.dealt {cards}
+        Server->>PrivateB: cards.dealt {cards}
+        PrivateB-->>B: cards.dealt {cards}
+    and Start of programming
+        Note over Server,Public: Revealed slots stay published until this reset
+        Server->>Public: game.programmingStarted {gameId}
+        Public-->>A: game.programmingStarted {gameId}
+        Public-->>B: game.programmingStarted {gameId}
         Server->>Public: game.updated {gameId, state}
         Public-->>A: game.updated {gameId, state}
         Public-->>B: game.updated {gameId, state}
-        loop Registers 1 through 5
-            loop Eligible robots in antenna order
-                Note over Server: Execute next instruction
-                par Resolved action broadcast
-                    Server->>Public: robot.actionResolved
-                    Public-->>A: robot.actionResolved
-                    Public-->>B: robot.actionResolved
-                and Public register reveal
-                    Note over Server,Public: Executing player's slot becomes {status: REVEALED, instruction}, without a card ID
-                    Server->>Public: game.updated {gameId, state}
-                    Public-->>A: game.updated {gameId, state}
-                    Public-->>B: game.updated {gameId, state}
-                end
-            end
-        end
-
-        par Private next-round hands
-            Server->>PrivateA: cards.dealt {cards}
-            PrivateA-->>A: cards.dealt {cards}
-            Server->>PrivateB: cards.dealt {cards}
-            PrivateB-->>B: cards.dealt {cards}
-        and Next programming phase
-            Note over Server,Public: Reset every player's registers to five {status: EMPTY} slots
-            Server->>Public: game.programmingStarted {gameId}
-            Public-->>A: game.programmingStarted {gameId}
-            Public-->>B: game.programmingStarted {gameId}
-        end
     end
 ```
-
 
 ## Reconnection
 A player’s game membership is independent of their connection to the server. When the connection is lost, the client must indicate that it is disconnected and prevent gameplay submissions until the connection and game state have been restored.
