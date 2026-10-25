@@ -32,7 +32,6 @@ Will update with a more conceptual domain diagram which will be used for present
         +relocateRobot(RobotId robotId, Position position)
         +nearestFreePosition(Position origin) Position?
         +hasEntryEffect(TileEntryEffect effect) bool
-        +moveRobot(RobotId robotId, Direction direction, PositiveInteger steps) MovementResult
         +pushRobot(RobotId robotId, Direction direction) RobotId[]
         }
 
@@ -108,9 +107,9 @@ Direct movement preserves orientation, programs, submissions, and register state
 
 # Board
 
-Board owns the tile grid, antenna, and RobotId-to-Position map. `Board.moveRobot()` checks both sides of walls, the priority antenna, and robot occupancy, without executing tile effects or pushing. The antenna square is impassable. An unblocked step off the board vacates the previous square, records the outside position, and stops spatial movement. Game resolves the reboot before another gameplay step or action.
+Board owns the tile grid, antenna, and RobotId-to-Position map. It resolves one spatial movement step at a time without executing tile effects. The antenna square is impassable. Entering a pit or leaving the board records the robot's new position; Game resolves the reboot before another gameplay step or action.
 
-`Board.pushRobot()` validates the complete chain before changing any positions. A wall on either side of any crossed boundary or the priority antenna blocks the whole step. Otherwise it moves the chain farthest first and returns the displaced robot IDs in that order. Board only changes positions; Game handles entry effects after the complete step. Gameplay displacement goes through Game's movement operation. Non-pushing Board movement remains available for future conveyors.
+`Board.pushRobot()` validates the complete chain before changing any positions. A wall on either side of any crossed boundary or the priority antenna blocks the whole step. Otherwise it moves the chain farthest first and returns the displaced robot IDs in that order. Board only changes positions; Game handles entry effects after the complete step. Gameplay displacement goes through Game's movement operation.
 
 Placement, relocation, spawning, reboot configuration, and safe-destination search use `Board.allowsPlacement()` to check bounds, tile suitability, and exclusion of the antenna. Robot occupancy is checked separately. Pits remain enterable during movement. Relocation does not trigger entry effects. Every Game requires a valid reboot tile, including on maps without pits. Reboot search uses Manhattan distance, then top-to-bottom and left-to-right tie-breaking; enclosing walls do not exclude a destination.
 

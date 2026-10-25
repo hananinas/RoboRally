@@ -57,6 +57,20 @@ describe('shared gameplay movement', () => {
     expect(robot.direction).toBe(Direction.NORTH)
   })
 
+  it('keeps successful steps when a multi-step move reaches the antenna', () => {
+    const { board, robot, game } = createGame()
+    const start = { x: Integer(2), y: Integer(1) }
+    const destination = { x: Integer(3), y: Integer(1) }
+    board.relocateRobot(robot.id, start)
+
+    game.moveRobot(robot, Direction.EAST, PositiveInteger(3))
+
+    expect(board.positionOf(robot.id)).toEqual(destination)
+    expect(board.occupantAt(start)).toBeUndefined()
+    expect(board.occupantAt(destination)).toBe(robot.id)
+    expect(board.occupantAt(board.antenna)).toBeUndefined()
+  })
+
   it.each([
     { wall: 'source', pitWalls: [], startWalls: [Direction.EAST] },
     { wall: 'destination', pitWalls: [Direction.WEST], startWalls: [] },

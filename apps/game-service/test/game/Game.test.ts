@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Board, Direction, EmptyTile, PitTile, Game, Card, Player, Robot } from '@/game/index'
-import { Integer, PositiveInteger } from '@/numbers'
+import { Integer } from '@/numbers'
 
 function createGame() {
   const board = new Board([
@@ -276,7 +276,7 @@ describe('Game reboot configuration and spawning', () => {
     const board = new Board([[new EmptyTile(), new PitTile(), new EmptyTile()]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
     const player = new Player('player', new Robot('robot', Direction.EAST))
     board.placeRobot(player.robot.id, { x: Integer(0), y: Integer(0) })
-    board.moveRobot(player.robot.id, Direction.EAST, PositiveInteger(1))
+    board.pushRobot(player.robot.id, Direction.EAST)
 
     expect(() => new Game(board, [player], deck, undefined, { x: Integer(0), y: Integer(0) }))
       .toThrow('Robots cannot start on pits')

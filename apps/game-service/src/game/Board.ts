@@ -1,13 +1,7 @@
 import { type Direction, type Position, neighbour, opposite } from '@/game/spatial'
 import type { RobotId } from '@/game/ids'
 import { allowsPlacement, tileDefinitions, type Tile, type TileEntryEffect } from '@/game/Tile'
-import { Integer, type PositiveInteger } from '@/numbers'
-
-export type MovementResult = Readonly<{
-  position: Position
-  stepsMoved: number
-  blocked: boolean
-}>
+import { Integer } from '@/numbers'
 
 export type Antenna = Readonly<Position & { angle: number }>
 
@@ -178,38 +172,5 @@ export class Board {
       this.updateRobotPosition(id, neighbour(this.positionOf(id), direction))
     }
     return chain
-  }
-
-  moveRobot(robotId: RobotId, direction: Direction, steps: PositiveInteger): MovementResult {
-    // Verify robot is on the board
-    let currentPosition = this.positionOf(robotId)
-    let nextPosition: Position = currentPosition
-    let stepsMoved = 0
-    
-    for (let step = 0; step < steps; step++) {
-      currentPosition = nextPosition
-      nextPosition = neighbour(nextPosition, direction)
-
-      if (this.blocksMovement(currentPosition, direction)) {
-        return { position: currentPosition, stepsMoved: step, blocked: true }
-      }
-
-      if (!this.contains(nextPosition)) {
-        // Falling ends spatial movement; Game resolves the reboot.
-        this.updateRobotPosition(robotId, nextPosition)
-        return { position: nextPosition, stepsMoved: step + 1, blocked: false }
-      }
-
-      if (this.occupantAt(nextPosition) !== undefined) {
-        // robot is blocked by another robot
-        return { position: currentPosition, stepsMoved: step, blocked: true }
-      }
-
-      // move the robot to the next position as it is free
-      this.updateRobotPosition(robotId, nextPosition)
-      stepsMoved = step + 1
-    }
-
-    return { position: this.positionOf(robotId), stepsMoved: stepsMoved, blocked: false }
   }
 }

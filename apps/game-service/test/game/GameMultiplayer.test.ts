@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Board, Card, Direction, EmptyTile, Game, Player, Robot } from '@/game/index.ts'
 import type { Antenna, Position, RobotId } from '@/game/index.ts'
-import { Integer, PositiveInteger } from '@/numbers'
+import { Integer } from '@/numbers'
 
 function createMultiplayerGame(
   positions: readonly Position[],
@@ -229,7 +229,7 @@ describe('Game multiplayer activation', () => {
     expect(robotBlocked.action).toMatchObject({ robotId: players[1].robot.id, card: deck[1], position: { x: 7, y: 4 } })
     expect(game.currentRegister).toBe(2)
 
-    board.moveRobot(players[0].robot.id, Direction.NORTH, PositiveInteger(1))
+    board.relocateRobot(players[0].robot.id, { x: Integer(8), y: Integer(3) })
     expect(board.positionOf(players[0].robot.id)).toEqual({ x: 8, y: 3 })
     expect(first.action.position).toEqual({ x: 8, y: 4 })
     expect(wallBlocked.action.position).toEqual({ x: 8, y: 4 })
