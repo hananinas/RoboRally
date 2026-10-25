@@ -31,5 +31,8 @@ key_active = '2026-10-03'
 [mfa]
 admin_force_mfa = false
 
+[user_registration]
+enable = true
+
 [bootstrap]
 bootstrap_dir = "infra/rauthy/bootstrap"
