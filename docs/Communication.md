@@ -167,6 +167,14 @@ Exact priority ties are resolved using player join order. The priority algorithm
 
 If an unexpected service failure makes gameplay unrecoverable, members receive `game.aborted {gameId}` and the game ends permanently.
 
+### Pits and rebooting
+
+Entering a `PIT` stops the current movement instruction and immediately reboots the robot at the configured reboot tile. Blocked movement produces no entry effect. If the reboot tile is occupied, use the nearest free, non-pit tile by Manhattan distance, breaking ties top to bottom, then left to right.
+
+Rebooting completes before the next action. `robot.actionResolved.position` and public snapshots contain the resulting position and unchanged orientation. No new event is added.
+
+Programs and checkpoint progress are preserved; later registers continue normally. Damage, round cancellation, direction selection, board-edge falls and pit animations are deferred.
+
 ### Checkpoint progress
 
 Tiles have an optional `checkpointNumber` alongside their walls and keep type `EMPTY`. Omit the number when there is no checkpoint. Numbers are positive integers, unique and consecutive from 1. Checkpoints stay at fixed positions and remain available to every player after completion. The demo board places checkpoint 1 at `(10, 6)` and checkpoint 2 at `(8, 9)`.

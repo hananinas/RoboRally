@@ -1,6 +1,26 @@
 import type { Direction } from '@/game/spatial'
 
+export type TileKind = 'EMPTY' | 'PIT'
+export type TileEntryEffect = 'reboot'
+
+export type TileDefinition = Readonly<{
+  canOccupy: boolean
+  entryEffect?: TileEntryEffect
+}>
+
+// Placement/reboot suitability does not restrict movement into an entry-effect tile.
+export const tileDefinitions: Readonly<Record<TileKind, TileDefinition>> = {
+  EMPTY: { canOccupy: true },
+  PIT: { canOccupy: false, entryEffect: 'reboot' },
+}
+
+// Tile suitability only; Board checks robot occupancy separately.
+export function allowsPlacement(tile: Tile | undefined): boolean {
+  return tile !== undefined && tileDefinitions[tile.kind].canOccupy
+}
+
 export abstract class Tile {
+  abstract readonly kind: TileKind
   private readonly wallDirections: Set<Direction>
 
   protected constructor(walls: Iterable<Direction> = [], private readonly checkpoint?: number) {
@@ -24,7 +44,17 @@ export abstract class Tile {
 }
 
 export class EmptyTile extends Tile {
+  readonly kind = 'EMPTY'
+
   constructor(walls: Iterable<Direction> = [], checkpointNumber?: number) {
     super(walls, checkpointNumber)
+  }
+}
+
+export class PitTile extends Tile {
+  readonly kind = 'PIT'
+
+  constructor(walls: Iterable<Direction> = []) {
+    super(walls)
   }
 }

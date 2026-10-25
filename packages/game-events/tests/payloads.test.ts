@@ -11,13 +11,16 @@ describe('game event payload types', () => {
     const coordinate = { x: 2, y: 3 } satisfies Coordinate
     const position = { coordinate, orientation: 'NORTH' } satisfies Position
     const tile = { position: coordinate, type: 'EMPTY' } satisfies Tile
+    const pit = { position: coordinate, type: 'PIT', walls: ['NORTH'] } satisfies Tile
 
+    expectTypeOf<Tile['type']>().toEqualTypeOf<'EMPTY' | 'PIT'>()
     expectTypeOf<Tile['position']>().toEqualTypeOf<Coordinate>()
     expectTypeOf<Position['coordinate']>().toEqualTypeOf<Coordinate>()
     expectTypeOf<Position>().not.toMatchTypeOf<Coordinate>()
     expectTypeOf<Coordinate>().not.toMatchTypeOf<Position>()
     expect(position).toEqual({ coordinate: { x: 2, y: 3 }, orientation: 'NORTH' })
     expect(tile.position).toEqual({ x: 2, y: 3 })
+    expect(pit.position).toEqual({ x: 2, y: 3 })
   })
 
   it('constructs a public game state', () => {
