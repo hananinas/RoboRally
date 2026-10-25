@@ -1,8 +1,9 @@
-import { emptyRequestSchema, type EmptyRequest, type SessionResult } from '@robo-rally/game-events'
+import { emptyRequestSchema, type EmptyRequest, type SessionResult, type LeaveGame, type LeaveResult, type SubmitProgram, type ProgramResult } from '@robo-rally/game-events'
 import type { GameSocket } from '@/socket/gameServer'
-import type { SessionContext } from '@/socket/sessionContext'
-import { presentLobby } from '@/socket/handlers/lobbyHandlers'
-import { handleReattachGame } from '@/socket/handlers/membershipHandlers'
+import { currentGame, type SessionContext } from '@/socket/sessionContext'
+import { presentLobby, leaveLobby } from '@/socket/handlers/lobbyHandlers'
+import { handleReattachGame, handleLeave, handleDisconnect, reconnectIfRecovered } from '@/socket/handlers/membershipHandlers'
+import { handleSubmitProgram } from '@/socket/handlers/gameplayHandlers'
 import { withSessionRequest } from '@/socket/utilities/withSessionRequest'
 
 export function handleGetSession(
@@ -25,4 +26,62 @@ export function handleGetSession(
     if (!game) throw new Error('Session references a missing game')
     handleReattachGame(game, socket, ack)
   })
+}
+
+export function validateRecoveredSession(context: SessionContext, socket: GameSocket, next: (error?: Error) => void): void {
+  if (socket.recovered && socket.data.user) {
+    const ctx = currentGame(context, socket)
+    const membership = ctx?.memberships.get(socket.data.user.userId)
+    if (membership?.connectionId && membership.connectionId !== socket.id) {
+      return next(new Error('USER_ALREADY_IN_GAME'))
+    }
+    const expectedRooms = new Set(membership && ctx
+      ? [socket.id, ctx.publicRoom, ctx.playerRoom(membership.player.id)] : [socket.id])
+    if ([...socket.rooms].some((room) => !expectedRooms.has(room))) {
+      return next(new Error('SESSION_EXPIRED'))
+    }
+  }
+  next()
+}
+
+export function recoverSession(context: SessionContext, socket: GameSocket): void {
+  const game = currentGame(context, socket)
+  if (game) reconnectIfRecovered(game, socket)
+}
+
+export function handleLeaveGame(
+  context: SessionContext,
+  socket: GameSocket,
+  payload: LeaveGame,
+  acknowledge: (result: LeaveResult) => void,
+): void {
+  if (typeof acknowledge !== 'function') return
+  const game = currentGame(context, socket)
+  if (!game) return acknowledge({ outcome: socket.data.user ? 'GAME_NOT_FOUND' : 'LOGIN_REQUIRED' })
+  handleLeave(game, socket, payload, (result) => {
+    if (result.outcome === 'LEFT') context.sessionsByUser.delete(socket.data.user!.userId)
+    acknowledge(result)
+  })
+  if (game.memberships.size === 0) {
+    game.actionScheduler.stop()
+    context.games.delete(game.gameId)
+  }
+}
+
+export function handleDisconnectSession(context: SessionContext, socket: GameSocket): void {
+  leaveLobby(context, socket)
+  const game = currentGame(context, socket)
+  if (game) handleDisconnect(game, socket)
+}
+
+export function handleSessionProgram(
+  context: SessionContext,
+  socket: GameSocket,
+  payload: SubmitProgram,
+  acknowledge: (result: ProgramResult) => void,
+): void {
+  if (typeof acknowledge !== 'function') return
+  const game = currentGame(context, socket)
+  if (game) handleSubmitProgram(game, socket, payload, acknowledge)
+  else acknowledge({ outcome: 'NOT_A_MEMBER' })
 }
