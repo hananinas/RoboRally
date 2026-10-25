@@ -2,11 +2,12 @@ import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type {
-  ClientToServerEvents, GameStarted, GameUpdated, JoinAccepted,
+  CardsDealt, ClientToServerEvents, GameStarted, JoinAccepted, RegistersChanged,
   RobotActionResolved, ServerToClientEvents,
 } from '@robo-rally/game-events'
 import { io as createClient, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import * as actionScheduler from '@/actionScheduler'
 import { createGame } from '@/game/GameFactory'
 import { createGameSocketServer, type GameSession, type GameSocketServer } from '@/socket/gameServer'
 
@@ -105,8 +106,8 @@ describe('public registers over Socket.IO', () => {
     expect(other.assignment.gameId).not.toBe(a.assignment.gameId)
     expect(a.state.players.map((player) => player.registers)).toEqual([empty, empty])
     expect(a.hand.every((card) => !b.hand.some((otherCard) => otherCard.id === card.id))).toBe(true)
-    const seen = clients.map(() => [] as GameUpdated[])
-    clients.forEach((client, index) => client.on('game.updated', (event) => seen[index].push(event)))
+    const seen = clients.map(() => [] as RegistersChanged[])
+    clients.forEach((client, index) => client.on('game.registersChanged', (event) => seen[index].push(event)))
     expect(await raw(first, update(a))).toEqual({ outcome: 'ACCEPTED' })
     const state = await snapshot(second)
     await snapshot(first)
@@ -117,9 +118,11 @@ describe('public registers over Socket.IO', () => {
     ]
     expect(seen.map((events) => events.length)).toEqual([1, 1, 0])
     for (const events of seen.slice(0, 2)) {
-      expect(events[0].gameId).toBe(a.assignment.gameId)
-      expect(events[0].state).not.toHaveProperty('board')
-      expect(events[0].state.players.map((player) => player.registers)).toEqual([registers, empty])
+      expect(events[0]).toEqual({
+        gameId: a.assignment.gameId, playerId: a.assignment.playerId, registers,
+      })
+      expect(events[0]).not.toHaveProperty('board')
+      expect(events[0]).not.toHaveProperty('state')
     }
     expect(state.state.players.find((player) => player.playerId === a.assignment.playerId)?.registers).toEqual(registers)
     expect(state.hand).toEqual(b.hand)
@@ -127,9 +130,18 @@ describe('public registers over Socket.IO', () => {
       expect(player).not.toHaveProperty('hand')
       expect(player).not.toHaveProperty('cardIds')
     }
-    for (const card of [...a.hand, ...b.hand]) expect(JSON.stringify(seen)).not.toContain(card.id)
+    const publicPayloads = JSON.stringify([seen, a.state, b.state, state.state])
+    for (const card of [...a.hand, ...b.hand]) expect(publicPayloads).not.toContain(card.id)
     expect(await raw(first, update(a, [false, false, false, false, false]))).toEqual({ outcome: 'ACCEPTED' })
     expect((await snapshot(first)).state.players[0].registers).toEqual(empty)
+    await snapshot(second)
+    await snapshot(outsider)
+    expect(seen.map((events) => events.length)).toEqual([2, 2, 0])
+    for (const events of seen.slice(0, 2)) {
+      expect(events[1]).toEqual({
+        gameId: a.assignment.gameId, playerId: a.assignment.playerId, registers: empty,
+      })
+    }
   })
 
   it('rejects invalid occupancy, extra identities, foreign memberships and player spoofing without mutation', async () => {
@@ -139,8 +151,8 @@ describe('public registers over Socket.IO', () => {
     const duplicate = await connect('Owner')
     const [a, b] = await start([first, second])
     await start([outsider])
-    const events: GameUpdated[] = []
-    first.on('game.updated', (event) => events.push(event))
+    const events: RegistersChanged[] = []
+    first.on('game.registersChanged', (event) => events.push(event))
     for (const payload of [null, {}, update(a, []), update(a, full.slice(0, 4)),
       update(a, [...full, true]), { ...update(a), occupied: [1, false, false, false, false] },
       { ...update(a), occupied: [null, false, false, false, false] },
@@ -194,57 +206,109 @@ describe('public registers over Socket.IO', () => {
     expect(departedEvents).toEqual([])
   })
 
-  it('reveals each executing register without instance IDs, deals privately, and resets before the next snapshot', async () => {
+  it('reveals each executing register in snapshots without instance IDs, deals privately, and resets before the next snapshot', async () => {
     const first = await connect('A')
     const second = await connect('B')
+    const createScheduler = actionScheduler.createActionScheduler
+    let scheduler: actionScheduler.ActionScheduler | undefined
+    vi.spyOn(actionScheduler, 'createActionScheduler').mockImplementation((deps) => {
+      scheduler = createScheduler(deps)
+      return scheduler
+    })
     const [a, b] = await start([first, second])
     for (const [index, client] of [first, second].entries()) {
       expect(await raw(client, update([a, b][index], full))).toEqual({ outcome: 'ACCEPTED' })
     }
     await snapshot(first)
     await snapshot(second)
+    const game = sessions[0].game
+    const execute = game.executeNextAction.bind(game)
+    let count = 0
+    vi.spyOn(game, 'executeNextAction').mockImplementation(() => {
+      const result = execute()
+      count++
+      expect(result.roundComplete).toBe(count === 10)
+      game.pause()
+      // Hold the final scheduler reset until a real session.get observes every revealed slot.
+      return { ...result, roundComplete: false }
+    })
+    const submit = game.submitProgram.bind(game)
+    vi.spyOn(game, 'submitProgram').mockImplementation((...args) => {
+      const result = submit(...args)
+      if (game.phase === 'activation') game.pause()
+      return result
+    })
     const actions: RobotActionResolved[] = []
-    const updates: GameUpdated[] = []
-    const privateHands: { playerId: string }[][] = [[], []]
+    const registerEvents: RegistersChanged[] = []
+    const executionStates: JoinAccepted['state'][] = []
+    const privateHands: CardsDealt[][] = [[], []]
     first.on('robot.actionResolved', (event) => actions.push(event))
-    first.on('game.updated', (event) => updates.push(event))
+    first.on('game.registersChanged', (event) => registerEvents.push(event))
     ;[first, second].forEach((client, index) => client.on('cards.dealt', (event) => privateHands[index].push(event)))
-    const reset = new Promise<void>((resolve) => first.once('game.programmingStarted', () => resolve()))
-    // Programming start also clears the shared state, so wait for the all-EMPTY update.
-    const emptyState = new Promise<GameUpdated>((resolve) => first.on('game.updated', (event) => {
-      if (event.state.players.every((player) => player.registers.every((slot) => slot.status === 'EMPTY'))) resolve(event)
-    }))
+    const firstAction = new Promise<RobotActionResolved>((resolve) => first.once('robot.actionResolved', resolve))
     expect(await first.timeout(1000).emitWithAck('program.submit', program(a))).toEqual({ outcome: 'ACCEPTED' })
     expect(await second.timeout(1000).emitWithAck('program.submit', program(b))).toEqual({ outcome: 'ACCEPTED' })
-    await reset
-    expect(actions.map((action) => action.registerIndex)).toEqual([0, 0, 1, 1, 2, 2, 3, 3, 4, 4])
-    const resetState = await emptyState
+    const activation = await snapshot(first)
     const hidden = Array.from({ length: 5 }, () => ({ status: 'HIDDEN' }))
-    // One update announces activation, then one follows each resolved action.
-    const executionStates = updates.filter((update) => update.state.phase === 'EXECUTING')
-    expect(executionStates).toHaveLength(11)
-    expect(executionStates[0].state.players.map((player) => player.registers)).toEqual([hidden, hidden])
+    expect(activation.state.phase).toBe('EXECUTING')
+    expect(activation.state.players.map((player) => player.registers)).toEqual([hidden, hidden])
+    expect((await snapshot(second)).state).toEqual(activation.state)
+    expect(actions).toEqual([])
+    game.resume()
+    scheduler!.scheduleNextAction()
+    let action = await firstAction
     const revealedSlots = new Map([[a.assignment.playerId, 0], [b.assignment.playerId, 0]])
-    actions.forEach((action, index) => {
+    for (let index = 0; index < 10; index++) {
+      expect(action.gameId).toBe(a.assignment.gameId)
+      expect(action.registerIndex).toBe(Math.floor(index / 2))
+      const actor = [a, b].find((joined) => joined.assignment.playerId === action.playerId)
+      expect(actor).toBeDefined()
+      expect(action.robotId).toBe(actor!.assignment.robotId)
+      expect(action.instruction).toBe(actor!.hand[action.registerIndex].instruction)
+      expect(revealedSlots.get(action.playerId)).toBe(action.registerIndex)
       revealedSlots.set(action.playerId, action.registerIndex + 1)
       const expected = [a, b].map((joined) => Array.from({ length: 5 }, (_, slot) =>
         slot < (revealedSlots.get(joined.assignment.playerId) ?? 0)
           ? { status: 'REVEALED', instruction: joined.hand[slot].instruction }
           : { status: 'HIDDEN' }))
-      expect(executionStates[index + 1].gameId).toBe(a.assignment.gameId)
-      expect(executionStates[index + 1].state.players.map((player) => player.registers)).toEqual(expected)
-    })
-    expect(updates.every((update) => (update.state as Record<string, unknown>).board === undefined)).toBe(true)
-    for (const card of [...a.hand, ...b.hand]) expect(JSON.stringify(updates)).not.toContain(card.id)
+      const current = await snapshot(first)
+      executionStates.push(current.state)
+      expect(current.state.phase).toBe('EXECUTING')
+      expect(current.state).toHaveProperty('board')
+      expect(current.state.players.map((player) => player.registers)).toEqual(expected)
+      expect(current.hand).toEqual(a.hand)
+      expect((await snapshot(second)).state).toEqual(current.state)
+      expect(actions).toHaveLength(index + 1)
+      if (index < 9) {
+        const nextAction = new Promise<RobotActionResolved>((resolve) => first.once('robot.actionResolved', resolve))
+        game.resume()
+        scheduler!.scheduleNextAction()
+        action = await nextAction
+      }
+    }
+    expect(actions.map((resolved) => resolved.registerIndex)).toEqual([0, 0, 1, 1, 2, 2, 3, 3, 4, 4])
+    expect(game.awaitingProgrammingStart).toBe(true)
+    expect((await snapshot(first)).state).toEqual(executionStates[9])
+    expect(privateHands).toEqual([[], []])
+    expect(registerEvents).toEqual([])
+    const reset = new Promise<void>((resolve) => first.once('game.programmingStarted', () => resolve()))
+    game.resume()
+    scheduler!.dealHands()
+    await reset
     const next = await snapshot(first)
-    await snapshot(second)
+    const otherNext = await snapshot(second)
     expect(next.state.phase).toBe('PROGRAMMING')
     expect(next.state.players.map((player) => player.registers)).toEqual([empty, empty])
     expect(next.state.players.map((player) => player.programSubmitted)).toEqual([false, false])
-    expect(resetState.state.phase).toBe('PROGRAMMING')
-    expect(resetState.state.players.map((player) => player.registers)).toEqual([empty, empty])
-    expect(updates[updates.length - 1]).toEqual(resetState)
-    expect(privateHands.map((hands) => hands.map((hand) => hand.playerId))).toEqual([[a.assignment.playerId], [b.assignment.playerId]])
+    expect(otherNext.state).toEqual(next.state)
+    expect(privateHands).toEqual([
+      [{ gameId: a.assignment.gameId, playerId: a.assignment.playerId, cards: next.hand }],
+      [{ gameId: b.assignment.gameId, playerId: b.assignment.playerId, cards: otherNext.hand }],
+    ])
+    expect(next.hand.every((card) => !otherNext.hand.some((otherCard) => otherCard.id === card.id))).toBe(true)
+    expect(registerEvents).toEqual([])
+    const publicPayloads = JSON.stringify([activation.state, actions, executionStates, next.state, otherNext.state])
+    for (const card of [...a.hand, ...b.hand, ...next.hand, ...otherNext.hand]) expect(publicPayloads).not.toContain(card.id)
     expect(await raw(first, update(a))).toEqual({ outcome: 'ACCEPTED' })
   })
 
@@ -265,13 +329,21 @@ describe('public registers over Socket.IO', () => {
       game.pause()
       return result
     })
-    const reveal = new Promise<GameUpdated>((resolve) => first.on('game.updated', (event) => {
-      if (event.state.players.some((player) => player.registers[0].status === 'REVEALED')) resolve(event)
-    }))
+    const reveal = new Promise<RobotActionResolved>((resolve) => first.once('robot.actionResolved', resolve))
     await first.timeout(1000).emitWithAck('program.submit', program(a))
     await returning.timeout(1000).emitWithAck('program.submit', program(b))
-    const executed = await reveal
-    const executedPlayer = executed.state.players.find((player) => player.registers[0].status === 'REVEALED')!
+    const action = await reveal
+    const executed = await snapshot(first)
+    const executedPlayer = executed.state.players.find((player) => player.playerId === action.playerId)!
+    const actor = [a, b].find((joined) => joined.assignment.playerId === action.playerId)!
+    expect(action).toMatchObject({
+      gameId: a.assignment.gameId, playerId: actor.assignment.playerId,
+      registerIndex: 0, instruction: actor.hand[0].instruction,
+    })
+    expect(executedPlayer.registers).toEqual([
+      { status: 'REVEALED', instruction: action.instruction },
+      { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' },
+    ])
     expect(await raw(first, update(a))).toEqual({ outcome: 'WRONG_PHASE' })
     await disconnect(returning)
     const reconnected = await connect('B')
@@ -344,11 +416,13 @@ describe('public registers over Socket.IO', () => {
     expect([...outcomes].sort((a, b) => a.localeCompare(b))).toEqual(['CONNECTED', 'USER_ALREADY_IN_SESSION'])
     const winner = attempts[outcomes.indexOf('CONNECTED')].client
     expect((await snapshot(winner)).assignment).toEqual(initial.assignment)
-    const changed = Promise.withResolvers<GameUpdated>()
-    winner.once('game.updated', changed.resolve)
+    const changed = Promise.withResolvers<RegistersChanged>()
+    winner.once('game.registersChanged', changed.resolve)
     expect(await raw(winner, update(initial))).toEqual({ outcome: 'ACCEPTED' })
-    expect((await changed.promise).state.players.find((player) => player.playerId === initial.assignment.playerId)?.registers)
-      .toEqual([{ status: 'HIDDEN' }, { status: 'EMPTY' }, { status: 'HIDDEN' }, { status: 'EMPTY' }, { status: 'EMPTY' }])
+    expect(await changed.promise).toEqual({
+      gameId: initial.assignment.gameId, playerId: initial.assignment.playerId,
+      registers: [{ status: 'HIDDEN' }, { status: 'EMPTY' }, { status: 'HIDDEN' }, { status: 'EMPTY' }, { status: 'EMPTY' }],
+    })
     expect((await snapshot(peer)).state.players.find((player) => player.playerId === initial.assignment.playerId)?.connected).toBe(true)
   })
 })

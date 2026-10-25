@@ -95,9 +95,9 @@ it('starts a fixed roster, broadcasts register-major actions, and deals two priv
       for (let index = 0; index < clients.length; index++) {
         expect(hands[index]).toMatchObject({ gameId, playerId: players[index].id })
         expect(events[index].map((event) => event.name)).toEqual([
-          'program.submitted', 'game.updated',
-          ...Array.from({ length: 10 }, () => ['robot.actionResolved', 'game.updated']).flat(),
-          'cards.dealt', 'game.programmingStarted', 'game.updated',
+          'program.submitted',
+          ...Array.from({ length: 10 }, () => 'robot.actionResolved'),
+          'cards.dealt', 'game.programmingStarted',
         ])
         expect(events[index][0].payload).toEqual({ gameId, playerId: players[1 - index].id })
         const actions = events[index].filter((event) => event.name === 'robot.actionResolved')

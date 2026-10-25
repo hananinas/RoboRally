@@ -20,7 +20,7 @@ export type MembershipContext = {
   playerRoom: (playerId: string) => string
   memberships: Map<string, GameMembership>
   publicState: () => PublicGameState
-  broadcastPublicState: () => void
+  broadcastRegisters: (playerId: string) => void
   actionScheduler: ActionScheduler
 }
 

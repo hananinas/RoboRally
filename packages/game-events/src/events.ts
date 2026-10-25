@@ -2,7 +2,7 @@ import type {
   CardsDealt,
   GameAborted,
   GameStarted,
-  GameUpdated,
+  RegistersChanged,
   LeaveGame,
   LeaveResult,
   LobbyJoinResult,
@@ -49,7 +49,7 @@ export interface ClientToServerEvents {
 export interface ServerToClientEvents {
   'lobby.updated': (payload: LobbyUpdated) => void
   'game.started': (payload: GameStarted) => void
-  'game.updated': (payload: GameUpdated) => void
+  'game.registersChanged': (payload: RegistersChanged) => void
   'game.programmingStarted': (payload: ProgrammingStarted) => void
   'player.checkpointProgress': (payload: PlayerCheckpointProgress) => void
   'game.playerJoined': (payload: PlayerJoined) => void

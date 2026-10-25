@@ -3,7 +3,7 @@ import { leaveGameSchema, type ClientToServerEvents, type LeaveResult, type Serv
 import { Server, type Socket } from 'socket.io'
 import type { Game } from '@/game/index'
 import {
-  presentPlayerStates, presentPublicGameState, presentPublicStateUpdate,
+  presentPlayerStates, presentPublicGameState,
 } from '@/socket/gamePresenter'
 import { createUserRegistry } from '@/userRegistry'
 import { createGame } from '@/game/GameFactory'
@@ -46,20 +46,27 @@ export function createGameSocketServer(
       const memberships = new Map<string, GameMembership>()
       const playerStates = () => presentPlayerStates(game, [...memberships.values()])
       const publicState = () => presentPublicGameState(gameId, game, playerStates())
-      // Registers belong to the game state the service shares, so register
-      // changes travel with it instead of a per-player event.
-      const broadcastPublicState = () => {
-        io.to(publicRoom).emit('game.updated', {
+      const broadcastRegisters = (playerId: string) => {
+        let membership: GameMembership | undefined
+        for (const candidate of memberships.values()) {
+          if (candidate.player.id === playerId) {
+            membership = candidate
+            break
+          }
+        }
+        if (!membership) return
+        io.to(publicRoom).emit('game.registersChanged', {
           gameId,
-          state: presentPublicStateUpdate(gameId, game, playerStates()),
+          playerId,
+          registers: membership.player.registers,
         })
       }
       const actionScheduler = createActionScheduler({
-        io, game, gameId, publicRoom, playerRoom, broadcastPublicState,
+        io, game, gameId, publicRoom, playerRoom,
       })
       return {
         io, game, gameId, publicRoom, playerRoom, memberships, actionScheduler,
-        publicState, broadcastPublicState,
+        publicState, broadcastRegisters,
       }
     },
   }

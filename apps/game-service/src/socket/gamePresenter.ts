@@ -4,7 +4,6 @@ import type {
   GamePhase as GamePhasePayload,
   Orientation,
   PublicGameState,
-  PublicGameStateUpdate,
   RobotActionResolved,
   PlayerState,
   Tile as TilePayload,
@@ -63,23 +62,6 @@ function presentRobots(game: Game) {
   }))
 }
 
-export function presentPublicStateUpdate(
-  gameId: GameId,
-  game: Game,
-  players: readonly PlayerState[] = [],
-): PublicGameStateUpdate {
-  return {
-    gameId,
-    checkpointCount: game.board.checkpointCount,
-    players,
-    antenna: game.board.antenna,
-    robots: presentRobots(game),
-    phase: phases[game.phase],
-    paused: game.paused,
-    aborted: game.aborted,
-  }
-}
-
 export function presentPublicGameState(
   gameId: GameId,
   game: Game,
@@ -90,7 +72,14 @@ export function presentPublicGameState(
   ).flat()
 
   return {
-    ...presentPublicStateUpdate(gameId, game, players),
+    gameId,
+    checkpointCount: game.board.checkpointCount,
+    players,
+    antenna: game.board.antenna,
+    robots: presentRobots(game),
+    phase: phases[game.phase],
+    paused: game.paused,
+    aborted: game.aborted,
     board: {
       width: game.board.width,
       height: game.board.height,

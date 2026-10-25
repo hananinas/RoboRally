@@ -568,9 +568,7 @@ describe('lobby and game sessions over Socket.IO', () => {
 
     function broadcastNames(client: Client): string[] {
       const names: string[] = []
-      client.onAny((name) => {
-        if (name !== 'game.updated') names.push(name)
-      })
+      client.onAny((name) => names.push(name))
       return names
     }
 

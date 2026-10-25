@@ -9,7 +9,6 @@ export type ActionSchedulerDeps = {
   gameId: string
   publicRoom: string
   playerRoom: (playerId: string) => string
-  broadcastPublicState: () => void
 }
 
 export type ActionScheduler = {
@@ -20,7 +19,7 @@ export type ActionScheduler = {
 }
 
 export function createActionScheduler(
-  { io, game, gameId, publicRoom, playerRoom, broadcastPublicState }: ActionSchedulerDeps,
+  { io, game, gameId, publicRoom, playerRoom }: ActionSchedulerDeps,
 ): ActionScheduler {
   let scheduledAction: NodeJS.Immediate | undefined
   let closed = false
@@ -42,14 +41,12 @@ export function createActionScheduler(
   }
 
   function dealHands(): void {
-    // programmingStarted announces the reset, so the slots clear first and the
-    // cleared state follows the announcement.
+    // Reset registers before announcing the new programming phase.
     game.beginProgramming()
     for (const player of game.players) {
       io.to(playerRoom(player.id)).emit('cards.dealt', presentCardsDealt(gameId, player))
     }
     io.to(publicRoom).emit('game.programmingStarted', { gameId })
-    broadcastPublicState()
   }
 
   function scheduleNextAction(): void {
@@ -63,7 +60,6 @@ export function createActionScheduler(
           'robot.actionResolved',
           presentRobotActionResolved(gameId, result),
         )
-        broadcastPublicState()
         broadcastCheckpointProgress()
         if (result.roundComplete) {
           dealHands()
@@ -79,7 +75,6 @@ export function createActionScheduler(
         })
         stop()
         game.abort()
-        broadcastPublicState()
         io.to(publicRoom).emit('game.aborted', { gameId })
       }
     })
