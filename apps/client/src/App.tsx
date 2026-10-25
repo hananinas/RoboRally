@@ -27,6 +27,7 @@ function App() {
     startLobby, leaveSession, refreshLobbies, retrySession,
   } = useSessionConnection()
 
+  // Keep the existing game visible while session.get restores membership after reconnecting.
   if ((session.status === 'joined' || session.status === 'resyncing') && game.state.assignment) {
     return <ActiveGame game={game} username={session.user.username} leaving={busy} onLeave={leaveSession} />
   }

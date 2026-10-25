@@ -37,6 +37,7 @@ export default function useSessionConnection() {
       const event = await operation()
       if (generation.current === attempt && socket.connected && event) dispatch(event)
     } catch {
+      // A timed-out lobby command may have succeeded; query membership before choosing a screen.
       if (generation.current === attempt && socket.connected && !(kind === 'start' && current.current.status === 'joined')) {
         dispatch(kind === 'login' ? { type: 'login-error', error: 'TIMEOUT' }
           : kind === 'sync' ? { type: 'error', error: 'TIMEOUT' } : { type: 'sync-requested' })
