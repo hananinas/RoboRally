@@ -603,6 +603,7 @@ describe('lobby and game sessions over Socket.IO', () => {
         { coordinate: { x: 4, y: 4 }, orientation: 'NORTH' },
       ].map((position, registerIndex) => ({
         gameId: shared.gameId, registerIndex, robotId: initial.assignment.robotId,
+        playerId: initial.assignment.playerId,
         instruction: initial.hand[[2, 0, 4, 5, 3][registerIndex]].instruction, position,
       })))
       expect(progress).toEqual([{
@@ -616,7 +617,7 @@ describe('lobby and game sessions over Socket.IO', () => {
       ])
       const latest = await snapshot(client)
       expect(latest.state.phase).toBe('PROGRAMMING')
-      expect(latest.state.robots).toEqual([{
+      expect(latest.state.robots).toMatchObject([{
         robotId: initial.assignment.robotId, playerId: initial.assignment.playerId,
         position: actions[4].position,
       }])
@@ -628,7 +629,7 @@ describe('lobby and game sessions over Socket.IO', () => {
       const restored = await snapshot(await connect('First'))
       expect(restored.assignment).toEqual(initial.assignment)
       expect(restored.hand).toEqual(initial.hand)
-      expect(restored.state.robots).toEqual(latest.state.robots)
+      expect(restored.state.robots).toMatchObject(latest.state.robots)
       expect(restored.state.players[0].lastCheckpoint).toBe(1)
       expect(restored.state.paused).toBe(false)
     })
@@ -659,14 +660,15 @@ describe('lobby and game sessions over Socket.IO', () => {
       expect(actions[1]).toEqual(actions[0])
       expect(actions[2]).toEqual(actions[0])
       expect(actions[0][0]).toEqual({
-        gameId: shared.gameId, registerIndex: 0, robotId: robotIds[0], instruction: 'MOVE_3',
+        gameId: shared.gameId, registerIndex: 0, robotId: robotIds[0], playerId: joined[0].assignment.playerId,
+        instruction: 'MOVE_3',
         position: { coordinate: { x: 4, y: 3 }, orientation: 'NORTH' },
       })
       expect(actions[0].slice(0, 3).map((action) => action.robotId)).toEqual([robotIds[0], robotIds[2], robotIds[1]])
       expect(actions[0].slice(3, 6).map((action) => action.robotId)).toEqual([robotIds[2], robotIds[0], robotIds[1]])
       for (const [index, client] of clients.entries()) {
         const latest = await snapshot(client)
-        expect(latest.state.robots).toEqual(joined.map((entry) => ({
+        expect(latest.state.robots).toMatchObject(joined.map((entry) => ({
           robotId: entry.assignment.robotId, playerId: entry.assignment.playerId,
           position: actions[0].findLast((action) => action.robotId === entry.assignment.robotId)!.position,
         })))

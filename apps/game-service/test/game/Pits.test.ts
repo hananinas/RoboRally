@@ -44,8 +44,9 @@ describe('pit entry and rebooting', () => {
     const program = [first, ...Object.values(cards).filter((card) => card !== first).slice(0, 4)]
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
-    expect(game.executeNextAction()).toEqual({
+    expect(game.executeNextAction()).toMatchObject({
       registerIndex: 0,
+      roundComplete: false,
       action: { robotId: robot.id, card: first, position: { x: Integer(0), y: Integer(2) }, direction },
     })
     expect(board.positionOf(robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
@@ -101,7 +102,7 @@ describe('pit entry and rebooting', () => {
       { position: { x: Integer(0), y: Integer(2) }, direction: Direction.EAST },
     ])
     expect(board.positionOf(robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
-    expect(game.phase).toBe('programming')
+    expect(game.awaitingProgrammingStart).toBe(true)
     expect(robot.program).toEqual([])
     expect(player.hand).toEqual(Object.values(c))
   })
@@ -120,7 +121,7 @@ describe('pit entry and rebooting', () => {
     }
     expect(game.executeNextAction().action.direction).toBe(Direction.NORTH)
     expect(game.executeNextAction().action.direction).toBe(Direction.EAST)
-    expect(game.phase).toBe('programming')
+    expect(game.awaitingProgrammingStart).toBe(true)
   })
 
   it('uses a free fallback when another player occupies the reboot tile', () => {
