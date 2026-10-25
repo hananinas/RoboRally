@@ -263,12 +263,11 @@ describe('Board robot ownership', () => {
     }
   })
 
-  it('blocks at board edges and occupied tiles without moving either robot', () => {
+  it('blocks at occupied tiles without moving either robot', () => {
     const board = new Board(grid(2, 2), { ...antenna, y: Integer(1) })
     board.placeRobot('alpha', { x: Integer(0), y: Integer(0) })
     board.placeRobot('beta', { x: Integer(1), y: Integer(0) })
 
-    expect(board.moveRobot('alpha', Direction.WEST, PositiveInteger(1)).blocked).toBe(true)
     expect(board.moveRobot('alpha', Direction.EAST, PositiveInteger(1)).blocked).toBe(true)
     expect(board.positionOf('alpha')).toEqual({ x: 0, y: 0 })
     expect(board.positionOf('beta')).toEqual({ x: 1, y: 0 })
@@ -339,16 +338,17 @@ describe('Board robot ownership', () => {
     expect(board.positionOf('alpha')).toEqual({ x: 3, y: 0 })
   })
 
-  it('stops at board edge during multi-step move', () => {
+  it('stops after the first step off the board without resolving the reboot', () => {
     const board = new Board(grid(3, 2), { ...antenna, y: Integer(1) })
     board.placeRobot('alpha', { x: Integer(0), y: Integer(0) })
 
     expect(board.moveRobot('alpha', Direction.EAST, PositiveInteger(5))).toEqual({
-      position: { x: 2, y: 0 },
-      stepsMoved: 2,
-      blocked: true,
+      position: { x: 3, y: 0 },
+      stepsMoved: 3,
+      blocked: false,
     })
-    expect(board.positionOf('alpha')).toEqual({ x: 2, y: 0 })
+    expect(board.positionOf('alpha')).toEqual({ x: 3, y: 0 })
+    expect(board.occupantAt({ x: Integer(2), y: Integer(0) })).toBeUndefined()
   })
 })
 

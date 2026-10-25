@@ -6,7 +6,7 @@ import { Card } from '@/game/Card'
 import type { CardId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
 import { Robot } from '@/game/Robot'
-import { tileDefinitions, type Tile } from '@/game/Tile'
+import { tileDefinitions } from '@/game/Tile'
 import { Direction, opposite, type Position } from '@/game/spatial'
 import { Integer, PositiveInteger, UnsignedInteger } from '@/numbers'
 
@@ -39,7 +39,7 @@ export class Game {
   readonly name: string
   readonly board: Board
   private readonly roster: Player[]
-  readonly rebootTile?: Position
+  readonly rebootTile: Position
   private readonly deck: readonly Card[]
   private currentPhase: GamePhase = 'programming'
   private registerIndex = 0
@@ -59,10 +59,10 @@ export class Game {
     if (deck.length < 5 || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')
     }
-    if (board.hasEntryEffect('reboot') && rebootTile === undefined) {
-      throw new RangeError('A board with pits requires a reboot tile')
+    if (rebootTile === undefined) {
+      throw new RangeError('A game requires a reboot tile')
     }
-    if (rebootTile !== undefined && !board.allowsPlacement(rebootTile)) {
+    if (!board.allowsPlacement(rebootTile)) {
       throw new RangeError('Reboot tile must be a non-pit tile on the board outside the priority antenna')
     }
 
@@ -82,7 +82,7 @@ export class Game {
     this.board = board
     this.name = name
     this.roster = [...players]
-    this.rebootTile = rebootTile === undefined ? undefined : Object.freeze({ ...rebootTile })
+    this.rebootTile = Object.freeze({ ...rebootTile })
     this.deck = [...deck]
     this.dealCards()
   }
@@ -230,9 +230,7 @@ export class Game {
       const movement = this.board.moveRobot(robot.id, direction, PositiveInteger(1))
       if (movement.stepsMoved === 0) return
 
-      const tile = this.board.getTile(movement.position)
-      if (tile === undefined) throw new Error('Robot entered a missing tile')
-      if (this.resolveTileEntry(robot, tile) === 'stop') return
+      if (this.resolveMovementEntry(robot, movement.position) === 'stop') return
     }
   }
 
@@ -313,8 +311,9 @@ export class Game {
     }
   }
 
-  private resolveTileEntry(robot: Robot, tile: Tile): 'continue' | 'stop' {
-    const effect = tileDefinitions[tile.kind].entryEffect
+  private resolveMovementEntry(robot: Robot, position: Position): 'continue' | 'stop' {
+    const tile = this.board.getTile(position)
+    const effect = tile === undefined ? 'reboot' : tileDefinitions[tile.kind].entryEffect
     switch (effect) {
       case undefined:
         return 'continue'
@@ -329,7 +328,6 @@ export class Game {
   }
 
   private rebootRobot(robot: Robot): void {
-    if (this.rebootTile === undefined) throw new Error('Pit reboot requires a configured reboot tile')
     const destination = this.board.nearestFreePosition(this.rebootTile)
     if (destination === undefined) throw new Error('No safe reboot destination is available')
     this.board.relocateRobot(robot.id, destination)

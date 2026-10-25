@@ -76,14 +76,15 @@ describe('pit entry and rebooting', () => {
     expect(board.occupantAt({ x: Integer(3), y: Integer(1) })).toBeUndefined()
   })
 
-  it('stops at the board boundary without rebooting', () => {
+  it('reboots at the board boundary just like a pit', () => {
     const { board, robot, player, cards: c, game } = createGame()
     robot.turn(2)
     game.submitProgram(player.id, [c.MOVE_3, c.MOVE_1, c.TURN_LEFT, c.TURN_RIGHT, c.BACK_UP].map((card) => card.id))._unsafeUnwrap()
 
-    expect(game.executeNextAction().action.position).toEqual({ x: Integer(0), y: Integer(1) })
-    expect(board.positionOf(robot.id)).toEqual({ x: Integer(0), y: Integer(1) })
+    expect(game.executeNextAction().action.position).toEqual({ x: Integer(0), y: Integer(2) })
+    expect(board.positionOf(robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
     expect(robot.direction).toBe(Direction.WEST)
+    expect(board.occupantAt({ x: Integer(0), y: Integer(1) })).toBeUndefined()
     expect(board.occupantAt({ x: Integer(1), y: Integer(1) })).toBeUndefined()
   })
 

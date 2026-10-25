@@ -16,7 +16,7 @@ function createMultiplayerGame(
     board.placeRobot(robot.id, position)
     return new Player(`player-${index}`, robot)
   })
-  const game = new Game(board, players, deck)
+  const game = new Game(board, players, deck, undefined, { x: Integer(0), y: Integer(0) })
   return { board, players, deck, game }
 }
 
@@ -62,7 +62,7 @@ describe('Game fixed-roster programming', () => {
     game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
     expect(game.phase).toBe('activation')
 
-    const empty = new Game(board, [], deck)
+    const empty = new Game(board, [], deck, undefined, game.rebootTile)
     empty.recheckProgrammingPhase()
     expect(empty.phase).toBe('programming')
     expect(empty.currentRegister).toBe(0)
@@ -71,10 +71,10 @@ describe('Game fixed-roster programming', () => {
   })
 
   it('rejects duplicate player IDs, duplicate robot IDs, and unplaced robots', () => {
-    const { board, players, deck } = createMultiplayerGame([{ x: Integer(4), y: Integer(5) }, { x: Integer(5), y: Integer(4) }])
-    expect(() => new Game(board, [players[0], new Player(players[0].id, players[1].robot)], deck)).toThrow(RangeError)
-    expect(() => new Game(board, [players[0], new Player('other', new Robot(players[0].robot.id, Direction.NORTH))], deck)).toThrow(RangeError)
-    expect(() => new Game(board, [new Player('unplaced', new Robot('unplaced', Direction.NORTH))], deck)).toThrow()
+    const { board, players, deck, game } = createMultiplayerGame([{ x: Integer(4), y: Integer(5) }, { x: Integer(5), y: Integer(4) }])
+    expect(() => new Game(board, [players[0], new Player(players[0].id, players[1].robot)], deck, undefined, game.rebootTile)).toThrow(RangeError)
+    expect(() => new Game(board, [players[0], new Player('other', new Robot(players[0].robot.id, Direction.NORTH))], deck, undefined, game.rebootTile)).toThrow(RangeError)
+    expect(() => new Game(board, [new Player('unplaced', new Robot('unplaced', Direction.NORTH))], deck, undefined, game.rebootTile)).toThrow()
   })
 
   it('exposes the antenna of its board', () => {
@@ -218,15 +218,19 @@ describe('Game multiplayer activation', () => {
 
   it('reports blocked actions and keeps earlier position snapshots independent', () => {
     const deck = Array.from({ length: 5 }, (_, index) => new Card(`move-${index}`, 'MOVE_1'))
-    const { board, players, game } = createMultiplayerGame(
-      [{ x: Integer(7), y: Integer(4) }, { x: Integer(6), y: Integer(4) }], { x: Integer(8), y: Integer(2), angle: 0 }, undefined, deck,
+    const tiles = Array.from({ length: 9 }, () => Array.from({ length: 9 }, () => new EmptyTile()))
+    tiles[4][8] = new EmptyTile([Direction.EAST])
+    const antenna = { x: Integer(8), y: Integer(2), angle: 0 }
+    const board = new Board(tiles, antenna)
+    const { players, game } = createMultiplayerGame(
+      [{ x: Integer(7), y: Integer(4) }, { x: Integer(6), y: Integer(4) }], antenna, board, deck,
     )
     for (const player of players) game.submitProgram(player.id, deck.map((card) => card.id))
     const first = game.executeNextAction()
     expect(first.action.position).toEqual({ x: 8, y: 4 })
     expect(game.executeNextAction().action.position).toEqual({ x: 7, y: 4 })
-    const edgeBlocked = game.executeNextAction()
-    expect(edgeBlocked.action).toMatchObject({ robotId: players[0].robot.id, card: deck[1], position: { x: 8, y: 4 } })
+    const wallBlocked = game.executeNextAction()
+    expect(wallBlocked.action).toMatchObject({ robotId: players[0].robot.id, card: deck[1], position: { x: 8, y: 4 } })
     const robotBlocked = game.executeNextAction()
     expect(robotBlocked.action).toMatchObject({ robotId: players[1].robot.id, card: deck[1], position: { x: 7, y: 4 } })
     expect(game.currentRegister).toBe(2)
@@ -234,9 +238,9 @@ describe('Game multiplayer activation', () => {
     board.moveRobot(players[0].robot.id, Direction.NORTH, PositiveInteger(1))
     expect(board.positionOf(players[0].robot.id)).toEqual({ x: 8, y: 3 })
     expect(first.action.position).toEqual({ x: 8, y: 4 })
-    expect(edgeBlocked.action.position).toEqual({ x: 8, y: 4 })
+    expect(wallBlocked.action.position).toEqual({ x: 8, y: 4 })
     Object.assign(first.action.position, { x: 0 })
-    expect(edgeBlocked.action.position).toEqual({ x: 8, y: 4 })
+    expect(wallBlocked.action.position).toEqual({ x: 8, y: 4 })
     expect(board.positionOf(players[0].robot.id)).toEqual({ x: 8, y: 3 })
   })
 })

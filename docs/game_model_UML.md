@@ -8,6 +8,7 @@ Will update with a more conceptual domain diagram which will be used for present
         class Game {
         +board: Board
         +players: Player[]
+        +rebootTile: Position readonly
         -phase: GamePhase
         -currentRegister: int
         -activatedRobotIds: RobotId[] set
@@ -18,7 +19,7 @@ Will update with a more conceptual domain diagram which will be used for present
         +executeNextAction() NextActionResult
         -nextRobotByPriority() Robot
         -executeCard(Robot robot, Card card)
-        -resolveTileEntry(Robot robot, Tile tile) continue_or_stop
+        -resolveMovementEntry(Robot robot, Position position) continue_or_stop
         }
 
         class Board {
@@ -26,6 +27,7 @@ Will update with a more conceptual domain diagram which will be used for present
         -robotPositions: Map
         +positionOf(RobotId robotId) Position
         +occupantAt(Position position) RobotId?
+        +allowsPlacement(Position position) bool
         +placeRobot(RobotId robotId, Position position)
         +relocateRobot(RobotId robotId, Position position)
         +nearestFreePosition(Position origin) Position?
@@ -99,15 +101,15 @@ Will update with a more conceptual domain diagram which will be used for present
 
 Game deals cards, accepts programs, and executes five registers. `submitProgram()` validates five distinct card IDs against the player's hand. Each action selects a pending robot using current Board positions and antenna priority. Movement uses `Game.moveRobot()`; turns change Robot's direction.
 
-`Game.moveRobot(robot, direction, steps)` attempts one Board step at a time and resolves entry effects after each successful step. Blocked steps stop movement without an effect. The resolver returns `continue` or `stop`; rebooting relocates immediately and discards the remaining steps. Each programmed action reports the final position and orientation before priority is recalculated.
+`Game.moveRobot(robot, direction, steps)` attempts one Board step at a time and resolves entry effects after each successful step. Blocked steps stop movement without an effect. Entering a pit or leaving the board immediately reboots the robot through the same resolver and discards the remaining movement steps. Facing and later programmed registers are preserved. Each programmed action reports the final position and orientation before priority is recalculated.
 
 Direct movement preserves orientation, programs, submissions, and register state. It neither starts a round nor marks an action complete, awards checkpoints, or emits events. Checkpoints are evaluated at final positions when all remaining robots finish a register, including when a departure completes it. Only the next numbered checkpoint counts; passing over one does not. After register five, Game returns to programming with progress preserved. Completing the course does not end the game.
 
 # Board
 
-Board owns the tile grid, antenna, and RobotId-to-Position map. `Board.moveRobot()` checks both sides of walls, board edges, the priority antenna, and robot occupancy, without executing tile effects. The antenna square is impassable. Gameplay displacement, including future pushing, goes through Game's movement operation.
+Board owns the tile grid, antenna, and RobotId-to-Position map. `Board.moveRobot()` checks both sides of walls, the priority antenna, and robot occupancy, without executing tile effects. The antenna square is impassable. An unblocked step off the board vacates the previous square, records the outside position, and stops spatial movement. Game resolves the reboot before another gameplay step or action. Gameplay displacement, including future pushing, goes through Game's movement operation.
 
-Placement, relocation, spawning, reboot configuration, and safe-destination search use `Board.allowsPlacement()` to check bounds, tile suitability, and exclusion of the antenna. Robot occupancy is checked separately. Pits remain enterable during movement. Relocation does not trigger entry effects. Reboot search uses Manhattan distance, then top-to-bottom and left-to-right tie-breaking; enclosing walls do not exclude a destination. `hasEntryEffect('reboot')` lets Game require reboot configuration where needed.
+Placement, relocation, spawning, reboot configuration, and safe-destination search use `Board.allowsPlacement()` to check bounds, tile suitability, and exclusion of the antenna. Robot occupancy is checked separately. Pits remain enterable during movement. Relocation does not trigger entry effects. Every Game requires a valid reboot tile, including on maps without pits. Reboot search uses Manhattan distance, then top-to-bottom and left-to-right tie-breaking; enclosing walls do not exclude a destination.
 
 # Tile
 
@@ -128,7 +130,7 @@ Definitions contain no callbacks. Walls, optional checkpoint numbers, and future
 4. Add map construction and, for public kinds, shared types, AsyncAPI, the board adapter, and rendering. The presenter serializes `tile.kind` directly.
 5. Test placement, movement, effect timing, and presentation through public APIs.
 
-Register-end effects need their own ordered phase when implemented. Conveyors and pushing still need scheduling and collision design. Pit animations, damage, register cancellation, direction selection, and board-edge falls remain deferred.
+Register-end effects need their own ordered phase when implemented. Conveyors and pushing still need scheduling and collision design. Pit animations, damage, register cancellation, and direction selection remain deferred.
 
 # Robot
 

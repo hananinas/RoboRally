@@ -10,7 +10,7 @@ function createGame(deck: Card[]) {
   const robot = new Robot('robot-1', Direction.EAST)
   board.placeRobot(robot.id, { x: Integer(1), y: Integer(1) })
   const player = new Player('player-1', robot)
-  const game = new Game(board, [player], deck)
+  const game = new Game(board, [player], deck, undefined, { x: Integer(0), y: Integer(2) })
   return { board, robot, player, game }
 }
 
@@ -91,7 +91,7 @@ function resolveCard(instruction: Instruction, direction: Direction, tiles: Empt
   board.placeRobot(robot.id, { x: Integer(3), y: Integer(3) })
   const player = new Player('player', robot)
   const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, instruction))
-  const game = new Game(board, [player], cards)
+  const game = new Game(board, [player], cards, undefined, { x: Integer(0), y: Integer(0) })
   game.submitProgram(player.id, cards.map((card) => card.id))
   return game.executeNextAction().action
 }
@@ -109,13 +109,13 @@ describe('programming card effects', () => {
     expect(action.direction).toBe(Direction.EAST)
   })
 
-  it.each(['MOVE_2', 'MOVE_3'] as const)('stops %s at walls and edges', (instruction) => {
+  it.each(['MOVE_2', 'MOVE_3'] as const)('stops %s at walls and reboots at edges', (instruction) => {
     for (const distance of [0, 1]) {
       const grid = tiles()
       grid[3][3 + distance] = new EmptyTile([Direction.EAST])
       expect(resolveCard(instruction, Direction.EAST, grid).position).toEqual({ x: 3 + distance, y: 3 })
       expect(resolveCard(instruction, Direction.EAST, tiles().map(row => row.slice(0, 4 + distance))).position)
-        .toEqual({ x: 3 + distance, y: 3 })
+        .toEqual({ x: 0, y: 0 })
     }
   })
 

@@ -179,7 +179,8 @@ describe('game membership over Socket.IO', () => {
     await new Promise<void>((resolve) => server.close(() => resolve()))
     shared = { gameId: shared.gameId, game: new Game(
       new Board([[new EmptyTile(), new EmptyTile()]], { x: Integer(1), y: Integer(0), angle: Math.PI / 2 }), [],
-      Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))) }
+      Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1')),
+      undefined, { x: Integer(0), y: Integer(0) }) }
     await start()
     await join(await connect('First'))
     const second = await connect('Second')

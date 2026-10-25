@@ -14,7 +14,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
     Array.from({ length: 3 }, () => new EmptyTile())), { x: Integer(1), y: Integer(0), angle: Math.PI / 2 })
   const deck = Array.from({ length: 5 }, (_, index) =>
     new Card(`00000000-0000-4000-8000-00000000010${index}`, 'TURN_LEFT'))
-  const game = new Game(board, players, deck)
+  const game = new Game(board, players, deck, undefined, { x: Integer(0), y: Integer(0) })
   const httpServer = createServer()
   const server = createGameSocketServer(httpServer, { gameId, game })
   const clients: Socket<ServerToClientEvents, ClientToServerEvents>[] = []

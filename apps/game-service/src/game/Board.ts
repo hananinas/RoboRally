@@ -174,8 +174,9 @@ export class Board {
       }
 
       if (!this.contains(nextPosition)) {
-        // robot hits board edge
-        return { position: currentPosition, stepsMoved: step, blocked: true }
+        // Falling ends spatial movement; Game resolves the reboot.
+        this.updateRobotPosition(robotId, nextPosition)
+        return { position: nextPosition, stepsMoved: step + 1, blocked: false }
       }
 
       if (this.isAntenna(nextPosition)) {
