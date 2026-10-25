@@ -39,6 +39,24 @@ sequenceDiagram
     end
 ```
 
+### Logout
+
+To log out, the client sends `GET /auth/logout` to the Game Service. The Game Service destroys the server-side session and clears the session cookie, then redirects the browser to Rauthy's end-session endpoint to terminate the identity provider session as well. Rauthy redirects back to the login screen once its session has been cleared.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server as Game Service
+    participant Rauthy
+
+    Client->>Server: GET /auth/logout
+    Note over Server: Destroy server-side session
+    Server-->>Client: Clear session cookie and redirect to Rauthy
+    Client->>Rauthy: End-session request
+    Note over Rauthy: Clear identity provider session
+    Rauthy-->>Client: Redirect to login screen
+```
+
 ## Lobby
 After successful authentication, the client sends a `session.get` request to determine if the user has an existent session. 
 If he does not, `session.get` acknowledges with `NO_SESSION` and the client is shown the lobby screen.
