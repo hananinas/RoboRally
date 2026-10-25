@@ -180,12 +180,16 @@ export function handleDisconnect(ctx: MembershipContext, socket: GameSocket): vo
   }
 }
 
-export function presentInitialization(ctx: MembershipContext, membership: GameMembership): GameInitialization {
+export function presentInitialization(
+  ctx: MembershipContext,
+  membership: GameMembership,
+  state: PublicGameState = ctx.publicState(),
+): GameInitialization {
   const { player } = membership
   return {
     outcome: 'JOINED',
     assignment: { gameId: ctx.gameId, playerId: player.id, robotId: player.robot.id },
-    state: ctx.publicState(),
+    state,
     hand: presentCardsDealt(ctx.gameId, player).cards,
     programSubmitted: ctx.game.hasSubmittedProgram(player.id),
   }

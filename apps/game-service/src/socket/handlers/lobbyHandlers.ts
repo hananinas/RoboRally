@@ -159,8 +159,9 @@ export function handleStartLobby(
         preparedContext.memberships.set(member.user.userId, membership)
         return { member: membership, socket: connection }
       })
+      const state = preparedContext.publicState()
       prepared = members.map((entry) => ({
-        ...entry, initialization: presentInitialization(preparedContext, entry.member),
+        ...entry, initialization: presentInitialization(preparedContext, entry.member, state),
       }))
       for (const entry of prepared) {
         for (const room of [gameContext.publicRoom, gameContext.playerRoom(entry.member.player.id)]) {
