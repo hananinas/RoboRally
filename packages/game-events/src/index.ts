@@ -20,7 +20,6 @@ export type {
   Orientation,
   PlayerAssignment,
   PlayerId,
-  PlayerJoined,
   PlayerLeft,
   PlayerConnectionChanged,
   PlayerCheckpointProgress,

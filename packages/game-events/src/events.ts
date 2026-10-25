@@ -8,7 +8,6 @@ import type {
   ProgramResult,
   ProgramSubmitted,
   RobotActionResolved,
-  PlayerJoined,
   PlayerLeft,
   PlayerConnectionChanged,
   PlayerCheckpointProgress,
@@ -39,7 +38,6 @@ export interface ServerToClientEvents {
   'lobby.updated': (payload: { lobby: LobbyState }) => void
   'game.started': (payload: { lobbyId: string; initialization: GameInitialization }) => void
   'player.checkpointProgress': (payload: PlayerCheckpointProgress) => void
-  'game.playerJoined': (payload: PlayerJoined) => void
   'game.playerLeft': (payload: PlayerLeft) => void
   'game.playerConnectionChanged': (payload: PlayerConnectionChanged) => void
   'cards.dealt': (payload: CardsDealt) => void

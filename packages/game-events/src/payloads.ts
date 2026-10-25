@@ -90,12 +90,6 @@ export type PlayerState = Readonly<{
   connected: boolean
 }>
 
-export type PlayerJoined = Readonly<{
-  gameId: GameId
-  player: PlayerState
-  robot: Robot
-}>
-
 export type PlayerLeft = Readonly<{ gameId: GameId; playerId: PlayerId; robotId: RobotId }>
 
 export type GameAborted = Readonly<{ gameId: GameId }>

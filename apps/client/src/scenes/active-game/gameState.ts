@@ -7,7 +7,6 @@ import type {
   PlayerConnectionChanged,
   PlayerCheckpointProgress,
   PlayerId,
-  PlayerJoined,
   PlayerLeft,
   ProgramResult,
   RobotActionResolved,
@@ -56,7 +55,6 @@ export type ClientGameState = {
 
 export type GameStateEvent =
   | { type: 'joined'; result: GameInitialization }
-  | { type: 'player-joined'; payload: PlayerJoined }
   | { type: 'player-left'; payload: PlayerLeft }
   | { type: 'player-connection-changed'; payload: PlayerConnectionChanged }
   | { type: 'checkpoint-progress'; payload: PlayerCheckpointProgress }
@@ -173,19 +171,6 @@ export function gameStateReducer(
   switch (event.type) {
     case 'error':
       return { ...state, error: event.message }
-    case 'player-joined': {
-      const { gameId, player, robot } = event.payload
-      if (gameId !== state.assignment?.gameId || player.playerId !== robot.playerId ||
-          state.players.some((candidate) => candidate.playerId === player.playerId)) return state
-      return {
-        ...state,
-        players: [...state.players, {
-          playerId: player.playerId, username: player.username, connected: player.connected,
-          lastCheckpoint: player.lastCheckpoint,
-        }],
-        playback: robotPlaybackReducer(state.playback, { type: 'add', robot }),
-      }
-    }
     case 'player-left': {
       const { gameId, playerId, robotId } = event.payload
       if (gameId !== state.assignment?.gameId ||
