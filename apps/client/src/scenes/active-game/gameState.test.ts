@@ -14,6 +14,7 @@ import {
   placeCard,
   REGISTER_COUNT,
   removeCard,
+  USER_ALREADY_IN_GAME_MESSAGE,
   type ClientGameState,
   type ProgramCard,
   type Registers,
@@ -44,6 +45,14 @@ const stationaryRobotId = '30000000-0000-4000-8000-000000000002'
 const publicState: PublicGameState = {
   gameId: '40000000-0000-4000-8000-000000000001',
   phase: 'PROGRAMMING',
+  paused: false,
+  aborted: false,
+  checkpointCount: 0,
+  players: [
+    { playerId: '50000000-0000-4000-8000-000000000001', lastCheckpoint: 0, username: 'First', connected: true, programSubmitted: false },
+    { playerId: '50000000-0000-4000-8000-000000000002', lastCheckpoint: 0, username: 'Second', connected: true, programSubmitted: false },
+  ],
+  antenna: { x: 2, y: 0, angle: Math.PI / 2 },
   board: {
     width: 5,
     height: 5,
@@ -66,12 +75,13 @@ const publicState: PublicGameState = {
   ],
 }
 const actions: readonly RobotActionResolved[] = [
-  { robotId, instruction: 'MOVE_1', position: { coordinate: { x: 2, y: 2 }, orientation: 'NORTH' } },
-  { robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 2, y: 2 }, orientation: 'WEST' } },
-  { robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 2 }, orientation: 'WEST' } },
-  { robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 1, y: 2 }, orientation: 'SOUTH' } },
-  { robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 3 }, orientation: 'SOUTH' } },
+  { gameId: publicState.gameId, registerIndex: 0, robotId, instruction: 'MOVE_1', position: { coordinate: { x: 2, y: 2 }, orientation: 'NORTH' } },
+  { gameId: publicState.gameId, registerIndex: 1, robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 2, y: 2 }, orientation: 'WEST' } },
+  { gameId: publicState.gameId, registerIndex: 2, robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 2 }, orientation: 'WEST' } },
+  { gameId: publicState.gameId, registerIndex: 3, robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 1, y: 2 }, orientation: 'SOUTH' } },
+  { gameId: publicState.gameId, registerIndex: 4, robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 3 }, orientation: 'SOUTH' } },
 ]
+const hand = { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, cards }
 
 const result: Extract<JoinResult, { outcome: 'JOINED' }> = {
   outcome: 'JOINED',
@@ -106,6 +116,15 @@ describe('join initialization', () => {
     expect(canProgram(state)).toBe(false)
   })
 
+  it('joins an aborted game and gameplay is disabled', () => {
+    const state = gameStateReducer(createClientGameState(), {
+      type: 'joined', result: { ...result, state: { ...publicState, aborted: true } },
+    })
+    expect(state.aborted).toBe(true)
+    expect(state.error).toBe('This game has encountered an error and cannot continue.')
+    expect(canProgram(state)).toBe(false)
+  })
+
   it('replaces old state on join and preserves accepted submission status', () => {
     const state = gameStateReducer(selectProgram(), {
       type: 'joined', result: { ...result, programSubmitted: true },
@@ -133,11 +152,11 @@ describe('placeCard', () => {
     expect(emptyRegisters).toEqual([null, null, null, null, null])
   })
 
-  it('rejects occupied, duplicate, and invalid placements', () => {
+  it('overwrites an occupied register, and rejects duplicate and invalid placements', () => {
     const occupiedRegisters = placeCard(emptyRegisters, firstCard, 0)
 
-    expect(placeCard(occupiedRegisters, secondCard, 0)).toBe(
-      occupiedRegisters,
+    expect(placeCard(occupiedRegisters, secondCard, 0)).toEqual(
+      [secondCard, null, null, null, null],
     )
     expect(placeCard(occupiedRegisters, firstCard, 1)).toBe(
       occupiedRegisters,
@@ -168,7 +187,55 @@ describe('removeCard', () => {
   })
 })
 
+describe('undo, redo, and clear', () => {
+  it('undoes and redoes a placement', () => {
+    const empty = programmingState()
+    const placed = gameStateReducer(empty, { type: 'place', cardId: firstCard.id, registerIndex: 0 })
+
+    expect(placed.registers[0]).toBe(firstCard)
+
+    const undone = gameStateReducer(placed, { type: 'undo' })
+    expect(undone.registers).toEqual(empty.registers)
+
+    const redone = gameStateReducer(undone, { type: 'redo' })
+    expect(redone.registers).toEqual(placed.registers)
+  })
+
+  it('does nothing when there is no history to undo or redo', () => {
+    const state = programmingState()
+
+    expect(gameStateReducer(state, { type: 'undo' })).toBe(state)
+    expect(gameStateReducer(state, { type: 'redo' })).toBe(state)
+  })
+
+  it('clears the redo history once a new action follows an undo', () => {
+    let state = programmingState()
+    state = gameStateReducer(state, { type: 'place', cardId: firstCard.id, registerIndex: 0 })
+    state = gameStateReducer(state, { type: 'undo' })
+    state = gameStateReducer(state, { type: 'place', cardId: secondCard.id, registerIndex: 1 })
+
+    expect(gameStateReducer(state, { type: 'redo' })).toBe(state)
+  })
+
+  it('clears every register at once, and the clear can be undone', () => {
+    let state = programmingState()
+    state = gameStateReducer(state, { type: 'place', cardId: firstCard.id, registerIndex: 0 })
+    state = gameStateReducer(state, { type: 'place', cardId: secondCard.id, registerIndex: 1 })
+    const filled = state
+
+    const cleared = gameStateReducer(state, { type: 'clear' })
+    expect(cleared.registers).toEqual(emptyRegisters)
+    expect(gameStateReducer(cleared, { type: 'undo' }).registers).toEqual(filled.registers)
+    expect(gameStateReducer(cleared, { type: 'clear' })).toBe(cleared)
+  })
+})
+
 describe('client game state', () => {
+  it('ignores private hands before joining', () => {
+    const state = createClientGameState()
+    expect(gameStateReducer(state, { type: 'dealt', hand })).toBe(state)
+  })
+
   it('keeps programming locked until joined', () => {
     let state = createClientGameState()
     expect(state.assignment).toBeNull()
@@ -188,7 +255,7 @@ describe('client game state', () => {
     const state = { ...selectProgram(), assignment: null }
     expect(canProgram(state)).toBe(false)
     expect(createSubmission(state)).toBeNull()
-    expect(gameStateReducer(state, { type: 'dealt', cards }).phase).toBeNull()
+    expect(gameStateReducer(state, { type: 'dealt', hand })).toBe(state)
   })
 
   it('uses the assignment game identity for submission', () => {
@@ -198,6 +265,7 @@ describe('client game state', () => {
     }))
     expect(createSubmission(state)).toEqual({
       gameId: assignment.gameId,
+      playerId: assignment.playerId,
       cardIds: selectedCardIds,
     })
   })
@@ -208,14 +276,19 @@ describe('client game state', () => {
     })
     expect(canProgram(state)).toBe(false)
 
-    state = gameStateReducer(state, { type: 'dealt', cards })
+    state = gameStateReducer(state, { type: 'dealt', hand })
     state = selectProgram(state)
     const registers = state.registers
-    expect(gameStateReducer(state, { type: 'submitted', playerId: 'unknown-player' })).toBe(state)
-    state = gameStateReducer(state, {
-      type: 'submitted',
-      playerId: publicState.robots[0].playerId,
-    })
+    for (const invalidAction of [
+      { ...actions[0], gameId: 'another-game' },
+      { ...actions[0], robotId: 'unknown-robot' },
+    ]) {
+      state = gameStateReducer(state, { type: 'action', action: invalidAction })
+      expect(canProgram(state)).toBe(true)
+      expect(state.playback.active).toBeNull()
+      expect(state.registers).toEqual(registers)
+    }
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
 
     expect(canProgram(state)).toBe(false)
     expect(createSubmission(state)).toBeNull()
@@ -239,6 +312,7 @@ describe('client game state', () => {
     }
     expect(createSubmission(state)).toEqual({
       gameId: publicState.gameId,
+      playerId: hand.playerId,
       cardIds: selectedCardIds,
     })
 
@@ -252,6 +326,19 @@ describe('client game state', () => {
       selectedCardIds[3],
       selectedCardIds[4],
     ])
+  })
+
+  it('does not erase a selected program when the same hand is dealt again', () => {
+    const state = selectProgram()
+    const submission = createSubmission(state)
+
+    const duplicate = gameStateReducer(state, {
+      type: 'dealt',
+      hand,
+    })
+
+    expect(duplicate.registers).toEqual(state.registers)
+    expect(createSubmission(duplicate)).toEqual(submission)
   })
 
   it('freezes edits and duplicate submissions from send through acceptance', () => {
@@ -295,6 +382,50 @@ describe('client game state', () => {
     expect(createSubmission(state)).toBeNull()
   })
 
+  it('shows the game-paused message on a paused rejection', () => {
+    let state = selectProgram()
+    const submission = createSubmission(state)
+    state = gameStateReducer(state, { type: 'submit' })
+    state = gameStateReducer(state, {
+      type: 'result',
+      result: { outcome: 'GAME_PAUSED' },
+      handVersion: state.handVersion,
+    })
+
+    expect(state.submission).toBe('idle')
+    expect(state.error).toBe('Game paused. Your program was not submitted — try again once reconnected.')
+    expect(createSubmission(state)).toEqual(submission)
+  })
+
+  it('treats an already-submitted rejection as accepted', () => {
+    let state = selectProgram()
+    state = gameStateReducer(state, { type: 'submit' })
+    state = gameStateReducer(state, {
+      type: 'result',
+      result: { outcome: 'ALREADY_SUBMITTED' },
+      handVersion: state.handVersion,
+    })
+
+    expect(state.submission).toBe('accepted')
+    expect(state.error).toBeNull()
+    expect(canProgram(state)).toBe(false)
+  })
+
+  it('shows the wrong-phase message when the round already moved on', () => {
+    let state = selectProgram()
+    const submission = createSubmission(state)
+    state = gameStateReducer(state, { type: 'submit' })
+    state = gameStateReducer(state, {
+      type: 'result',
+      result: { outcome: 'WRONG_PHASE' },
+      handVersion: state.handVersion,
+    })
+
+    expect(state.submission).toBe('idle')
+    expect(state.error).toBe('The round already moved on before your submission arrived.')
+    expect(createSubmission(state)).toEqual(submission)
+  })
+
   it('preserves an unacknowledged selection without allowing a duplicate resend', () => {
     let state = selectProgram()
     const registers = state.registers
@@ -303,6 +434,7 @@ describe('client game state', () => {
       type: 'submission-unknown',
       handVersion: state.handVersion,
     })
+    expect(state.submission).toBe('uncertain')
 
     expect(canProgram(state)).toBe(false)
     expect(createSubmission(state)).toBeNull()
@@ -317,7 +449,9 @@ describe('client game state', () => {
     let state = selectProgram()
     const previousVersion = state.handVersion
     state = gameStateReducer(state, { type: 'submit' })
-    state = gameStateReducer(state, { type: 'dealt', cards })
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, { type: 'complete' })
+    state = gameStateReducer(state, { type: 'dealt', hand })
 
     expect(state.registers).toEqual(emptyRegisters)
     expect(canProgram(state)).toBe(true)
@@ -336,6 +470,7 @@ describe('client game state', () => {
     const submission = createSubmission(state)
     expect(submission).toEqual({
       gameId: publicState.gameId,
+      playerId: hand.playerId,
       cardIds: selectedCardIds,
     })
     state = gameStateReducer(state, { type: 'submit' })
@@ -360,12 +495,13 @@ describe('client game state', () => {
     expect(state.playback.robots.find((robot) => robot.robotId === robotId)?.position)
       .toEqual(publicState.robots[0].position)
     state = gameStateReducer(state, { type: 'submit' })
+    const registers = state.registers
     for (const action of actions) {
       state = gameStateReducer(state, { type: 'action', action })
     }
 
-    state = gameStateReducer(state, { type: 'dealt', cards })
-    expect(state.registers).toEqual(emptyRegisters)
+    state = gameStateReducer(state, { type: 'dealt', hand })
+    expect(state.registers).toEqual(registers)
 
     const displayedAngles = [0, -90, -90, -180, -180]
     for (const [index, action] of actions.entries()) {
@@ -376,7 +512,7 @@ describe('client game state', () => {
       expect(canProgram(state)).toBe(false)
       expect(createSubmission(state)).toBeNull()
       state = gameStateReducer(state, { type: 'place', cardId: cards[0].id, registerIndex: 0 })
-      expect(state.registers).toEqual(emptyRegisters)
+      expect(state.registers).toEqual(registers)
       state = gameStateReducer(state, { type: 'complete' })
     }
 
@@ -384,10 +520,85 @@ describe('client game state', () => {
     state = selectProgram(state)
     expect(createSubmission(state)).toEqual({
       gameId: publicState.gameId,
+      playerId: hand.playerId,
       cardIds: selectedCardIds,
     })
     expect(state.playback.robots.find((robot) => robot.robotId === robotId)?.position)
       .toEqual(actions[4].position)
+  })
+
+  it('replaces old cards with the next hand only after playback finishes', () => {
+    const nextCards: readonly Card[] = cards.map((card) => ({
+      id: card.id.replace('10000000', '20000000'),
+      instruction: card.instruction === 'MOVE_1' ? 'TURN_LEFT' : 'MOVE_1',
+    }))
+    let state = selectProgram()
+    const previousRegisters = state.registers
+
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, { type: 'dealt', hand: { ...hand, cards: nextCards } })
+    state = gameStateReducer(state, { type: 'dealt', hand })
+
+    expect(state.registers).toEqual(previousRegisters)
+    expect(canProgram(state)).toBe(false)
+
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(state.hand).toEqual(nextCards)
+    expect(state.registers).toEqual(emptyRegisters)
+    expect(canProgram(state)).toBe(true)
+
+    state = gameStateReducer(state, { type: 'place', cardId: cards[0].id, registerIndex: 0 })
+    expect(state.registers).toEqual(emptyRegisters)
+
+    for (const [registerIndex, card] of nextCards.slice(0, 5).entries()) {
+      state = gameStateReducer(state, { type: 'place', cardId: card.id, registerIndex })
+    }
+    expect(state.registers.slice(0, 5)).toEqual(nextCards.slice(0, 5))
+    state = gameStateReducer(state, { type: 'dealt', hand: { ...hand, cards: nextCards } })
+    expect(state.registers.slice(0, 5)).toEqual(nextCards.slice(0, 5))
+    expect(createSubmission(state)?.cardIds).toEqual(nextCards.slice(0, 5).map((card) => card.id))
+  })
+
+  it('requires the matching private hand after playback finishes', () => {
+    let state = selectProgram()
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(canProgram(state)).toBe(false)
+    expect(createSubmission(state)).toBeNull()
+    for (const invalidHand of [
+      { ...hand, playerId: publicState.robots[1].playerId },
+      { ...hand, gameId: 'another-game' },
+    ]) {
+      expect(gameStateReducer(state, { type: 'dealt', hand: invalidHand })).toBe(state)
+    }
+    state = gameStateReducer(state, { type: 'dealt', hand })
+    expect(canProgram(state)).toBe(true)
+    expect(state.registers).toEqual(emptyRegisters)
+    expect(gameStateReducer(state, { type: 'dealt', hand })).toBe(state)
+  })
+
+  it('buffers the next hand until both robots in the same register have played', () => {
+    let state = selectProgram()
+    const registers = state.registers
+    const first = actions[0]
+    const second: RobotActionResolved = {
+      ...first, robotId: stationaryRobotId,
+      position: { coordinate: { x: 3, y: 4 }, orientation: 'WEST' },
+    }
+    state = gameStateReducer(state, { type: 'action', action: first })
+    state = gameStateReducer(state, { type: 'action', action: second })
+    state = gameStateReducer(state, { type: 'dealt', hand })
+    expect(canProgram(state)).toBe(false)
+    expect(state.registers).toEqual(registers)
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(state.playback.active).toEqual(second)
+    expect(state.playback.robots[0].position).toEqual(first.position)
+    expect(state.playback.robots[1].position).toEqual(second.position)
+    expect(canProgram(state)).toBe(false)
+    expect(state.registers).toEqual(registers)
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(canProgram(state)).toBe(true)
+    expect(state.registers).toEqual(emptyRegisters)
   })
 
   it.each(['idle', 'pending'] as const)('preserves the game and locks editing on connection loss with submission %s', (submission) => {
@@ -400,7 +611,7 @@ describe('client game state', () => {
     expect(state).toEqual({
       ...before,
       connected: false,
-      error: 'Connection lost. Reload to connect again; your program was not resent.',
+      error: 'Connection lost. Reconnecting… Your program was not resent.',
     })
     expect(canProgram(state)).toBe(false)
     expect(createSubmission(state)).toBeNull()
@@ -420,5 +631,220 @@ describe('client game state', () => {
     expect(state.error).toBeNull()
     expect(state.registers).toEqual(emptyRegisters)
     expect(canProgram(state)).toBe(true)
+  })
+
+  it('highlights registers in order when all five results arrive in a burst', () => {
+    let state = selectProgram()
+    const program = state.registers
+    for (const action of actions) state = gameStateReducer(state, { type: 'action', action })
+    state = gameStateReducer(state, { type: 'dealt', hand })
+
+    for (const [index, action] of actions.entries()) {
+      expect(state.playback.active).toEqual(action)
+      expect(state.playback.active?.registerIndex).toBe(index)
+      expect(state.playbackProgram).toEqual(program)
+      expect(canProgram(state)).toBe(false)
+      state = gameStateReducer(state, { type: 'complete' })
+    }
+
+    expect(state.playback.active).toBeNull()
+    expect(state.playbackProgram).toBeNull()
+    expect(state.registers).toEqual(emptyRegisters)
+    expect(canProgram(state)).toBe(true)
+  })
+
+  it('preserves the executed program across a paused playback queue gap', () => {
+    let state = selectProgram()
+    const program = state.registers
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, {
+      type: 'player-connection-changed',
+      payload: {
+        gameId: publicState.gameId,
+        playerId: publicState.players[1].playerId,
+        connected: false,
+        paused: true,
+      },
+    })
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(state.playbackProgram).toEqual(program)
+    expect(state.registers).toEqual(program)
+
+    state = gameStateReducer(state, {
+      type: 'player-connection-changed',
+      payload: {
+        gameId: publicState.gameId,
+        playerId: publicState.players[1].playerId,
+        connected: true,
+        paused: false,
+      },
+    })
+    state = gameStateReducer(state, { type: 'action', action: actions[1] })
+    expect(state.playbackProgram).toEqual(program)
+    expect(state.registers).toEqual(program)
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(state.playbackProgram).toEqual(program)
+
+    state = gameStateReducer(state, { type: 'dealt', hand })
+    expect(state.playbackProgram).toBeNull()
+    expect(state.registers).toEqual(emptyRegisters)
+  })
+
+  it('restores a recovered connection', () => {
+    const before = gameStateReducer(selectProgram(), { type: 'submit' })
+    const disconnected = gameStateReducer(before, { type: 'disconnected' })
+    const state = gameStateReducer(disconnected, { type: 'reconnected' })
+
+    expect(state).toEqual({ ...before, connected: true, error: null })
+    expect(canProgram(state)).toBe(false)
+  })
+
+  it('reports a recognized connect error in place of the generic disconnect message', () => {
+    const disconnected = gameStateReducer(selectProgram(), { type: 'disconnected' })
+    const state = gameStateReducer(disconnected, {
+      type: 'connect-error', message: 'USER_ALREADY_IN_GAME',
+    })
+
+    expect(state).toEqual({ ...disconnected, error: USER_ALREADY_IN_GAME_MESSAGE })
+  })
+
+  it('ignores an unrecognized connect error and reports generic disconnect message', () => {
+    const disconnected = gameStateReducer(selectProgram(), { type: 'disconnected' })
+    const state = gameStateReducer(disconnected, {
+      type: 'connect-error', message: 'transport error',
+    })
+
+    expect(state).toEqual(disconnected)
+  })
+
+  it('locks programming while paused and unlocks once every player reconnects', () => {
+    const state = programmingState()
+    const otherPlayerId = publicState.players[1].playerId
+    expect(canProgram(state)).toBe(true)
+
+    const paused = gameStateReducer(state, {
+      type: 'player-connection-changed',
+      payload: { gameId: publicState.gameId, playerId: otherPlayerId, connected: false, paused: true },
+    })
+    expect(paused.paused).toBe(true)
+    expect(paused.players.find((player) => player.playerId === otherPlayerId)?.connected).toBe(false)
+    expect(canProgram(paused)).toBe(false)
+
+    const resumed = gameStateReducer(paused, {
+      type: 'player-connection-changed',
+      payload: { gameId: publicState.gameId, playerId: otherPlayerId, connected: true, paused: false },
+    })
+    expect(resumed.paused).toBe(false)
+    expect(canProgram(resumed)).toBe(true)
+  })
+
+  it('disables programming and shows an error once the game aborts', () => {
+    const state = selectProgram()
+    expect(canProgram(state)).toBe(true)
+
+    const aborted = gameStateReducer(state, { type: 'aborted' })
+    expect(aborted.aborted).toBe(true)
+    expect(aborted.error).toBe('This game has encountered an error and cannot continue.')
+    expect(canProgram(aborted)).toBe(false)
+  })
+})
+
+describe('checkpoint progress', () => {
+  const progress = {
+    gameId: publicState.gameId, playerId: result.assignment.playerId,
+    lastCheckpoint: 1, checkpointCount: 2,
+  }
+
+  it('initializes and replaces progress from authoritative join snapshots', () => {
+    const snapshot = {
+      ...publicState, checkpointCount: 2,
+      board: { ...publicState.board, tiles: publicState.board.tiles.map((tile, index) =>
+        index < 2 ? { ...tile, checkpointNumber: index + 1 } : tile) },
+      players: publicState.players.map((player) => ({ ...player, lastCheckpoint: 1 })),
+    }
+    const state = gameStateReducer(createClientGameState(), { type: 'joined', result: { ...result, state: snapshot } })
+    expect(state.checkpointCount).toBe(2)
+    expect(state.board?.cells[0].checkpointNumber).toBe(1)
+    expect(state.players.map((player) => player.lastCheckpoint)).toEqual([1, 1])
+    const replaced = gameStateReducer(state, { type: 'joined', result })
+    expect(replaced.checkpointCount).toBe(0)
+    expect(replaced.players.map((player) => player.lastCheckpoint)).toEqual([0, 0])
+  })
+
+  it('updates the identified player immediately without changing programming or playback', () => {
+    let state = selectProgram()
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, { type: 'action', action: actions[1] })
+    const updated = gameStateReducer(state, { type: 'checkpoint-progress', payload: progress })
+    expect(updated.players.map((player) => player.lastCheckpoint)).toEqual([1, 0])
+    expect(updated.checkpointCount).toBe(2)
+    expect(updated).toEqual({ ...state, players: updated.players, checkpointCount: 2 })
+    expect(updated.playback).toBe(state.playback)
+    expect(canProgram(updated)).toBe(false)
+    const restored = gameStateReducer(gameStateReducer(updated, { type: 'disconnected' }), { type: 'reconnected' })
+    expect(restored.players).toBe(updated.players)
+  })
+
+  it('ignores duplicates, older progress, unrelated games and unknown or departed players', () => {
+    const state = gameStateReducer(programmingState(), { type: 'checkpoint-progress', payload: progress })
+    for (const payload of [
+      progress, { ...progress, lastCheckpoint: 0 },
+      { ...progress, gameId: 'another-game', lastCheckpoint: 2 },
+      { ...progress, playerId: 'unknown' },
+      { ...progress, lastCheckpoint: 3 },
+      { ...progress, lastCheckpoint: 1.5 },
+      { ...progress, checkpointCount: -1, lastCheckpoint: 2 },
+    ]) expect(gameStateReducer(state, { type: 'checkpoint-progress', payload })).toBe(state)
+    const departed = gameStateReducer(state, { type: 'player-left', payload: {
+      gameId: progress.gameId, playerId: progress.playerId, robotId,
+    } })
+    expect(gameStateReducer(departed, { type: 'checkpoint-progress', payload: progress })).toBe(departed)
+    expect(gameStateReducer(state, { type: 'reset' }).checkpointCount).toBe(0)
+  })
+})
+
+describe('membership updates', () => {
+  const newcomer = {
+    gameId: publicState.gameId,
+    player: { playerId: 'new-player', lastCheckpoint: 0, username: 'New', connected: true, programSubmitted: false },
+    robot: { robotId: 'new-robot', playerId: 'new-player', position: { coordinate: { x: 1, y: 3 }, orientation: 'NORTH' as const } },
+  }
+
+  it('adds a joined robot while preserving playback and ignoring duplicate or unrelated joins', () => {
+    let state = programmingState()
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    const updated = gameStateReducer(state, { type: 'player-joined', payload: newcomer })
+    expect(updated.players.map((player) => player.playerId)).toContain('new-player')
+    expect(updated.players.at(-1)?.lastCheckpoint).toBe(0)
+    expect(updated.playback.robots.at(-1)?.robotId).toBe('new-robot')
+    expect(updated.playback.active).toBe(state.playback.active)
+    expect(gameStateReducer(updated, { type: 'player-joined', payload: newcomer })).toBe(updated)
+    expect(gameStateReducer(state, { type: 'player-joined', payload: { ...newcomer, gameId: 'other' } })).toBe(state)
+  })
+
+  it('removes a departed robot and its queued actions without disturbing another robot', () => {
+    let state = gameStateReducer(programmingState(), { type: 'player-joined', payload: newcomer })
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, { type: 'action', action: { ...actions[0], robotId: 'new-robot' } })
+    const payload = { gameId: publicState.gameId, playerId: 'new-player', robotId: 'new-robot' }
+    const updated = gameStateReducer(state, { type: 'player-left', payload })
+    expect(updated.players.map((player) => player.playerId)).not.toContain('new-player')
+    expect(updated.playback.robots.some((robot) => robot.robotId === 'new-robot')).toBe(false)
+    expect(updated.playback.pending).toEqual([])
+    expect(updated.playback.active).toBe(state.playback.active)
+    expect(gameStateReducer(updated, { type: 'player-left', payload })).toBe(updated)
+    expect(gameStateReducer(state, { type: 'player-left', payload: { ...payload, gameId: 'other' } })).toBe(state)
+  })
+
+  it('continues with the next queued action when the active robot leaves', () => {
+    let state = programmingState()
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    const next = { ...actions[0], robotId: stationaryRobotId }
+    state = gameStateReducer(state, { type: 'action', action: next })
+    const updated = gameStateReducer(state, { type: 'player-left', payload: {
+      gameId: publicState.gameId, playerId: result.assignment.playerId, robotId,
+    } })
+    expect(updated.playback.active).toBe(next)
+    expect(updated.playback.robots.some((robot) => robot.robotId === robotId)).toBe(false)
   })
 })

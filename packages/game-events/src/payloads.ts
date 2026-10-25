@@ -1,3 +1,5 @@
+import type { Instruction } from './instructions.js'
+
 export type GameId = string
 export type PlayerId = string
 export type RobotId = string
@@ -27,14 +29,6 @@ export type PlayerAssignment = Readonly<{
   robotId: RobotId
 }>
 
-export type Instruction = | 'MOVE_1'
-  | 'MOVE_2'
-  | 'MOVE_3'
-  | 'BACK_UP'
-  | 'TURN_LEFT'
-  | 'TURN_RIGHT'
-  | 'U_TURN'
-
 export type Card = Readonly<{
   id: CardId
   instruction: Instruction
@@ -60,8 +54,9 @@ export type Robot = Readonly<{
 
 export type Tile = Readonly<{
   position: Coordinate
-  type: 'EMPTY'
+  type: 'EMPTY' | 'PIT'
   walls?: readonly Orientation[]
+  checkpointNumber?: number
 }>
 
 export type Board = Readonly<{
@@ -70,46 +65,121 @@ export type Board = Readonly<{
   tiles: readonly Tile[]
 }>
 
-export type GamePhase = 'WAITING' | 'PROGRAMMING' | 'EXECUTING'
+export type GamePhase = 'PROGRAMMING' | 'EXECUTING'
+
+export type Antenna = Readonly<Coordinate & { angle: number }>
 
 export type PublicGameState = Readonly<{
   gameId: GameId
+  checkpointCount: number
+  antenna: Antenna
   board: Board
   robots: readonly Robot[]
   phase: GamePhase
+  players: readonly PlayerState[]
+  paused: boolean
+  aborted: boolean
+}>
+
+export type PlayerState = Readonly<{
+  playerId: PlayerId
+  lastCheckpoint: number
+  username: string
+  programSubmitted: boolean
+  connected: boolean
+}>
+
+export type PlayerJoined = Readonly<{
+  gameId: GameId
+  player: PlayerState
+  robot: Robot
+}>
+
+export type PlayerLeft = Readonly<{ gameId: GameId; playerId: PlayerId; robotId: RobotId }>
+
+export type GameAborted = Readonly<{ gameId: GameId }>
+export type PlayerCheckpointProgress = Readonly<{
+  gameId: GameId
+  playerId: PlayerId
+  lastCheckpoint: number
+  checkpointCount: number
+}>
+
+export type PlayerConnectionChanged = Readonly<{
+  gameId: GameId
+  playerId: PlayerId
+  connected: boolean
+  paused: boolean
+}>
+
+export type LeaveResult = Readonly<{
+  outcome: 'LEFT' | 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND' | 'INTERNAL_ERROR'
 }>
 
 export type CardsDealt = Readonly<{
+  gameId: GameId
+  playerId: PlayerId
   cards: readonly Card[]
 }>
 
-export type ProgramResultOutcome = 'ACCEPTED' | 'INVALID_PROGRAM'
+export type ProgramResultOutcome =
+  | 'ACCEPTED'
+  | 'INVALID_PROGRAM'
+  | 'GAME_PAUSED'
+  | 'GAME_ABORTED'
+  | 'ALREADY_SUBMITTED'
+  | 'WRONG_PHASE'
+  | 'NOT_A_MEMBER'
+  | 'INVALID_REQUEST'
+  | 'GAME_ID_MISMATCH'
+  | 'PLAYER_ID_MISMATCH'
+  | 'PLAYER_NOT_IN_GAME'
+  | 'INTERNAL_ERROR'
 
 export type ProgramResult = Readonly<{
   outcome: ProgramResultOutcome
 }>
 
 export type ProgramSubmitted = Readonly<{
+  gameId: GameId
   playerId: PlayerId
 }>
 
 export type RobotActionResolved = Readonly<{
+  gameId: GameId
+  registerIndex: number
   robotId: RobotId
   instruction: Instruction
   position: Position
 }>
 
-export type GetPublicGameState = Readonly<{
-  gameId: GameId
+export type GetLobbyDetails = Readonly<Record<string, never>>
+
+export type GameMap = Readonly<{
+  name: string
+  icon: string
+  maxPlayers: number
 }>
 
-export type PublicGameStateResult =
+export type LobbyPlayer = Readonly<{
+  playerId: PlayerId
+  username: string
+}>
+
+export type LobbyDetails = Readonly<{
+  gameId: GameId
+  name: string
+  players: readonly LobbyPlayer[]
+  map: GameMap
+}>
+
+export type LobbyDetailsResult =
   | Readonly<{
-      outcome: 'GAME_FOUND'
-      state: PublicGameState
+      outcome: 'LOBBY_FOUND'
+      lobbies: readonly LobbyDetails[]
     }>
   | Readonly<{
-      outcome: 'GAME_NOT_FOUND'
+      outcome: 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'INTERNAL_ERROR'
     }>
 
 export type JoinResult =

@@ -44,6 +44,8 @@ export async function openGame(page: Page, width?: number, height?: number) {
   await page.goto('/')
   await page.getByRole('textbox', { name: 'Username' }).fill('Player 1')
   await page.getByRole('button', { name: 'Log in', exact: true }).click()
+  await page.getByRole('button', { name: /Shared game/ }).click()
+  await page.getByRole('button', { name: 'Join game', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Player 1', exact: true })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button')).toHaveCount(9)
 }

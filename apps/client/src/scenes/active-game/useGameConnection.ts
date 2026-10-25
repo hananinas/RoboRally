@@ -1,8 +1,12 @@
 import type {
   CardsDealt,
+  GameAborted,
   JoinResult,
-  ProgramSubmitted,
+  PlayerConnectionChanged,
+  PlayerCheckpointProgress,
   RobotActionResolved,
+  PlayerJoined,
+  PlayerLeft,
 } from '@robo-rally/game-events'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -38,28 +42,52 @@ export default function useGameConnection(socket: GameSocket) {
     // Installed before joining. The acknowledgement initializes state synchronously
     // before Socket.IO delivers the subsequent gameplay events.
     const receive = (event: GameStateEvent) => {
-      if (current.current.connected && current.current.assignment !== null) dispatch(event)
+      if (socket.connected && current.current.assignment !== null) dispatch(event)
     }
     const handleDisconnect = () => {
       generation.current += 1
       dispatch({ type: 'disconnected' })
     }
-    const handleCardsDealt = ({ cards }: CardsDealt) => receive({ type: 'dealt', cards })
-    const handleProgramSubmitted = ({ playerId }: ProgramSubmitted) => {
-      receive({ type: 'submitted', playerId })
+    const handleConnect = () => {
+      if (socket.recovered) dispatch({ type: 'reconnected' })
     }
+    const handleConnectError = (error: Error) => {
+      if (current.current.assignment === null) return
+      dispatch({ type: 'connect-error', message: error.message })
+      if (error.message === 'USER_ALREADY_IN_GAME') socket.disconnect()
+    }
+    const handleCardsDealt = (hand: CardsDealt) => receive({ type: 'dealt', hand })
     const handleActionResolved = (action: RobotActionResolved) => receive({ type: 'action', action })
+    const handlePlayerJoined = (payload: PlayerJoined) => receive({ type: 'player-joined', payload })
+    const handlePlayerLeft = (payload: PlayerLeft) => receive({ type: 'player-left', payload })
+    const handlePlayerConnectionChanged = (payload: PlayerConnectionChanged) =>
+      receive({ type: 'player-connection-changed', payload })
+    const handleAborted = (_payload: GameAborted) => receive({ type: 'aborted' })
+    const handleCheckpointProgress = (payload: PlayerCheckpointProgress) =>
+      receive({ type: 'checkpoint-progress', payload })
 
     socket.on('disconnect', handleDisconnect)
+    socket.on('connect', handleConnect)
+    socket.on('connect_error', handleConnectError)
     socket.on('cards.dealt', handleCardsDealt)
-    socket.on('program.submitted', handleProgramSubmitted)
     socket.on('robot.actionResolved', handleActionResolved)
+    socket.on('game.playerJoined', handlePlayerJoined)
+    socket.on('game.playerLeft', handlePlayerLeft)
+    socket.on('game.playerConnectionChanged', handlePlayerConnectionChanged)
+    socket.on('game.aborted', handleAborted)
+    socket.on('player.checkpointProgress', handleCheckpointProgress)
     return () => {
       generation.current += 1
       socket.off('disconnect', handleDisconnect)
+      socket.off('connect', handleConnect)
+      socket.off('connect_error', handleConnectError)
       socket.off('cards.dealt', handleCardsDealt)
-      socket.off('program.submitted', handleProgramSubmitted)
       socket.off('robot.actionResolved', handleActionResolved)
+      socket.off('game.playerJoined', handlePlayerJoined)
+      socket.off('game.playerLeft', handlePlayerLeft)
+      socket.off('game.playerConnectionChanged', handlePlayerConnectionChanged)
+      socket.off('game.aborted', handleAborted)
+      socket.off('player.checkpointProgress', handleCheckpointProgress)
     }
   }, [dispatch, socket])
 

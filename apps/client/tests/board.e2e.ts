@@ -53,15 +53,19 @@ test('plays rapid server results one robot at a time without replacing its sprit
 
   const red = page.locator('[data-robot-id="red"]')
   const blue = page.locator('[data-robot-id="blue"]')
+  const transitionDurations = await red.first().evaluate((element) =>
+    getComputedStyle(element).transitionDuration.split(',').map((duration) => duration.trim()),
+  )
+  expect(transitionDurations).toContain('0.6s')
   const original = await red.first().elementHandle()
   if (!original) throw new Error('Robot sprite is unavailable')
 
   const steps = [
-    { robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 6 }, orientation: 'NORTH' } },
-    { robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 5 }, orientation: 'NORTH' } },
-    { robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 10, y: 5 }, orientation: 'WEST' } },
-    { robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 9, y: 5 }, orientation: 'WEST' } },
-    { robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 9, y: 5 }, orientation: 'SOUTH' } },
+    { gameId: 'demo', registerIndex: 0, robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 6 }, orientation: 'NORTH' } },
+    { gameId: 'demo', registerIndex: 1, robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 5 }, orientation: 'NORTH' } },
+    { gameId: 'demo', registerIndex: 2, robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 10, y: 5 }, orientation: 'WEST' } },
+    { gameId: 'demo', registerIndex: 3, robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 9, y: 5 }, orientation: 'WEST' } },
+    { gameId: 'demo', registerIndex: 4, robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 9, y: 5 }, orientation: 'SOUTH' } },
   ] as const
   await page.evaluate((actions) => {
     (window as Window & { boardFixture: BoardHarnessApi }).boardFixture.enqueue(actions)
@@ -75,11 +79,7 @@ test('plays rapid server results one robot at a time without replacing its sprit
     expect(await red.first().evaluate((element, first) => element === first, original)).toBe(true)
     await expect(blue.first()).toHaveAttribute('data-board-tile', '9,7')
     if (index === 0) {
-      await page.clock.runFor(300)
-      const midway = await computedStyleNumber(red.first(), 'top')
-      expect(midway).toBeLessThan(0)
-      expect(midway).toBeGreaterThan(-78)
-      await page.clock.runFor(300)
+      await page.clock.runFor(600)
     } else {
       await page.clock.runFor(step.instruction === 'TURN_LEFT' ? 300 : 600)
     }
@@ -420,4 +420,3 @@ test('preserves the board camera across HUD rerenders', async ({ page }) => {
 
   await expect.poll(cameraMatrix).toEqual({ x: 100, y: 40, zoom: 1 })
 })
-

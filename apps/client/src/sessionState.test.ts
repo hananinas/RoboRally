@@ -2,29 +2,37 @@ import type { JoinResult, User } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'
 import { createSessionState, sessionReducer, type SessionState } from './sessionState.ts'
 
+
 const user: User = {
-  userId: '00000000-0000-4000-8000-000000000001',
-  username: ' Player ',
+userId: '00000000-0000-4000-8000-000000000001',
+username: ' Player ',
 }
 
+const gameId = '00000000-0000-4000-8000-000000000002'
+
 const joined: Extract<JoinResult, { outcome: 'JOINED' }> = {
-  outcome: 'JOINED',
-  assignment: {
-    gameId: '00000000-0000-4000-8000-000000000002',
-    playerId: '00000000-0000-4000-8000-000000000003',
-    robotId: '00000000-0000-4000-8000-000000000004',
-  },
-  state: {
-    gameId: '00000000-0000-4000-8000-000000000002',
-    board: { width: 1, height: 1, tiles: [] },
-    robots: [],
-    phase: 'PROGRAMMING',
+outcome: 'JOINED',
+assignment: {
+  gameId: '00000000-0000-4000-8000-000000000002',
+  playerId: '00000000-0000-4000-8000-000000000003',
+  robotId: '00000000-0000-4000-8000-000000000004',
+},
+state: {
+  gameId: '00000000-0000-4000-8000-000000000002',
+  antenna: { x: 0, y: 0, angle: Math.PI / 2 },
+  board: { width: 1, height: 1, tiles: [] },
+  robots: [],
+  players: [],
+  phase: 'PROGRAMMING',
+  paused: false,
+    aborted: false,
+    checkpointCount: 0,
   },
   hand: [],
   programSubmitted: false,
 }
 
-function joiningState(): SessionState {
+function readyState(): SessionState {
   let state = sessionReducer(createSessionState(), {
     type: 'username-changed',
     username: user.username,
@@ -33,17 +41,28 @@ function joiningState(): SessionState {
   return sessionReducer(state, { type: 'login-result', result: { outcome: 'LOGGED_IN', user } })
 }
 
+function joiningState(): SessionState {
+  return sessionReducer(readyState(), { type: 'join-requested', gameId })
+}
+
+function resyncingState(): SessionState {
+  const entered = sessionReducer(joiningState(), { type: 'join-result', result: joined })
+  return sessionReducer(entered, { type: 'resync' })
+}
+
 describe('sessionReducer', () => {
   const editing: SessionState = { status: 'editing', username: user.username, error: null }
   it.each([
     editing,
     sessionReducer(editing, { type: 'login-submitted' }),
+    readyState(),
     joiningState(),
     sessionReducer(joiningState(), { type: 'join-error', error: 'TIMEOUT' }),
+    resyncingState(),
   ])('requires fresh login after disconnect from $status', (previous) => {
     const reset = sessionReducer(previous, { type: 'disconnected' })
     expect(reset).toEqual(editing)
-    expect(sessionReducer(reset, { type: 'join-retried' })).toBe(reset)
+    expect(sessionReducer(reset, { type: 'join-requested',gameId })).toBe(reset)
     expect(sessionReducer(reset, { type: 'join-result', result: joined })).toBe(reset)
     expect(sessionReducer(reset, {
       type: 'login-result', result: { outcome: 'LOGGED_IN', user },
@@ -58,7 +77,7 @@ describe('sessionReducer', () => {
     const disconnected = sessionReducer(entered, { type: 'disconnected' })
     expect(disconnected).toBe(entered)
     expect(sessionReducer(disconnected, { type: 'login-submitted' })).toBe(disconnected)
-    expect(sessionReducer(disconnected, { type: 'join-retried' })).toBe(disconnected)
+    expect(sessionReducer(disconnected, { type: 'join-requested',gameId })).toBe(disconnected)
   })
 
   it('moves from editing through login and join while retaining the approved user', () => {
@@ -68,7 +87,20 @@ describe('sessionReducer', () => {
     expect(state).toMatchObject({
       status: 'joined',
       user,
+      gameId,
     })
+  })
+
+  it('waits for an explicit join after login and ignores unsolicited join results', () => {
+    const ready = readyState()
+    expect(ready).toEqual({ status: 'ready-to-join', user })
+    expect(sessionReducer(ready, { type: 'join-result', result: joined })).toBe(ready)
+    expect(sessionReducer(ready, { type: 'join-requested',gameId })).toEqual({ status: 'joining', user, gameId })
+  })
+
+  it('returns to the join step after leaving without logging out or rejoining', () => {
+    const entered = sessionReducer(joiningState(), { type: 'join-result', result: joined })
+    expect(sessionReducer(entered, { type: 'left' })).toEqual({ status: 'ready-to-join', user })
   })
 
   it('returns a rejected login to editing with the exact username', () => {
@@ -106,9 +138,9 @@ describe('sessionReducer', () => {
       result: { outcome },
     })
     expect(state).toEqual({ status: 'join-failed', user, error: outcome })
-    state = sessionReducer(state, { type: 'join-retried' })
+    state = sessionReducer(state, { type: 'join-requested',gameId })
 
-    expect(state).toEqual({ status: 'joining', user })
+    expect(state).toEqual({ status: 'joining', user, gameId })
   })
 
   it('returns to login when joining requires it', () => {
@@ -130,6 +162,35 @@ describe('sessionReducer', () => {
     expect(state).toEqual({ status: 'join-failed', user, error: 'TIMEOUT' })
   })
 
+  it('moves from joined to resyncing on a failed-recovery reconnect, then back to joining', () => {
+    const entered = sessionReducer(joiningState(), { type: 'join-result', result: joined })
+    const resyncing = sessionReducer(entered, { type: 'resync' })
+    expect(resyncing).toEqual({ status: 'resyncing', user, gameId })
+
+    const state = sessionReducer(resyncing, {
+      type: 'login-result', result: { outcome: 'LOGGED_IN', user },
+    })
+    expect(state).toEqual({ status: 'joining', user, gameId })
+  })
+
+  it('ignores resync outside the joined state', () => {
+    expect(sessionReducer(editing, { type: 'resync' })).toBe(editing)
+    const joining = joiningState()
+    expect(sessionReducer(joining, { type: 'resync' })).toBe(joining)
+  })
+
+  it('returns a rejected resync login to editing with the known username', () => {
+    const state = sessionReducer(resyncingState(), {
+      type: 'login-result', result: { outcome: 'INVALID_USERNAME' },
+    })
+    expect(state).toEqual({ status: 'editing', username: user.username, error: 'INVALID_USERNAME' })
+  })
+
+  it('allows retry after a resync login timeout', () => {
+    const state = sessionReducer(resyncingState(), { type: 'login-timeout' })
+    expect(state).toEqual({ status: 'editing', username: user.username, error: 'TIMEOUT' })
+  })
+
   it('ignores duplicate submissions and results outside their pending state', () => {
     const loggingIn = sessionReducer(createSessionState(), { type: 'login-submitted' })
     expect(sessionReducer(loggingIn, { type: 'login-submitted' })).toBe(loggingIn)
@@ -139,6 +200,6 @@ describe('sessionReducer', () => {
       type: 'login-result',
       result: { outcome: 'LOGGED_IN', user },
     })).toBe(joining)
-    expect(sessionReducer(joining, { type: 'join-retried' })).toBe(joining)
+    expect(sessionReducer(joining, { type: 'join-requested', gameId })).toBe(joining)
   })
 })

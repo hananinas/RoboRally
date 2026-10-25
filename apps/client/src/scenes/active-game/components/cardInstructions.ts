@@ -8,26 +8,12 @@ import arrowUp2 from './svg/arrow-up-2.svg'
 import arrowUp3 from './svg/arrow-up-3.svg'
 import uTurn from './svg/u-turn.svg'
 
-export const instructionLabels: Record<Instruction, string> = {
-  MOVE_1: 'Move 1',
-  MOVE_2: 'Move 2',
-  MOVE_3: 'Move 3',
-  BACK_UP: 'Back Up',
-  TURN_LEFT: 'Turn Left',
-  TURN_RIGHT: 'Turn Right',
-  U_TURN: 'U-Turn',
-}
-
-export const instructionIcons: Record<Instruction, string> = {
-  MOVE_1: arrowUp1,
-  MOVE_2: arrowUp2,
-  MOVE_3: arrowUp3,
-  BACK_UP: backDown,
-  TURN_LEFT: arrowLeft,
-  TURN_RIGHT: arrowRight,
-  U_TURN: uTurn,
-}
-
-export function instructionLabel(instruction: Instruction): string {
-  return instructionLabels[instruction]
+export const cardPresentation: Record<Instruction, { label: string; icon: string }> = {
+  MOVE_1: { label: 'Move 1', icon: arrowUp1 },
+  MOVE_2: { label: 'Move 2', icon: arrowUp2 },
+  MOVE_3: { label: 'Move 3', icon: arrowUp3 },
+  BACK_UP: { label: 'Back Up', icon: backDown },
+  TURN_LEFT: { label: 'Turn Left', icon: arrowLeft },
+  TURN_RIGHT: { label: 'Turn Right', icon: arrowRight },
+  U_TURN: { label: 'U-Turn', icon: uTurn },
 }

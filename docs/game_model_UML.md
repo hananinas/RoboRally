@@ -13,10 +13,12 @@ Will update with a more conceptual domain diagram which will be used for present
         -activatedRobotIds: RobotId[] set
         -deck: Card[] unordered
         -dealCards()
-        +submitProgram(PlayerId playerId, Card[5] program)
-        +executeCurrentRegister()
-        -nextRobotByPriority() RobotId
-        -executeCard(RobotId robotId, Card card)
+        +submitProgram(PlayerId playerId, CardId[5] cardIds)
+        +moveRobot(Robot robot, Direction direction, PositiveInteger steps)
+        +executeNextAction() NextActionResult
+        -nextRobotByPriority() Robot
+        -executeCard(Robot robot, Card card)
+        -resolveTileEntry(Robot robot, Tile tile) continue_or_stop
         }
 
         class Board {
@@ -24,19 +26,34 @@ Will update with a more conceptual domain diagram which will be used for present
         -robotPositions: Map
         +positionOf(RobotId robotId) Position
         +occupantAt(Position position) RobotId?
-        +moveRobot(RobotId robotId, Direction direction, int steps) MovementResult
+        +placeRobot(RobotId robotId, Position position)
+        +relocateRobot(RobotId robotId, Position position)
+        +nearestFreePosition(Position origin) Position?
+        +hasEntryEffect(TileEntryEffect effect) bool
+        +moveRobot(RobotId robotId, Direction direction, PositiveInteger steps) MovementResult
         }
 
         class Tile {
             <<abstract>>
+            +kind: TileKind readonly
             +walls: Direction[] set
+            +checkpointNumber: int?
         }
 
         class EmptyTile
+        class PitTile
+
+        class TileKind {
+            <<enumeration>>
+            EMPTY
+            PIT
+        }
 
         class Player {
         -robot: Robot
         -hand: Card[] unordered
+        +lastCheckpoint: int
+        +completeCheckpoint(int number) bool
         }
 
         class Robot {
@@ -45,6 +62,7 @@ Will update with a more conceptual domain diagram which will be used for present
         +program: Card[5] ordered
         +setProgram(Card[5] program)
         +getProgramCard(int registerIndex) Card
+        +turn(int quarterTurns)
         }
 
         class Direction {
@@ -56,11 +74,9 @@ Will update with a more conceptual domain diagram which will be used for present
         }
 
         class Card {
-            <<abstract>>
+            +id: CardId
+            +instruction: Instruction
         }
-
-        class Move1
-        class TurnLeft
 
         Game "1" *--> "1" Board
         Game *--> "1..*" Player
@@ -68,6 +84,8 @@ Will update with a more conceptual domain diagram which will be used for present
 
         Robot --> Direction
         Tile <|-- EmptyTile
+        Tile <|-- PitTile
+        Tile --> TileKind
 
         Player "1" --> "1" Robot
 
@@ -75,29 +93,42 @@ Will update with a more conceptual domain diagram which will be used for present
         Player "1" --> "*" Card : hand
         Robot "1" --> "5" Card : program
 
-        Card <|-- Move1
-        Card <|-- TurnLeft
 ```
 
 # Game
 
-Responsible for dictating the game loop: dealing cards, taking programs, and executing their registers.
+Game deals cards, accepts programs, and executes five registers. `submitProgram()` validates five distinct card IDs against the player's hand. Each action selects a pending robot using current Board positions and antenna priority. Movement uses `Game.moveRobot()`; turns change Robot's direction.
 
-Keeps track of the current phase and register. `submitProgram()` checks a player's five cards before assigning them to their Robot. During activation, Game chooses the next robot from those that have not acted yet, using current positions on Board and the priority antenna. It reads that robot's card and applies it: movement goes through Board, while turns change Robot's direction. Priority is worked out again after each robot acts.
+`Game.moveRobot(robot, direction, steps)` attempts one Board step at a time and resolves entry effects after each successful step. Blocked steps stop movement without an effect. The resolver returns `continue` or `stop`; rebooting relocates immediately and discards the remaining steps. Each programmed action reports the final position and orientation before priority is recalculated.
 
-Board elements activate after the robot actions in each register. This is a no-op in V0, but leaves room for ordered board effects later. After the fifth register, Game returns to the programming phase.
+Direct movement preserves orientation, programs, submissions, and register state. It neither starts a round nor marks an action complete, awards checkpoints, or emits events. Checkpoints are evaluated at final positions when all remaining robots finish a register, including when a departure completes it. Only the next numbered checkpoint counts; passing over one does not. After register five, Game returns to programming with progress preserved. Completing the course does not end the game.
 
 # Board
 
-Has the Tile grid and keeps track of each Robot's position in a map from RobotId to Position. Tile and Robot do not hold references to one another.
+Board owns the tile grid, antenna, and RobotId-to-Position map. `Board.moveRobot()` checks both sides of walls, board edges, and robot occupancy, without executing tile effects. Gameplay displacement, including future pushing, goes through Game's movement operation.
 
-Answers position and occupancy queries, and carries out movement. Board checks walls, board edges, and other robots before moving anything; pushing other robots can be resolved here later. Game reads Board positions and antenna state to work out priority, but Board does not sort robots or execute their programs.
+Placement, relocation, and safe-destination search use `allowsPlacement()` for tile suitability, with bounds and occupancy checked separately. Pits remain enterable during movement. Relocation does not trigger entry effects. Reboot search uses Manhattan distance, then top-to-bottom and left-to-right tie-breaking; enclosing walls do not exclude a destination. `hasEntryEffect('reboot')` lets Game require reboot configuration where needed.
 
 # Tile
 
-Abstract class describing what is on a board space. Walls are properties of any Tile, not a separate tile type. EmptyTile is currently the only tile type shown for V0.
+Tile is descriptive data with a readonly `TileKind`: EmptyTile uses `EMPTY`, and PitTile uses `PIT`. The exhaustive `tileDefinitions` table declares:
 
-Tiles do not hold robots or activate themselves. Game can schedule board effects later, with Board handling the spatial checks needed to find what they affect.
+| Kind | `canOccupy` for placement/reboot | `entryEffect` |
+| --- | --- | --- |
+| `EMPTY` | true | absent |
+| `PIT` | false | `reboot` |
+
+Definitions contain no callbacks. Walls, optional checkpoint numbers, and future settings such as conveyor direction belong to instances. Board validates unique checkpoint numbers consecutive from 1 and derives their count. Checkpoints can coexist with walls without a separate subclass. Tiles hold neither robots nor activation logic.
+
+## Extending tiles
+
+1. Add a tile kind and subclass with its instance data.
+2. Declare placement suitability and any entry effect in `tileDefinitions`.
+3. Reuse an effect or extend `TileEntryEffect` and Game's exhaustive resolver. Leave collision logic and card interpretation generic.
+4. Add map construction and, for public kinds, shared types, AsyncAPI, the board adapter, and rendering. The presenter serializes `tile.kind` directly.
+5. Test placement, movement, effect timing, and presentation through public APIs.
+
+Register-end effects need their own ordered phase when implemented. Conveyors and pushing still need scheduling and collision design. Pit animations, damage, register cancellation, direction selection, and board-edge falls remain deferred.
 
 # Robot
 
@@ -109,7 +140,9 @@ Has an assigned Robot and an unordered hand of cards. A five-card program is sub
 
 # Cards
 
-Abstract class that gets extended with each card type. `Move1` and `TurnLeft` are the V0 examples. Cards describe actions; Game interprets them instead of each card executing itself.
+Each Card has an instance ID and an Instruction. The shared instruction catalog defines movement distances and quarter turns, and its keys define the Instruction type. Game interprets these effects through Board and Robot. Cards describe actions rather than executing themselves.
+
+The client keeps labels and icons in one presentation map and uses the shared effect kind to choose animation timing.
 
 A Player's hand and Game's deck are unordered Card collections. A Robot's program is an ordered list of five Cards. These are properties, not separate classes.
 
@@ -125,23 +158,20 @@ Later, directional board elements such as lasers or conveyor belts can use Direc
 ## Register execution:
 
 ```
-game.startActivationPhase()                     # currentRegister = 0
-while game.currentRegister < 5:
-    remaining = game.getActiveRobotIds()
-    while remaining is not empty:
-        robotId = game.getNextRobot(remaining)    # Uses current Board positions and antenna
-        card = robot(robotId).getProgramCard(game.currentRegister)
-        game.executeCard(robotId, card)           # Movement via Board, turning via Robot
-        remaining.remove(robotId)                 # Priority is checked again for the next robot
-    game.activateBoardElements()                  # No-op in V0; ordered effects later
-    game.finishRegister()                         # Advance to the next register
-game.finishRound()                                # Return to programming phase
+# submitProgram enters activation once all players have submitted.
+while game.phase == "activation":
+    result = game.executeNextAction()             # Select next pending robot by current priority
+    # Execute its card: Game.moveRobot resolves entries; Robot handles turning.
+    # Mark this robot as activated and capture the final position after any reboot.
+    # After the last robot: evaluate checkpoints and advance the register.
+    # After the fifth register: clear programs and return to programming.
+    # The socket layer publishes the action before associated checkpoint updates.
 ```
 
 ## Laser obstacle:
 
 ```
-game.activateBoardElements():                     # Later; no-op in V0
+game.activateBoardElements():                     # Illustrative future laser phase; retain checkpoint checks
     for each (position, laser) on board:
         hit = board.firstRobotHit(position, laser.direction)
         if hit exists:
@@ -162,7 +192,7 @@ board.firstRobotHit(position, direction):
 
 ## Robot priority (TypeScript reference implementation):
 
-The antenna is passed explicitly because the current Board model does not store it yet. Its `angle` is in radians from east; with board coordinates increasing south, positive angles rotate clockwise. Call this again after each robot acts, using only robots that have not activated in the current register. Exact ties keep the first ID in `remaining`.
+Board stores the antenna. This reference function accepts it explicitly to show the priority calculation independently. Its `angle` is in radians from east; with board coordinates increasing south, positive angles rotate clockwise. Call this again after each robot acts, using only robots that have not activated in the current register. Exact ties keep the first ID in `remaining`.
 
 ```ts
 type RobotId = string

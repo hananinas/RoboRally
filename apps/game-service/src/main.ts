@@ -1,6 +1,11 @@
 import { createServer } from 'node:http'
-import { parseGameServicePort } from './config.js'
-import { createGameSocketServer } from './gameServer.js'
+import { parseGameServicePort } from '@/config'
+import { createGameSocketServer } from '@/socket/gameServer'
+import { logError } from '@/logger'
+
+process.on('uncaughtExceptionMonitor', (error, origin) => {
+  logError('Unhandled process error', error, { source: 'process', origin })
+})
 
 const host = '127.0.0.1'
 const port = parseGameServicePort(process.env.PORT)
@@ -15,7 +20,7 @@ let shuttingDown = false
 function shutdown(): void {
   if (shuttingDown) return
   shuttingDown = true
-  io.close((error) => {
+  void io.close((error) => {
     if (!error) return
     console.error('Game Service failed to shut down cleanly', error)
     process.exitCode = 1

@@ -130,8 +130,7 @@ The non-Nix setup is best-effort and may require additional platform-specific to
 .
 ├── apps/
 │   ├── client/
-│   ├── game-service/
-│   └── user-service/
+│   └── game-service/
 ├── package.json
 └── pnpm-workspace.yaml
 ```
@@ -145,4 +144,3 @@ pnpm lint
 pnpm test
 pnpm typecheck
 ```
-

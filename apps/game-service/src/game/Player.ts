@@ -1,9 +1,10 @@
-import type { Card } from './Card.js'
-import type { PlayerId } from './ids.js'
-import type { Robot } from './Robot.js'
+import type { Card } from '@/game/Card'
+import type { PlayerId } from '@/game/ids'
+import type { Robot } from '@/game/Robot'
 
 export class Player {
   private currentHand: readonly Card[]
+  private completedCheckpoint = 0
 
   constructor(
     readonly id: PlayerId,
@@ -15,6 +16,18 @@ export class Player {
 
   get hand(): readonly Card[] {
     return [...this.currentHand]
+  }
+
+  get lastCheckpoint(): number {
+    return this.completedCheckpoint
+  }
+
+  completeCheckpoint(checkpointNumber: number): boolean {
+    if (!Number.isSafeInteger(checkpointNumber) || checkpointNumber !== this.completedCheckpoint + 1) {
+      return false
+    }
+    this.completedCheckpoint = checkpointNumber
+    return true
   }
 
   setHand(hand: readonly Card[]): void {

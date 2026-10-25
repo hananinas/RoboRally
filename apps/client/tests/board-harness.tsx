@@ -6,6 +6,7 @@ import BoardViewport from '../src/scenes/active-game/components/BoardViewport.ts
 import PlayerPanel from '../src/scenes/active-game/components/PlayerPanel.tsx'
 import ProgrammingHand from '../src/scenes/active-game/components/ProgrammingHand.tsx'
 import RegisterPanel from '../src/scenes/active-game/components/RegisterPanel.tsx'
+import useGameKeybinds from '../src/scenes/active-game/components/useGameKeybinds.ts'
 import { DEMO_BOARD, DEMO_ROBOTS } from '../src/scenes/active-game/board/demoBoard.ts'
 import {
   useRobotPlayback,
@@ -13,6 +14,7 @@ import {
 } from '../src/scenes/active-game/board/robotPlayback.ts'
 import {
   placeCard,
+  registersAreFilled,
   removeCard,
   type ProgramCard,
   type Registers,
@@ -37,6 +39,8 @@ const hand: readonly ProgramCard[] = Array.from({ length: 9 }, (_, index) => ({
 export default function BoardHarness() {
   const { robots, enqueue } = useRobotPlayback(DEMO_ROBOTS)
   const [registers, setRegisters] = useState<Registers>(() => Array(5).fill(null))
+  const [registersPast, setRegistersPast] = useState<readonly Registers[]>([])
+  const [registersFuture, setRegistersFuture] = useState<readonly Registers[]>([])
   const [confirmed, setConfirmed] = useState(false)
   const { handBelowHud, handRef, hudContentRef, hudFits, overlayRef } = useOverlayLayout()
 
@@ -45,6 +49,45 @@ export default function BoardHarness() {
   }, [enqueue])
 
   const registeredCardIds = new Set(registers.flatMap((card) => card ? [card.id] : []))
+  const handlePlaceCard = (card: ProgramCard, index: number) => {
+    const next = placeCard(registers, card, index)
+    if (next === registers) return
+    setRegistersPast((past) => [...past, registers])
+    setRegistersFuture([])
+    setRegisters(next)
+  }
+  const handleRemove = (index: number) => {
+    const next = removeCard(registers, index)
+    if (next === registers) return
+    setRegistersPast((past) => [...past, registers])
+    setRegistersFuture([])
+    setRegisters(next)
+  }
+  const handleClearRegisters = () => {
+    if (registers.every((card) => card === null)) return
+    setRegistersPast((past) => [...past, registers])
+    setRegistersFuture([])
+    setRegisters(Array(5).fill(null))
+  }
+  const handleUndo = () => {
+    if (registersPast.length === 0) return
+    const previous = registersPast[registersPast.length - 1]
+    setRegistersPast((past) => past.slice(0, -1))
+    setRegistersFuture((future) => [...future, registers])
+    setRegisters(previous)
+  }
+  const handleRedo = () => {
+    if (registersFuture.length === 0) return
+    const next = registersFuture[registersFuture.length - 1]
+    setRegistersFuture((future) => future.slice(0, -1))
+    setRegistersPast((past) => [...past, registers])
+    setRegisters(next)
+  }
+  const handleSubmit = () => setConfirmed(true)
+  const [highlightedIndex, highlightCard, pendingDelete, awaitingSubmitConfirm] = useGameKeybinds(
+    hand, registeredCardIds, confirmed, handlePlaceCard, handleRemove,
+    handleClearRegisters, handleUndo, handleRedo, handleSubmit, registersAreFilled(registers),
+  )
   const overlayClassName = [
     'game-overlay',
     handBelowHud && 'game-overlay--hand-below-hud',
@@ -57,15 +100,18 @@ export default function BoardHarness() {
       <div ref={overlayRef} className={overlayClassName}>
         <aside className="game-hud" aria-label="Game controls">
           <div ref={hudContentRef} className="game-hud__content">
-            <PlayerPanel player={{ name: 'Board fixture player' }} />
+            <PlayerPanel player={{ name: 'Board fixture player', lastCheckpoint: 0 }} checkpointCount={0} />
             <RegisterPanel
               registers={registers}
+              activeRegister={null}
               disabled={confirmed}
+              pendingDelete={pendingDelete}
+              awaitingSubmitConfirm={awaitingSubmitConfirm}
               submission={confirmed ? 'accepted' : 'idle'}
               status="Programming"
               error={null}
-              onRemove={(index) => setRegisters((current) => removeCard(current, index))}
-              onConfirm={() => setConfirmed(true)}
+              onRemove={handleRemove}
+              onConfirm={handleSubmit}
             />
           </div>
         </aside>
@@ -74,8 +120,10 @@ export default function BoardHarness() {
           cards={hand}
           registeredCardIds={registeredCardIds}
           disabled={confirmed}
+          highlightedIndex={highlightedIndex}
+          onHighlightCard={highlightCard}
           onSelect={(card) => setRegisters((current) => placeCard(current, card, current.indexOf(null)))}
-          onDrop={(card, index) => setRegisters((current) => placeCard(current, card, index))}
+          onPlaceCard={handlePlaceCard}
         />
       </div>
     </div>

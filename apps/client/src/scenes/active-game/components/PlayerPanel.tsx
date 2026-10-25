@@ -3,24 +3,39 @@ import GameMenu from './GameMenu.tsx'
 import Panel from './Panel.tsx'
 
 type PlayerPanelProps = {
-  player: { name: string }
+  player: { name: string; lastCheckpoint: number }
+  robotColour?: string
+  checkpointCount: number
+  onLeave?: () => void
+  leaveDisabled?: boolean
 }
 
 // Shows collapsible player details.
-function PlayerPanel({ player }: PlayerPanelProps) {
+function PlayerPanel({ player, robotColour, checkpointCount, onLeave, leaveDisabled }: PlayerPanelProps) {
   const [expanded, setExpanded] = useState(true)
 
   return (
     <Panel className="player-panel">
       <header className="player-panel__header">
-        <h1 className="player-panel__name">{player.name}</h1>
-        <GameMenu />
+        <h1 className="player-panel__name" aria-label={player.name}>
+          {robotColour && (
+            <span
+              className="player-panel__colour"
+              style={{ backgroundColor: robotColour }}
+              aria-label="Robot colour"
+              role="img"
+            />
+          )}
+          {player.name}
+        </h1>
+        <GameMenu onLeave={onLeave} leaveDisabled={leaveDisabled} />
       </header>
       {expanded && (
         <div className="player-panel__details">
           {['Checkpoints', 'Health', 'Energy', 'Upgrades'].map((section) => (
             <section key={section} className="player-panel__detail">
               <h2>{section}</h2>
+              {section === 'Checkpoints' && <p>{player.lastCheckpoint}/{checkpointCount}</p>}
             </section>
           ))}
         </div>

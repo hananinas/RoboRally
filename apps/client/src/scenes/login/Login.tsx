@@ -1,5 +1,4 @@
 import type { FormEvent } from 'react'
-import './Login.css'
 import { isValidUsername } from './username.ts'
 import type { SocketStatus } from '../../useGameSocket.ts'
 
@@ -9,10 +8,7 @@ type LoginProps = {
   onSubmitUsername: (username: string) => void
   onUsernameChange: (username: string) => void
   pending: boolean
-  pendingLabel: string
-  retryingJoin: boolean
   requiresReconnect: boolean
-  usernameLocked: boolean
   username: string
 }
 
@@ -22,10 +18,7 @@ export default function Login({
   onSubmitUsername,
   onUsernameChange,
   pending,
-  pendingLabel,
-  retryingJoin,
   requiresReconnect,
-  usernameLocked,
   username,
 }: LoginProps) {
   const usernameLength = Array.from(username).length
@@ -39,59 +32,49 @@ export default function Login({
   }
 
   return (
-    <main className="login">
-      <div className="login-board-background" aria-hidden="true">
-        {Array.from({ length: 63 }, (_, index) => <div key={index} />)}
-      </div>
-      <section className="login-panel" aria-labelledby="login-heading">
-        <h1 id="login-heading">RoboRally</h1>
-
-        <form onSubmit={handleSubmit}>
-          <label className="login-field">
-            <span>Username</span>
-            <input
-              aria-describedby="username-help"
-              aria-invalid={usernameLength > 30}
-              autoComplete="username"
-              disabled={usernameLocked}
-              name="username"
-              onChange={(event) => onUsernameChange(event.target.value)}
-              placeholder="e.g. CircuitBreaker"
-              type="text"
-              value={username}
-            />
-          </label>
-          <label className="login-field">
-            <span>Password</span>
-            <input
-              autoComplete="current-password"
-              disabled={usernameLocked}
-              name="password"
-              type="password"
-            />
-          </label>
-          <p
-            className={`login-validation${usernameLength > 30 || error ? ' login-validation--error' : ''}`}
-            id="username-help"
-            role={error ? 'alert' : undefined}
-          >
-            {error ?? (usernameLength > 30
-              ? 'Username cannot exceed 30 characters.'
-              : 'Use 1–30 characters.')}
-          </p>
-          <button
-            className="login-primary-button"
-            disabled={!usernameIsValid || pending || connecting}
-            type="submit"
-          >
-            {pending ? pendingLabel
-              : connecting ? 'Connecting…'
-                : requiresReconnect ? 'Retry connection'
-                : retryingJoin && connectionStatus === 'connected' ? 'Retry joining'
-                : connectionStatus === 'connected' ? 'Log in' : 'Retry connection'}
-          </button>
-        </form>
-      </section>
-    </main>
+    <form onSubmit={handleSubmit}>
+      <label className="login-field">
+        <span>Username</span>
+        <input
+          aria-describedby="username-help"
+          aria-invalid={usernameLength > 30}
+          autoComplete="username"
+          disabled={pending}
+          name="username"
+          onChange={(event) => onUsernameChange(event.target.value)}
+          placeholder="e.g. CircuitBreaker"
+          type="text"
+          value={username}
+        />
+      </label>
+      <label className="login-field">
+        <span>Password</span>
+        <input
+          autoComplete="current-password"
+          disabled={pending}
+          name="password"
+          type="password"
+        />
+      </label>
+      <p
+        className={`login-validation${usernameLength > 30 || error ? ' login-validation--error' : ''}`}
+        id="username-help"
+        role={error ? 'alert' : undefined}
+      >
+        {error ?? (usernameLength > 30
+          ? 'Username cannot exceed 30 characters.'
+          : 'Use 1–30 characters.')}
+      </p>
+      <button
+        className="login-primary-button"
+        disabled={!usernameIsValid || pending || connecting}
+        type="submit"
+      >
+        {pending ? 'Logging in…'
+          : connecting ? 'Connecting…'
+            : requiresReconnect ? 'Retry connection'
+            : connectionStatus === 'connected' ? 'Log in' : 'Retry connection'}
+      </button>
+    </form>
   )
 }

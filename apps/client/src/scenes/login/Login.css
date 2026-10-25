@@ -103,3 +103,117 @@
   cursor: not-allowed;
   opacity: 0.5;
 }
+
+.lobby-list {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.lobby {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #4c5560;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lobby:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.lobby:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
+.lobby--selected {
+  border-color: #dcbd05;
+  background: rgb(220 189 5 / 12%);
+  box-shadow: 0 0 0 2px #dcbd05;
+}
+
+.lobby__image {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border: 1px solid #4c5560;
+  border-radius: 6px;
+  background: #2b323b;
+  object-fit: cover;
+}
+
+.lobby__details {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+}
+
+.lobby__name {
+  font-weight: 600;
+}
+
+.lobby__map {
+  color: #9aa4b0;
+  font-size: 12px;
+}
+
+.lobby__status {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.lobby__players {
+  color: #c7ced6;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.lobby--message {
+  justify-content: space-between;
+  margin: 0;
+  cursor: default;
+}
+
+.lobby--message .login-validation {
+  margin: 0;
+}
+
+.lobby__action {
+  flex: none;
+  margin-bottom: 10px;
+  padding: 6px 12px;
+  border: 1px solid #4c5560;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.lobby--message .lobby__action {
+  margin-bottom: 0;
+}
+
+.lobby__action:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.lobby__action:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}

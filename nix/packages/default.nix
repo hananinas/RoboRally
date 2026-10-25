@@ -14,4 +14,8 @@ in {
   production = import ./production.nix {
     inherit pkgs client game-service;
   };
+
+  build-production = import ./build-production.nix {
+    inherit pkgs;
+  };
 }

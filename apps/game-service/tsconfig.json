@@ -4,12 +4,17 @@
     "lib": ["ES2023"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "rootDir": "src",
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@/*": ["./src/*", "./src/*.ts"]
+    },
+    "rootDir": ".",
     "outDir": "dist",
+    "noEmit": true,
     "strict": true,
     "noEmitOnError": true,
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src"]
+  "include": ["src", "test", "vitest.config.ts"]
 }

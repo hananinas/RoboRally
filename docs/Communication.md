@@ -5,58 +5,20 @@ Client requests receive acknowledgement callbacks. Game state changes and gamepl
 This document describes the v0.6 communication flow. [AsyncAPI](asyncapi.yaml) defines the exact payloads and rejection codes, with a [rendered reference](asyncapi.html).
 
 
-## Authentication and joining
+## Authentication
 Authentication is handled using OpenID Connect (OIDC) with Rauthy. The Game Service acts as the Backend for Frontend (BFF) and maintains the authenticated browser session.
 
 When the user is not authenticated, the browser starts login through the Game Service. The Game Service redirects the browser to Rauthy and completes the OIDC Authorization Code flow. After successful authentication, the Game Service creates a server-side session and returns a Secure, HttpOnly session cookie to the browser.
 
 When the client establishes a Socket.IO connection, the browser includes the session cookie in the connection handshake. The Game Service validates the session before accepting the connection and associates the authenticated user with the socket. Unauthenticated Socket.IO connections are rejected.
 
-Once an authenticated Socket.IO connection has been established, the client sends:
-
-`game.join {gameId}`
-
-for the configured game.
-
-A successful join returns:
-
-`JOINED {assignment, state, hand, programSubmitted}`
-
-The acknowledgement contains the player's current robot assignment, public game state, private hand, and program-submission status. The client must apply all JOINED data before processing later live game events. A future lobby may be inserted between authentication and joining without changing this model.
-
-### Membership
-
-New players may join a game until the server accepts the first program submission. Accepting that submission starts the game and permanently closes joining to new players. Later attempts by new players receive GAME_ALREADY_STARTED. 
-
-In case of disconnection, existing members may reconnect at any time. If the tab is left open SocketIO will automatically try to reestablish the connection. In case of a closed tab, the player can reopen the webpage in another tab to reconnect. In case multiple tabs are used, the first connection to reclaim a disconnected membership becomes its owner. A later connection cannot replace that owner, even if its Socket.IO session was successfully recovered. 
-
-When an existing member sends game.join while not being connected to the game, the server uses the authenticated user associated with the connection, attaches the new connection to the existing player and robot, and returns their current assignment and state through JOINED.
-
-If another connection attempts to join the same game for that authenticated user, it receives:
-
-`USER_ALREADY_IN_GAME`
-
-Only the connection associated with the membership may read that game's public snapshot through:
-
-`game.getPublicGameState`
-
-Other connections receive:
-
-`GAME_NOT_FOUND`
-
-without receiving game state.
-
-Reconnection behavior is described in the Reconnection section.
-
-The following diagram documents the initial authentication and join behaviour:
+The following diagram documents authentication:
 
 ```mermaid
 sequenceDiagram
     participant Client
     participant Server as Game Service
     participant Rauthy
-    participant Public as game:{gameId}:public
-    participant Others as Existing members
 
     Client->>Server: GET /auth/login
     Server-->>Client: Redirect to Rauthy
@@ -72,24 +34,77 @@ sequenceDiagram
     Client->>Server: Establish Socket.IO connection with session cookie
     alt Session valid
         Note over Server: Associate authenticated user with socket
-        Client->>Server: game.join {gameId}
-        alt Join accepted
-            Server-->>Client: Acknowledgement: JOINED {assignment, state, hand, programSubmitted}
-            Server->>Public: game.playerJoined {player, robot}
-            Public-->>Others: game.playerJoined {player, robot}
-            Note over Client,Server: Initialize before later game events
-        else Join rejected
-            Server-->>Client: Acknowledgement: rejection outcome
-        end
     else Session invalid or missing
         Server-->>Client: Reject Socket.IO connection
     end
 ```
 
+## Lobby
+After successful authentication, the client sends a `session.get` request to determine if the user has an existent session. 
+If he does not, `session.get` acknowledges with `NO_SESSION` and the client is shown the lobby screen.
+
+### Listing lobbies
+The client then requets a list of existant lobbies via
+
+`lobby.list`
+
+A successful request returns:
+
+`LOBBIES_FOUND {lobbies}`
+
+From there the user has two options, creating a lobby or joining a lobby.
+
+### Creating a lobby
+The client sends `lobby.create`. As of this version there are no options and the server just assigns values for name and map. The creator becomes the lobbies owner. 
+
+### Joining a lobby
+Alternatively, the user can join an existing lobby. Once a lobby has been selected, the clients sends `lobby.join {lobbyId}`. 
+
+### Starting a game
+Both `lobby.join` and `lobby.create` acknowledge with `LOBBY_JOINED {lobby}` after which the client enters the waiting screen. All non owner users, then wait for the owner to start the game via `lobby.start {lobbyId}`. 
+
+Once a game has successfully started , the onber receives `STARTED {gameId}` as the command acknowledgement. How the game is initialised is described in [Initialization](#initialization).
+
+### Lobby Membership
+While waiting, `lobby.leave {lobbyId}` or disconnecting removes membership. Leaving returns `LEFT`. Ownership passes to the earliest remaining member, announced through `lobby.updated {lobby}`. An empty lobby is deleted. A disconnected lobby member returns to browsing after reconnecting.
+
+The following diagram documents the lobby lifecycle:
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server as Game Service
+    participant Others as Lobby members
+
+    Client->>Server: session.get {}
+    Server-->>Client: Acknowledgement: NO_SESSION
+    Client->>Server: lobby.list {}
+    Server-->>Client: Acknowledgement: LOBBIES_FOUND {lobbies}
+    Note over Client: Creates a lobby or picks a lobbyId
+    Client->>Server: lobby.create {} or lobby.join {lobbyId}
+    alt Join accepted
+        Server-->>Client: Acknowledgement: LOBBY_JOINED {lobby}
+        Note over Client,Others: Wait for the owner to start
+        Client->>Server: lobby.start {lobbyId} (owner only)
+        Note over Server: Move members to game rooms and remove lobby
+        Note over Server: Send through each game:{gameId}:player:{playerId} room
+        Server-->>Client: game.started {lobbyId, initialization}
+        Server-->>Others: game.started with each player's own initialization
+        Server-->>Client: Acknowledgement: STARTED {gameId}
+        Note over Client,Server: Initialize before later game events
+    else Join rejected
+        Server-->>Client: Acknowledgement: rejection outcome
+    end
+```
 
 ## Game has started
-### Programming
+### Initialization
+The service creates a fresh game, moves every member into its public and private player rooms, and removes the lobby room and record. The service sends each player the following through their own `game:{gameId}:player:{playerId}` room:
 
+`game.started {lobbyId, initialization: {outcome: JOINED, assignment, state, hand, programSubmitted}}`
+
+
+### Programming
 During the programming phase, each player submits five distinct card IDs in register order for the current round.
 
 The client sends:
@@ -110,16 +125,6 @@ to the game's public room.
 
 This informs other players that the player has submitted their program without revealing the submitted cards. The server waits until all players have successfully submitted before beginning activation.
 
-
-### Submission failures
-
-`INVALID_PROGRAM` indicates that the submitted program is malformed, stale, contains duplicate cards, contains cards the player does not own, or was submitted during an invalid game phase.
-
-An invalid submission does not replace or modify the player's current program.
-
-`INTERNAL_ERROR` means that the service failed before accepting the program.
-
-If the client receives no acknowledgement, the outcome is unknown. The client must not automatically resend the submission because the original request may have been accepted.
 
 
 ### Activation
@@ -143,7 +148,17 @@ The test board uses:
 
 The antenna does not occupy a robot tile.
 
-Exact priority ties are resolved using player join order. The priority algorithm defines the complete robot action order.
+The priority algorithm calculates the activation order based on the game rules.
+
+
+### Checkpoint progress
+Some tiles hold checkpoints. The demo board places checkpoint 1 at `(10, 6)` and checkpoint 2 at `(8, 9)`.
+
+When a player progresses (a robot reaches a checkpoint according o the game rules), the service broadcasts to `game:{gameId}:public`:
+
+`player.checkpointProgress {gameId, playerId, lastCheckpoint, checkpointCount}`
+
+The event follows the related `robot.actionResolved`.
 
 ### Dealing the next hand
 
@@ -161,7 +176,7 @@ A new hand may arrive while the client is still playing animations from the prev
 
 The following sequence shows one complete round while the game remains connected and unpaused.
 
-Both players have already joined and received their initial hands in their JOINED acknowledgements.
+Both players have received their initial hands through game.started or session.get.
 ```mermaid
 sequenceDiagram
     participant A as Client A
@@ -198,31 +213,42 @@ sequenceDiagram
 ```
 
 
-## Reconnection
+### Game Membership
+In case of disconnection during a game, existing members may reconnect at any time. If the tab is left open SocketIO will automatically try to reestablish the connection. In case of a closed tab, the player can reopen the webpage in another tab to reconnect. In case multiple tabs are used, the first connection to reclaim a disconnected membership becomes its owner. A later connection cannot replace that owner, even if its Socket.IO session was successfully recovered.
+
+When an existing game member sends `session.get {}`, the server attaches the new connection to the existing player and returns their current assignment and state through `IN_GAME {initialization}`.
+
+If another live connection attempts to claim the same session for that user, session.get returns:
+
+`USER_ALREADY_IN_SESSION`
+
+A `session.get` rejected with `USER_ALREADY_IN_SESSION` leaves the authenticated session unaffected, and the client may call `session.get` again later.
+
+An explicit `game.leave {gameId}` removes the owning connection's player and robot, frees the occupied tile, and revokes its public/private room access. Remaining members receive `game.playerLeft {gameId, playerId, robotId}`. A disconnected player remains a member. Disconnecting is not leaving.
+
 A player’s game membership is independent of their Socket.IO connection to the server. The authenticated browser session is also independent of the Socket.IO connection. When the connection is lost, the client must indicate that it is disconnected and prevent gameplay submissions until the connection and game state have been restored.
 
 There are two possible reconnection paths:
 
 1. Socket.IO connection state recovery succeeds and missed events are replayed.
-2. Connection state recovery fails, so the client establishes a new authenticated Socket.IO connection and joins the game again to obtain a fresh authoritative snapshot.
+2. Connection state recovery fails, so the client establishes a new authenticated Socket.IO connection and calls `session.get` to obtain a fresh authoritative snapshot.
 
-If the browser session has expired, the Socket.IO connection is rejected and the user must authenticate again before reconnecting to the game.
-
-### Pausing on disconnection
-
+#### Pausing on disconnection
 When the server detects that a player has disconnected, it pauses the game. An action already in progress completes, but no subsequent action is executed. The current game state is preserved.
 
-Connected clients are informed that the game is paused and which players are disconnected.
+The server announces this to the game's public room:
+
+`game.playerConnectionChanged {gameId, playerId, connected: false, paused: true}`
 
 All clients must disable gameplay while the game is paused.
 
 The server must reject gameplay submissions received while the game is paused.
 
-### Restoring the connections
+#### Restoring the connections
 
-After an unexpected connection loss, the client attempts to reconnect automatically through Socket.IO. The browser includes the existing session cookie in the new Socket.IO handshake. If the session is still valid, the Game Service associates the authenticated user with the connection. If Socket.IO can reestablish the connection, it will try to replay missed events through its [connection state recovery mechanism](https://socket.io/docs/v4/connection-state-recovery). 
+After an unexpected connection loss, the client attempts to reconnect automatically through Socket.IO. If the session is still valid, the Game Service associates the authenticated user with the connection. If Socket.IO can reestablish the connection, it will try to replay missed events through its [connection state recovery mechanism](https://socket.io/docs/v4/connection-state-recovery). 
 
-#### Successful connection state recovery 
+##### Successful connection state recovery 
 If recovery succeeds and the client still retains its local game state, Socket.IO replays missed events.
 
 The client applies the recovered events in order and continues using its existing player and robot assignments.
@@ -257,19 +283,18 @@ sequenceDiagram
     Note over A,B: Unpause clients
 ```
 
-#### Failed connection state recovery
-
-Once Socket.IO has reconnected, if state recovery was unsuccessful, the connection is still authenticated from the browser session but its game membership must be reattached.
+##### Failed connection state recovery
+Once Socket.IO has reconnected, if state recovery was unsuccessful the client must reinitialize.
 
 The client performs the normal game initialization flow by sending:
 
-`game.join {gameId}`
+`session.get {}`
 
-Because the authenticated user is already a game member, game.join restores the connection to the existing player and robot.
+Because the user is already a game member, session.get restores the connection to the existing player and robot.
 
-The returned JOINED acknowledgement contains the current authoritative state.
+The returned `IN_GAME {initialization}` acknowledgement contains the current authoritative state.
 
-The client replaces its local game state with the returned JOINED data before processing further game events.
+The client replaces its local game state with the returned initialization before processing further game events.
 
 ```mermaid
 sequenceDiagram
@@ -292,12 +317,12 @@ sequenceDiagram
     Note over A: socket.recovered is false
     Note over S: Game remains paused until membership is reattached
 
-    A->>S: game.join {gameId}
+    A->>S: session.get {}
     Note over A,Public: Restore public room membership
     Note over A,PrivateA: Restore private room membership
 
-    S-->>A: Acknowledgement: JOINED {assignment, state, hand, programSubmitted}
-    Note over A: Clear outdated state and apply JOINED data
+    S-->>A: Acknowledgement: IN_GAME {initialization}
+    Note over A: Clear outdated state and apply initialization
 
     S->>Public: game.playerConnectionChanged {gameId, playerId: A, connected: true, paused: false}
     Public-->>A: game.playerConnectionChanged
@@ -307,6 +332,11 @@ sequenceDiagram
     Note over A,B: Unpause game
 ```
 
-### Resuming the game
-The game remains paused while any remaining player is disconnected. Once all remaining players are connected, the server announces that the game has resumed before continuing gameplay from the preserved game state.
+The game remains paused while any remaining player is disconnected. Once all remaining players are connected, the same `game.playerConnectionChanged` event (now with `paused: false`) announces that the game has resumed, and gameplay continues from the preserved game state.
+
+## Errors and rejections
+
+Most commands acknowledge failures with a specific outcome string rather than throwing. See [AsyncAPI](asyncapi.yaml), with a [rendered reference](asyncapi.html), for the exact payload shapes and the full set of rejection codes per command.
+
+If an unexpected service failure makes gameplay unrecoverable, members receive `game.aborted {gameId}` and the game ends permanently.
 

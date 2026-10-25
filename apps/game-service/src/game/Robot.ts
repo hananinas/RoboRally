@@ -1,7 +1,7 @@
-
-import type { Card } from './Card.js'
-import type { RobotId } from './ids.js'
-import { Direction, turnLeft, turnRight,opposite } from './spatial.js'
+import type { Card } from '@/game/Card'
+import type { RobotId } from '@/game/ids'
+import { Direction, rotateDirection } from '@/game/spatial'
+import type { UnsignedInteger } from '@/numbers'
 
 export class Robot {
   private currentDirection: Direction
@@ -30,8 +30,8 @@ export class Robot {
     this.programmedCards = []
   }
 
-  getProgramCard(registerIndex: number): Card {
-    if (!Number.isInteger(registerIndex) || registerIndex < 0 || registerIndex >= 5) {
+  getProgramCard(registerIndex: UnsignedInteger): Card {
+    if (registerIndex >= 5) {
       throw new RangeError('Register index must be between 0 and 4')
     }
 
@@ -42,13 +42,7 @@ export class Robot {
     return card
   }
 
-  turnLeft(): void {
-    this.currentDirection = turnLeft(this.currentDirection)
-  }
-  turnRight():void{
-    this.currentDirection = turnRight(this.currentDirection)
-  }
-  uTurn():void {
-    this.currentDirection = opposite(this.currentDirection)
+  turn(quarterTurns: number): void {
+    this.currentDirection = rotateDirection(this.currentDirection, quarterTurns)
   }
 }

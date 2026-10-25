@@ -1,12 +1,11 @@
-import type { ButtonHTMLAttributes } from 'react'
+import type { ComponentProps } from 'react'
 import type {
   Card
 } from '@robo-rally/game-events'
-
-import { instructionIcons, instructionLabel } from './cardInstructions.ts'
+import { cardPresentation } from './cardInstructions.ts'
 
 type ProgramCardProps =
-  ButtonHTMLAttributes<HTMLButtonElement> & {
+  ComponentProps<'button'> & {
     card: Card
     size: 'hand' | 'register'
     selected?: boolean
@@ -15,14 +14,12 @@ type ProgramCardProps =
   }
 
 
-
-// Renders a programming card.
 function ProgramCard({
   card,
   size,
   selected = false,
   dragging = false,
-  label = instructionLabel(card.instruction),
+  label = cardPresentation[card.instruction].label,
   ...buttonProps
 }: ProgramCardProps) {
   const selectedClassName = selected
@@ -44,17 +41,14 @@ function ProgramCard({
         draggingClassName
       }
     >
-      
-      
-          <img
-        src={instructionIcons[card.instruction]}
+      <img
+        src={cardPresentation[card.instruction].icon}
         alt=""
         className="program-card__icon"
         draggable={false}
       />
-
       <span className="program-card__label">
-        {instructionLabel(card.instruction)}
+        {cardPresentation[card.instruction].label}
       </span>
     </button>
   )
