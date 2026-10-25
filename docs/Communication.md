@@ -138,9 +138,13 @@ If the client receives no acknowledgement, the outcome is unknown. The client mu
 
 During programming, before final submission, the client sends an occupancy update whenever a card is placed in or removed from a register. This shares only which slots are occupied; it does not submit a program. The final `program.submit {gameId, playerId, cardIds}` sends five distinct card instance IDs in register order.
 
-`game.updated {gameId, state}` broadcasts the shared game state to `game:{gameId}:public` after an accepted occupancy update, when activation begins, and after each register execution. `state` carries the players, robots, phase, and antenna; clients keep the board from `game.started` or `session.get`.
+`game.registersChanged {gameId, playerId, registers}` broadcasts that player's occupancy to `game:{gameId}:public` after an accepted occupancy update and carries only `HIDDEN` and `EMPTY` slots.
 
-`game.programmingStarted {gameId}` announces the start of programming to the public room and resets every player's registers to five EMPTY slots. The cleared registers arrive in the `game.updated` sent with it, and revealed slots stay published until then.
+The client reveals a slot from `robot.actionResolved`, which carries `playerId`, `registerIndex` and `instruction`.
+
+`game.started` and `session.get` include every player's registers, revealed slots included, until `game.programmingStarted` resets them.
+
+`game.programmingStarted {gameId}` announces the start of programming to the public room and resets every player's registers to five EMPTY slots.
 
 ### Activation
 
@@ -228,9 +232,9 @@ sequenceDiagram
             Server-->>A: game.updateRegistersResult {outcome: ACCEPTED}
         and Occupancy broadcast
             Note over Server,Public: true maps to {status: HIDDEN}<br/>false maps to {status: EMPTY}
-            Server->>Public: game.updated {gameId, state}
-            Public-->>A: game.updated {gameId, state}
-            Public-->>B: game.updated {gameId, state}
+            Server->>Public: game.registersChanged {gameId, playerId: A, registers}
+            Public-->>A: game.registersChanged {gameId, playerId: A, registers}
+            Public-->>B: game.registersChanged {gameId, playerId: A, registers}
         end
     end
 
@@ -246,9 +250,6 @@ sequenceDiagram
     Public-->>A: program.submitted {gameId, playerId: B}
 
     Note over Server,Public: The last submission starts activation and the phase becomes EXECUTING
-    Server->>Public: game.updated {gameId, state}
-    Public-->>A: game.updated {gameId, state}
-    Public-->>B: game.updated {gameId, state}
 ```
 
 #### Activation
@@ -265,16 +266,10 @@ sequenceDiagram
     loop Registers 1 through 5
         loop Eligible robots in antenna order
             Note over Server: Execute next instruction
-            par Resolved action
-                Server->>Public: robot.actionResolved
-                Public-->>A: robot.actionResolved
-                Public-->>B: robot.actionResolved
-            and Register reveal
-                Note over Server,Public: Executing player's slot becomes {status: REVEALED, instruction}, without a card ID
-                Server->>Public: game.updated {gameId, state}
-                Public-->>A: game.updated {gameId, state}
-                Public-->>B: game.updated {gameId, state}
-            end
+            Server->>Public: robot.actionResolved
+            Public-->>A: robot.actionResolved
+            Public-->>B: robot.actionResolved
+            Note over A,B: Each client reveals the player's slot from robot.actionResolved using playerId, registerIndex and instruction
         end
     end
 
@@ -284,13 +279,10 @@ sequenceDiagram
         Server->>PrivateB: cards.dealt {cards}
         PrivateB-->>B: cards.dealt {cards}
     and Start of programming
-        Note over Server,Public: Revealed slots stay published until this reset
+        Note over A,B: game.programmingStarted resets every player's registers to five EMPTY slots
         Server->>Public: game.programmingStarted {gameId}
         Public-->>A: game.programmingStarted {gameId}
         Public-->>B: game.programmingStarted {gameId}
-        Server->>Public: game.updated {gameId, state}
-        Public-->>A: game.updated {gameId, state}
-        Public-->>B: game.updated {gameId, state}
     end
 ```
 
