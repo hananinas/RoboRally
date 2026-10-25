@@ -227,10 +227,15 @@ export class Game {
   // Gameplay movement resolves entry effects; Board movement only changes positions.
   moveRobot(robot: Robot, direction: Direction, steps: PositiveInteger): void {
     for (let step = 0; step < steps; step++) {
-      const movement = this.board.moveRobot(robot.id, direction, PositiveInteger(1))
-      if (movement.stepsMoved === 0) return
+      const movedRobotIds = this.board.pushRobot(robot.id, direction)
+      if (movedRobotIds.length === 0) return
 
-      if (this.resolveMovementEntry(robot, movement.position) === 'stop') return
+      for (const id of movedRobotIds) {
+        const movedRobot = id === robot.id ? robot : this.roster.find((player) => player.robot.id === id)?.robot
+        if (movedRobot === undefined) throw new Error(`Pushed robot ${id} is not in the game`)
+        const entry = this.resolveMovementEntry(movedRobot, this.board.positionOf(id))
+        if (id === robot.id && entry === 'stop') return
+      }
     }
   }
 

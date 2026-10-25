@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Board, Card, Direction, EmptyTile, Game, Player, Robot } from '@/game/index.ts'
-import type { Antenna, MovementResult, Position, RobotId } from '@/game/index.ts'
+import type { Antenna, Position, RobotId } from '@/game/index.ts'
 import { Integer, PositiveInteger } from '@/numbers'
 
 function createMultiplayerGame(
@@ -194,23 +194,17 @@ describe('Game multiplayer activation', () => {
   })
 
   it('recalculates pending priority from positions changed by an earlier action', () => {
-    class DisplacingBoard extends Board {
-      override moveRobot(robotId: RobotId, direction: Direction, steps: PositiveInteger): MovementResult {
-        const result = super.moveRobot(robotId, direction, steps)
-        if (robotId === 'robot-0') super.moveRobot('robot-1', Direction.SOUTH, PositiveInteger(2))
-        return result
-      }
-    }
-    const board = new DisplacingBoard(Array.from({ length: 9 }, () =>
+    const board = new Board(Array.from({ length: 9 }, () =>
       Array.from({ length: 9 }, () => new EmptyTile()),
     ), { x: Integer(4), y: Integer(4), angle: Math.PI / 2 })
     const deck = Array.from({ length: 5 }, (_, index) => new Card(`move-${index}`, 'MOVE_1'))
     const { players, game } = createMultiplayerGame(
-      [{ x: Integer(4), y: Integer(5) }, { x: Integer(4), y: Integer(6) }, { x: Integer(6), y: Integer(4) }], undefined, board, deck,
+      [{ x: Integer(4), y: Integer(5) }, { x: Integer(4), y: Integer(6) }, { x: Integer(3), y: Integer(5) }], undefined, board, deck,
     )
+    players[0].robot.turn(3)
     for (const player of players) game.submitProgram(player.id, deck.map((card) => card.id))
     expect(game.executeNextAction().action.robotId).toBe(players[0].robot.id)
-    expect(board.positionOf(players[1].robot.id)).toEqual({ x: 4, y: 8 })
+    expect(board.positionOf(players[1].robot.id)).toEqual({ x: 4, y: 7 })
     expect(game.executeNextAction().action.robotId).toBe(players[2].robot.id)
     expect(game.executeNextAction().action.robotId).toBe(players[1].robot.id)
     expect(game.currentRegister).toBe(1)

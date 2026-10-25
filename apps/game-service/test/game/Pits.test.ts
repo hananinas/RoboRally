@@ -63,16 +63,16 @@ describe('pit entry and rebooting', () => {
     expect(board.occupantAt({ x: Integer(1), y: Integer(1) })).toBeUndefined()
   })
 
-  it('stops at an occupied tile after a successful step without reaching the pit', () => {
+  it('pushes another robot into a pit and resolves a later fall during the same move', () => {
     const { board, robot, player, cards: c, game } = createGame({ x: Integer(3), y: Integer(1) })
     const other = game.addPlayer()._unsafeUnwrap()
     game.submitProgram(player.id, [c.MOVE_3, c.MOVE_1, c.TURN_LEFT, c.TURN_RIGHT, c.BACK_UP].map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(other.id, [4, 5, 6, 0, 1].map((index) => other.hand[index].id))._unsafeUnwrap()
 
     expect(game.executeNextAction().action.robotId).toBe(other.robot.id)
-    expect(game.executeNextAction().action.position).toEqual({ x: Integer(1), y: Integer(1) })
-    expect(board.positionOf(robot.id)).toEqual({ x: Integer(1), y: Integer(1) })
-    expect(board.positionOf(other.robot.id)).toEqual({ x: Integer(2), y: Integer(1) })
+    expect(game.executeNextAction().action.position).toEqual({ x: Integer(0), y: Integer(1) })
+    expect(board.positionOf(robot.id)).toEqual({ x: Integer(0), y: Integer(1) })
+    expect(board.positionOf(other.robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
     expect(board.occupantAt({ x: Integer(3), y: Integer(1) })).toBeUndefined()
   })
 

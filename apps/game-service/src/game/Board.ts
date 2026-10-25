@@ -153,6 +153,33 @@ export class Board {
     this.robotPositions.set(robotId, { ...position })
   }
 
+  private blocksMovement(position: Position, direction: Direction): boolean {
+    const nextPosition = neighbour(position, direction)
+    return this.getTile(position)?.hasWall(direction) === true ||
+      this.getTile(nextPosition)?.hasWall(opposite(direction)) === true ||
+      this.isAntenna(nextPosition)
+  }
+
+  // One atomic step. Return displaced robots farthest first for entry effects.
+  pushRobot(robotId: RobotId, direction: Direction): readonly RobotId[] {
+    const chain = [robotId]
+    let position = this.positionOf(robotId)
+    while (true) {
+      if (this.blocksMovement(position, direction)) return []
+      const nextPosition = neighbour(position, direction)
+      const occupant = this.occupantAt(nextPosition)
+      if (occupant === undefined) break
+      chain.push(occupant)
+      position = nextPosition
+    }
+
+    chain.reverse()
+    for (const id of chain) {
+      this.updateRobotPosition(id, neighbour(this.positionOf(id), direction))
+    }
+    return chain
+  }
+
   moveRobot(robotId: RobotId, direction: Direction, steps: PositiveInteger): MovementResult {
     // Verify robot is on the board
     let currentPosition = this.positionOf(robotId)
@@ -163,13 +190,7 @@ export class Board {
       currentPosition = nextPosition
       nextPosition = neighbour(nextPosition, direction)
 
-      if (this.getTile(currentPosition)?.hasWall(direction)) {
-        // robot is blocked by a wall in the current tile
-        return { position: currentPosition, stepsMoved: step, blocked: true }
-      }
-
-      if (this.getTile(nextPosition)?.hasWall(opposite(direction))) {
-        // robot blocked by a wall in the next tile
+      if (this.blocksMovement(currentPosition, direction)) {
         return { position: currentPosition, stepsMoved: step, blocked: true }
       }
 
@@ -179,10 +200,6 @@ export class Board {
         return { position: nextPosition, stepsMoved: step + 1, blocked: false }
       }
 
-      if (this.isAntenna(nextPosition)) {
-        return { position: currentPosition, stepsMoved: step, blocked: true }
-      }
-      
       if (this.occupantAt(nextPosition) !== undefined) {
         // robot is blocked by another robot
         return { position: currentPosition, stepsMoved: step, blocked: true }
