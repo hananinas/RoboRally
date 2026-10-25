@@ -18,7 +18,7 @@ function createGame(
   const instructions: Instruction[] = [instruction, 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'MOVE_1']
   const program = instructions.map((instruction, index) => new Card(`card-${index}`, instruction))
   const reboot = { x: Integer(1), y: Integer(2) }
-  const game = new Game(board, [player], program, undefined, reboot)
+  const game = new Game(board, [player], program, reboot)
   return { board, robot, player, program, reboot, game }
 }
 
@@ -116,7 +116,7 @@ describe('board-edge falls', () => {
     board.placeRobot(robot.id, reboot)
     const player = new Player('player', robot)
     const program = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_3'))
-    const game = new Game(board, [player], program, undefined, reboot)
+    const game = new Game(board, [player], program, reboot)
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
     for (let register = 0; register < 5; register++) {

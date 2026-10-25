@@ -180,7 +180,7 @@ describe('game membership over Socket.IO', () => {
     shared = { gameId: shared.gameId, game: new Game(
       new Board([[new EmptyTile(), new EmptyTile()]], { x: Integer(1), y: Integer(0), angle: Math.PI / 2 }), [],
       Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1')),
-      undefined, { x: Integer(0), y: Integer(0) }) }
+      { x: Integer(0), y: Integer(0) }) }
     await start()
     await join(await connect('First'))
     const second = await connect('Second')
@@ -600,7 +600,7 @@ describe('game membership over Socket.IO', () => {
       tiles[4][0] = new EmptyTile([], 2)
       shared = {
         gameId: shared.gameId,
-        game: new Game(new Board(tiles, { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }), [], createHand(), undefined, { x: Integer(4), y: Integer(4) }),
+        game: new Game(new Board(tiles, { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }), [], createHand(), { x: Integer(4), y: Integer(4) }),
       }
       await start()
     })

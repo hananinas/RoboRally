@@ -16,7 +16,7 @@ function createMultiplayerGame(
     board.placeRobot(robot.id, position)
     return new Player(`player-${index}`, robot)
   })
-  const game = new Game(board, players, deck, undefined, { x: Integer(0), y: Integer(0) })
+  const game = new Game(board, players, deck, { x: Integer(0), y: Integer(0) })
   return { board, players, deck, game }
 }
 
@@ -62,7 +62,7 @@ describe('Game fixed-roster programming', () => {
     game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
     expect(game.phase).toBe('activation')
 
-    const empty = new Game(board, [], deck, undefined, game.rebootTile)
+    const empty = new Game(board, [], deck, game.rebootTile)
     empty.recheckProgrammingPhase()
     expect(empty.phase).toBe('programming')
     expect(empty.currentRegister).toBe(0)
@@ -72,9 +72,9 @@ describe('Game fixed-roster programming', () => {
 
   it('rejects duplicate player IDs, duplicate robot IDs, and unplaced robots', () => {
     const { board, players, deck, game } = createMultiplayerGame([{ x: Integer(4), y: Integer(5) }, { x: Integer(5), y: Integer(4) }])
-    expect(() => new Game(board, [players[0], new Player(players[0].id, players[1].robot)], deck, undefined, game.rebootTile)).toThrow(RangeError)
-    expect(() => new Game(board, [players[0], new Player('other', new Robot(players[0].robot.id, Direction.NORTH))], deck, undefined, game.rebootTile)).toThrow(RangeError)
-    expect(() => new Game(board, [new Player('unplaced', new Robot('unplaced', Direction.NORTH))], deck, undefined, game.rebootTile)).toThrow()
+    expect(() => new Game(board, [players[0], new Player(players[0].id, players[1].robot)], deck, game.rebootTile)).toThrow(RangeError)
+    expect(() => new Game(board, [players[0], new Player('other', new Robot(players[0].robot.id, Direction.NORTH))], deck, game.rebootTile)).toThrow(RangeError)
+    expect(() => new Game(board, [new Player('unplaced', new Robot('unplaced', Direction.NORTH))], deck, game.rebootTile)).toThrow()
   })
 
   it('exposes the antenna of its board', () => {

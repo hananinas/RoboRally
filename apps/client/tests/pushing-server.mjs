@@ -15,7 +15,7 @@ const icon = 'data:image/svg+xml;base64,' + Buffer.from(
 const board = new Board(tiles, { x: Integer(0), y: Integer(0), angle: 0 }, {
   name: 'Pushing test board', icon, maxPlayers: 6,
 })
-const game = new Game(board, [], createHand(), 'Shared game', { x: Integer(5), y: Integer(5) })
+const game = new Game(board, [], createHand(), { x: Integer(5), y: Integer(5) }, 'Shared game')
 const server = createServer()
 const io = createGameSocketServer(server, { gameId: '00000000-0000-4000-8000-000000000001', game })
 const port = parseGameServicePort(process.env.PORT)

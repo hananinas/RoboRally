@@ -26,7 +26,7 @@ function createGame(
   })
   const instructions: Instruction[] = ['MOVE_1', 'MOVE_2', 'MOVE_3', 'BACK_UP', 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN']
   const cards = instructions.map((instruction) => new Card(instruction, instruction))
-  const game = new Game(board, players, cards, undefined, reboot)
+  const game = new Game(board, players, cards, reboot)
   return { board, players, robots: players.map((player) => player.robot), cards, game, reboot }
 }
 

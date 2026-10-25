@@ -23,7 +23,7 @@ function createGame(
     TURN_RIGHT: new Card('right', 'TURN_RIGHT'),
     U_TURN: new Card('uturn', 'U_TURN'),
   }
-  const game = new Game(board, [player], Object.values(cards), undefined, rebootTile)
+  const game = new Game(board, [player], Object.values(cards), rebootTile)
   return { board, robot, player, cards, game }
 }
 
@@ -156,7 +156,7 @@ describe('pit entry and rebooting', () => {
     player.completeCheckpoint(1)
     const instructions: Instruction[] = ['MOVE_3', 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'BACK_UP']
     const program = instructions.map((instruction, index) => new Card(`card-${index}`, instruction))
-    const game = new Game(board, [player], program, undefined, rebootTile)
+    const game = new Game(board, [player], program, rebootTile)
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
     expect(game.executeNextAction().action.position).toEqual(rebootTile)

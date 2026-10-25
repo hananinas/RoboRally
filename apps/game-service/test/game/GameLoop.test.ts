@@ -10,7 +10,7 @@ function createGame(deck: Card[]) {
   const robot = new Robot('robot-1', Direction.EAST)
   board.placeRobot(robot.id, { x: Integer(1), y: Integer(1) })
   const player = new Player('player-1', robot)
-  const game = new Game(board, [player], deck, undefined, { x: Integer(0), y: Integer(2) })
+  const game = new Game(board, [player], deck, { x: Integer(0), y: Integer(2) })
   return { board, robot, player, game }
 }
 
@@ -92,7 +92,7 @@ function resolveCard(instruction: Instruction, direction: Direction, tiles: Empt
   board.placeRobot(robot.id, { x: Integer(3), y: Integer(3) })
   const player = new Player('player', robot)
   const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, instruction))
-  const game = new Game(board, [player], cards, undefined, { x: Integer(0), y: Integer(0) })
+  const game = new Game(board, [player], cards, { x: Integer(0), y: Integer(0) })
   game.submitProgram(player.id, cards.map((card) => card.id))
   return game.executeNextAction().action
 }

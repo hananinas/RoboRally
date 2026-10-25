@@ -58,8 +58,8 @@ export class Game {
     board: Board,
     players: readonly Player[],
     deck: readonly Card[],
+    rebootTile: Position,
     name: string = DEFAULT_GAME_NAME,
-    rebootTile?: Position,
   ) {
     if (deck.length < 5 || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')

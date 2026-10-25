@@ -21,7 +21,7 @@ function createGame(starts = [{ x: 0, y: 1, direction: Direction.EAST }]) {
     right: new Card('right', 'TURN_RIGHT'),
     uturn: new Card('uturn', 'U_TURN'),
   }
-  const game = new Game(board, players, Object.values(cards), undefined, { x: Integer(0), y: Integer(2) })
+  const game = new Game(board, players, Object.values(cards), { x: Integer(0), y: Integer(2) })
   return { board, players, cards, game }
 }
 
