@@ -24,6 +24,7 @@ export type NextActionResult = Readonly<{
   registerIndex: number
   action: RobotActionResult
   registers: PublicRegisters
+  roundComplete: boolean
 }>
 
 export type AddPlayerError = 'GAME_ALREADY_STARTED' | 'NO_SPAWN_AVAILABLE'
@@ -48,6 +49,7 @@ export class Game {
   private readonly submittedPlayerIds = new Set<PlayerId>()
   private readonly activatedRobotIds = new Set<RobotId>()
   private started = false
+  private roundFinished = false
   private isPaused = false
   private isAborted = false
 
@@ -236,6 +238,21 @@ export class Game {
     return { outcome: 'ACCEPTED' }
   }
 
+  get awaitingProgrammingStart(): boolean {
+    return this.roundFinished
+  }
+
+  /**
+   * Starts the next programming phase: clears every player's shared slots and
+   * flips the phase. The completed round's reveals stay published until this runs.
+   */
+  beginProgramming(): void {
+    if (!this.roundFinished) return
+    for (const player of this.roster) player.resetRegisters()
+    this.currentPhase = 'programming'
+    this.roundFinished = false
+  }
+
   recheckProgrammingPhase(): void {
     if (
       this.currentPhase === 'programming' &&
@@ -280,11 +297,12 @@ export class Game {
       direction: robot.direction,
     }
 
+    let roundComplete = false
     if (this.activatedRobotIds.size === this.players.length) {
       this.activateBoardElements()
-      this.finishRegister()
+      roundComplete = this.finishRegister()
     }
-    return { registerIndex, action, registers }
+    return { registerIndex, action, registers, roundComplete }
   }
 
   private dealCards(): void {
@@ -369,20 +387,23 @@ export class Game {
     }
   }
 
-  private finishRegister(): void {
+  private finishRegister(): boolean {
     this.activatedRobotIds.clear()
     this.registerIndex++
-    if (this.registerIndex === 5) this.finishRound()
+    if (this.registerIndex < 5) return false
+    this.finishRound()
+    return true
   }
 
   private finishRound(): void {
     for (const player of this.players) {
       player.robot.clearProgram()
-      player.resetRegisters()
     }
     this.submittedPlayerIds.clear()
     this.registerIndex = 0
     this.dealCards()
-    this.currentPhase = 'programming'
+    // The phase flips when programming starts, so the final register's reveal is
+    // still published while the game reports EXECUTING.
+    this.roundFinished = true
   }
 }

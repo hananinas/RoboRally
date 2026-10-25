@@ -20,6 +20,7 @@ export type MembershipContext = {
   playerRoom: (playerId: string) => string
   memberships: Map<string, GameMembership>
   publicState: () => PublicGameState
+  broadcastPublicState: () => void
   actionScheduler: ActionScheduler
 }
 
@@ -111,7 +112,6 @@ export function handleLeave(
     const membership = ownedMembership(ctx, socket)
     if (parsed.data.gameId !== gameId || !membership) return ack({ outcome: 'GAME_NOT_FOUND' })
     const { player, user } = membership
-    const phaseBeforeLeave = game.phase
     game.removePlayer(player.id)
     memberships.delete(user.userId)
     resumeUnlessStillDisconnected(ctx)
@@ -120,7 +120,7 @@ export function handleLeave(
     ack({ outcome: 'LEFT' })
     io.to(publicRoom).emit('game.playerLeft', { gameId, playerId: player.id, robotId: player.robot.id })
     actionScheduler.broadcastCheckpointProgress()
-    if (phaseBeforeLeave === 'activation' && game.phase === 'programming') actionScheduler.dealHands()
+    if (game.awaitingProgrammingStart) actionScheduler.dealHands()
     actionScheduler.scheduleNextAction()
   }, (error) => {
     logError('Failed to process player leaving', error, { command: 'game.leave', gameId })

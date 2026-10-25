@@ -49,6 +49,8 @@ describe('Game programming', () => {
       { registerIndex: 3, position: { x: 9, y: 5 }, direction: Direction.SOUTH },
       { registerIndex: 4, position: { x: 9, y: 5 }, direction: Direction.NORTH },
     ])
+    expect(game.awaitingProgrammingStart).toBe(true)
+    game.beginProgramming()
     expect(game.phase).toBe('programming')
   })
 

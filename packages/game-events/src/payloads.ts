@@ -180,11 +180,11 @@ export type UpdateRegistersResult = Readonly<{
     | 'INTERNAL_ERROR'
 }>
 
-export type RegistersChanged = Readonly<{
-  gameId: GameId
-  playerId: PlayerId
-  registers: PublicRegisters
-}>
+/** The shared state a game.updated carries; clients keep the board from game.started or session.get. */
+export type PublicGameStateUpdate = Readonly<Omit<PublicGameState, 'board'>>
+
+/** The shared game state published to the public room after it changes. */
+export type GameUpdated = Readonly<{ gameId: GameId; state: PublicGameStateUpdate }>
 
 export type ProgrammingStarted = Readonly<{ gameId: GameId }>
 

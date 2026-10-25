@@ -4,6 +4,7 @@ import type {
   GamePhase as GamePhasePayload,
   Orientation,
   PublicGameState,
+  PublicGameStateUpdate,
   RobotActionResolved,
   PlayerState,
   Tile as TilePayload,
@@ -50,6 +51,35 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
   }
 }
 
+function presentRobots(game: Game) {
+  return game.players.map((player) => ({
+    robotId: player.robot.id,
+    playerId: player.id,
+    colour: player.colour,
+    position: {
+      coordinate: game.board.positionOf(player.robot.id),
+      orientation: orientations[player.robot.direction],
+    },
+  }))
+}
+
+export function presentPublicStateUpdate(
+  gameId: GameId,
+  game: Game,
+  players: readonly PlayerState[] = [],
+): PublicGameStateUpdate {
+  return {
+    gameId,
+    checkpointCount: game.board.checkpointCount,
+    players,
+    antenna: game.board.antenna,
+    robots: presentRobots(game),
+    phase: phases[game.phase],
+    paused: game.paused,
+    aborted: game.aborted,
+  }
+}
+
 export function presentPublicGameState(
   gameId: GameId,
   game: Game,
@@ -60,28 +90,27 @@ export function presentPublicGameState(
   ).flat()
 
   return {
-    gameId,
-    checkpointCount: game.board.checkpointCount,
-    players,
-    antenna: game.board.antenna,
+    ...presentPublicStateUpdate(gameId, game, players),
     board: {
       width: game.board.width,
       height: game.board.height,
       tiles,
     },
-    robots: game.players.map((player) => ({
-      robotId: player.robot.id,
-      playerId: player.id,
-      colour: player.colour,
-      position: {
-        coordinate: game.board.positionOf(player.robot.id),
-        orientation: orientations[player.robot.direction],
-      },
-    })),
-    phase: phases[game.phase],
-    paused: game.paused,
-    aborted: game.aborted,
   }
+}
+
+export function presentPlayerStates(
+  game: Game,
+  members: readonly { user: { username: string }; player: Player; connectionId: string | null }[],
+): PlayerState[] {
+  return members.map(({ user, player, connectionId }) => ({
+    playerId: player.id,
+    lastCheckpoint: player.lastCheckpoint,
+    registers: player.registers,
+    username: user.username,
+    programSubmitted: game.hasSubmittedProgram(player.id),
+    connected: connectionId !== null,
+  }))
 }
 
 

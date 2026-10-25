@@ -2,7 +2,9 @@ import type { Server as HttpServer } from 'node:http'
 import { leaveGameSchema, type ClientToServerEvents, type LeaveResult, type ServerToClientEvents, type User } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
 import type { Game } from '@/game/index'
-import { presentPublicGameState } from '@/socket/gamePresenter'
+import {
+  presentPlayerStates, presentPublicGameState, presentPublicStateUpdate,
+} from '@/socket/gamePresenter'
 import { createUserRegistry } from '@/userRegistry'
 import { createGame } from '@/game/GameFactory'
 import { createActionScheduler } from '@/actionScheduler'
@@ -42,19 +44,22 @@ export function createGameSocketServer(
       const publicRoom = `game:${gameId}:public`
       const playerRoom = (playerId: string) => `game:${gameId}:player:${playerId}`
       const memberships = new Map<string, GameMembership>()
-      const actionScheduler = createActionScheduler({ io, game, gameId, publicRoom, playerRoom })
+      const playerStates = () => presentPlayerStates(game, [...memberships.values()])
+      const publicState = () => presentPublicGameState(gameId, game, playerStates())
+      // Registers belong to the game state the service shares, so register
+      // changes travel with it instead of a per-player event.
+      const broadcastPublicState = () => {
+        io.to(publicRoom).emit('game.updated', {
+          gameId,
+          state: presentPublicStateUpdate(gameId, game, playerStates()),
+        })
+      }
+      const actionScheduler = createActionScheduler({
+        io, game, gameId, publicRoom, playerRoom, broadcastPublicState,
+      })
       return {
         io, game, gameId, publicRoom, playerRoom, memberships, actionScheduler,
-        publicState: () => presentPublicGameState(gameId, game,
-          [...memberships.values()].map(({ user, player, connectionId }) => ({
-            playerId: player.id,
-            lastCheckpoint: player.lastCheckpoint,
-            registers: player.registers,
-            username: user.username,
-            programSubmitted: game.hasSubmittedProgram(player.id),
-            connected: connectionId !== null,
-          })),
-        ),
+        publicState, broadcastPublicState,
       }
     },
   }

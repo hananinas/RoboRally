@@ -64,6 +64,8 @@ describe('Player', () => {
       game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
       for (let register = 0; register < 5; register++) game.executeNextAction()
 
+      expect(game.awaitingProgrammingStart).toBe(true)
+      game.beginProgramming()
       expect(game.phase).toBe('programming')
       expect(player.robot.program).toEqual([])
       expect(player.lastCheckpoint).toBe(1)

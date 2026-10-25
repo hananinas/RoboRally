@@ -45,7 +45,7 @@ describe('public register lifecycle', () => {
     expect(first.robot.program).toEqual(program)
   })
 
-  it('reveals only the executed instruction and resets after the final action without changing captured reveals', () => {
+  it('reveals only the executed instruction and clears slots when programming starts', () => {
     const { game } = createGame('empty-map')
     const player = game.addPlayer()._unsafeUnwrap()
     game.updateRegisters(player.id, [true, true, true, true, true])
@@ -57,10 +57,15 @@ describe('public register lifecycle', () => {
         ? { status: 'REVEALED', instruction: player.hand[slot].instruction }
         : { status: 'HIDDEN' }))
       expect(result.registers[index]).not.toHaveProperty('id')
-      if (index === 4) expect(player.registers).toEqual(empty)
-      else expect(player.registers).toBe(result.registers)
+      expect(result.roundComplete).toBe(index === 4)
+      expect(player.registers).toEqual(result.registers)
     }
+    // The completed round keeps its reveals and stays in activation until programming starts.
+    expect(game.phase).toBe('activation')
+    expect(game.awaitingProgrammingStart).toBe(true)
+    game.beginProgramming()
     expect(game.phase).toBe('programming')
+    expect(player.registers).toEqual(empty)
     expect(game.hasSubmittedProgram(player.id)).toBe(false)
     expect(game.updateRegisters(player.id, occupied)).toEqual({ outcome: 'ACCEPTED' })
   })

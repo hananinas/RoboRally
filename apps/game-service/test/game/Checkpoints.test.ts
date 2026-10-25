@@ -52,6 +52,8 @@ describe('checkpoint activation', () => {
     expect(progress).toEqual([0, 1, 1, 2, 2])
     expect(board.getTile({ x: Integer(1), y: Integer(1) })?.checkpointNumber).toBe(1)
     expect(board.getTile({ x: Integer(3), y: Integer(1) })?.checkpointNumber).toBe(2)
+    expect(game.awaitingProgrammingStart).toBe(true)
+    game.beginProgramming()
     expect(game.phase).toBe('programming')
     game.submitProgram(player.id, program.map((card) => card.id))
     expect(game.phase).toBe('activation')

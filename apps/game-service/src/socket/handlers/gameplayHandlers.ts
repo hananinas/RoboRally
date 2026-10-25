@@ -68,6 +68,7 @@ export function handleSubmitProgram(
       playerId: result.value.id,
     })
 
+    if (ctx.game.phase === 'activation') ctx.broadcastPublicState()
     ctx.actionScheduler.scheduleNextAction()
   }, (error) => {
     logError('Failed to process program submission', error, { command: 'program.submit', gameId: ctx.gameId, playerId, payload })
@@ -99,11 +100,7 @@ export function handleUpdateRegisters(
     }
     const result = ctx.game.updateRegisters(player.id, parsed.data.occupied)
     ack(result)
-    if (result.outcome === 'ACCEPTED') {
-      ctx.io.to(ctx.publicRoom).emit('game.registersChanged', {
-        gameId: ctx.gameId, playerId: player.id, registers: player.registers,
-      })
-    }
+    if (result.outcome === 'ACCEPTED') ctx.broadcastPublicState()
   }, (error) => {
     logError('Failed to update registers', error, { command: 'game.updateRegisters', gameId: ctx.gameId })
     return { outcome: 'INTERNAL_ERROR' } as const

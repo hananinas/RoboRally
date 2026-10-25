@@ -9,6 +9,7 @@ export type ActionSchedulerDeps = {
   gameId: string
   publicRoom: string
   playerRoom: (playerId: string) => string
+  broadcastPublicState: () => void
 }
 
 export type ActionScheduler = {
@@ -19,7 +20,7 @@ export type ActionScheduler = {
 }
 
 export function createActionScheduler(
-  { io, game, gameId, publicRoom, playerRoom }: ActionSchedulerDeps,
+  { io, game, gameId, publicRoom, playerRoom, broadcastPublicState }: ActionSchedulerDeps,
 ): ActionScheduler {
   let scheduledAction: NodeJS.Immediate | undefined
   let closed = false
@@ -41,14 +42,18 @@ export function createActionScheduler(
   }
 
   function dealHands(): void {
+    // programmingStarted announces the reset, so the slots clear first and the
+    // cleared state follows the announcement.
+    game.beginProgramming()
     for (const player of game.players) {
       io.to(playerRoom(player.id)).emit('cards.dealt', presentCardsDealt(gameId, player))
     }
     io.to(publicRoom).emit('game.programmingStarted', { gameId })
+    broadcastPublicState()
   }
 
   function scheduleNextAction(): void {
-    if (closed || game.phase !== 'activation' || scheduledAction || game.paused) return
+    if (closed || game.phase !== 'activation' || scheduledAction || game.paused || game.awaitingProgrammingStart) return
     scheduledAction = setImmediate(() => {
       scheduledAction = undefined
       if (closed || game.phase !== 'activation' || game.paused || game.aborted) return
@@ -58,16 +63,12 @@ export function createActionScheduler(
           'robot.actionResolved',
           presentRobotActionResolved(gameId, result),
         )
-        io.to(publicRoom).emit('game.registersChanged', {
-          gameId,
-          playerId: result.action.playerId,
-          registers: result.registers,
-        })
+        broadcastPublicState()
         broadcastCheckpointProgress()
-        if (game.phase === 'activation') {
-          scheduleNextAction()
-        } else {
+        if (result.roundComplete) {
           dealHands()
+        } else {
+          scheduleNextAction()
         }
       } catch (error) {
         logError('Failed to execute next robot action', error, {
@@ -78,6 +79,7 @@ export function createActionScheduler(
         })
         stop()
         game.abort()
+        broadcastPublicState()
         io.to(publicRoom).emit('game.aborted', { gameId })
       }
     })

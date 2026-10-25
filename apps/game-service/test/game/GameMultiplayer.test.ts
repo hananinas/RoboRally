@@ -104,6 +104,8 @@ describe('Game multiplayer activation', () => {
 
     game.removePlayer(players[0].id)
 
+    expect(game.awaitingProgrammingStart).toBe(true)
+    game.beginProgramming()
     expect(game.phase).toBe('programming')
     expect(game.currentRegister).toBe(0)
     expect(game.players).toEqual([])
@@ -137,7 +139,7 @@ describe('Game multiplayer activation', () => {
           expect(result.action.card).toBe(programs[players.indexOf(player)][registerIndex])
           const registerFinished = robotIndex === expectedOrder.length - 1
           expect(game.currentRegister).toBe(registerFinished ? (registerIndex + 1) % 5 : registerIndex)
-          expect(game.phase).toBe(registerFinished && registerIndex === 4 ? 'programming' : 'activation')
+          expect(game.phase).toBe('activation')
         }
       }
 
@@ -146,7 +148,8 @@ describe('Game multiplayer activation', () => {
         expect(player.hand).toEqual(deck)
         expect(game.hasSubmittedProgram(player.id)).toBe(false)
       }
-      game.recheckProgrammingPhase()
+      expect(game.awaitingProgrammingStart).toBe(true)
+      game.beginProgramming()
       expect(game.phase).toBe('programming')
       expect(() => game.executeNextAction()).toThrow()
     }
