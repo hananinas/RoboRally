@@ -16,6 +16,21 @@ processes:
       migrate-kratos-db:
         condition: process_completed_successfully
 
+  reset-hydra-db:
+    command: "rm -rf hydra/data && mkdir -p hydra/data"
+
+  migrate-hydra-db:
+    command: "hydra migrate -c infra/hydra/hydra.yml sql up -e --yes"
+    depends_on:
+      reset-hydra-db:
+        condition: process_completed_successfully
+
+  hydra:
+    command: "hydra serve -c infra/hydra/hydra.yml all --dev"
+    depends_on:
+      migrate-hydra-db:
+        condition: process_completed_successfully
+
   build-game-events:
     command: "pnpm --filter @robo-rally/game-events run build"
 

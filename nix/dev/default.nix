@@ -23,7 +23,7 @@ let
     withEditor ? false
   }:
     pkgs.mkShell ({
-      packages = [ nodejs pnpm pkgs.process-compose pkgs.kratos ]
+      packages = [ nodejs pnpm pkgs.process-compose pkgs.kratos pkgs.ory-hydra ]
         ++ pkgs.lib.optionals withAsyncapi asyncapiPackages
         ++ pkgs.lib.optionals withEditor [ editor ];
 
