@@ -18,10 +18,19 @@ selfservice:
   methods:
     password:
       enabled: true
+    code:
+      enabled: true
 
   flows:
     error:
       ui_url: http://127.0.0.1:4455/error
+
+    verification:
+      enabled: true
+      ui_url: http://127.0.0.1:4455/verification
+      use: code
+      after:
+        default_browser_return_url: http://127.0.0.1:4455/welcome
 
     settings:
       ui_url: http://127.0.0.1:4455/settings
@@ -43,6 +52,7 @@ selfservice:
         password:
           hooks:
             - hook: session
+            - hook: show_verification_ui
 
 log:
   level: debug
@@ -68,6 +78,10 @@ identity:
   schemas:
     - id: default
       url: file://infra/kratos/identity.schema.json
+
+courier:
+  smtp:
+    connection_uri: smtp://test:test@127.0.0.1:1025/?disable_starttls=true
 
 oauth2_provider:
   url: http://127.0.0.1:4445

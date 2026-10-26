@@ -19,9 +19,20 @@
               }
             }
           }
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "title": "E-Mail",
+          "minLength": 3,
+          "ory.sh/kratos": {
+            "verification": {
+              "via": "email"
+            }
+          }
         }
       },
-      "required": ["username"],
+      "required": ["username", "email"],
       "additionalProperties": false
     }
   }

@@ -10,11 +10,16 @@ processes:
       reset-kratos-db:
         condition: process_completed_successfully
 
+  mailpit:
+    command: "mailpit"
+
   kratos:
-    command: "kratos serve -c infra/kratos/kratos.yml --dev"
+    command: "kratos serve -c infra/kratos/kratos.yml --dev --watch-courier"
     depends_on:
       migrate-kratos-db:
         condition: process_completed_successfully
+      mailpit:
+        condition: process_started
 
   reset-hydra-db:
     command: "rm -rf hydra/data && mkdir -p hydra/data"
