@@ -1,6 +1,21 @@
 version: "0.5"
 
 processes:
+  reset-kratos-db:
+    command: "rm -rf kratos/data && mkdir -p kratos/data"
+
+  migrate-kratos-db:
+    command: "kratos -c infra/kratos/kratos.yml migrate sql -e --yes"
+    depends_on:
+      reset-kratos-db:
+        condition: process_completed_successfully
+
+  kratos:
+    command: "kratos serve -c infra/kratos/kratos.yml --dev"
+    depends_on:
+      migrate-kratos-db:
+        condition: process_completed_successfully
+
   build-game-events:
     command: "pnpm --filter @robo-rally/game-events run build"
 
