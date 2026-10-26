@@ -4,13 +4,19 @@ processes:
   reset-rauthy-db:
     command: "rm -rf rauthy/data"
 
+  mailpit:
+    command: "mailpit"
+
   rauthy:
     command: "rauthy serve -c infra/rauthy/config.toml"
     environment:
       - "BOOTSTRAP_DIR=infra/rauthy/bootstrap"
+      - "SMTP_DANGER_INSECURE=true"
     depends_on:
       reset-rauthy-db:
         condition: process_completed_successfully
+      mailpit:
+        condition: process_started
 
   apply-rauthy-theme:
     command: "bash infra/rauthy/apply-theme.sh"

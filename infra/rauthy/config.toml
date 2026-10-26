@@ -31,6 +31,11 @@ key_active = '2026-10-03'
 [mfa]
 admin_force_mfa = false
 
+[email]
+smtp_url = 'localhost'
+smtp_port = 1025
+smtp_from = 'Rauthy <rauthy@localhost>'
+
 [user_registration]
 enable = true
 
