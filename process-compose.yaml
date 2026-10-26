@@ -31,6 +31,14 @@ processes:
       migrate-hydra-db:
         condition: process_completed_successfully
 
+  kratos-hydra-ui:
+    command: "pnpm --filter @robo-rally/kratos-hydra-ui run start"
+    depends_on:
+      kratos:
+        condition: process_started
+      hydra:
+        condition: process_started
+
   build-game-events:
     command: "pnpm --filter @robo-rally/game-events run build"
 
