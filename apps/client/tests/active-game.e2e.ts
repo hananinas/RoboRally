@@ -726,6 +726,7 @@ test('displays all basic cards and plays their results across two programs', asy
       robotId: ROBOT_ID,
       instruction: step.instruction,
       position: { coordinate: { x: step.x, y: step.y }, orientation: step.orientation },
+      pushedRobots: [],
     })) })
     for (const step of round.steps) {
       await expect(robot).toHaveAttribute('data-board-tile', `${step.x},${step.y}`)

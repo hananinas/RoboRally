@@ -312,7 +312,8 @@ export function gameStateReducer(
     }
     case 'action':
       if (event.action.gameId !== state.assignment?.gameId ||
-        !state.playback.robots.some((robot) => robot.robotId === event.action.robotId)) return state
+        !state.playback.robots.some((robot) => robot.robotId === event.action.robotId ||
+          event.action.pushedRobots.some((pushed) => pushed.robotId === robot.robotId))) return state
       return {
         ...state,
         phase: 'EXECUTING',

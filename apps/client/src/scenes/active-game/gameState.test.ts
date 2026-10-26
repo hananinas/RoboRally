@@ -75,11 +75,11 @@ const publicState: PublicGameState = {
   ],
 }
 const actions: readonly RobotActionResolved[] = [
-  { gameId: publicState.gameId, registerIndex: 0, robotId, instruction: 'MOVE_1', position: { coordinate: { x: 2, y: 2 }, orientation: 'NORTH' } },
-  { gameId: publicState.gameId, registerIndex: 1, robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 2, y: 2 }, orientation: 'WEST' } },
-  { gameId: publicState.gameId, registerIndex: 2, robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 2 }, orientation: 'WEST' } },
-  { gameId: publicState.gameId, registerIndex: 3, robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 1, y: 2 }, orientation: 'SOUTH' } },
-  { gameId: publicState.gameId, registerIndex: 4, robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 3 }, orientation: 'SOUTH' } },
+  { gameId: publicState.gameId, registerIndex: 0, pushedRobots: [], robotId, instruction: 'MOVE_1', position: { coordinate: { x: 2, y: 2 }, orientation: 'NORTH' } },
+  { gameId: publicState.gameId, registerIndex: 1, pushedRobots: [], robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 2, y: 2 }, orientation: 'WEST' } },
+  { gameId: publicState.gameId, registerIndex: 2, pushedRobots: [], robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 2 }, orientation: 'WEST' } },
+  { gameId: publicState.gameId, registerIndex: 3, pushedRobots: [], robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 1, y: 2 }, orientation: 'SOUTH' } },
+  { gameId: publicState.gameId, registerIndex: 4, pushedRobots: [], robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 3 }, orientation: 'SOUTH' } },
 ]
 const hand = { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, cards }
 
@@ -804,6 +804,18 @@ describe('checkpoint progress', () => {
 })
 
 describe('membership updates', () => {
+  it('applies pushed results for a surviving robot when the acting robot is no longer present', () => {
+    const position = { coordinate: { x: 3, y: 4 }, orientation: 'EAST' as const }
+    const action = {
+      ...actions[0], robotId: 'departed-robot', pushedRobots: [{ robotId: stationaryRobotId, position }],
+    }
+    const state = gameStateReducer(programmingState(), { type: 'action', action })
+
+    expect(state.playback.active).toBe(action)
+    expect(state.playback.robots.find((robot) => robot.robotId === stationaryRobotId)?.position).toEqual(position)
+    expect(state.playback.robots.some((robot) => robot.robotId === 'departed-robot')).toBe(false)
+  })
+
   const newcomer = {
     gameId: publicState.gameId,
     player: { playerId: 'new-player', lastCheckpoint: 0, username: 'New', connected: true, programSubmitted: false },

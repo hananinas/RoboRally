@@ -163,6 +163,12 @@ Each resolved action is emitted to the [public room](#rooms) as:
 
 Clients must process resolved actions in the order in which they are received.
 
+A movement card can push a chain of robots. A wall or the antenna blocks the whole step. Pushed robots keep their facing direction and pending actions.
+
+Movement resolves one square at a time. Robots entering pits or leaving the board reboot at once. The move stops if the acting robot reboots. A pushed robot rebooting does not stop it.
+
+The event includes final positions after reboots: `position` for the acting robot and `pushedRobots` for other robots whose positions changed. Clients apply them together when the action plays.
+
 #### Activation ordering
 
 The antenna is located at the top centre of the board and faces south.
@@ -172,7 +178,7 @@ The test board uses:
 - position (10, 0)
 - direction Math.PI / 2
 
-The antenna does not occupy a robot tile.
+Robots cannot enter the antenna square.
 
 The priority algorithm calculates the activation order based on the game rules.
 
@@ -180,7 +186,7 @@ The priority algorithm calculates the activation order based on the game rules.
 ### Checkpoint progress
 Some tiles hold checkpoints. The demo board places checkpoint 1 at `(10, 6)` and checkpoint 2 at `(8, 9)`.
 
-When a player progresses (a robot reaches a checkpoint according o the game rules), the service broadcasts to `game:{gameId}:public`:
+At the end of each register, the service checks each robot's final position for its next checkpoint. It broadcasts progress to the [public room](#rooms):
 
 `player.checkpointProgress {gameId, playerId, lastCheckpoint, checkpointCount}`
 
