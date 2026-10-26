@@ -68,3 +68,6 @@ identity:
   schemas:
     - id: default
       url: file://infra/kratos/identity.schema.json
+
+oauth2_provider:
+  url: http://127.0.0.1:4445
