@@ -1,5 +1,11 @@
 import { expect, type Page } from '@playwright/test'
 
+// The disconnect spinner also has role="status". Scope gameplay status checks
+// to the HUD so they remain unambiguous while the overlay is visible.
+export function gameStatus(page: Page) {
+  return page.getByRole('complementary', { name: 'Game controls' }).getByRole('status')
+}
+
 export async function login(page: Page, username: string) {
   await page.goto('/')
   await page.getByRole('textbox', { name: 'Username' }).fill(username)
