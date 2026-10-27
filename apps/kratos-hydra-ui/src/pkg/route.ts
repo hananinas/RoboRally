@@ -8,7 +8,7 @@ import {
   OAuth2LogoutRequest,
 } from "@ory/client"
 import { Theme } from "@ory/elements-markup"
-import { NextFunction, Request, Response, Router } from "express"
+import { Request, RequestHandler, Response, Router } from "express"
 
 export interface RouteOptions {
   frontend: FrontendApi
@@ -42,9 +42,7 @@ export interface RouteOptions {
 
 export type RouteOptionsCreator = (req: Request, res: Response) => RouteOptions
 
-export type RouteCreator = (
-  opts: RouteOptionsCreator,
-) => (req: Request, res: Response, next: NextFunction) => void
+export type RouteCreator = (opts: RouteOptionsCreator) => RequestHandler
 
 export type RouteRegistrator = (
   router: Router,

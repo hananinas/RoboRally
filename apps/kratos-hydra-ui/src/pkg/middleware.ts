@@ -6,7 +6,7 @@ import { Session } from "@ory/client"
 import { locales } from "@ory/elements-markup"
 import { pick as pickLanguage } from "accept-language-parser"
 import { AxiosError } from "axios"
-import { NextFunction, Request, Response } from "express"
+import { NextFunction, Request, RequestHandler, Response } from "express"
 
 /**
  * Checks the error returned by toSession() and initiates a 2FA flow if necessary
@@ -59,8 +59,8 @@ const addSessionToRequest =
  * @param createHelpers
  */
 export const requireAuth =
-  (createHelpers: RouteOptionsCreator) =>
-  (req: Request, res: Response, next: NextFunction) => {
+  (createHelpers: RouteOptionsCreator): RequestHandler =>
+  (req, res, next) => {
     const { frontend, apiBaseUrl } = createHelpers(req, res)
 
     // when accessing settings with a valid flow id
@@ -85,8 +85,8 @@ export const requireAuth =
   }
 
 export const addFavicon =
-  (createHelpers: RouteOptionsCreator) =>
-  (req: Request, res: Response, next: NextFunction) => {
+  (createHelpers: RouteOptionsCreator): RequestHandler =>
+  (req, res, next) => {
     const { faviconUrl, faviconType } = createHelpers(req, res)
     res.locals.faviconUrl = faviconUrl
     res.locals.faviconType = faviconType
@@ -103,8 +103,8 @@ export const addFavicon =
  * @param createHelpers
  */
 export const setSession =
-  (createHelpers: RouteOptionsCreator) =>
-  (req: Request, res: Response, next: NextFunction) => {
+  (createHelpers: RouteOptionsCreator): RequestHandler =>
+  (req, res, next) => {
     const { frontend, apiBaseUrl } = createHelpers(req, res)
     frontend
       .toSession({ cookie: req.header("cookie") })
@@ -120,8 +120,8 @@ export const setSession =
  * @param createHelpers
  */
 export const requireNoAuth =
-  (createHelpers: RouteOptionsCreator) =>
-  (req: Request, res: Response, next: NextFunction) => {
+  (createHelpers: RouteOptionsCreator): RequestHandler =>
+  (req, res, next) => {
     const { frontend } = createHelpers(req, res)
     frontend
       .toSession({ cookie: req.header("cookie") })
@@ -140,11 +140,7 @@ export const requireNoAuth =
  * @param res
  * @param next
  */
-export const detectLanguage = (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
+export const detectLanguage: RequestHandler = (req, res, next) => {
   res.locals.lang = pickLanguage(
     Object.keys(locales),
     req.header("Accept-Language") || "en",

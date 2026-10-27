@@ -26,7 +26,7 @@ import {
 import { csrfErrorHandler } from "./routes/csrfError"
 import bodyParser from "body-parser"
 import cookieParser from "cookie-parser"
-import { DoubleCsrfCookieOptions, doubleCsrf } from "csrf-csrf"
+import { CsrfTokenCookieOptions, doubleCsrf } from "csrf-csrf"
 import express, { Request, Response } from "express"
 import { engine } from "express-handlebars"
 import * as fs from "fs"
@@ -37,12 +37,11 @@ const baseUrl = process.env.BASE_PATH || "/"
 const app = express()
 const router = express.Router()
 
-const cookieOptions: DoubleCsrfCookieOptions = {
+const cookieOptions: CsrfTokenCookieOptions = {
   sameSite: "lax",
-  // csrf-csrf@4 reads this cookie via req.cookies, which cookie-parser empties
-  // out for signed cookies (moved to req.signedCookies instead), so this must
-  // stay unsigned; the token already carries its own HMAC.
-  signed: false,
+  // csrf-csrf@4's cookie options always omit `signed` - it reads this cookie
+  // via req.cookies, which cookie-parser empties out for signed cookies
+  // (moved to req.signedCookies instead); the token carries its own HMAC.
   // set secure cookies by default (recommended in production)
   // can be disabled through DANGEROUSLY_DISABLE_SECURE_COOKIES=true env var
   secure: true,

@@ -11,7 +11,7 @@ import {
 import { ButtonLink, Divider, MenuLink, Typography } from "@ory/elements-markup"
 import { AxiosError } from "axios"
 import { NextFunction, Response } from "express"
-import { UnknownObject } from "express-handlebars/types"
+import { HelperDelegateObject } from "express-handlebars/types"
 
 export * from "./logger"
 export * from "./middleware"
@@ -120,7 +120,7 @@ export const redirectOnSoftError =
     next(err)
   }
 
-export const handlebarsHelpers: UnknownObject = {
+export const handlebarsHelpers: HelperDelegateObject = {
   jsonPretty: (context: any) => JSON.stringify(context, null, 2),
   onlyNodes: (
     nodes: UiNode[],

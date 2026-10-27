@@ -48,7 +48,7 @@ export const createShowLogoutRoute: RouteCreator =
 
         res.render("logout", {
           card: UserLogoutCard({
-            csrfToken: req.csrfToken(true),
+            csrfToken: req.csrfToken({ overwrite: true }),
             challenge: logoutChallenge,
             action: "logout",
           }),

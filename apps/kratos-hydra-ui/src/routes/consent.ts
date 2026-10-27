@@ -151,7 +151,7 @@ export const createConsentRoute: RouteCreator =
         res.render("consent", {
           card: UserConsentCard({
             consent: body,
-            csrfToken: req.csrfToken(true),
+            csrfToken: req.csrfToken({ overwrite: true }),
             cardImage: body.client?.logo_uri || logoUrl,
             client_name:
               body.client?.client_name ||
