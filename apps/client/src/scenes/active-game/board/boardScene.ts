@@ -17,6 +17,7 @@ export type BoardScenePiece = Readonly<{
   component: BoardVisualComponent
   componentName: BoardComponentName
   height: number
+  angle?: number
   key: string
   liftHeight: number
   slice: BoardSlice
@@ -58,7 +59,9 @@ export function createBoardScene(
 
   for (const cell of board.cells) {
     const pillar = hasAllWalls(cell.walls)
-    const recipe = recipes[pillar ? 'pillar' : cell.tile]
+    const antenna = board.antenna?.x === cell.x && board.antenna.y === cell.y
+      ? board.antenna : undefined
+    const recipe = recipes[antenna ? 'antenna' : pillar ? 'pillar' : cell.tile]
     const centre = tileCentre(cell, board, config)
     tiles.push({ cell, hole: recipe.hole ?? false, tileCentre: centre })
 
@@ -102,6 +105,7 @@ export function createBoardScene(
         component: components[slice.component],
         componentName: slice.component,
         height,
+        angle: antenna && !slice.wall ? antenna.angle * 180 / Math.PI - 90 : undefined,
         key: `${cell.x},${cell.y},${slice.layer},${slice.component},${slice.wall ?? 'tile'},${sliceIndex}`,
         liftHeight,
         slice,

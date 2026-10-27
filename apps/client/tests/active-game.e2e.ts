@@ -30,6 +30,34 @@ test('renders the programming interface', async ({ page }) => {
   await expect(controls.getByRole('heading', { name: 'Checkpoints', exact: true }).locator('..')).toContainText('0/0')
 })
 
+for (const antenna of [
+  { x: 5, y: 0, angle: Math.PI / 2 },
+  { x: 3, y: 2, angle: 0 },
+  { x: 8, y: 6, angle: Math.PI * 1.25 },
+]) {
+  test(`renders the configured antenna at ${antenna.x},${antenna.y} facing ${antenna.angle}`, async ({ page, game }) => {
+    await game.control({ type: 'joined-state', state: { ...game.initial.state, antenna }, hand: game.initial.cards, programSubmitted: false })
+    await openGame(page)
+    await expect(page.getByRole('img', { name: 'Priority antenna' })).toBeVisible()
+    const slices = page.locator('[data-board-component^="antenna"]')
+    await expect(slices).toHaveCount(10)
+    const bounds = await slices.first().locator('use').evaluate((element) => {
+      const box = (element as SVGUseElement).getBBox()
+      return { x: box.x, y: box.y, width: box.width }
+    })
+    expect(bounds.x).toBeCloseTo(6, 3)
+    expect(bounds.y).toBeCloseTo(6, 3)
+    expect(bounds.width).toBeCloseTo(72, 3)
+    expect(await slices.evaluateAll((elements) => elements.map((element) => ({
+      tile: element.getAttribute('data-board-tile'),
+      angle: (element as SVGSVGElement).style.getPropertyValue('--board-piece-angle'),
+      symbolExists: !!document.querySelector(element.querySelector('use')!.getAttribute('href')!),
+    })))).toEqual(Array(10).fill({
+      tile: `${antenna.x},${antenna.y}`, angle: `${antenna.angle * 180 / Math.PI - 90}deg`, symbolExists: true,
+    }))
+  })
+}
+
 test('shows checkpoint counts from snapshots and broadcasts without disrupting queued playback', async ({ page, game }) => {
   await page.clock.install()
   const state = {

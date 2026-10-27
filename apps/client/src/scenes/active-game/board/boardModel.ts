@@ -3,7 +3,7 @@ import type { Antenna } from '@robo-rally/game-events'
 export type BoardPoint = Readonly<{ x: number; y: number }>
 
 export type BoardTileType = 'empty' | 'hole' | 'laser'
-export type BoardRecipeName = BoardTileType | 'pillar'
+export type BoardRecipeName = BoardTileType | 'pillar' | 'antenna'
 export type BoardWallSide = 'north' | 'east' | 'south' | 'west'
 export type BoardTileWalls = Readonly<Record<BoardWallSide, boolean>>
 
@@ -22,6 +22,7 @@ export type BoardRenderModel = Readonly<{
 }>
 
 export type BoardComponentName =
+  | `antenna${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10}`
   | 'ground'
   | 'laser1'
   | 'laser2'
