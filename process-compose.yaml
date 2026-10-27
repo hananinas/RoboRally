@@ -30,10 +30,18 @@ processes:
       reset-hydra-db:
         condition: process_completed_successfully
 
+  generate-dev-tls-cert:
+    command: >
+      mkdir -p infra/dev-tls &&
+      mkcert -install &&
+      mkcert -cert-file infra/dev-tls/cert.pem -key-file infra/dev-tls/key.pem 127.0.0.1 localhost
+
   hydra:
     command: "hydra serve -c infra/hydra/hydra.yml all --dev"
     depends_on:
       migrate-hydra-db:
+        condition: process_completed_successfully
+      generate-dev-tls-cert:
         condition: process_completed_successfully
 
   kratos-hydra-ui:
@@ -64,9 +72,13 @@ processes:
         condition: process_completed_successfully
 
   game-service:
-    command: "pnpm --filter @robo-rally/game-service run dev"
+    command: >
+      export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem" &&
+      pnpm --filter @robo-rally/game-service run dev
     depends_on:
       build-game-events:
         condition: process_completed_successfully
       register-game-service-client:
+        condition: process_completed_successfully
+      generate-dev-tls-cert:
         condition: process_completed_successfully
