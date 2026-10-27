@@ -12,6 +12,7 @@
     "views/*"
   ],
   "scripts": {
+    "install-dev": "pnpm --filter @robo-rally/kratos-hydra-ui... install --frozen-lockfile --prod=false",
     "build": "rm -rf lib/* && npx tsc",
     "serve": "node lib/index.js",
     "start": "nodemon",
