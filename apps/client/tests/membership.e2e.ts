@@ -1,55 +1,78 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from './real-game-fixture.ts'
-import { login, robotIds } from './browserClient.ts'
+import { browse, gameStatus, login, robotIds, startTogether } from './browserClient.ts'
 
-async function leave(page: Page) {
-  await page.getByRole('button', { name: 'Game options', exact: true }).click()
-  await page.getByRole('button', { name: 'Leave game', exact: true }).click()
-  await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: /Shared game/ })).toBeEnabled()
-}
-
-test('two real clients see joins and leaves without losing the first player’s selected cards', async ({ browser, page, baseURL }) => {
-  const otherContext = await browser.newContext({ baseURL })
-  const other = await otherContext.newPage()
+test('two players wait for owner Start, play a round, and leave for the lobby browser', async ({ browser, page, baseURL }) => {
+  const context = await browser.newContext({ baseURL, reducedMotion: 'reduce' })
+  const other = await context.newPage()
   try {
-    await login(page, 'First')
-    const [firstRobot] = await robotIds(page)
-    await expect(page.locator(`[data-robot-id="${firstRobot}"]`).first()).toHaveAttribute('data-board-tile', '8,7')
-    await page.getByRole('region', { name: 'Programming hand' }).getByRole('button').first().click()
-    const selected = page.getByRole('button', { name: 'Move 1, remove from register 1', exact: true })
-    await expect(selected).toBeVisible()
-
-    await login(other, 'Second')
-    await expect.poll(() => robotIds(page)).toHaveLength(2)
+    await startTogether(page, other, 'First', 'Second')
+    expect(await robotIds(page)).toHaveLength(2)
     expect(await robotIds(other)).toEqual(await robotIds(page))
-    const secondRobot = (await robotIds(other)).find((id) => id !== firstRobot)!
-    await expect(page.locator(`[data-robot-id="${secondRobot}"]`).first()).toHaveAttribute('data-board-tile', '7,7')
-    await expect(selected).toBeVisible()
-
-    await leave(other)
-    await expect(other.getByText('Second', { exact: true })).toBeVisible()
+    for (const client of [page, other]) {
+      const hand = client.getByRole('region', { name: 'Programming hand' }).getByRole('button')
+      for (let index = 0; index < 5; index++) await hand.nth(index).click()
+      await client.getByRole('button', { name: 'Done', exact: true }).click()
+    }
+    for (const client of [page, other]) {
+      await expect(client.getByRole('button', { name: /remove from register/ })).toHaveCount(0, { timeout: 15000 })
+      await expect(gameStatus(client)).toHaveText('Programming')
+    }
+    await other.getByRole('button', { name: 'Game options', exact: true }).click()
+    await other.getByRole('button', { name: 'Leave game', exact: true }).click()
+    await expect(other.getByRole('button', { name: 'Create lobby', exact: true })).toBeVisible()
     await expect(other.getByRole('textbox', { name: 'Username' })).toHaveCount(0)
-    await expect.poll(() => robotIds(page)).toEqual([firstRobot])
-    await expect(selected).toBeVisible()
+    await expect.poll(() => robotIds(page)).toHaveLength(1)
     await expect(page.locator('.disconnect-overlay')).toHaveCount(0)
-    await expect(selected).toBeEnabled()
-
-    await other.getByRole('button', { name: /Shared game/ }).click()
-    await other.getByRole('button', { name: 'Join game', exact: true }).click()
-    await expect(other.getByRole('main', { name: 'Game board' })).toBeVisible()
-    await expect.poll(() => robotIds(page)).toHaveLength(2)
-    const replacementRobot = (await robotIds(other)).find((id) => id !== firstRobot)!
-    expect(replacementRobot).not.toBe(secondRobot)
-    await expect(page.locator(`[data-robot-id="${replacementRobot}"]`).first()).toHaveAttribute('data-board-tile', '7,7')
-    await expect(selected).toBeVisible()
-    
-    await leave(other)
-    await expect.poll(() => robotIds(page)).toEqual([firstRobot])
-    await expect(page.locator('.disconnect-overlay')).toHaveCount(0)
-    await expect(selected).toBeEnabled()
-    await leave(page)
+    await other.getByRole('button', { name: 'Create lobby', exact: true }).click()
+    await other.getByRole('button', { name: 'Start', exact: true }).click()
+    await expect.poll(() => robotIds(other)).toHaveLength(1)
+    expect(await robotIds(other)).not.toEqual(await robotIds(page))
   } finally {
-    await otherContext.close()
+    await context.close()
+  }
+})
+
+test('the next member becomes owner when the creator leaves a waiting lobby', async ({ browser, page, baseURL }) => {
+  const context = await browser.newContext({ baseURL })
+  const other = await context.newPage()
+  try {
+    await browse(page, 'Owner')
+    await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
+    await browse(other, 'Other')
+    await other.getByRole('list', { name: 'Lobbies' }).getByRole('button', { disabled: false }).first().click()
+    await other.getByRole('button', { name: 'Join game', exact: true }).click()
+    await page.getByRole('button', { name: 'Leave lobby', exact: true }).click()
+    await expect(other.getByRole('button', { name: 'Start', exact: true })).toBeEnabled()
+    await other.getByRole('button', { name: 'Start', exact: true }).click()
+    await expect(other.getByRole('main', { name: 'Game board' })).toBeVisible()
+  } finally {
+    await context.close()
+  }
+})
+
+test('robot colours agree between clients and survive a departure followed by a reload', async ({ browser, page, baseURL }) => {
+  const context = await browser.newContext({ baseURL })
+  const other = await context.newPage()
+  const colours = (client: Page) => client.locator('[data-robot-id]').evaluateAll((elements) =>
+    Object.fromEntries(elements.map((element) => [element.getAttribute('data-robot-id'),
+      getComputedStyle(element).getPropertyValue('--tank-colour').trim()])))
+  try {
+    await startTogether(page, other, 'First', 'Second')
+    const initial = await colours(other)
+    expect(new Set(Object.values(initial)).size).toBe(2)
+    expect(await colours(page)).toEqual(initial)
+    const swatch = other.getByRole('img', { name: 'Robot colour', exact: true })
+    await expect(swatch).toHaveCSS('background-color', 'rgb(77, 141, 235)')
+    await page.getByRole('button', { name: 'Game options', exact: true }).click()
+    await page.getByRole('button', { name: 'Leave game', exact: true }).click()
+    await expect.poll(() => robotIds(other)).toHaveLength(1)
+    const remaining = await colours(other)
+    for (const [robotId, colour] of Object.entries(remaining)) expect(colour).toBe(initial[robotId])
+    await login(other, 'Second')
+    expect(await colours(other)).toEqual(remaining)
+    await expect(swatch).toHaveCSS('background-color', 'rgb(77, 141, 235)')
+  } finally {
+    await context.close()
   }
 })

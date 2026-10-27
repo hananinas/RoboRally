@@ -19,7 +19,6 @@ import {
 } from '@/game/index.ts'
 import {
   presentCardsDealt,
-  presentLobbyDetails,
   presentPublicGameState,
   presentRobotActionResolved,
 } from '@/socket/gamePresenter.ts'
@@ -86,6 +85,7 @@ describe('game presenter', () => {
       robots: [
         {
           robotId: player.robot.id,
+          colour: player.robot.colour,
           playerId: player.id,
           position: {
             coordinate: { x: 10, y: 7 },
@@ -195,27 +195,4 @@ describe('game presenter', () => {
     })
   })
 
-  it.each([
-    ['empty-map', 'Empty Map'],
-    ['test-map', 'Test Map'],
-  ] as const)('presents lobby details for the %s board map', (mapName, mapLabel) => {
-    const { gameId, game } = createGame(mapName, 'Game with map')
-    const players = [
-      { playerId: '00000000-0000-4000-8000-000000000011', username: 'Malte' },
-      { playerId: '00000000-0000-4000-8000-000000000012', username: 'Abid' },
-    ]
-    const lobby = presentLobbyDetails(gameId, game, players)
-
-    expect(lobby).toEqual({
-      gameId,
-      name: game.name,
-      players,
-      map: {
-        name: mapLabel,
-        icon: expect.stringMatching(/^data:image\/svg\+xml;base64,/),
-        maxPlayers: 6,
-      },
-    })
-    expect(lobby.map.icon).toBe(game.board.map?.icon)
-  })
 })

@@ -137,8 +137,6 @@ channels:
         $ref: '#/components/messages/RobotActionResolved'
       playerCheckpointProgress:
         $ref: '#/components/messages/PlayerCheckpointProgress'
-      playerJoined:
-        $ref: '#/components/messages/PlayerJoined'
       playerLeft:
         $ref: '#/components/messages/PlayerLeft'
       playerConnectionChanged:
@@ -447,12 +445,6 @@ components:
             gameId: 00000000-0000-4000-8000-000000000001
             playerId: 00000000-0000-4000-8000-000000000002
             robotId: 00000000-0000-4000-8000-000000000003
-
-    PlayerJoined:
-      name: game.playerJoined
-      description: Announces a new player and robot to existing game participants.
-      payload:
-        $ref: '#/components/schemas/PlayerJoined'
 
     SubmitProgram:
       name: program.submit
@@ -838,6 +830,14 @@ components:
             gameId:
               type: string
               format: uuid
+        - type: object
+          additionalProperties: false
+          description: A listed player disconnected before Start. Remain in the lobby and retry.
+          required:
+            - outcome
+          properties:
+            outcome:
+              const: LOBBY_MEMBER_DISCONNECTED
         - $ref: '#/components/schemas/LobbyFailure'
     SessionResult:
       oneOf:
@@ -1047,23 +1047,6 @@ components:
           $ref: '#/components/schemas/LastCheckpoint'
       description: >-
         Public participation and submission status; never contains cards.
-
-    PlayerJoined:
-      type: object
-      additionalProperties: false
-      required:
-        - gameId
-        - player
-        - robot
-      properties:
-        gameId:
-          $ref: "#/components/schemas/GameId"
-        player:
-          $ref: "#/components/schemas/PlayerState"
-        robot:
-          $ref: "#/components/schemas/Robot"
-      description: >-
-        player.playerId must equal robot.playerId.
 
     PublicGameState:
       description: >-

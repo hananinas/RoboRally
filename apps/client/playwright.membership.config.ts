@@ -12,7 +12,8 @@ export default defineConfig({
   use: { baseURL, screenshot: 'only-on-failure', trace: 'retain-on-failure' },
   webServer: [
     {
-      command: 'pnpm dev --host 127.0.0.1 --port 4175 --strictPort',
+      // Rebuild the service and shared contracts so tests never launch stale dist files.
+      command: 'pnpm --filter @robo-rally/game-service... build && pnpm dev --host 127.0.0.1 --port 4175 --strictPort',
       env: { GAME_SERVICE_URL },
       url: baseURL,
       reuseExistingServer: false,

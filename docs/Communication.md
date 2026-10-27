@@ -69,6 +69,8 @@ sequenceDiagram
 After successful authentication, the client sends a `session.get` request to determine if the user has an existent session. 
 If he does not, `session.get` acknowledges with `NO_SESSION` and the client is shown the lobby screen.
 
+If a listed player disconnects before Start, `LOBBY_MEMBER_DISCONNECTED` leaves the lobby intact; the owner can retry after membership updates.
+
 ### Listing lobbies
 The client then requets a list of existant lobbies via
 

@@ -16,7 +16,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
     new Card(`00000000-0000-4000-8000-00000000010${index}`, 'TURN_LEFT'))
   const game = new Game(board, players, deck, { x: Integer(0), y: Integer(0) })
   const httpServer = createServer()
-  const server = createGameSocketServer(httpServer, { gameId, game })
+  const server = createGameSocketServer(httpServer, () => ({ gameId, game }))
   const clients: Socket<ServerToClientEvents, ClientToServerEvents>[] = []
   const events: { name: string; payload: unknown }[][] = [[], []]
   try {
@@ -32,8 +32,12 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
       socket.connect()
       await connected
       await socket.timeout(1000).emitWithAck('user.login', { username: `Player ${index}` })
-      const joined = await socket.timeout(1000).emitWithAck('game.join', { gameId })
-      expect(joined.outcome).toBe('JOINED')
+    }
+    const created = await clients[0].emitWithAck('lobby.create', {})
+    if (created.outcome !== 'LOBBY_JOINED') throw new Error(created.outcome)
+    await clients[1].emitWithAck('lobby.join', { lobbyId: created.lobby.lobbyId })
+    await clients[0].emitWithAck('lobby.start', { lobbyId: created.lobby.lobbyId })
+    for (let index = 0; index < clients.length; index++) {
       const player = game.players[index]
       players.push(player)
       player.setHand(deck.map((card, cardIndex) => new Card(
@@ -46,7 +50,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
     }
 
     for (const socket of clients) {
-      await socket.timeout(1000).emitWithAck('game.join', { gameId })
+      await socket.timeout(1000).emitWithAck('session.get', {})
     }
     events[0] = []
     events[1] = []
@@ -58,10 +62,10 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
       }))
       expect(await clients[0].timeout(1000).emitWithAck('program.submit', submissions[0]))
         .toEqual({ outcome: 'ACCEPTED' })
-      // Join acknowledgements fence each connection's earlier deliveries.
+      // Session acknowledgements fence each connection's earlier deliveries.
       for (const socket of clients) {
-        const waiting = await socket.timeout(1000).emitWithAck('game.join', { gameId })
-        expect(waiting).toMatchObject({ outcome: 'JOINED', state: { phase: 'PROGRAMMING' } })
+        const waiting = await socket.timeout(1000).emitWithAck('session.get', {})
+        expect(waiting).toMatchObject({ outcome: 'IN_GAME', initialization: { state: { phase: 'PROGRAMMING' } } })
       }
       expect(events[0]).toEqual([])
       expect(events[1]).toEqual([{

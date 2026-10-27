@@ -1,4 +1,4 @@
-{ pkgs, gameId ? "" }:
+{ pkgs }:
 
 let
   nodejs = pkgs.nodejs_24;
@@ -50,9 +50,6 @@ pkgs.stdenvNoCC.mkDerivation (finalAttrs: {
   ];
 
   pnpmBuildScript = "build";
-
-  # Vite embeds this value in the generated JavaScript.
-  VITE_GAME_ID = gameId;
 
   installPhase = ''
     runHook preInstall
