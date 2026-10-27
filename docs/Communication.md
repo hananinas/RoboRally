@@ -68,6 +68,8 @@ sequenceDiagram
 ## Lobby
 After successful authentication, the client sends `session.get {}` to determine whether the user already has a session. `NO_SESSION` continues to lobby selection, `IN_LOBBY {lobby}` confirms waiting membership on the same live connection (for example, after a command acknowledgement times out), and `IN_GAME {initialization}` restores an existing game. Disconnecting removes lobby membership; reconnecting does not rejoin that lobby.
 
+If a listed player disconnects before Start, `LOBBY_MEMBER_DISCONNECTED` leaves the lobby intact; the owner can retry after membership updates.
+
 ### Listing lobbies
 The client can ask which lobbies exist:
 

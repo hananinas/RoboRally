@@ -199,7 +199,7 @@ Through the room feature we can easily model player lobbies and game rooms and b
 A user would be member to up to 3 rooms:
 1. user room: Contains private user messages such as which cards are being played 
 2. game room: Contains messages all players in a given game should receive (eg. RobotMoved(A)) 
-3. lobby room: used to set up games and contains messages such as PlayerJoined(A))
+3. lobby room: used to set up games and contains messages such as lobby.updated
 
 
 I have created an (incomplete and not quite correct!) sequence diagram highlighting the above:
@@ -222,7 +222,7 @@ sequenceDiagram
     C->>S: createLobby() or joinLobby(lobbyId)
     S->>S: Validate lobby access
     S->>L: Join lobby room
-    S-->>L: Emit playerJoined and lobbyState
+    S-->>L: Emit lobby.updated
 
     C->>S: setReady(true)
     S->>S: Update ready state

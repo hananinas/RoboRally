@@ -1,6 +1,6 @@
 import type {
   Card,
-  JoinResult,
+  GameInitialization,
   ProgramCardIds,
   PublicGameState,
   RobotActionResolved,
@@ -64,11 +64,13 @@ const publicState: PublicGameState = {
   robots: [
     {
       robotId,
+      colour: '#A66BE0',
       playerId: '50000000-0000-4000-8000-000000000001',
       position: { coordinate: { x: 2, y: 3 }, orientation: 'NORTH' },
     },
     {
       robotId: stationaryRobotId,
+      colour: '#4DC9C0',
       playerId: '50000000-0000-4000-8000-000000000002',
       position: { coordinate: { x: 4, y: 4 }, orientation: 'EAST' },
     },
@@ -83,7 +85,7 @@ const actions: readonly RobotActionResolved[] = [
 ]
 const hand = { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, cards }
 
-const result: Extract<JoinResult, { outcome: 'JOINED' }> = {
+const result: GameInitialization = {
   outcome: 'JOINED',
   assignment: { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, robotId },
   state: publicState,
@@ -816,32 +818,37 @@ describe('membership updates', () => {
     expect(state.playback.robots.some((robot) => robot.robotId === 'departed-robot')).toBe(false)
   })
 
-  const newcomer = {
-    gameId: publicState.gameId,
-    player: { playerId: 'new-player', lastCheckpoint: 0, username: 'New', connected: true, programSubmitted: false },
-    robot: { robotId: 'new-robot', playerId: 'new-player', position: { coordinate: { x: 1, y: 3 }, orientation: 'NORTH' as const } },
-  }
-
-  it('adds a joined robot while preserving playback and ignoring duplicate or unrelated joins', () => {
-    let state = programmingState()
-    state = gameStateReducer(state, { type: 'action', action: actions[0] })
-    const updated = gameStateReducer(state, { type: 'player-joined', payload: newcomer })
-    expect(updated.players.map((player) => player.playerId)).toContain('new-player')
-    expect(updated.players.at(-1)?.lastCheckpoint).toBe(0)
-    expect(updated.playback.robots.at(-1)?.robotId).toBe('new-robot')
-    expect(updated.playback.active).toBe(state.playback.active)
-    expect(gameStateReducer(updated, { type: 'player-joined', payload: newcomer })).toBe(updated)
-    expect(gameStateReducer(state, { type: 'player-joined', payload: { ...newcomer, gameId: 'other' } })).toBe(state)
+  it('uses server colours across reordered snapshots and departures, including a fresh reconnect', () => {
+    const colours = (state: ClientGameState) => Object.fromEntries(
+      state.playback.robots.map((robot) => [robot.robotId, robot.colour]),
+    )
+    const initial = programmingState()
+    expect(colours(initial)).toEqual({ [robotId]: '#A66BE0', [stationaryRobotId]: '#4DC9C0' })
+    const reordered = gameStateReducer(initial, { type: 'joined', result: {
+      ...result, state: { ...publicState, robots: [...publicState.robots].reverse() },
+    } })
+    expect(colours(reordered)).toEqual(colours(initial))
+    const departed = gameStateReducer(reordered, { type: 'player-left', payload: {
+      gameId: publicState.gameId, playerId: publicState.robots[0].playerId, robotId,
+    } })
+    const reconnected = gameStateReducer(createClientGameState(), { type: 'joined', result: {
+      ...result, assignment: { ...result.assignment,
+        playerId: publicState.robots[1].playerId, robotId: stationaryRobotId },
+      state: { ...publicState,
+        players: publicState.players.slice(1), robots: publicState.robots.slice(1) },
+    } })
+    expect(colours(reconnected)).toEqual(colours(departed))
+    expect(colours(reconnected)).toEqual({ [stationaryRobotId]: '#4DC9C0' })
   })
 
   it('removes a departed robot and its queued actions without disturbing another robot', () => {
-    let state = gameStateReducer(programmingState(), { type: 'player-joined', payload: newcomer })
+    let state = programmingState()
     state = gameStateReducer(state, { type: 'action', action: actions[0] })
-    state = gameStateReducer(state, { type: 'action', action: { ...actions[0], robotId: 'new-robot' } })
-    const payload = { gameId: publicState.gameId, playerId: 'new-player', robotId: 'new-robot' }
+    state = gameStateReducer(state, { type: 'action', action: { ...actions[0], robotId: stationaryRobotId } })
+    const payload = { gameId: publicState.gameId, playerId: publicState.robots[1].playerId, robotId: stationaryRobotId }
     const updated = gameStateReducer(state, { type: 'player-left', payload })
-    expect(updated.players.map((player) => player.playerId)).not.toContain('new-player')
-    expect(updated.playback.robots.some((robot) => robot.robotId === 'new-robot')).toBe(false)
+    expect(updated.players.map((player) => player.playerId)).not.toContain(publicState.robots[1].playerId)
+    expect(updated.playback.robots.some((robot) => robot.robotId === stationaryRobotId)).toBe(false)
     expect(updated.playback.pending).toEqual([])
     expect(updated.playback.active).toBe(state.playback.active)
     expect(gameStateReducer(updated, { type: 'player-left', payload })).toBe(updated)
