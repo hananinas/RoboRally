@@ -17,6 +17,8 @@
   },
   "dependencies": {
     "@robo-rally/game-events": "workspace:*",
+    "cookie": "^1.0.2",
+    "openid-client": "^6.8.8",
     "socket.io": "^4.8.4",
     "neverthrow": "^8.2.0",
     "pino": "^10.4.0",
