@@ -151,6 +151,7 @@ export type RobotActionResolved = Readonly<{
   robotId: RobotId
   instruction: Instruction
   position: Position
+  pushedRobots: readonly Pick<Robot, 'robotId' | 'position'>[]
 }>
 
 export type GetLobbyDetails = Readonly<Record<string, never>>

@@ -8,6 +8,7 @@ Will update with a more conceptual domain diagram which will be used for present
         class Game {
         +board: Board
         +players: Player[]
+        +rebootTile: Position readonly
         -phase: GamePhase
         -currentRegister: int
         -activatedRobotIds: RobotId[] set
@@ -18,7 +19,7 @@ Will update with a more conceptual domain diagram which will be used for present
         +executeNextAction() NextActionResult
         -nextRobotByPriority() Robot
         -executeCard(Robot robot, Card card)
-        -resolveTileEntry(Robot robot, Tile tile) continue_or_stop
+        -resolveMovementEntry(Robot robot, Position position) continue_or_stop
         }
 
         class Board {
@@ -26,11 +27,11 @@ Will update with a more conceptual domain diagram which will be used for present
         -robotPositions: Map
         +positionOf(RobotId robotId) Position
         +occupantAt(Position position) RobotId?
+        +allowsPlacement(Position position) bool
         +placeRobot(RobotId robotId, Position position)
         +relocateRobot(RobotId robotId, Position position)
         +nearestFreePosition(Position origin) Position?
-        +hasEntryEffect(TileEntryEffect effect) bool
-        +moveRobot(RobotId robotId, Direction direction, PositiveInteger steps) MovementResult
+        +pushRobot(RobotId robotId, Direction direction) RobotId[]
         }
 
         class Tile {
@@ -99,15 +100,17 @@ Will update with a more conceptual domain diagram which will be used for present
 
 Game deals cards, accepts programs, and executes five registers. `submitProgram()` validates five distinct card IDs against the player's hand. Each action selects a pending robot using current Board positions and antenna priority. Movement uses `Game.moveRobot()`; turns change Robot's direction.
 
-`Game.moveRobot(robot, direction, steps)` attempts one Board step at a time and resolves entry effects after each successful step. Blocked steps stop movement without an effect. The resolver returns `continue` or `stop`; rebooting relocates immediately and discards the remaining steps. Each programmed action reports the final position and orientation before priority is recalculated.
+`Game.moveRobot(robot, direction, steps)` calls `Board.pushRobot()` one step at a time. After each successful step, it resolves entry effects for every displaced robot, farthest first. Blocked steps stop movement without an effect and preserve earlier successful steps. Entering a pit or leaving the board immediately reboots that robot through the same resolver. A pushed robot rebooting does not stop the initiating robot's remaining movement; the initiating robot rebooting does. Facing and programmed registers are preserved. Pushing does not mark the displaced robot as activated. Each programmed action reports the acting robot's final position and orientation before pending priority is recalculated.
 
 Direct movement preserves orientation, programs, submissions, and register state. It neither starts a round nor marks an action complete, awards checkpoints, or emits events. Checkpoints are evaluated at final positions when all remaining robots finish a register, including when a departure completes it. Only the next numbered checkpoint counts; passing over one does not. After register five, Game returns to programming with progress preserved. Completing the course does not end the game.
 
 # Board
 
-Board owns the tile grid, antenna, and RobotId-to-Position map. `Board.moveRobot()` checks both sides of walls, board edges, and robot occupancy, without executing tile effects. Gameplay displacement, including future pushing, goes through Game's movement operation.
+Board owns the tile grid, antenna, and RobotId-to-Position map. It resolves one spatial movement step at a time without executing tile effects. The antenna square is impassable. Entering a pit or leaving the board records the robot's new position; Game resolves the reboot before another gameplay step or action.
 
-Placement, relocation, and safe-destination search use `allowsPlacement()` for tile suitability, with bounds and occupancy checked separately. Pits remain enterable during movement. Relocation does not trigger entry effects. Reboot search uses Manhattan distance, then top-to-bottom and left-to-right tie-breaking; enclosing walls do not exclude a destination. `hasEntryEffect('reboot')` lets Game require reboot configuration where needed.
+`Board.pushRobot()` validates the complete chain before changing any positions. A wall on either side of any crossed boundary or the priority antenna blocks the whole step. Otherwise it moves the chain farthest first and returns the displaced robot IDs in that order. Board only changes positions; Game handles entry effects after the complete step. Gameplay displacement goes through Game's movement operation.
+
+Placement, relocation, spawning, reboot configuration, and safe-destination search use `Board.allowsPlacement()` to check bounds, tile suitability, and exclusion of the antenna. Robot occupancy is checked separately. Pits remain enterable during movement. Relocation does not trigger entry effects. Every Game requires a valid reboot tile, including on maps without pits. Reboot search uses Manhattan distance, then top-to-bottom and left-to-right tie-breaking; enclosing walls do not exclude a destination.
 
 # Tile
 
@@ -128,7 +131,22 @@ Definitions contain no callbacks. Walls, optional checkpoint numbers, and future
 4. Add map construction and, for public kinds, shared types, AsyncAPI, the board adapter, and rendering. The presenter serializes `tile.kind` directly.
 5. Test placement, movement, effect timing, and presentation through public APIs.
 
-Register-end effects need their own ordered phase when implemented. Conveyors and pushing still need scheduling and collision design. Pit animations, damage, register cancellation, direction selection, and board-edge falls remain deferred.
+Register-end effects need their own ordered phase when implemented. Conveyors and push panels remain unimplemented. Pit animations, damage, register cancellation, and direction selection remain deferred.
+
+## Action playback
+
+Each `NextActionResult` captures the acting robot and a `pushedRobots` list of other robots whose final positions changed during the card. These snapshots include completed reboots and remain independent of later movement. The presenter includes this list in the existing `robot.actionResolved` event; ordinary turns and blocked movements send an empty list.
+
+Client playback applies the acting robot's result and all pushed results together when that queued action starts, preserving each robot's reported orientation and the existing card timing. A push does not create extra programmed actions. Departed robots are not recreated, and queued pushes to surviving robots are retained when the acting robot leaves.
+
+## Pushing tests
+
+Build and run the multiplayer push tests:
+
+```sh
+pnpm build
+pnpm --filter @robo-rally/client exec playwright test --config playwright.membership.config.ts tests/pushing-multiplayer.e2e.ts
+```
 
 # Robot
 

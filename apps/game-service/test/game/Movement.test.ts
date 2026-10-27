@@ -8,7 +8,7 @@ function createGame(pitWalls: readonly Direction[] = [], startWalls: readonly Di
   tiles[1][1] = new PitTile(pitWalls)
   tiles[0][4] = new EmptyTile([], 1)
   tiles[2][3] = new EmptyTile([], 2)
-  const board = new Board(tiles, { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
+  const board = new Board(tiles, { x: Integer(4), y: Integer(1), angle: Math.PI / 2 })
   const robot = new Robot('robot', Direction.NORTH)
   const start = { x: Integer(0), y: Integer(1) }
   const pit = { x: Integer(1), y: Integer(1) }
@@ -22,7 +22,7 @@ function createGame(pitWalls: readonly Direction[] = [], startWalls: readonly Di
     new Card('move', 'MOVE_1'),
     new Card('back', 'BACK_UP'),
   ]
-  const game = new Game(board, [player], program, undefined, reboot)
+  const game = new Game(board, [player], program, reboot)
   return { board, robot, player, program, game, start, pit, reboot }
 }
 
@@ -55,6 +55,20 @@ describe('shared gameplay movement', () => {
 
     expect(board.positionOf(robot.id)).toEqual({ x: Integer(3), y: Integer(0) })
     expect(robot.direction).toBe(Direction.NORTH)
+  })
+
+  it('keeps successful steps when a multi-step move reaches the antenna', () => {
+    const { board, robot, game } = createGame()
+    const start = { x: Integer(2), y: Integer(1) }
+    const destination = { x: Integer(3), y: Integer(1) }
+    board.relocateRobot(robot.id, start)
+
+    game.moveRobot(robot, Direction.EAST, PositiveInteger(3))
+
+    expect(board.positionOf(robot.id)).toEqual(destination)
+    expect(board.occupantAt(start)).toBeUndefined()
+    expect(board.occupantAt(destination)).toBe(robot.id)
+    expect(board.occupantAt(board.antenna)).toBeUndefined()
   })
 
   it.each([

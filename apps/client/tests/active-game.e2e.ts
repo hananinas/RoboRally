@@ -1,6 +1,7 @@
 import type { Dialog, Page } from '@playwright/test'
 import { expect, openGame, test } from './game-fixture.ts'
 import { GAME_ID, OTHER_PLAYER_ID, OTHER_ROBOT_ID, PLAYER_ID, ROBOT_ID, ROUND_ACTIONS } from './game-fixture-data.ts'
+import { gameStatus } from './browserClient.ts'
 async function fillProgram(page: Page, indices = [0, 1, 2, 3, 4]) {
   const cards = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
   for (const index of indices) await cards.nth(index).click()
@@ -252,9 +253,11 @@ test('clears a dangling "d" instead of letting it bleed into the next round', as
   await page.getByRole('button', { name: 'Done', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()
   
-  //wait for round to finish
+  // Wait for each register to start before advancing its playback timer. The
+  // HTTP control response can arrive before the browser receives socket events.
   await game.control({ type: 'round', actions: ROUND_ACTIONS })
   for (const action of ROUND_ACTIONS) {
+    await expect(page.locator('.register[data-active]')).toContainText(String(action.registerIndex + 1))
     await page.clock.runFor(action.instruction === 'TURN_LEFT' ? 300 : 600)
   }
 
@@ -641,7 +644,12 @@ for (const submitting of [false, true]) {
     }
 
     await game.control({ type: 'disconnect' })
-    await expect(page.getByRole('status')).toHaveText('Not connected')
+    await expect(gameStatus(page)).toHaveText('Not connected')
+    const overlay = page.locator('.disconnect-overlay')
+    await expect(overlay).toBeVisible()
+    await expect(overlay.getByRole('heading', {name: 'Connection to server lost', exact: true,})).toBeVisible()
+    await expect(overlay.getByRole('status')).toBeVisible()
+    await expect(overlay.getByRole('button', {name: 'Leave game', exact: true,})).toBeDisabled()
     await expect(page.getByRole('alert')).toContainText('Connection lost. Reconnecting… Your program was not resent.')
     await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
     await expect(page.getByRole('textbox', { name: 'Username' })).toHaveCount(0)
@@ -718,6 +726,7 @@ test('displays all basic cards and plays their results across two programs', asy
       robotId: ROBOT_ID,
       instruction: step.instruction,
       position: { coordinate: { x: step.x, y: step.y }, orientation: step.orientation },
+      pushedRobots: [],
     })) })
     for (const step of round.steps) {
       await expect(robot).toHaveAttribute('data-board-tile', `${step.x},${step.y}`)
