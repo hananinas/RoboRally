@@ -1,6 +1,6 @@
 import type { PublicRobotActionResolved } from '../src/scenes/active-game/publicRegisters.ts'
 import { GAME_ID } from './game-fixture-data.ts'
-import { ADA_ID, REGISTER_ROBOT_IDS, createRegisterState, executionPlayers } from './player-registers-fixtures.ts'
+import { ADA_ID, NOOR_ID, REGISTER_ROBOT_IDS, createRegisterState, executionPlayers } from './player-registers-fixtures.ts'
 import { expect, openGame, test } from './game-fixture.ts'
 
 test('opponents expose only public registers on hover and keyboard focus', async ({ page, game }) => {
@@ -8,13 +8,16 @@ test('opponents expose only public registers on hover and keyboard focus', async
   await openGame(page)
   const panel = page.getByRole('complementary', { name: 'Other players’ registers' })
   await expect(panel.getByRole('button')).toHaveCount(3)
+  await expect(panel.getByRole('button', { name: /^Noor,/ })).toHaveAccessibleName(/Reconnecting/)
+  await expect(page.getByRole('heading', { name: 'Noor has disconnected' })).toBeVisible()
+  await game.control({ type: 'connection-changed', payload: { gameId: GAME_ID, playerId: NOOR_ID, connected: true, paused: false } })
+  await expect(page.locator('.disconnect-overlay')).toHaveCount(0)
   const ada = panel.getByRole('button', { name: /^Ada,/ })
   await expect(ada).toHaveAttribute('aria-expanded', 'false')
   await ada.hover()
   await expect(ada).toHaveAttribute('aria-expanded', 'true')
   await expect(ada.locator('.other-player__slot-label')).toHaveText(['Filled', 'Filled', 'Filled', 'Empty', 'Empty'])
   await expect(ada.locator('.other-player__status')).toHaveText('3/5 programmed')
-  await expect(panel.getByRole('button', { name: /^Noor,/ })).toHaveAccessibleName(/Reconnecting/)
   await expect(panel).not.toContainText('Move 3')
   await ada.focus()
   await page.mouse.move(800, 500)
@@ -37,6 +40,7 @@ test('socket broadcasts reveal actions and reset the next programming round inde
   const action: PublicRobotActionResolved = {
     gameId: GAME_ID, playerId: ADA_ID, robotId: REGISTER_ROBOT_IDS[0], registerIndex: 2, instruction: 'MOVE_2',
     position: { coordinate: { x: 3, y: 1 }, orientation: 'NORTH' },
+    pushedRobots: [],
   }
   await game.control({ type: 'round', actions: [action, { ...action, registerIndex: 3, instruction: 'BACK_UP' }], deferHand: true })
   await expect(ada.locator('.other-player__slot--current .other-player__slot-label')).toHaveText('Move 2')

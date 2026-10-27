@@ -6,6 +6,7 @@ import { Card } from '@/game/Card'
 import type { CardId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
 import { Robot } from '@/game/Robot'
+import { tileDefinitions } from '@/game/Tile'
 import { Direction, opposite, type Position } from '@/game/spatial'
 import { Integer, PositiveInteger, UnsignedInteger } from '@/numbers'
 
@@ -21,6 +22,11 @@ export type RobotActionResult = Readonly<{
 export type NextActionResult = Readonly<{
   registerIndex: number
   action: RobotActionResult
+  pushedRobots: readonly Readonly<{
+    robotId: RobotId
+    position: Position
+    direction: Direction
+  }>[]
 }>
 
 export type AddPlayerError = 'GAME_ALREADY_STARTED' | 'NO_SPAWN_AVAILABLE'
@@ -38,6 +44,7 @@ export class Game {
   readonly name: string
   readonly board: Board
   private readonly roster: Player[]
+  readonly rebootTile: Position
   private readonly deck: readonly Card[]
   private currentPhase: GamePhase = 'programming'
   private registerIndex = 0
@@ -51,10 +58,17 @@ export class Game {
     board: Board,
     players: readonly Player[],
     deck: readonly Card[],
+    rebootTile: Position,
     name: string = DEFAULT_GAME_NAME,
   ) {
     if (deck.length < 5 || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')
+    }
+    if (rebootTile === undefined) {
+      throw new RangeError('A game requires a reboot tile')
+    }
+    if (!board.allowsPlacement(rebootTile)) {
+      throw new RangeError('Reboot tile must be a non-pit tile on the board outside the priority antenna')
     }
 
     const playerIds = new Set<PlayerId>()
@@ -63,7 +77,9 @@ export class Game {
       if (playerIds.has(player.id) || robotIds.has(player.robot.id)) {
         throw new RangeError('Players and robots must have unique IDs')
       }
-      board.positionOf(player.robot.id)
+      if (!board.allowsPlacement(board.positionOf(player.robot.id))) {
+        throw new RangeError('Robots cannot start on pits or the priority antenna')
+      }
       playerIds.add(player.id)
       robotIds.add(player.robot.id)
     }
@@ -71,6 +87,7 @@ export class Game {
     this.board = board
     this.name = name
     this.roster = [...players]
+    this.rebootTile = Object.freeze({ ...rebootTile })
     this.deck = [...deck]
     this.dealCards()
   }
@@ -124,9 +141,13 @@ export class Game {
     const { width, height } = this.board
     const y = Math.floor(height / 2)
     let x = Math.floor(width / 2)
-    while (x >= 0 && this.board.occupantAt({ x: Integer(x), y: Integer(y) }) !== undefined) x--
-    if (x < 0) return err('NO_SPAWN_AVAILABLE')
-    return ok({ x: Integer(x), y: Integer(y) })
+    while (x >= 0) {
+      const position = { x: Integer(x), y: Integer(y) }
+      if (this.board.allowsPlacement(position) &&
+          this.board.occupantAt(position) === undefined) return ok(position)
+      x--
+    }
+    return err('NO_SPAWN_AVAILABLE')
   }
 
   addPlayer(): Result<Player, AddPlayerError> {
@@ -208,6 +229,21 @@ export class Game {
     }
   }
 
+  // Gameplay movement resolves entry effects; Board movement only changes positions.
+  moveRobot(robot: Robot, direction: Direction, steps: PositiveInteger): void {
+    for (let step = 0; step < steps; step++) {
+      const movedRobotIds = this.board.pushRobot(robot.id, direction)
+      if (movedRobotIds.length === 0) return
+
+      for (const id of movedRobotIds) {
+        const movedRobot = id === robot.id ? robot : this.roster.find((player) => player.robot.id === id)?.robot
+        if (movedRobot === undefined) throw new Error(`Pushed robot ${id} is not in the game`)
+        const entry = this.resolveMovementEntry(movedRobot, this.board.positionOf(id))
+        if (id === robot.id && entry === 'stop') return
+      }
+    }
+  }
+
   executeNextAction(): NextActionResult {
     if (this.currentPhase !== 'activation') {
       throw new Error('Robot actions can only execute during activation')
@@ -218,6 +254,7 @@ export class Game {
 
     const registerIndex = this.registerIndex
     const card = robot.getProgramCard(UnsignedInteger(registerIndex))
+    const previousPositions = this.roster.map((player) => this.board.positionOf(player.robot.id))
     this.executeCard(robot, card)
     this.activatedRobotIds.add(robot.id)
     const action: RobotActionResult = {
@@ -226,12 +263,19 @@ export class Game {
       position: this.board.positionOf(robot.id),
       direction: robot.direction,
     }
+    const pushedRobots = this.roster.flatMap(({ robot: other }, index) => {
+      if (other.id === robot.id) return []
+      const position = this.board.positionOf(other.id)
+      const previous = previousPositions[index]
+      if (position.x === previous.x && position.y === previous.y) return []
+      return [{ robotId: other.id, position, direction: other.direction }]
+    })
 
     if (this.activatedRobotIds.size === this.players.length) {
       this.activateBoardElements()
       this.finishRegister()
     }
-    return { registerIndex, action }
+    return { registerIndex, action, pushedRobots }
   }
 
   private dealCards(): void {
@@ -279,10 +323,33 @@ export class Game {
     const effect = instructions[card.instruction]
     if (effect.kind === 'move') {
       const direction = effect.steps < 0 ? opposite(robot.direction) : robot.direction
-      this.board.moveRobot(robot.id, direction, PositiveInteger(Math.abs(effect.steps)))
+      this.moveRobot(robot, direction, PositiveInteger(Math.abs(effect.steps)))
     } else {
       robot.turn(effect.quarterTurns)
     }
+  }
+
+  private resolveMovementEntry(robot: Robot, position: Position): 'continue' | 'stop' {
+    const tile = this.board.getTile(position)
+    const effect = tile === undefined ? 'reboot' : tileDefinitions[tile.kind].entryEffect
+    switch (effect) {
+      case undefined:
+        return 'continue'
+      case 'reboot':
+        this.rebootRobot(robot)
+        return 'stop'
+      default: {
+        const unexpectedEffect: never = effect
+        throw new Error(`Unsupported tile entry effect: ${String(unexpectedEffect)}`)
+      }
+    }
+  }
+
+  private rebootRobot(robot: Robot): void {
+    const destination = this.board.nearestFreePosition(this.rebootTile)
+    if (destination === undefined) throw new Error('No safe reboot destination is available')
+    this.board.relocateRobot(robot.id, destination)
+    // TODO: Add two SPAM cards and cancel this robot's remaining registers.
   }
 
   private activateBoardElements(): void {

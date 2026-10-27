@@ -1,13 +1,7 @@
 import { type Direction, type Position, neighbour, opposite } from '@/game/spatial'
 import type { RobotId } from '@/game/ids'
-import type { Tile } from '@/game/Tile'
-import type { PositiveInteger } from '@/numbers'
-
-export type MovementResult = Readonly<{
-  position: Position
-  stepsMoved: number
-  blocked: boolean
-}>
+import { allowsPlacement, type Tile } from '@/game/Tile'
+import { Integer } from '@/numbers'
 
 export type Antenna = Readonly<Position & { angle: number }>
 
@@ -68,9 +62,22 @@ export class Board {
     return this.contains(position) ? this.tiles[position.y][position.x] : undefined
   }
 
+  // Tile and obstacle suitability; robot occupancy is checked separately.
+  allowsPlacement(position: Position): boolean {
+    return allowsPlacement(this.getTile(position)) && !this.isAntenna(position)
+  }
+
+  private isAntenna(position: Position): boolean {
+    return position.x === this.antenna.x && position.y === this.antenna.y
+  }
+
   placeRobot(robotId: RobotId, position: Position): void {
-    if (!this.contains(position)) {
+    const tile = this.getTile(position)
+    if (tile === undefined) {
       throw new RangeError('Robot position must be on the board')
+    }
+    if (!this.allowsPlacement(position)) {
+      throw new RangeError('Robots cannot be placed on pits or the priority antenna')
     }
     if (this.robotPositions.has(robotId)) {
       throw new Error(`Robot ${robotId} is already on the board`)
@@ -80,6 +87,35 @@ export class Board {
     }
 
     this.robotPositions.set(robotId, { ...position })
+  }
+
+  relocateRobot(robotId: RobotId, position: Position): void {
+    this.positionOf(robotId)
+    if (!this.allowsPlacement(position)) {
+      throw new RangeError('Robot destination must be a non-pit tile on the board outside the priority antenna')
+    }
+    const occupant = this.occupantAt(position)
+    if (occupant !== undefined && occupant !== robotId) {
+      throw new Error('Tile is already occupied')
+    }
+    this.updateRobotPosition(robotId, position)
+  }
+
+  nearestFreePosition(origin: Position): Position | undefined {
+    let nearest: Position | undefined
+    let nearestDistance = Infinity
+    for (let y = 0; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        const position = { x: Integer(x), y: Integer(y) }
+        if (!this.allowsPlacement(position) || this.occupantAt(position) !== undefined) continue
+        const distance = Math.abs(x - origin.x) + Math.abs(y - origin.y)
+        if (distance < nearestDistance) {
+          nearest = position
+          nearestDistance = distance
+        }
+      }
+    }
+    return nearest
   }
 
   positionOf(robotId: RobotId): Position {
@@ -107,41 +143,30 @@ export class Board {
     this.robotPositions.set(robotId, { ...position })
   }
 
-  moveRobot(robotId: RobotId, direction: Direction, steps: PositiveInteger): MovementResult {
-    // Verify robot is on the board
-    let currentPosition = this.positionOf(robotId)
-    let nextPosition: Position = currentPosition
-    let stepsMoved = 0
-    
-    for (let step = 0; step < steps; step++) {
-      currentPosition = nextPosition
-      nextPosition = neighbour(nextPosition, direction)
+  private blocksMovement(position: Position, direction: Direction): boolean {
+    const nextPosition = neighbour(position, direction)
+    return this.getTile(position)?.hasWall(direction) === true ||
+      this.getTile(nextPosition)?.hasWall(opposite(direction)) === true ||
+      this.isAntenna(nextPosition)
+  }
 
-      if (this.getTile(currentPosition)?.hasWall(direction)) {
-        // robot is blocked by a wall in the current tile
-        return { position: currentPosition, stepsMoved: step, blocked: true }
-      }
-
-      if (this.getTile(nextPosition)?.hasWall(opposite(direction))) {
-        // robot blocked by a wall in the next tile
-        return { position: currentPosition, stepsMoved: step, blocked: true }
-      }
-
-      if (!this.contains(nextPosition)) {
-        // robot hits board edge
-        return { position: currentPosition, stepsMoved: step, blocked: true }
-      }
-      
-      if (this.occupantAt(nextPosition) !== undefined) {
-        // robot is blocked by another robot
-        return { position: currentPosition, stepsMoved: step, blocked: true }
-      }
-
-      // move the robot to the next position as it is free
-      this.updateRobotPosition(robotId, nextPosition)
-      stepsMoved = step + 1
+  // One atomic step. Return displaced robots farthest first for entry effects.
+  pushRobot(robotId: RobotId, direction: Direction): readonly RobotId[] {
+    const chain = [robotId]
+    let position = this.positionOf(robotId)
+    while (true) {
+      if (this.blocksMovement(position, direction)) return []
+      const nextPosition = neighbour(position, direction)
+      const occupant = this.occupantAt(nextPosition)
+      if (occupant === undefined) break
+      chain.push(occupant)
+      position = nextPosition
     }
 
-    return { position: this.positionOf(robotId), stepsMoved: stepsMoved, blocked: false }
+    chain.reverse()
+    for (const id of chain) {
+      this.updateRobotPosition(id, neighbour(this.positionOf(id), direction))
+    }
+    return chain
   }
 }

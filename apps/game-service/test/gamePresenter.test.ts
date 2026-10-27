@@ -3,6 +3,7 @@ import type {
   CardsDealt,
   PublicGameState,
   RobotActionResolved,
+  Tile as TilePayload,
 } from '@robo-rally/game-events'
 import {
   Board,
@@ -10,9 +11,11 @@ import {
   Direction,
   EmptyTile,
   Game,
+  PitTile,
   Player,
   Robot,
   createGame,
+  type TileKind,
 } from '@/game/index.ts'
 import {
   presentCardsDealt,
@@ -29,6 +32,47 @@ function createGameWithPlayer() {
 }
 
 describe('game presenter', () => {
+  it('serializes pushed robot positions and orientations alongside the acting robot', () => {
+    const { player } = createGameWithPlayer()
+    const resolved = presentRobotActionResolved('game', {
+      registerIndex: 0,
+      action: { robotId: player.robot.id, card: player.hand[0], position: { x: Integer(2), y: Integer(3) }, direction: Direction.EAST },
+      pushedRobots: [
+        { robotId: 'pushed', position: { x: Integer(3), y: Integer(3) }, direction: Direction.NORTH },
+        { robotId: 'rebooted', position: { x: Integer(0), y: Integer(0) }, direction: Direction.WEST },
+      ],
+    })
+
+    expect(resolved.pushedRobots).toEqual([
+      { robotId: 'pushed', position: { coordinate: { x: 3, y: 3 }, orientation: 'NORTH' } },
+      { robotId: 'rebooted', position: { coordinate: { x: 0, y: 0 }, orientation: 'WEST' } },
+    ])
+  })
+
+  it('keeps domain tile kinds exhaustively compatible with public tile types', () => {
+    expectTypeOf<TileKind>().toEqualTypeOf<TilePayload['type']>()
+  })
+
+  it('serializes pits alongside empty tiles, walls and checkpoints', () => {
+    const board = new Board([[
+      new EmptyTile(),
+      new PitTile(),
+      new PitTile([Direction.NORTH, Direction.WEST]),
+      new EmptyTile([Direction.SOUTH], 1),
+    ]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
+    const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
+    const game = new Game(board, [], cards, { x: Integer(0), y: Integer(0) })
+    const state = presentPublicGameState('game', game)
+
+    expect(state.checkpointCount).toBe(1)
+    expect(state.board.tiles).toEqual([
+      { position: { x: 0, y: 0 }, type: 'EMPTY' },
+      { position: { x: 1, y: 0 }, type: 'PIT' },
+      { position: { x: 2, y: 0 }, type: 'PIT', walls: ['NORTH', 'WEST'] },
+      { position: { x: 3, y: 0 }, type: 'EMPTY', walls: ['SOUTH'], checkpointNumber: 1 },
+    ])
+  })
+
   it('presents a complete public programming state in row-major order', () => {
     const { gameId, game, player } = createGameWithPlayer()
     const state = presentPublicGameState(gameId, game)
@@ -71,7 +115,7 @@ describe('game presenter', () => {
         new EmptyTile([Direction.NORTH, Direction.WEST], 1),
         new EmptyTile(),
       ],
-    ], { x: Integer(0), y: Integer(0), angle: Math.PI / 2 })
+    ], { x: Integer(1), y: Integer(0), angle: Math.PI / 2 })
     const robot = new Robot('robot', Direction.EAST)
     board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })
     const player = new Player('player', robot)
@@ -79,7 +123,7 @@ describe('game presenter', () => {
       { length: 5 },
       (_, index) => new Card(`card-${index}`, 'MOVE_1'),
     )
-    const game = new Game(board, [player], cards)
+    const game = new Game(board, [player], cards, { x: Integer(0), y: Integer(0) })
     game.submitProgram(player.id, cards.map((card) => card.id))
 
     const state = presentPublicGameState('game', game)
@@ -135,7 +179,7 @@ describe('game presenter', () => {
       direction: Direction.SOUTH,
     }
 
-    const resolved = presentRobotActionResolved('game', { registerIndex: 4, action })
+    const resolved = presentRobotActionResolved('game', { registerIndex: 4, action, pushedRobots: [] })
 
     expectTypeOf(resolved).toEqualTypeOf<RobotActionResolved>()
     expect(resolved).toEqual({
@@ -143,6 +187,7 @@ describe('game presenter', () => {
       registerIndex: 4,
       robotId: player.robot.id,
       instruction,
+      pushedRobots: [],
       position: {
         coordinate: { x: 4, y: 5 },
         orientation: 'SOUTH',

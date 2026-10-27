@@ -1,9 +1,31 @@
+import { Integer } from '@/numbers'
 import { submitProgramSchema } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'
 import { boardMaps } from '@/game/boardMaps'
 import { Direction, createGame, createPlayer } from '@/game/index'
 
 describe('game factory', () => {
+  it.each(['empty-map', 'test-map'] as const)('reboots at the configured destination after falling off %s', (mapName) => {
+    const { game } = createGame(mapName)
+    const player = game.addPlayer()._unsafeUnwrap()
+    game.board.relocateRobot(player.robot.id, { x: Integer(0), y: Integer(0) })
+    game.submitProgram(player.id, [0, 4, 5, 3, 6].map((index) => player.hand[index].id))._unsafeUnwrap()
+
+    expect(game.executeNextAction().action.position).toEqual(boardMaps[mapName].rebootTile)
+    expect(player.robot.direction).toBe(Direction.NORTH)
+    expect(game.board.occupantAt({ x: Integer(0), y: Integer(0) })).toBeUndefined()
+  })
+
+  it('uses the map reboot tile when a robot enters a test pit', () => {
+    const { game } = createGame('test-map')
+    const player = game.addPlayer()._unsafeUnwrap()
+    game.board.relocateRobot(player.robot.id, { x: Integer(5), y: Integer(11) })
+    game.submitProgram(player.id, [0, 4, 5, 3, 6].map((index) => player.hand[index].id))._unsafeUnwrap()
+
+    expect(game.executeNextAction().action.position).toEqual(boardMaps['test-map'].rebootTile)
+    expect(player.robot.direction).toBe(Direction.NORTH)
+  })
+
   it('creates a programming-phase game on the map-sized board with no players', () => {
     const { gameId, game } = createGame()
 

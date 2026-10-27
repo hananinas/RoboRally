@@ -37,6 +37,7 @@ export const executionPlayers: readonly PublicPlayerState[] = programmingPlayers
 export const executionAction: PublicRobotActionResolved = {
   gameId: GAME_ID, playerId: ADA_ID, robotId: REGISTER_ROBOT_IDS[0], registerIndex: 2, instruction: 'MOVE_2',
   position: { coordinate: { x: 3, y: 1 }, orientation: 'NORTH' },
+  pushedRobots: [],
 }
 
 export function createRegisterState(executing = false): PublicGameState & { players: readonly PublicPlayerState[] } {

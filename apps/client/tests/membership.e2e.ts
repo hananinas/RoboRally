@@ -32,6 +32,8 @@ test('two real clients see joins and leaves without losing the first player’s 
     await expect(other.getByRole('textbox', { name: 'Username' })).toHaveCount(0)
     await expect.poll(() => robotIds(page)).toEqual([firstRobot])
     await expect(selected).toBeVisible()
+    await expect(page.locator('.disconnect-overlay')).toHaveCount(0)
+    await expect(selected).toBeEnabled()
 
     await other.getByRole('button', { name: /Shared game/ }).click()
     await other.getByRole('button', { name: 'Join game', exact: true }).click()
@@ -41,7 +43,11 @@ test('two real clients see joins and leaves without losing the first player’s 
     expect(replacementRobot).not.toBe(secondRobot)
     await expect(page.locator(`[data-robot-id="${replacementRobot}"]`).first()).toHaveAttribute('data-board-tile', '7,7')
     await expect(selected).toBeVisible()
+    
     await leave(other)
+    await expect.poll(() => robotIds(page)).toEqual([firstRobot])
+    await expect(page.locator('.disconnect-overlay')).toHaveCount(0)
+    await expect(selected).toBeEnabled()
     await leave(page)
   } finally {
     await otherContext.close()

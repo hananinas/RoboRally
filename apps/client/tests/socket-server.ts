@@ -97,6 +97,9 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
     case 'checkpoint-progress':
       for (const socket of fixture.sockets) socket.emit('player.checkpointProgress', control.progress)
       break
+    case 'connection-changed':
+      for (const socket of fixture.sockets) socket.emit('game.playerConnectionChanged', control.payload)
+      break
     case 'registers-changed':
       for (const socket of fixture.sockets) socket.emit('game.registersChanged', control.payload)
       break
@@ -162,9 +165,11 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
     case 'round': {
       let robots = fixture.state.robots
       for (const action of control.actions) {
-        robots = robots.map((robot) => robot.robotId === action.robotId
-          ? { ...robot, position: action.position }
-          : robot)
+        robots = robots.map((robot) => {
+          const position = robot.robotId === action.robotId ? action.position
+            : action.pushedRobots.find((pushed) => pushed.robotId === robot.robotId)?.position
+          return position === undefined ? robot : { ...robot, position }
+        })
       }
       fixture.state = { ...fixture.state, phase: 'PROGRAMMING', robots }
       fixture.cards = dealCards()

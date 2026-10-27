@@ -21,7 +21,7 @@ function createGame(starts = [{ x: 0, y: 1, direction: Direction.EAST }]) {
     right: new Card('right', 'TURN_RIGHT'),
     uturn: new Card('uturn', 'U_TURN'),
   }
-  const game = new Game(board, players, Object.values(cards))
+  const game = new Game(board, players, Object.values(cards), { x: Integer(0), y: Integer(2) })
   return { board, players, cards, game }
 }
 
@@ -84,7 +84,11 @@ describe('checkpoint activation', () => {
       { x: 0, y: 1, direction: Direction.EAST },
       { x: 1, y: 2, direction: Direction.NORTH },
     ])
-    for (const player of players) game.submitProgram(player.id, [c.step, c.stepAgain, c.left, c.right, c.uturn].map((card) => card.id))
+    game.submitProgram(players[0].id, [c.step, c.stepAgain, c.left, c.right, c.uturn].map((card) => card.id))
+    game.submitProgram(players[1].id, [c.left, c.right, c.step, c.stepAgain, c.uturn].map((card) => card.id))
+    game.executeNextAction()
+    game.executeNextAction()
+    expect(players.map((player) => player.lastCheckpoint)).toEqual([1, 0])
     game.executeNextAction()
     game.executeNextAction()
     expect(players.map((player) => player.lastCheckpoint)).toEqual([1, 0])

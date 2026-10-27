@@ -1,5 +1,5 @@
 import type { Antenna, BoardMap } from '@/game/Board'
-import { Direction } from '@/game/spatial'
+import { Direction, type Position } from '@/game/spatial'
 import { Integer } from '@/numbers'
 
 const { NORTH: N, WEST: W, SOUTH: S, EAST: E } = Direction
@@ -29,6 +29,8 @@ export type MapSpec = BoardMap & Readonly<{
   antenna: Antenna
   walls: readonly WallSpec[]
   checkpoints: readonly (readonly [x: number, y: number])[]
+  pits?: readonly (readonly [x: number, y: number])[]
+  rebootTile: Position
 }>
 
 export const boardMaps = {
@@ -39,6 +41,7 @@ export const boardMaps = {
     width: 21,
     height: 15,
     antenna: { x: Integer(10), y: Integer(0), angle: Math.PI / 2 },
+    rebootTile: { x: Integer(10), y: Integer(7) },
     walls: [],
     checkpoints: [[10, 6], [8, 9]],
   },
@@ -48,11 +51,13 @@ export const boardMaps = {
     maxPlayers: 6,
     width: 16,
     height: 15,
+    pits: [[3, 3], [13, 4], [12, 7], [15, 9], [5, 10], [12, 11]],
+    rebootTile: { x: Integer(10), y: Integer(7) },
     antenna: { x: Integer(10), y: Integer(0), angle: Math.PI / 2 },
     checkpoints: [[10, 6], [8, 9]],
     walls: [
       // TEST written top left corner of map
-      { at: [1, 1], directions: [N, E] }, 
+      { at: [1, 1], directions: [N, E] },
       { at: [1, 2], directions: [E] },
       { at: [2, 1], directions: [N] },
       { at: [4, 1], directions: [N, W] },

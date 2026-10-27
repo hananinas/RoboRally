@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { boardMaps } from '@/game/boardMaps'
-import { Direction, EmptyTile, createBoard } from '@/game/index'
+import { Direction, EmptyTile, PitTile, createBoard } from '@/game/index'
 import { Integer } from '@/numbers'
 
 describe('board factory', () => {
+  it('keeps test pits within the resized map and preserves their walls', () => {
+    const board = createBoard('test-map')
+    for (const [x, y] of boardMaps['test-map'].pits) {
+      expect(board.getTile({ x: Integer(x), y: Integer(y) })).toBeInstanceOf(PitTile)
+    }
+    expect(board.getTile({ x: Integer(12), y: Integer(7) })?.walls).toEqual(new Set([Direction.NORTH, Direction.WEST]))
+  })
+
   it('creates the empty map with the size specified by the map and no walls', () => {
     const board = createBoard('empty-map')
 

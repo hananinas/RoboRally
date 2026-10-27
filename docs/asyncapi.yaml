@@ -556,6 +556,7 @@ components:
           - position
           - gameId
           - registerIndex
+          - pushedRobots
         properties:
           robotId:
             $ref: "#/components/schemas/RobotId"
@@ -563,6 +564,17 @@ components:
             $ref: "#/components/schemas/Instruction"
           position:
             $ref: "#/components/schemas/Position"
+          pushedRobots:
+            type: array
+            description: Final states of other robots displaced by this instruction, after all movement steps and reboots. Empty when no other robot changed position.
+            items:
+              type: object
+              required: [robotId, position]
+              properties:
+                robotId:
+                  $ref: "#/components/schemas/RobotId"
+                position:
+                  $ref: "#/components/schemas/Position"
           gameId:
             $ref: "#/components/schemas/GameId"
           registerIndex:
@@ -572,6 +584,9 @@ components:
             description: Zero-based register index; display 1–5. Multiple robot actions can share one index.
       description: >-
         Reports the resulting robot state after one programmed instruction.
+        position and pushedRobots are authoritative after any pit or board-edge
+        reboots. Apply them together as one action. Reboots complete before this
+        event and before selecting the next robot by antenna priority.
       examples:
         - name: firstRegister
           payload:
@@ -579,6 +594,7 @@ components:
             registerIndex: 0
             robotId: 00000000-0000-4000-8000-000000000003
             instruction: MOVE_1
+            pushedRobots: []
             position:
               coordinate:
                 x: 10
@@ -1052,6 +1068,7 @@ components:
     PublicGameState:
       description: >-
         Public board, robot, player, phase, and antenna state for a game.
+        Robot positions include any completed pit reboot.
       type: object
       required:
         - gameId
@@ -1207,7 +1224,10 @@ components:
           $ref: '#/components/schemas/Coordinate'
         type:
           type: string
-          enum: [ EMPTY ]
+          enum: [ EMPTY, PIT ]
+          description: >-
+            PIT triggers an immediate server-side reboot on entry during movement,
+            discarding the remaining steps of that instruction. Walls can block entry.
         walls:
           type: array
           uniqueItems: true
@@ -1217,7 +1237,7 @@ components:
           type: integer
           minimum: 1
           description: >-
-            Optional checkpoint on this tile, independent of its walls and type.
+            Optional checkpoint on an EMPTY tile, independent of its walls.
             Omit when absent. Numbers are unique and consecutive from 1 on a board.
             Checkpoints stay at their fixed positions and are available to every player.
     Antenna:

@@ -19,6 +19,7 @@ function joined(executing = false) {
 const action: PublicRobotActionResolved = {
   gameId: GAME_ID, playerId: ADA_ID, robotId: REGISTER_ROBOT_IDS[0], registerIndex: 2, instruction: 'MOVE_2',
   position: { coordinate: { x: 3, y: 1 }, orientation: 'NORTH' },
+  pushedRobots: [],
 }
 
 describe('public registers', () => {
@@ -59,6 +60,20 @@ describe('public registers', () => {
     expect(updated.players.find((player) => player.playerId === MIKKEL_ID)?.registers).toBe(state.players.find((player) => player.playerId === MIKKEL_ID)?.registers)
     const mismatched: PublicRobotActionResolved = { ...action, playerId: MIKKEL_ID }
     expect(gameStateReducer(state, { type: 'action', action: mismatched })).toBe(state)
+  })
+
+  it('plays pushed robots without revealing their registers', () => {
+    const state = joined()
+    const pushedPosition = { coordinate: { x: 4, y: 2 }, orientation: 'NORTH' } as const
+    const updated = gameStateReducer(state, {
+      type: 'action',
+      action: { ...action, pushedRobots: [{ robotId: REGISTER_ROBOT_IDS[1], position: pushedPosition }] },
+    })
+    expect(getOtherPlayers(updated)[0].registers[2]).toEqual({ status: 'REVEALED', instruction: 'MOVE_2' })
+    expect(getOtherPlayers(updated)[1].registers).toBe(getOtherPlayers(state)[1].registers)
+    const completed = gameStateReducer(updated, { type: 'complete' })
+    expect(completed.playback.robots.find((robot) => robot.robotId === REGISTER_ROBOT_IDS[1])?.position).toEqual(pushedPosition)
+    expect(getOtherPlayers(completed)[1].registers).toBe(getOtherPlayers(state)[1].registers)
   })
 
   it('resets public slots immediately but gates the next private hand behind queued playback', () => {

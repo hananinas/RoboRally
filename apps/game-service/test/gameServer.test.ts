@@ -4,12 +4,14 @@ import type { AddressInfo } from 'node:net'
 import { submitProgramSchema } from '@robo-rally/game-events'
 import type {
   ClientToServerEvents, JoinResult, LobbyDetails, PlayerConnectionChanged, PlayerCheckpointProgress, ServerToClientEvents,
+  CardsDealt, RobotActionResolved,
 } from '@robo-rally/game-events'
 import { io as createClient, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Board, EmptyTile, Game, Card } from '@/game/index.ts'
-import { createGame } from '@/game/GameFactory.ts'
+import { Board, Direction, EmptyTile, PitTile, Game, Card, type Tile } from '@/game/index.ts'
+import { createGame, createHand } from '@/game/GameFactory.ts'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer.ts'
+import * as gamePresenter from '@/socket/gamePresenter.ts'
 import { Integer } from '@/numbers'
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>
@@ -176,8 +178,9 @@ describe('game membership over Socket.IO', () => {
   it('rejects exhausted spawns without leaving a membership or room', async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()))
     shared = { gameId: shared.gameId, game: new Game(
-      new Board([[new EmptyTile()]], { x: Integer(0), y: Integer(0), angle: Math.PI / 2 }), [],
-      Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))) }
+      new Board([[new EmptyTile(), new EmptyTile()]], { x: Integer(1), y: Integer(0), angle: Math.PI / 2 }), [],
+      Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1')),
+      { x: Integer(0), y: Integer(0) }) }
     await start()
     await join(await connect('First'))
     const second = await connect('Second')
@@ -189,13 +192,19 @@ describe('game membership over Socket.IO', () => {
 
   it('rolls back a failed join snapshot before granting room access', async () => {
     const client = await connect('First')
-    vi.spyOn(shared.game.board, 'getTile').mockImplementationOnce(() => { throw new Error('Presentation failed') })
+    const removed = vi.spyOn(shared.game, 'removePlayer')
+    const snapshot = vi.spyOn(gamePresenter, 'presentPublicGameState')
+      .mockImplementationOnce(() => { throw new Error('Presentation failed') })
     expect(await client.timeout(1000).emitWithAck('game.join', { gameId: shared.gameId }))
       .toEqual({ outcome: 'INTERNAL_ERROR' })
+    snapshot.mockRestore()
+    expect(removed).toHaveBeenCalledTimes(1)
     expect(shared.game.players).toEqual([])
     expect(shared.game.board.occupantAt({ x: Integer(10), y: Integer(7) })).toBeUndefined()
     expect(server.sockets.sockets.get(client.id!)?.rooms).toEqual(new Set([client.id]))
-    expect((await join(client)).state.robots).toHaveLength(1)
+    const retried = await join(client)
+    expect(retried.assignment.playerId).not.toBe(removed.mock.calls[0][0])
+    expect(retried.state.robots).toHaveLength(1)
   })
 
   it('rejects nonmember and foreign-hand submissions and reports accepted programs', async () => {
@@ -580,6 +589,174 @@ describe('game membership over Socket.IO', () => {
       .toEqual({ outcome: 'LOGIN_REQUIRED' })
     expect(shared.game.players).toHaveLength(0)
     expect(server.sockets.sockets.get(client.id!)?.data.user).toBeUndefined()
+  })
+
+  describe('pit results over Socket.IO', () => {
+    beforeEach(async () => {
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+      const tiles: Tile[][] = Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => new EmptyTile()))
+      tiles[1][2] = new PitTile()
+      tiles[4][4] = new EmptyTile([Direction.WEST], 1)
+      tiles[4][0] = new EmptyTile([], 2)
+      shared = {
+        gameId: shared.gameId,
+        game: new Game(new Board(tiles, { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }), [], createHand(), { x: Integer(4), y: Integer(4) }),
+      }
+      await start()
+    })
+
+    function program(joined: Joined, indices: readonly number[]) {
+      return submitProgramSchema.parse({
+        gameId: shared.gameId, playerId: joined.assignment.playerId,
+        cardIds: indices.map((index) => joined.hand[index].id),
+      })
+    }
+
+    it('broadcasts a chain push and its rebooted robot to every client in one action', async () => {
+      const members: { client: Client; joined: Joined }[] = []
+      for (const username of ['Pusher', 'Pushed', 'Falling']) {
+        const client = await connect(username)
+        members.push({ client, joined: await join(client) })
+      }
+      const robotIds = members.map(({ joined }) => joined.assignment.robotId)
+      shared.game.board.relocateRobot(robotIds[0], { x: Integer(2), y: Integer(2) })
+      shared.game.board.relocateRobot(robotIds[1], { x: Integer(3), y: Integer(2) })
+      shared.game.board.relocateRobot(robotIds[2], { x: Integer(4), y: Integer(2) })
+      shared.game.players[0].robot.turn(3)
+      shared.game.players[1].robot.turn(2)
+      shared.game.players[2].robot.turn(1)
+      const actions: RobotActionResolved[][] = members.map(() => [])
+      members.forEach(({ client }, index) => client.on('robot.actionResolved', (action) => actions[index].push(action)))
+      const hands = members.map(({ client }) => new Promise<CardsDealt>((resolve) => client.once('cards.dealt', resolve)))
+      for (const [index, { client, joined }] of members.entries()) {
+        const indices = index === 0 ? [0, 4, 5, 6, 8] : [4, 5, 6, 8, 3]
+        expect(await client.timeout(1000).emitWithAck('program.submit', program(joined, indices))).toEqual({ outcome: 'ACCEPTED' })
+      }
+      await Promise.all(hands)
+
+      expect(actions[0][0]).toEqual({
+        gameId: shared.gameId, registerIndex: 0, robotId: robotIds[0], instruction: 'MOVE_1',
+        position: { coordinate: { x: 3, y: 2 }, orientation: 'EAST' },
+        pushedRobots: [
+          { robotId: robotIds[1], position: { coordinate: { x: 4, y: 2 }, orientation: 'SOUTH' } },
+          { robotId: robotIds[2], position: { coordinate: { x: 4, y: 4 }, orientation: 'WEST' } },
+        ],
+      })
+      expect(actions[0]).toHaveLength(15)
+      expect(actions[1]).toEqual(actions[0])
+      expect(actions[2]).toEqual(actions[0])
+    })
+
+    it('broadcasts rebooted positions before progress and hands and restores them on rejoining', async () => {
+      const client = await connect('First')
+      const initial = await join(client)
+      expect(initial.state.board.tiles.find((tile) => tile.type === 'PIT'))
+        .toEqual({ position: { x: 2, y: 1 }, type: 'PIT' })
+      const outsider = await connect('Login only')
+      const outsideEvents = vi.fn()
+      outsider.onAny(outsideEvents)
+      const actions: RobotActionResolved[] = []
+      const progress: PlayerCheckpointProgress[] = []
+      const events: string[] = []
+      client.onAny((name) => events.push(name))
+      client.on('robot.actionResolved', (action) => actions.push(action))
+      client.on('player.checkpointProgress', (payload) => progress.push(payload))
+      const hand = new Promise<CardsDealt>((resolve) => client.once('cards.dealt', resolve))
+
+      expect(await client.timeout(1000).emitWithAck('program.submit', program(initial, [2, 0, 4, 5, 3])))
+        .toEqual({ outcome: 'ACCEPTED' })
+      expect(await hand).toEqual({
+        gameId: shared.gameId, playerId: initial.assignment.playerId, cards: initial.hand,
+      })
+      expect(actions).toEqual([
+        { coordinate: { x: 4, y: 4 }, orientation: 'NORTH' },
+        { coordinate: { x: 4, y: 3 }, orientation: 'NORTH' },
+        { coordinate: { x: 4, y: 3 }, orientation: 'WEST' },
+        { coordinate: { x: 4, y: 3 }, orientation: 'NORTH' },
+        { coordinate: { x: 4, y: 4 }, orientation: 'NORTH' },
+      ].map((position, registerIndex) => ({
+        gameId: shared.gameId, registerIndex, robotId: initial.assignment.robotId,
+        pushedRobots: [],
+        instruction: initial.hand[[2, 0, 4, 5, 3][registerIndex]].instruction, position,
+      })))
+      expect(progress).toEqual([{
+        gameId: shared.gameId, playerId: initial.assignment.playerId, lastCheckpoint: 1, checkpointCount: 2,
+      }])
+      expect(events).toEqual([
+        'robot.actionResolved', 'player.checkpointProgress',
+        ...Array.from({ length: 4 }, () => 'robot.actionResolved'), 'cards.dealt',
+      ])
+      const snapshot = await join(client)
+      expect(snapshot.outcome).toBe('JOINED')
+      expect(snapshot.state.phase).toBe('PROGRAMMING')
+      expect(snapshot.state.robots).toEqual([{
+        robotId: initial.assignment.robotId, playerId: initial.assignment.playerId,
+        position: actions[4].position,
+      }])
+      expect(snapshot.state.players[0].lastCheckpoint).toBe(1)
+      expect(shared.game.board.occupantAt({ x: Integer(2), y: Integer(1) })).toBeUndefined()
+      await outsider.timeout(1000).emitWithAck('game.getLobbyDetails', {})
+      expect(outsideEvents).not.toHaveBeenCalled()
+
+      await disconnectClient(client)
+      const restored = await join(await connect('First'))
+      expect(restored.assignment).toEqual(initial.assignment)
+      expect(restored.hand).toEqual(initial.hand)
+      expect(restored.state.robots).toEqual(snapshot.state.robots)
+      expect(restored.state.players[0].lastCheckpoint).toBe(1)
+      expect(restored.state.paused).toBe(false)
+    })
+
+    it('broadcasts the occupied-tile fallback to every member and uses its position for later priority', async () => {
+      const members: { client: Client; joined: Joined }[] = []
+      for (const username of ['First', 'Second', 'Third']) {
+        const client = await connect(username)
+        members.push({ client, joined: await join(client) })
+      }
+      const robotIds = members.map(({ joined }) => joined.assignment.robotId)
+      shared.game.board.relocateRobot(robotIds[1], { x: Integer(4), y: Integer(4) })
+      const actions: RobotActionResolved[][] = members.map(() => [])
+      const dealt: CardsDealt[][] = members.map(() => [])
+      for (const [index, { client }] of members.entries()) {
+        await join(client)
+        client.on('robot.actionResolved', (action) => actions[index].push(action))
+        client.on('cards.dealt', (hand) => dealt[index].push(hand))
+      }
+      const hands = members.map(({ client }) => new Promise<CardsDealt>((resolve) => client.once('cards.dealt', resolve)))
+      for (const [index, { client, joined }] of members.entries()) {
+        const indices = index === 0 ? [2, 4, 5, 6, 8] : [4, 5, 6, 8, 3]
+        expect(await client.timeout(1000).emitWithAck('program.submit', program(joined, indices)))
+          .toEqual({ outcome: 'ACCEPTED' })
+      }
+
+      expect(await Promise.all(hands)).toEqual(members.map(({ joined }) => ({
+        gameId: shared.gameId, playerId: joined.assignment.playerId, cards: joined.hand,
+      })))
+      expect(actions[0]).toHaveLength(15)
+      expect(actions[1]).toEqual(actions[0])
+      expect(actions[2]).toEqual(actions[0])
+      expect(actions[0][0]).toEqual({
+        gameId: shared.gameId, registerIndex: 0, robotId: robotIds[0], instruction: 'MOVE_3',
+        pushedRobots: [],
+        position: { coordinate: { x: 4, y: 3 }, orientation: 'NORTH' },
+      })
+      expect(actions[0].slice(0, 3).map((action) => action.robotId)).toEqual([robotIds[0], robotIds[2], robotIds[1]])
+      expect(actions[0].slice(3, 6).map((action) => action.robotId)).toEqual([robotIds[2], robotIds[0], robotIds[1]])
+      for (const [index, { client, joined }] of members.entries()) {
+        const snapshot = await join(client)
+        expect(snapshot.outcome).toBe('JOINED')
+        expect(snapshot.state.robots).toEqual(members.map(({ joined }) => ({
+          robotId: joined.assignment.robotId, playerId: joined.assignment.playerId,
+          position: actions[0].findLast((action) => action.robotId === joined.assignment.robotId)!.position,
+        })))
+        expect(new Set(snapshot.state.robots.map(({ position }) =>
+          `${position.coordinate.x},${position.coordinate.y}`)).size).toBe(3)
+        expect(dealt[index]).toEqual([{
+          gameId: shared.gameId, playerId: joined.assignment.playerId, cards: joined.hand,
+        }])
+      }
+      expect(shared.game.board.occupantAt({ x: Integer(2), y: Integer(1) })).toBeUndefined()
+    })
   })
 
   describe('game.getLobbyDetails', () => {

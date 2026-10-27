@@ -344,6 +344,8 @@ export function gameStateReducer(
           snapshot.board.width,
           snapshot.board.height,
           {
+            hole: snapshot.board.tiles.filter((tile) => tile.type === 'PIT')
+              .map((tile) => [tile.position.x, tile.position.y] as const),
             checkpoints: snapshot.board.tiles.flatMap((tile) => tile.checkpointNumber === undefined
               ? [] : [{ ...tile.position, checkpointNumber: tile.checkpointNumber }]),
             walls: snapshot.board.tiles.map((tile) => ({
@@ -371,11 +373,13 @@ export function gameStateReducer(
     case 'action': {
       const actionPlayerId = (event.action as RobotActionResolved & Partial<Pick<PublicRobotActionResolved, 'playerId'>>).playerId
       const player = state.players.find((candidate) => candidate.robotId === event.action.robotId)
+      // Keep pushes playable even if only a pushed robot is known; reveal only the actor's registers.
       if (event.action.gameId !== state.assignment?.gameId ||
           (actionPlayerId !== undefined && actionPlayerId !== player?.playerId) ||
           !Number.isInteger(event.action.registerIndex) || event.action.registerIndex < 0 ||
           event.action.registerIndex >= REGISTER_COUNT ||
-          !state.playback.robots.some((robot) => robot.robotId === event.action.robotId)) return state
+          !state.playback.robots.some((robot) => robot.robotId === event.action.robotId ||
+            event.action.pushedRobots.some((pushed) => pushed.robotId === robot.robotId))) return state
       const registers: [...PublicRegisters] | null = player?.registers ? [...player.registers] : null
       if (registers) registers[event.action.registerIndex] = { status: 'REVEALED', instruction: event.action.instruction }
       return {

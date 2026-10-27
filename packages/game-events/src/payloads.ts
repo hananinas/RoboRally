@@ -54,7 +54,7 @@ export type Robot = Readonly<{
 
 export type Tile = Readonly<{
   position: Coordinate
-  type: 'EMPTY'
+  type: 'EMPTY' | 'PIT'
   walls?: readonly Orientation[]
   checkpointNumber?: number
 }>
@@ -151,6 +151,7 @@ export type RobotActionResolved = Readonly<{
   robotId: RobotId
   instruction: Instruction
   position: Position
+  pushedRobots: readonly Pick<Robot, 'robotId' | 'position'>[]
 }>
 
 export type GetLobbyDetails = Readonly<Record<string, never>>
