@@ -30,7 +30,7 @@ export type MapSpec = BoardMap & Readonly<{
   walls: readonly WallSpec[]
   checkpoints: readonly (readonly [x: number, y: number])[]
   pits?: readonly (readonly [x: number, y: number])[]
-  rebootTile?: Position
+  rebootTile: Position
 }>
 
 export const boardMaps = {
@@ -41,6 +41,7 @@ export const boardMaps = {
     width: 21,
     height: 15,
     antenna: { x: Integer(10), y: Integer(0), angle: Math.PI / 2 },
+    rebootTile: { x: Integer(10), y: Integer(7) },
     walls: [],
     checkpoints: [[10, 6], [8, 9]],
   },

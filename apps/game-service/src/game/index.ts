@@ -1,5 +1,5 @@
 export { Board } from '@/game/Board'
-export type { Antenna, BoardMap, MovementResult } from '@/game/Board'
+export type { Antenna, BoardMap } from '@/game/Board'
 export { Card } from '@/game/Card'
 export { Game } from '@/game/Game'
 export type { AddPlayerError, GamePhase, NextActionResult, RobotActionResult, SubmitProgramError } from '@/game/Game'

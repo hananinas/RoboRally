@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { CardsDealt, ClientToServerEvents, GameStarted, ServerToClientEvents, SubmitProgram } from '@robo-rally/game-events'
@@ -8,12 +9,12 @@ import { createGameSocketServer } from '@/socket/gameServer.ts'
 import { Integer } from '@/numbers'
 
 it('starts a fixed roster, broadcasts register-major actions, and deals two private next rounds', async () => {
-  const gameId = '00000000-0000-4000-8000-000000000001'
+  const gameId = randomUUID()
   const board = new Board(Array.from({ length: 3 }, () =>
     Array.from({ length: 3 }, () => new EmptyTile())), { x: Integer(1), y: Integer(0), angle: Math.PI / 2 })
   const deck = Array.from({ length: 5 }, (_, index) =>
     new Card(`00000000-0000-4000-8000-00000000010${index}`, 'TURN_LEFT'))
-  const game = new Game(board, [], deck)
+  const game = new Game(board, [], deck, { x: Integer(0), y: Integer(0) })
   const httpServer = createServer()
   const server = createGameSocketServer(httpServer, () => ({ gameId, game }))
   const clients: Socket<ServerToClientEvents, ClientToServerEvents>[] = []
@@ -105,6 +106,7 @@ it('starts a fixed roster, broadcasts register-major actions, and deals two priv
           Array.from({ length: 5 }, (_, registerIndex) => [1, 0].map((playerIndex) => ({
             gameId, registerIndex,
             playerId: players[playerIndex].id,
+            pushedRobots: [],
             robotId: players[playerIndex].robot.id,
             instruction: 'TURN_LEFT',
             position: {

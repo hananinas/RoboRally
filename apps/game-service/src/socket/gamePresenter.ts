@@ -112,7 +112,7 @@ export function presentCardsDealt(
 
 export function presentRobotActionResolved(
   gameId: GameId,
-  result: Pick<NextActionResult, 'action' | 'registerIndex'>,
+  result: Pick<NextActionResult, 'action' | 'registerIndex' | 'pushedRobots'>,
 ): RobotActionResolved {
   const { action, registerIndex } = result
   return {
@@ -125,5 +125,9 @@ export function presentRobotActionResolved(
       coordinate: action.position,
       orientation: orientations[action.direction],
     },
+    pushedRobots: result.pushedRobots.map((robot) => ({
+      robotId: robot.robotId,
+      position: { coordinate: robot.position, orientation: orientations[robot.direction] },
+    })),
   }
 }

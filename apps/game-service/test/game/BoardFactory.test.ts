@@ -10,8 +10,6 @@ describe('board factory', () => {
       expect(board.getTile({ x: Integer(x), y: Integer(y) })).toBeInstanceOf(PitTile)
     }
     expect(board.getTile({ x: Integer(12), y: Integer(7) })?.walls).toEqual(new Set([Direction.NORTH, Direction.WEST]))
-    expect(board.hasEntryEffect('reboot')).toBe(true)
-    expect(createBoard('empty-map').hasEntryEffect('reboot')).toBe(false)
   })
 
   it('creates the empty map with the size specified by the map and no walls', () => {

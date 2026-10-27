@@ -31,6 +31,23 @@ function createGameWithPlayer() {
 }
 
 describe('game presenter', () => {
+  it('serializes pushed robot positions and orientations alongside the acting robot', () => {
+    const { player } = createGameWithPlayer()
+    const resolved = presentRobotActionResolved('game', {
+      registerIndex: 0,
+      action: { robotId: player.robot.id, playerId: player.id, card: player.hand[0], position: { x: Integer(2), y: Integer(3) }, direction: Direction.EAST },
+      pushedRobots: [
+        { robotId: 'pushed', position: { x: Integer(3), y: Integer(3) }, direction: Direction.NORTH },
+        { robotId: 'rebooted', position: { x: Integer(0), y: Integer(0) }, direction: Direction.WEST },
+      ],
+    })
+
+    expect(resolved.pushedRobots).toEqual([
+      { robotId: 'pushed', position: { coordinate: { x: 3, y: 3 }, orientation: 'NORTH' } },
+      { robotId: 'rebooted', position: { coordinate: { x: 0, y: 0 }, orientation: 'WEST' } },
+    ])
+  })
+
   it('keeps domain tile kinds exhaustively compatible with public tile types', () => {
     expectTypeOf<TileKind>().toEqualTypeOf<TilePayload['type']>()
   })
@@ -43,7 +60,7 @@ describe('game presenter', () => {
       new EmptyTile([Direction.SOUTH], 1),
     ]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
-    const game = new Game(board, [], cards, undefined, { x: Integer(0), y: Integer(0) })
+    const game = new Game(board, [], cards, { x: Integer(0), y: Integer(0) })
     const state = presentPublicGameState('game', game)
 
     expect(state.checkpointCount).toBe(1)
@@ -69,6 +86,7 @@ describe('game presenter', () => {
         {
           robotId: player.robot.id,
           playerId: player.id,
+          colour: player.colour,
           position: {
             coordinate: { x: 10, y: 7 },
             orientation: 'NORTH',
@@ -97,7 +115,7 @@ describe('game presenter', () => {
         new EmptyTile([Direction.NORTH, Direction.WEST], 1),
         new EmptyTile(),
       ],
-    ], { x: Integer(0), y: Integer(0), angle: Math.PI / 2 })
+    ], { x: Integer(1), y: Integer(0), angle: Math.PI / 2 })
     const robot = new Robot('robot', Direction.EAST)
     board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })
     const player = new Player('player', robot)
@@ -105,7 +123,7 @@ describe('game presenter', () => {
       { length: 5 },
       (_, index) => new Card(`card-${index}`, 'MOVE_1'),
     )
-    const game = new Game(board, [player], cards)
+    const game = new Game(board, [player], cards, { x: Integer(0), y: Integer(0) })
     game.submitProgram(player.id, cards.map((card) => card.id))
 
     const state = presentPublicGameState('game', game)
@@ -162,7 +180,7 @@ describe('game presenter', () => {
       direction: Direction.SOUTH,
     }
 
-    const resolved = presentRobotActionResolved('game', { registerIndex: 4, action })
+    const resolved = presentRobotActionResolved('game', { registerIndex: 4, action, pushedRobots: [] })
 
     expectTypeOf(resolved).toEqualTypeOf<RobotActionResolved>()
     expect(resolved).toEqual({
@@ -171,6 +189,7 @@ describe('game presenter', () => {
       robotId: player.robot.id,
       playerId: player.id,
       instruction,
+      pushedRobots: [],
       position: {
         coordinate: { x: 4, y: 5 },
         orientation: 'SOUTH',

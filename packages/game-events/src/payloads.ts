@@ -154,6 +154,7 @@ export type RobotActionResolved = Readonly<{
   playerId: PlayerId
   instruction: Instruction
   position: Position
+  pushedRobots: readonly Pick<Robot, 'robotId' | 'position'>[]
 }>
 
 export type PublicRegisterSlot =

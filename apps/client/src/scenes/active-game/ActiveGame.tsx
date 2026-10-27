@@ -43,7 +43,7 @@ function ActiveGame({ game, username, leaving, onLeave }: {
     hudFits,
     overlayRef,
   } = useOverlayLayout(state.handVersion)
-  const disabled = leaving || !canProgram(state)
+  const disabled = leaving || state.paused || !canProgram(state)
   const handleRemove = (registerIndex: number) => dispatch({ type: 'remove', registerIndex })
   const handlePlaceCard = (card: ProgramCard, registerIndex: number) =>
     dispatch({ type: 'place', cardId: card.id, registerIndex })
@@ -52,6 +52,7 @@ function ActiveGame({ game, username, leaving, onLeave }: {
   const handleRedo = () => dispatch({ type: 'redo' })
   const hasHand = state.handVersion > 0
   const status = getGameStatus(state)
+  const disconnectedNames = state.players.filter((player) => !player.connected).map((player) => player.username)
   const player = state.players.find((candidate) => candidate.playerId === state.assignment?.playerId)
   const robotColour = state.playback.robots.find((robot) => robot.robotId === state.assignment?.robotId)?.colour
   const registeredCardIds = new Set(
@@ -110,6 +111,27 @@ function ActiveGame({ game, username, leaving, onLeave }: {
           />
         )}
       </div>
+      {(state.paused || !state.connected) && (
+        <div className="disconnect-overlay">
+          <div className="disconnect-popup">
+            <h2>{!state.connected
+                  ? 'Connection to server lost'
+                  : disconnectedNames.length > 0
+                    ? `${disconnectedNames.join(', ')} has disconnected`
+                    : 'A player has disconnected'}
+            </h2>
+            <div className="disconnect-spinner" role="status"/>
+            <button
+              className="game-menu__button game-menu__button--leave"
+              type="button"
+              onClick={onLeave}
+              disabled={leaving || !state.connected}
+            >
+              Leave game
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
