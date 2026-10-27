@@ -1,3 +1,5 @@
+import type { Antenna } from '@robo-rally/game-events'
+
 export type BoardPoint = Readonly<{ x: number; y: number }>
 
 export type BoardTileType = 'empty' | 'hole' | 'laser'
@@ -15,6 +17,7 @@ export type BoardCell = BoardPoint &
 export type BoardRenderModel = Readonly<{
   columns: number
   rows: number
+  antenna?: Antenna
   cells: readonly BoardCell[]
 }>
 
@@ -96,6 +99,7 @@ export type BoardRenderConfig = Readonly<{
 
 type BoardWallAssignment = BoardPoint & Partial<BoardTileWalls>
 type BoardAssignments = Readonly<{
+  antenna?: Antenna
   hole?: readonly (readonly [number, number])[]
   laser?: readonly (readonly [number, number])[]
   walls?: readonly BoardWallAssignment[]
@@ -150,6 +154,13 @@ export function createBoardRenderModel(
     return `${x},${y}`
   }
 
+  if (assignments.antenna) {
+    positionKey(assignments.antenna.x, assignments.antenna.y)
+    if (!Number.isFinite(assignments.antenna.angle)) {
+      throw new RangeError('Board antenna angle must be finite')
+    }
+  }
+
   const tiles = new Map<string, BoardTileType>()
   for (const tile of ['hole', 'laser'] as const) {
     const positions = assignments[tile] ?? []
@@ -194,7 +205,10 @@ export function createBoardRenderModel(
     ).flat(),
   )
 
-  return Object.freeze({ columns, rows, cells })
+  return Object.freeze({
+    columns, rows, cells,
+    ...(assignments.antenna ? { antenna: Object.freeze({ ...assignments.antenna }) } : {}),
+  })
 }
 
 export function validateBoardRendering(
