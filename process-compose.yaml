@@ -44,6 +44,16 @@ processes:
       hydra:
         condition: process_started
 
+  register-game-service-client:
+    command: >
+      curl --fail --silent --show-error
+      -X POST http://127.0.0.1:4445/admin/clients
+      -H "Content-Type: application/json"
+      -d @infra/hydra/clients/game-service.json
+    depends_on:
+      hydra:
+        condition: process_started
+
   build-game-events:
     command: "pnpm --filter @robo-rally/game-events run build"
 
@@ -57,4 +67,6 @@ processes:
     command: "pnpm --filter @robo-rally/game-service run dev"
     depends_on:
       build-game-events:
+        condition: process_completed_successfully
+      register-game-service-client:
         condition: process_completed_successfully
