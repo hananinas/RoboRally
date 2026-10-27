@@ -108,6 +108,8 @@ At minimum, you will need:
 - Node.js 24 or a compatible version
 - pnpm 10.9 or newer
 - [Process Compose](https://f1bonacc1.github.io/process-compose/)
+- [Ory Kratos](https://www.ory.com/docs/kratos) and [Ory Hydra](https://www.ory.com/docs/hydra), the identity and OAuth2/OIDC providers used for authentication
+- [Mailpit](https://mailpit.axllent.org/), a local SMTP sink for viewing emails sent during development (e.g. verification codes)
 - AsyncAPI tooling for writing and generating API documentation
 
 Then install the project dependencies:
