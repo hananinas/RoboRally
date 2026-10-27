@@ -1236,7 +1236,7 @@ components:
         registers:
           $ref: '#/components/schemas/PublicRegisters'
       description: >-
-        Public player participation, submission status, and registers.
+        Public participation and submission status; never contains cards.
 
     RegistersChanged:
       type: object
@@ -1270,31 +1270,27 @@ components:
       description: Five public slots in register order.
 
     PublicRegisterSlot:
-      oneOf:
-        - type: object
-          additionalProperties: false
-          required: [ status ]
-          properties:
-            status:
-              type: string
-              enum: [ EMPTY ]
-        - type: object
-          additionalProperties: false
-          required: [ status ]
-          properties:
-            status:
-              type: string
-              enum: [ HIDDEN ]
-        - type: object
-          additionalProperties: false
-          required: [ status, instruction ]
-          properties:
-            status:
-              type: string
-              enum: [ REVEALED ]
-            instruction:
-              $ref: '#/components/schemas/Instruction'
-          description: Already-executed register instruction.
+      type: object
+      additionalProperties: false
+      required: [ status ]
+      properties:
+        status:
+          type: string
+          enum: [ EMPTY, HIDDEN, REVEALED ]
+        instruction:
+          $ref: '#/components/schemas/Instruction'
+      if:
+        properties:
+          status:
+            const: REVEALED
+      then:
+        required: [ instruction ]
+      else:
+        not:
+          required: [ instruction ]
+      description: >-
+        One register slot in register order. EMPTY and HIDDEN carry only their status;
+        REVEALED carries the executed instruction.
 
     PublicGameState:
       description: >-
