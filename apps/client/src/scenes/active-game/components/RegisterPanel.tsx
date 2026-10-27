@@ -46,7 +46,7 @@ function RegisterSlot({
   dragHandlers,
   onRemove,
 }: RegisterSlotProps) {
-  const cardClassName = card
+  const cardClassName = card && !dragging
     ? 'register__card register__card--filled'
     : 'register__card'
   const registerIndex = disabled ? undefined : index

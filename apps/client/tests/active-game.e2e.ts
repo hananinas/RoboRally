@@ -257,6 +257,7 @@ test('drags a card out of a register to remove it', async ({ page }) => {
   // Dropping outside every register removes it and frees the hand card.
   await dragRegisterCard(1, 300, 200)
   await expect(page.locator('.dragged-card')).toHaveCount(1)
+  await expect(page.locator('[data-register-index="0"]')).toHaveCSS('border-top-style', 'dashed')
   await page.mouse.up()
 
   await expect(registeredCards).toHaveCount(1)
