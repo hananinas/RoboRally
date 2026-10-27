@@ -1,6 +1,7 @@
 import { createServer } from 'node:http'
 import { parseGameServicePort } from '@/config'
 import { createGameSocketServer } from '@/socket/gameServer'
+import { handleAuthRequest } from '@/auth/httpRoutes'
 import { logError } from '@/logger'
 
 process.on('uncaughtExceptionMonitor', (error, origin) => {
@@ -10,6 +11,9 @@ process.on('uncaughtExceptionMonitor', (error, origin) => {
 const host = '127.0.0.1'
 const port = parseGameServicePort(process.env.PORT)
 const httpServer = createServer()
+httpServer.on('request', (req, res) => {
+  void handleAuthRequest(req, res)
+})
 const io = createGameSocketServer(httpServer)
 
 httpServer.listen(port, host, () => {
