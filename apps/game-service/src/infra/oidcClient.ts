@@ -9,19 +9,19 @@ export type OidcClient = Readonly<{
   ): Promise<client.TokenEndpointResponse & client.TokenEndpointResponseHelpers>
 }>
 
-export function createOidcClient(oidcConfig: OidcConfig = parseOidcConfig(process.env)): OidcClient {
-  const configPromise = client.discovery(oidcConfig.issuerUrl, oidcConfig.clientId, oidcConfig.clientSecret)
+export async function createOidcClient(
+  oidcConfig: OidcConfig = parseOidcConfig(process.env),
+): Promise<OidcClient> {
+  const config = await client.discovery(oidcConfig.issuerUrl, oidcConfig.clientId, oidcConfig.clientSecret)
 
   return {
     async buildAuthorizationUrl(params) {
-      const config = await configPromise
       return client.buildAuthorizationUrl(config, {
         redirect_uri: oidcConfig.callbackUrl.toString(),
         ...params,
       })
     },
     async exchangeAuthorizationCode(requestUrl, checks) {
-      const config = await configPromise
       const currentUrl = new URL(requestUrl, oidcConfig.callbackUrl)
       return client.authorizationCodeGrant(config, currentUrl, checks)
     },
