@@ -12,6 +12,8 @@ describe('GET /auth/login', () => {
   const oidcClient: OidcClient = {
     buildAuthorizationUrl: vi.fn<OidcClient['buildAuthorizationUrl']>(),
     exchangeAuthorizationCode: vi.fn<OidcClient['exchangeAuthorizationCode']>(),
+    buildEndSessionUrl: vi.fn<OidcClient['buildEndSessionUrl']>(),
+    postLogoutRedirectUrl: new URL('https://127.0.0.1:3001/'),
   }
 
   beforeAll(async () => {
@@ -92,6 +94,8 @@ describe('GET /auth/callback', () => {
   const oidcClient: OidcClient = {
     buildAuthorizationUrl: vi.fn<OidcClient['buildAuthorizationUrl']>(),
     exchangeAuthorizationCode: vi.fn<OidcClient['exchangeAuthorizationCode']>(),
+    buildEndSessionUrl: vi.fn<OidcClient['buildEndSessionUrl']>(),
+    postLogoutRedirectUrl: new URL('https://127.0.0.1:3001/'),
   }
   const sessionStore = createSessionStore()
 
@@ -118,7 +122,7 @@ describe('GET /auth/callback', () => {
 
   it('exchanges the code, creates a session, and clears the transaction cookies on success', async () => {
     vi.mocked(oidcClient.exchangeAuthorizationCode).mockResolvedValue(
-      { claims: () => ({ sub: 'user-123' }), expires_in: 900 } as unknown as Awaited<
+      { claims: () => ({ sub: 'user-123' }), expires_in: 900, id_token: 'id-token-abc' } as unknown as Awaited<
         ReturnType<OidcClient['exchangeAuthorizationCode']>
       >,
     )
@@ -146,7 +150,7 @@ describe('GET /auth/callback', () => {
     expect(sessionCookie).toMatch(/Max-Age=900/i)
 
     const sessionId = parseCookie(sessionCookie!).game_session!
-    expect(sessionStore.get(sessionId)).toStrictEqual({ sub: 'user-123' })
+    expect(sessionStore.get(sessionId)).toStrictEqual({ sub: 'user-123', idToken: 'id-token-abc' })
   })
 
   it('responds 400 and clears cookies without creating a session when the ID token has no subject', async () => {
@@ -175,5 +179,71 @@ describe('GET /auth/callback', () => {
     for (const cookie of setCookies) {
       expect(cookie).toMatch(/Max-Age=0/i)
     }
+  })
+})
+
+describe('GET /auth/logout', () => {
+  let baseUrl: string
+  let server: Server
+  const oidcClient: OidcClient = {
+    buildAuthorizationUrl: vi.fn<OidcClient['buildAuthorizationUrl']>(),
+    exchangeAuthorizationCode: vi.fn<OidcClient['exchangeAuthorizationCode']>(),
+    buildEndSessionUrl: vi.fn<OidcClient['buildEndSessionUrl']>(),
+    postLogoutRedirectUrl: new URL('https://127.0.0.1:3001/'),
+  }
+  const sessionStore = createSessionStore()
+
+  beforeAll(async () => {
+    server = createServer(createAuthApp({ oidcClient, sessionStore }))
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+  })
+
+  afterAll(() => {
+    server.close()
+  })
+
+  beforeEach(() => {
+    vi.mocked(oidcClient.buildEndSessionUrl).mockReset()
+  })
+
+  it('destroys the session, clears the cookie, and redirects to the end-session URL with the id token hint', async () => {
+    const endSessionUrl = new URL('https://hydra.test/oauth2/sessions/logout')
+    vi.mocked(oidcClient.buildEndSessionUrl).mockResolvedValue(endSessionUrl)
+    const sessionId = sessionStore.create('user-123', 'id-token-abc', 900)
+
+    const response = await fetch(`${baseUrl}/auth/logout`, {
+      redirect: 'manual',
+      headers: { cookie: `game_session=${sessionId}` },
+    })
+
+    expect(response.status).toBe(302)
+    expect(response.headers.get('location')).toBe(endSessionUrl.toString())
+    expect(oidcClient.buildEndSessionUrl).toHaveBeenCalledWith('id-token-abc')
+    expect(sessionStore.get(sessionId)).toBeUndefined()
+
+    const setCookie = response.headers.getSetCookie()
+    expect(setCookie).toHaveLength(1)
+    expect(setCookie[0]).toMatch(/Max-Age=0/i)
+  })
+
+  it('skips Hydra and redirects straight to the post-logout URL when there is no session', async () => {
+    const response = await fetch(`${baseUrl}/auth/logout`, { redirect: 'manual' })
+
+    expect(response.status).toBe(302)
+    expect(response.headers.get('location')).toBe(oidcClient.postLogoutRedirectUrl.toString())
+    expect(oidcClient.buildEndSessionUrl).not.toHaveBeenCalled()
+  })
+
+  it('responds 500 without crashing when buildEndSessionUrl rejects', async () => {
+    vi.mocked(oidcClient.buildEndSessionUrl).mockRejectedValue(new Error('discovery unreachable'))
+    const sessionId = sessionStore.create('user-123', 'id-token-abc', 900)
+
+    const response = await fetch(`${baseUrl}/auth/logout`, {
+      redirect: 'manual',
+      headers: { cookie: `game_session=${sessionId}` },
+    })
+
+    expect(response.status).toBe(500)
   })
 })

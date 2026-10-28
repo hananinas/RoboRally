@@ -7,6 +7,7 @@ vi.mock('openid-client', () => ({
   discovery: vi.fn(),
   buildAuthorizationUrl: vi.fn(),
   authorizationCodeGrant: vi.fn(),
+  buildEndSessionUrl: vi.fn(),
 }))
 
 const oidcConfig: OidcConfig = {
@@ -14,6 +15,7 @@ const oidcConfig: OidcConfig = {
   clientId: 'game-service',
   clientSecret: 'game-service-dev-secret',
   callbackUrl: new URL('http://127.0.0.1:3001/auth/callback'),
+  postLogoutRedirectUrl: new URL('http://127.0.0.1:3001/'),
 }
 
 const fakeConfig = { fake: 'configuration' } as unknown as client.Configuration
@@ -22,6 +24,7 @@ beforeEach(() => {
   vi.mocked(client.discovery).mockReset().mockResolvedValue(fakeConfig)
   vi.mocked(client.buildAuthorizationUrl).mockReset()
   vi.mocked(client.authorizationCodeGrant).mockReset()
+  vi.mocked(client.buildEndSessionUrl).mockReset()
 })
 
 describe('createOidcClient', () => {
@@ -92,6 +95,22 @@ describe('createOidcClient', () => {
       })
 
       expect(result).toBe(tokens)
+    })
+  })
+
+  describe('buildEndSessionUrl', () => {
+    it('passes the configured post_logout_redirect_uri and the given id token hint', async () => {
+      const expectedUrl = new URL('https://hydra.test/oauth2/sessions/logout')
+      vi.mocked(client.buildEndSessionUrl).mockReturnValue(expectedUrl)
+
+      const oidcClient = await createOidcClient(oidcConfig)
+      const url = await oidcClient.buildEndSessionUrl('the-id-token')
+
+      expect(client.buildEndSessionUrl).toHaveBeenCalledWith(fakeConfig, {
+        post_logout_redirect_uri: oidcConfig.postLogoutRedirectUrl.toString(),
+        id_token_hint: 'the-id-token',
+      })
+      expect(url).toBe(expectedUrl)
     })
   })
 })

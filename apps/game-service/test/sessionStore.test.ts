@@ -12,9 +12,9 @@ afterEach(() => {
 describe('createSessionStore', () => {
   it('retrieves the session that was created', () => {
     const store = createSessionStore()
-    const sessionId = store.create('user-123', 3600)
+    const sessionId = store.create('user-123', 'id-token-123', 3600)
 
-    expect(store.get(sessionId)).toStrictEqual({ sub: 'user-123' })
+    expect(store.get(sessionId)).toStrictEqual({ sub: 'user-123', idToken: 'id-token-123' })
   })
 
   it('returns undefined for an unknown session id', () => {
@@ -25,19 +25,19 @@ describe('createSessionStore', () => {
 
   it('keeps independent sessions isolated from each other', () => {
     const store = createSessionStore()
-    const first = store.create('user-1', 3600)
-    const second = store.create('user-2', 3600)
+    const first = store.create('user-1', 'id-token-1', 3600)
+    const second = store.create('user-2', 'id-token-2', 3600)
 
-    expect(store.get(first)).toStrictEqual({ sub: 'user-1' })
-    expect(store.get(second)).toStrictEqual({ sub: 'user-2' })
+    expect(store.get(first)).toStrictEqual({ sub: 'user-1', idToken: 'id-token-1' })
+    expect(store.get(second)).toStrictEqual({ sub: 'user-2', idToken: 'id-token-2' })
   })
 
   it('expires a session once its lifetime has passed', () => {
     const store = createSessionStore()
-    const sessionId = store.create('user-123', 60)
+    const sessionId = store.create('user-123', 'id-token-123', 60)
 
     vi.advanceTimersByTime(59_000)
-    expect(store.get(sessionId)).toStrictEqual({ sub: 'user-123' })
+    expect(store.get(sessionId)).toStrictEqual({ sub: 'user-123', idToken: 'id-token-123' })
 
     vi.advanceTimersByTime(2_000)
     expect(store.get(sessionId)).toBeUndefined()
@@ -45,7 +45,7 @@ describe('createSessionStore', () => {
 
   it('destroy removes a session immediately, even before it would expire', () => {
     const store = createSessionStore()
-    const sessionId = store.create('user-123', 3600)
+    const sessionId = store.create('user-123', 'id-token-123', 3600)
 
     store.destroy(sessionId)
 
