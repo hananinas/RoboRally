@@ -143,6 +143,8 @@ channels:
         $ref: '#/components/messages/PlayerConnectionChanged'
       gameAborted:
         $ref: '#/components/messages/GameAborted'
+      gameWon:
+        $ref: '#/components/messages/GameWon'
 
 operations:
   handleLogin:
@@ -495,6 +497,7 @@ components:
               - INVALID_PROGRAM
               - GAME_PAUSED
               - GAME_ABORTED
+              - GAME_FINISHED
               - ALREADY_SUBMITTED
               - WRONG_PHASE
               - NOT_A_MEMBER
@@ -508,6 +511,7 @@ components:
         INVALID_PROGRAM: the cards did not match the player's hand, or did not cover all five registers.
         GAME_PAUSED: rejected because the game is paused.
         GAME_ABORTED: rejected because the game has stopped irrecoverably after an unexpected service failure.
+        GAME_FINISHED: rejected because a player has won and the game has ended.
         ALREADY_SUBMITTED: this player already has a stored program for the current round; it is unchanged.
         WRONG_PHASE: the round had already moved into activation before this submission arrived.
         NOT_A_MEMBER: this connection does not own a membership for this game.
@@ -517,6 +521,7 @@ components:
         PLAYER_NOT_IN_GAME: the player is no longer part of the game (left or otherwise removed).
         INTERNAL_ERROR: unexpected service failure.
         No acknowledgement means the outcome is unknown.
+
 
     ProgramSubmitted:
       name: program.submitted
@@ -703,6 +708,20 @@ components:
         - name: aborted
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
+
+    GameWon:
+      name: game.won
+      description: >-
+        Announces the winner to game:{gameId}:public after the player.checkpointProgress
+        that completed the final checkpoint. The game ends: no further actions are resolved
+        and no new hands are dealt.
+      payload:
+        $ref: '#/components/schemas/GameWon'
+      examples:
+        - name: won
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
 
   schemas:
     EmptyRequest:
@@ -1063,6 +1082,7 @@ components:
         - paused
         - aborted
         - checkpointCount
+        - winner
       properties:
         gameId:
           $ref: "#/components/schemas/GameId"
@@ -1088,6 +1108,11 @@ components:
           description: Whether gameplay has stopped irrecoverably after an unexpected service failure.
         checkpointCount:
           $ref: '#/components/schemas/CheckpointCount'
+        winner:
+          description: The winning player, or null while the game runs.
+          oneOf:
+            - $ref: '#/components/schemas/PlayerId'
+            - type: 'null'
 
     LastCheckpoint:
       type: integer
@@ -1095,7 +1120,7 @@ components:
       description: >-
         Last checkpoint completed by the player in numerical order, initially 0.
         Must not exceed checkpointCount. Persists across rounds and reconnections.
-        Completing the final checkpoint does not end the game.
+        Completing the final checkpoint wins the game.
 
     CheckpointCount:
       type: integer
@@ -1272,3 +1297,13 @@ components:
       properties:
         gameId:
           $ref: '#/components/schemas/GameId'
+
+    GameWon:
+      type: object
+      additionalProperties: false
+      required: [ gameId, playerId ]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+        playerId:
+          $ref: '#/components/schemas/PlayerId'
