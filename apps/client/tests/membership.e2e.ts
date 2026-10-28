@@ -33,23 +33,36 @@ test('two players wait for owner Start, play a round, and leave for the lobby br
   }
 })
 
-test('the next member becomes owner when the creator leaves a waiting lobby', async ({ browser, page, baseURL }) => {
-  const context = await browser.newContext({ baseURL })
-  const other = await context.newPage()
-  try {
-    await browse(page, 'Owner')
-    await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
-    await browse(other, 'Other')
-    await other.getByRole('list', { name: 'Lobbies' }).getByRole('button', { disabled: false }).first().click()
-    await other.getByRole('button', { name: 'Join game', exact: true }).click()
-    await page.getByRole('button', { name: 'Leave lobby', exact: true }).click()
-    await expect(other.getByRole('button', { name: 'Start', exact: true })).toBeEnabled()
-    await other.getByRole('button', { name: 'Start', exact: true }).click()
-    await expect(other.getByRole('main', { name: 'Game board' })).toBeVisible()
-  } finally {
-    await context.close()
-  }
-})
+for (const departure of ['leaves', 'disconnects'] as const) {
+  test(`the roster updates and the next member becomes owner when the creator ${departure}`, async ({ browser, page, baseURL }) => {
+    const context = await browser.newContext({ baseURL })
+    const other = await context.newPage()
+    try {
+      await browse(page, 'Owner')
+      await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
+      const ownerRoster = page.getByRole('list', { name: 'Connected players' })
+      await expect(ownerRoster.getByRole('listitem')).toHaveText(['OwnerYou · Owner'])
+      await expect(page.getByText('1/6 connected', { exact: true })).toBeVisible()
+      await browse(other, 'Other')
+      await other.getByRole('list', { name: 'Lobbies' }).getByRole('button', { disabled: false }).first().click()
+      await other.getByRole('button', { name: 'Join game', exact: true }).click()
+      const otherRoster = other.getByRole('list', { name: 'Connected players' })
+      await expect(ownerRoster.getByRole('listitem')).toHaveText(['OwnerYou · Owner', 'Other'])
+      await expect(otherRoster.getByRole('listitem')).toHaveText(['OwnerOwner', 'OtherYou'])
+      for (const client of [page, other]) await expect(client.getByText('2/6 connected', { exact: true })).toBeVisible()
+      await expect(other.getByRole('button', { name: 'Start', exact: true })).toHaveCount(0)
+      if (departure === 'leaves') await page.getByRole('button', { name: 'Leave lobby', exact: true }).click()
+      else await page.close()
+      await expect(otherRoster.getByRole('listitem')).toHaveText(['OtherYou · Owner'])
+      await expect(other.getByText('1/6 connected', { exact: true })).toBeVisible()
+      await expect(other.getByRole('button', { name: 'Start', exact: true })).toBeEnabled()
+      await other.getByRole('button', { name: 'Start', exact: true }).click()
+      await expect(other.getByRole('main', { name: 'Game board' })).toBeVisible()
+    } finally {
+      await context.close()
+    }
+  })
+}
 
 test('robot colours agree between clients and survive a departure followed by a reload', async ({ browser, page, baseURL }) => {
   const context = await browser.newContext({ baseURL })
