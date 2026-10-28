@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { parseCookie } from 'cookie'
 import { createAuthApp } from '@/auth/httpRoutes.ts'
+import { createSessionStore } from '@/auth/sessionStore.ts'
 import type { OidcClient } from '@/infra/oidcClient.ts'
 
 describe('GET /auth/login', () => {
@@ -14,7 +15,7 @@ describe('GET /auth/login', () => {
   }
 
   beforeAll(async () => {
-    server = createServer(createAuthApp({ oidcClient }))
+    server = createServer(createAuthApp({ oidcClient, sessionStore: createSessionStore() }))
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   })
@@ -92,9 +93,10 @@ describe('GET /auth/callback', () => {
     buildAuthorizationUrl: vi.fn<OidcClient['buildAuthorizationUrl']>(),
     exchangeAuthorizationCode: vi.fn<OidcClient['exchangeAuthorizationCode']>(),
   }
+  const sessionStore = createSessionStore()
 
   beforeAll(async () => {
-    server = createServer(createAuthApp({ oidcClient }))
+    server = createServer(createAuthApp({ oidcClient, sessionStore }))
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   })
@@ -114,9 +116,9 @@ describe('GET /auth/callback', () => {
     expect(oidcClient.exchangeAuthorizationCode).not.toHaveBeenCalled()
   })
 
-  it('exchanges the code using the cookie values and clears the transaction cookies on success', async () => {
+  it('exchanges the code, creates a session, and clears the transaction cookies on success', async () => {
     vi.mocked(oidcClient.exchangeAuthorizationCode).mockResolvedValue(
-      { claims: () => ({ sub: 'user-123' }) } as unknown as Awaited<
+      { claims: () => ({ sub: 'user-123' }), expires_in: 900 } as unknown as Awaited<
         ReturnType<OidcClient['exchangeAuthorizationCode']>
       >,
     )
@@ -133,10 +135,31 @@ describe('GET /auth/callback', () => {
     expect(await response.text()).toContain('user-123')
 
     const setCookies = response.headers.getSetCookie()
-    expect(setCookies).toHaveLength(2)
-    for (const cookie of setCookies) {
-      expect(cookie).toMatch(/Max-Age=0/i)
-    }
+    const transactionCookies = setCookies.filter((cookie) => /Max-Age=0/i.test(cookie))
+    expect(transactionCookies).toHaveLength(2)
+
+    const sessionCookie = setCookies.find((cookie) => cookie.startsWith('game_session='))
+    expect(sessionCookie).toBeDefined()
+    expect(sessionCookie).toMatch(/HttpOnly/i)
+    expect(sessionCookie).toMatch(/SameSite=Lax/i)
+    expect(sessionCookie).toMatch(/Path=\//i)
+    expect(sessionCookie).toMatch(/Max-Age=900/i)
+
+    const sessionId = parseCookie(sessionCookie!).game_session!
+    expect(sessionStore.get(sessionId)).toStrictEqual({ sub: 'user-123' })
+  })
+
+  it('responds 400 and clears cookies without creating a session when the ID token has no subject', async () => {
+    vi.mocked(oidcClient.exchangeAuthorizationCode).mockResolvedValue(
+      { claims: () => ({}) } as unknown as Awaited<ReturnType<OidcClient['exchangeAuthorizationCode']>>,
+    )
+
+    const response = await fetch(`${baseUrl}/auth/callback?code=abc&state=xyz`, {
+      headers: { cookie: 'oauth_state=xyz; oauth_verifier=verifier-abc' },
+    })
+
+    expect(response.status).toBe(400)
+    expect(response.headers.getSetCookie().some((cookie) => cookie.startsWith('game_session='))).toBe(false)
   })
 
   it('responds 400 and still clears the transaction cookies when the exchange fails', async () => {
