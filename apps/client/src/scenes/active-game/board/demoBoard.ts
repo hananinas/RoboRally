@@ -2,6 +2,7 @@ import { createBoardRenderModel } from './boardModel.ts'
 import type { Robot } from './robotPlayback.ts'
 
 export const DEMO_BOARD = createBoardRenderModel(21, 15, {
+  antenna: { x: 10, y: 0, angle: Math.PI / 2 },
   hole: [
     [3, 3],
     [9, 2],

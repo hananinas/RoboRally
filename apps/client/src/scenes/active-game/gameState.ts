@@ -251,6 +251,7 @@ export function gameStateReducer(
           snapshot.board.width,
           snapshot.board.height,
           {
+            antenna: snapshot.antenna,
             hole: snapshot.board.tiles.filter((tile) => tile.type === 'PIT')
               .map((tile) => [tile.position.x, tile.position.y] as const),
             checkpoints: snapshot.board.tiles.flatMap((tile) => tile.checkpointNumber === undefined

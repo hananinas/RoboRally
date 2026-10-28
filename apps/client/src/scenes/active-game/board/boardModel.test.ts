@@ -28,6 +28,16 @@ describe('createBoardRenderModel', () => {
     expect(board.cells.every((cell) => Object.values(cell.walls).every((wall) => !wall))).toBe(true)
   })
 
+  it('copies antenna configuration and rejects off-board positions or invalid facing', () => {
+    const antenna = { x: 1, y: 0, angle: Math.PI / 4 }
+    const board = createBoardRenderModel(2, 1, { antenna })
+    antenna.x = 0
+    expect(board.antenna).toEqual({ x: 1, y: 0, angle: Math.PI / 4 })
+    expect(Object.isFrozen(board.antenna)).toBe(true)
+    expect(() => createBoardRenderModel(1, 1, { antenna: { ...antenna, x: 1 } })).toThrow(RangeError)
+    expect(() => createBoardRenderModel(1, 1, { antenna: { ...antenna, angle: NaN } })).toThrow(RangeError)
+  })
+
   it('rejects invalid dimensions and assignments', () => {
     expect(() => createBoardRenderModel(0, 1)).toThrow(RangeError)
     expect(() => createBoardRenderModel(1, 1, { hole: [[1, 0]] })).toThrow(

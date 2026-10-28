@@ -1,4 +1,5 @@
 import { useMemo, useRef, type CSSProperties } from 'react'
+import antennaSprites from '../board/assets/antenna.hbls?raw'
 import laserSprites from '../board/assets/lasers.hbls?raw'
 import tankSprites from '../board/assets/tanks.hbls?raw'
 import {
@@ -58,6 +59,7 @@ function pieceStyle(piece: BoardScenePiece): PieceStyle {
     top: piece.tileCentre.worldY,
     width: BOARD_CONFIG.tile * piece.component.width,
     zIndex: piece.slice.order ?? 0,
+    '--board-piece-angle': piece.angle === undefined ? undefined : `${piece.angle}deg`,
   }
 
   if (!piece.slice.wall) return style
@@ -111,7 +113,9 @@ function BoardPiece({ piece }: Readonly<{ piece: BoardScenePiece }>) {
     return (
       <svg
         {...sharedProps}
-        aria-hidden="true"
+        aria-hidden={piece.componentName === 'antenna10' ? undefined : true}
+        role={piece.componentName === 'antenna10' ? 'img' : undefined}
+        aria-label={piece.componentName === 'antenna10' ? 'Priority antenna' : undefined}
         preserveAspectRatio="xMidYMid meet"
         viewBox={viewBox}
       >
@@ -214,7 +218,7 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
       >
         <div
           aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: `${laserSprites}${tankSprites}` }}
+          dangerouslySetInnerHTML={{ __html: `${antennaSprites}${laserSprites}${tankSprites}` }}
         />
         {scene.planes.map((pieces, layer) => {
           const robotComponent = ROBOT_COMPONENTS[layer - 3]
