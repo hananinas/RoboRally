@@ -5,6 +5,8 @@ import { io as connectSocket, type Socket } from 'socket.io-client'
 import { expect, it } from 'vitest'
 import { Board, Card, EmptyTile, Game, type Player } from '@/game/index.ts'
 import { createGameSocketServer } from '@/socket/gameServer.ts'
+import { createSessionStore } from '@/auth/sessionStore.ts'
+import { authCookieHeader } from './authTestHelper.ts'
 import { Integer } from '@/numbers'
 
 it('waits for the roster, broadcasts register-major actions, and deals two private next rounds', async () => {
@@ -16,7 +18,8 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
     new Card(`00000000-0000-4000-8000-00000000010${index}`, 'TURN_LEFT'))
   const game = new Game(board, players, deck, { x: Integer(0), y: Integer(0) })
   const httpServer = createServer()
-  const server = createGameSocketServer(httpServer, () => ({ gameId, game }))
+  const sessionStore = createSessionStore()
+  const server = createGameSocketServer(httpServer, sessionStore, () => ({ gameId, game }))
   const clients: Socket<ServerToClientEvents, ClientToServerEvents>[] = []
   const events: { name: string; payload: unknown }[][] = [[], []]
   try {
@@ -25,6 +28,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
     for (let index = 0; index < 2; index++) {
       const socket: Socket<ServerToClientEvents, ClientToServerEvents> = connectSocket(url, {
         transports: ['websocket'], autoConnect: false, reconnection: false,
+        extraHeaders: authCookieHeader(sessionStore),
       })
       clients.push(socket)
       socket.onAny((name, payload: unknown) => events[index].push({ name, payload }))

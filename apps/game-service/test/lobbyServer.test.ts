@@ -5,10 +5,13 @@ import { io, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDefaultGame } from '@/game/GameFactory'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
+import { createSessionStore, type SessionStore } from '@/auth/sessionStore'
+import { authCookieHeader } from './authTestHelper.ts'
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>
 describe('lobby lifecycle over Socket.IO', () => {
   let server: GameSocketServer
+  let sessionStore: SessionStore
   let url: string
   let clients: Client[]
   const factory = vi.fn(createDefaultGame)
@@ -16,7 +19,8 @@ describe('lobby lifecycle over Socket.IO', () => {
     clients = []
     factory.mockReset().mockImplementation(createDefaultGame)
     const http = createServer()
-    server = createGameSocketServer(http, factory)
+    sessionStore = createSessionStore()
+    server = createGameSocketServer(http, sessionStore, factory)
     await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve))
     url = `http://127.0.0.1:${(http.address() as AddressInfo).port}`
   })
@@ -25,7 +29,10 @@ describe('lobby lifecycle over Socket.IO', () => {
     await new Promise<void>((resolve) => server.close(() => resolve()))
   })
   async function connect(username?: string): Promise<Client> {
-    const client: Client = io(url, { autoConnect: false, transports: ['websocket'], reconnection: false, ackTimeout: 1000 })
+    const client: Client = io(url, {
+      autoConnect: false, transports: ['websocket'], reconnection: false, ackTimeout: 1000,
+      extraHeaders: authCookieHeader(sessionStore),
+    })
     clients.push(client)
     const connected = new Promise<void>((resolve) => client.once('connect', resolve))
     client.connect()
