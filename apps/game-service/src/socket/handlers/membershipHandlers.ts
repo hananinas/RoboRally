@@ -118,7 +118,7 @@ export function handleReattachGame(
     if (wasPaused) ctx.game.pause()
     return acknowledge({ outcome: 'INTERNAL_ERROR' })
   }
-  acknowledge({ outcome: 'IN_GAME', initialization })
+  acknowledge({ outcome: 'IN_GAME', initialization, user })
   if (reconnected) notifyReconnected(ctx, membership.player.id)
 }
 

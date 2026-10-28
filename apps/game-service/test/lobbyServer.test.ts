@@ -147,7 +147,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(await owner.emitWithAck('lobby.list', {})).toEqual({ outcome: 'LOBBIES_FOUND', lobbies: [] })
     expect(await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'LOBBY_NOT_FOUND' })
     const outsider = await connect('Outsider')
-    expect(await outsider.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION' })
+    expect(await outsider.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION', user: { userId: 'Outsider', username: 'Outsider' } })
     expect(await outsider.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'LOBBY_NOT_FOUND' })
     expect(await outsider.emitWithAck('program.submit', {
       gameId: first.assignment.gameId, playerId: first.assignment.playerId,
@@ -225,9 +225,10 @@ describe('lobby lifecycle over Socket.IO', () => {
   })
   it('discovers a committed start when its notification or acknowledgement was missed', async () => {
     const owner = await connect('Owner')
-    expect(await owner.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION' })
+    const ownerUser = { userId: 'Owner', username: 'Owner' }
+    expect(await owner.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION', user: ownerUser })
     const lobby = await create(owner)
-    expect(await owner.emitWithAck('session.get', {})).toEqual({ outcome: 'IN_LOBBY', lobby })
+    expect(await owner.emitWithAck('session.get', {})).toEqual({ outcome: 'IN_LOBBY', lobby, user: ownerUser })
     // Deliberately do not install a game.started listener or await its start ack.
     owner.emit('lobby.start', { lobbyId: lobby.lobbyId }, () => {})
     const session = await owner.emitWithAck('session.get', {})
@@ -256,7 +257,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })
     expect((await ready).state.players).toHaveLength(1)
     const replacement = await connect('Other')
-    expect(await replacement.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION' })
+    expect(await replacement.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION', user: { userId: 'Other', username: 'Other' } })
     await disconnect(owner)
     const returnedOwner = await connect('Owner')
     const result = await returnedOwner.emitWithAck('session.get', {})
@@ -276,7 +277,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     owner.connect()
     expect((await rejected).message).toBe('SESSION_EXPIRED')
     const replacement = await connect('Owner')
-    expect(await replacement.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION' })
+    expect(await replacement.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION', user: { userId: 'Owner', username: 'Owner' } })
     const state = await other.emitWithAck('session.get', {})
     expect(state.outcome).toBe('IN_LOBBY')
     if (state.outcome === 'IN_LOBBY') expect(state.lobby.playerCount).toBe(1)
@@ -298,7 +299,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     const connection = server.sockets.sockets.get(owner.id!)!
     vi.spyOn(connection, 'join').mockImplementationOnce(() => { throw new Error('Room failure') })
     expect(await owner.emitWithAck('lobby.create', {})).toEqual({ outcome: 'INTERNAL_ERROR' })
-    expect(await owner.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION' })
+    expect(await owner.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION', user: { userId: 'Owner', username: 'Owner' } })
     expect(await owner.emitWithAck('lobby.list', {})).toEqual({ outcome: 'LOBBIES_FOUND', lobbies: [] })
     expect(connection.rooms).toEqual(new Set([owner.id]))
     expect((await create(owner)).playerCount).toBe(1)
@@ -309,7 +310,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     const lobby = await create(owner)
     factory.mockImplementationOnce(() => { throw new Error('Factory failure') })
     expect(await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'INTERNAL_ERROR' })
-    expect(await owner.emitWithAck('session.get', {})).toEqual({ outcome: 'IN_LOBBY', lobby })
+    expect(await owner.emitWithAck('session.get', {})).toEqual({ outcome: 'IN_LOBBY', lobby, user: { userId: 'Owner', username: 'Owner' } })
     const ready = started(owner)
     expect((await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })).outcome).toBe('STARTED')
     await ready

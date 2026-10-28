@@ -77,7 +77,7 @@ describe('started game membership over Socket.IO', () => {
   it('rejects malformed session requests and starts with no session', async () => {
     const client = await connect('Dane')
     expect(await raw(client, 'session.get', { gameId: shared.gameId })).toEqual({ outcome: 'INVALID_REQUEST' })
-    expect(await client.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION' })
+    expect(await client.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION', user: { userId: 'Dane', username: 'Dane' } })
     expect(server.sockets.sockets.get(client.id!)!.rooms).toEqual(new Set([client.id]))
   })
   it('returns the same assignment and hand on repeated session discovery', async () => {
@@ -104,7 +104,7 @@ describe('started game membership over Socket.IO', () => {
     expect(await left).toEqual({ gameId: shared.gameId, playerId: initial.assignment.playerId, robotId: initial.assignment.robotId })
     expect(shared.game.board.occupantAt({ x: Integer(10), y: Integer(7) })).toBeUndefined()
     expect(server.sockets.sockets.get(first.id!)!.rooms).toEqual(new Set([first.id]))
-    expect(await first.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION' })
+    expect(await first.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION', user: { userId: 'First', username: 'First' } })
     expect(await first.emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'NOT_A_MEMBER' })
   })
   it('completes the programming barrier when an unsubmitted member leaves', async () => {
@@ -215,7 +215,7 @@ describe('started game membership over Socket.IO', () => {
     const emit = client.emit.bind(client) as (event: string, payload: unknown) => void
     emit('lobby.create', {})
     emit('program.submit', {})
-    expect(await client.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION' })
+    expect(await client.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION', user: { userId: 'Abid', username: 'Abid' } })
     expect(shared.game.players).toHaveLength(0)
   })
   it('aborts the game permanently on an unexpected execution failure, still tells (re)joining members, and still allows leaving', async () => {
