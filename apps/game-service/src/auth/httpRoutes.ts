@@ -62,19 +62,17 @@ export function createAuthApp({ oidcClient, sessionStore }: AuthAppDeps): Expres
       if (!sub) {
         throw new Error('ID token did not contain a subject claim')
       }
+      if (!tokens.id_token) {
+        throw new Error('Token response did not contain an ID token')
+      }
 
       const expiresIn = tokens.expires_in ?? DEFAULT_SESSION_EXPIRES_IN_SECONDS
-      const sessionId = sessionStore.create(sub, expiresIn)
+      const sessionId = sessionStore.create(sub, tokens.id_token, expiresIn)
       logInfo('OIDC callback succeeded', { sub })
 
       res.setHeader('Set-Cookie', [
         ...clearTransactionCookies,
-        stringifySetCookie(SESSION_COOKIE_NAME, sessionId, {
-          httpOnly: true,
-          sameSite: 'lax',
-          path: '/',
-          maxAge: expiresIn,
-        }),
+        sessionCookie(sessionId, expiresIn),
       ])
       res.status(200).type('text/plain').send(`Login succeeded. Subject: ${sub}`)
     } catch (error) {
@@ -82,6 +80,25 @@ export function createAuthApp({ oidcClient, sessionStore }: AuthAppDeps): Expres
       res.setHeader('Set-Cookie', clearTransactionCookies)
       res.status(400).type('text/plain').send('Login failed. Please try /auth/login again.')
     }
+  })
+
+  app.get('/auth/logout', async (req, res) => {
+    const cookies = parseCookie(req.headers.cookie ?? '')
+    const sessionId = cookies[SESSION_COOKIE_NAME]
+    const session = sessionId ? sessionStore.get(sessionId) : undefined
+    if (sessionId) {
+      sessionStore.destroy(sessionId)
+    }
+
+    res.setHeader('Set-Cookie', sessionCookie('', 0))
+
+    if (!session) {
+      res.redirect(oidcClient.postLogoutRedirectUrl.toString())
+      return
+    }
+
+    const endSessionUrl = await oidcClient.buildEndSessionUrl(session.idToken)
+    res.redirect(endSessionUrl.toString())
   })
 
   app.use(handleAuthRouteError)
@@ -94,6 +111,15 @@ function transactionCookie(name: string, value: string, maxAge: number): string 
     httpOnly: true,
     sameSite: 'lax',
     path: TRANSACTION_COOKIE_PATH,
+    maxAge,
+  })
+}
+
+function sessionCookie(value: string, maxAge: number): string {
+  return stringifySetCookie(SESSION_COOKIE_NAME, value, {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
     maxAge,
   })
 }
