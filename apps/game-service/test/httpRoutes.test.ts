@@ -84,3 +84,73 @@ describe('GET /auth/login', () => {
     expect(response.status).toBe(500)
   })
 })
+
+describe('GET /auth/callback', () => {
+  let baseUrl: string
+  let server: Server
+  const oidcClient: OidcClient = {
+    buildAuthorizationUrl: vi.fn<OidcClient['buildAuthorizationUrl']>(),
+    exchangeAuthorizationCode: vi.fn<OidcClient['exchangeAuthorizationCode']>(),
+  }
+
+  beforeAll(async () => {
+    server = createServer(createAuthApp({ oidcClient }))
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+  })
+
+  afterAll(() => {
+    server.close()
+  })
+
+  beforeEach(() => {
+    vi.mocked(oidcClient.exchangeAuthorizationCode).mockReset()
+  })
+
+  it('rejects with 400 and never calls the OIDC client when transaction cookies are missing', async () => {
+    const response = await fetch(`${baseUrl}/auth/callback?code=abc&state=xyz`)
+
+    expect(response.status).toBe(400)
+    expect(oidcClient.exchangeAuthorizationCode).not.toHaveBeenCalled()
+  })
+
+  it('exchanges the code using the cookie values and clears the transaction cookies on success', async () => {
+    vi.mocked(oidcClient.exchangeAuthorizationCode).mockResolvedValue(
+      { claims: () => ({ sub: 'user-123' }) } as unknown as Awaited<
+        ReturnType<OidcClient['exchangeAuthorizationCode']>
+      >,
+    )
+
+    const response = await fetch(`${baseUrl}/auth/callback?code=abc&state=xyz`, {
+      headers: { cookie: 'oauth_state=xyz; oauth_verifier=verifier-abc' },
+    })
+
+    expect(response.status).toBe(200)
+    expect(oidcClient.exchangeAuthorizationCode).toHaveBeenCalledWith('/auth/callback?code=abc&state=xyz', {
+      pkceCodeVerifier: 'verifier-abc',
+      expectedState: 'xyz',
+    })
+    expect(await response.text()).toContain('user-123')
+
+    const setCookies = response.headers.getSetCookie()
+    expect(setCookies).toHaveLength(2)
+    for (const cookie of setCookies) {
+      expect(cookie).toMatch(/Max-Age=0/i)
+    }
+  })
+
+  it('responds 400 and still clears the transaction cookies when the exchange fails', async () => {
+    vi.mocked(oidcClient.exchangeAuthorizationCode).mockRejectedValue(new Error('invalid_grant'))
+
+    const response = await fetch(`${baseUrl}/auth/callback?code=abc&state=xyz`, {
+      headers: { cookie: 'oauth_state=xyz; oauth_verifier=verifier-abc' },
+    })
+
+    expect(response.status).toBe(400)
+    const setCookies = response.headers.getSetCookie()
+    expect(setCookies).toHaveLength(2)
+    for (const cookie of setCookies) {
+      expect(cookie).toMatch(/Max-Age=0/i)
+    }
+  })
+})
