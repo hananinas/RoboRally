@@ -128,15 +128,16 @@ describe('GET /auth/callback', () => {
     )
 
     const response = await fetch(`${baseUrl}/auth/callback?code=abc&state=xyz`, {
+      redirect: 'manual',
       headers: { cookie: 'oauth_state=xyz; oauth_verifier=verifier-abc' },
     })
 
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(302)
+    expect(response.headers.get('location')).toBe('/')
     expect(oidcClient.exchangeAuthorizationCode).toHaveBeenCalledWith('/auth/callback?code=abc&state=xyz', {
       pkceCodeVerifier: 'verifier-abc',
       expectedState: 'xyz',
     })
-    expect(await response.text()).toContain('user-123')
 
     const setCookies = response.headers.getSetCookie()
     const transactionCookies = setCookies.filter((cookie) => /Max-Age=0/i.test(cookie))

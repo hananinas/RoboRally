@@ -74,7 +74,7 @@ export function createAuthApp({ oidcClient, sessionStore }: AuthAppDeps): Expres
         ...clearTransactionCookies,
         sessionCookie(sessionId, expiresIn),
       ])
-      res.status(200).type('text/plain').send(`Login succeeded. Subject: ${sub}`)
+      res.redirect('/')
     } catch (error) {
       logError('OIDC callback failed', error, { url: req.originalUrl })
       res.setHeader('Set-Cookie', clearTransactionCookies)
