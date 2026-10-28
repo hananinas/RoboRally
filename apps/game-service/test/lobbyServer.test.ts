@@ -70,6 +70,40 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(await duplicate.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'NOT_LOBBY_MEMBER' })
     expect(factory).not.toHaveBeenCalled()
   })
+  it.each(['leave', 'disconnect'] as const)('updates the roster and owner on %s without notifying other lobbies', async (departure) => {
+    const owner = await connect('Owner')
+    const lobby = await create(owner)
+    const first = lobby.players[0]!
+    expect(first).toEqual({ userId: lobby.ownerUserId, username: 'Owner' })
+    expect(lobby.players).toHaveLength(lobby.playerCount)
+    const outsider = await connect('Outsider')
+    await create(outsider)
+    const foreignUpdates = vi.fn()
+    outsider.on('lobby.updated', foreignUpdates)
+
+    const other = await connect('Other')
+    const joined = new Promise<LobbyState>((resolve) => owner.once('lobby.updated', ({ lobby: state }) => resolve(state)))
+    const result = await other.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })
+    if (result.outcome !== 'LOBBY_JOINED') throw new Error(result.outcome)
+    const roster = result.lobby
+    expect(await joined).toEqual(roster)
+    expect(roster.players).toEqual([first, { userId: expect.any(String), username: 'Other' }])
+    expect(roster.playerCount).toBe(2)
+    expect(await other.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })).toEqual(result)
+    expect(await other.emitWithAck('session.get', {})).toEqual({ outcome: 'IN_LOBBY', lobby: roster })
+    const listed = await outsider.emitWithAck('lobby.list', {})
+    if (listed.outcome !== 'LOBBIES_FOUND') throw new Error(listed.outcome)
+    expect(listed.lobbies.find(({ lobbyId }) => lobbyId === lobby.lobbyId)).toEqual({
+      lobbyId: lobby.lobbyId, name: lobby.name, playerCount: 2, maxPlayers: 6,
+    })
+
+    const left = new Promise<LobbyState>((resolve) => other.once('lobby.updated', ({ lobby: state }) => resolve(state)))
+    if (departure === 'leave') await owner.emitWithAck('lobby.leave', { lobbyId: lobby.lobbyId })
+    else await disconnect(owner)
+    expect(await left).toEqual({ ...roster, ownerUserId: roster.players[1]!.userId, playerCount: 1, players: [roster.players[1]!] })
+    await outsider.emitWithAck('session.get', {})
+    expect(foreignUpdates).not.toHaveBeenCalled()
+  })
   it('enforces six members, including idempotent rejoin at capacity', async () => {
     const owner = await connect('0')
     const lobby = await create(owner)
