@@ -21,7 +21,7 @@ httpServer.on('request', (req, res) => {
     authApp(req, res)
   }
 })
-const io = createGameSocketServer(httpServer)
+const io = createGameSocketServer(httpServer, sessionStore)
 
 httpServer.listen(port, host, () => {
   console.log(`Game Service listening at http://${host}:${port}`)

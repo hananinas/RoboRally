@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
+export const SESSION_COOKIE_NAME = 'game_session'
+
 export type Session = Readonly<{ sub: string }>
 
 export type SessionStore = Readonly<{

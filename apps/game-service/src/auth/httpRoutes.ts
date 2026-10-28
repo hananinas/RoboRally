@@ -2,7 +2,7 @@ import express, { type ErrorRequestHandler, type Express } from 'express'
 import { parseCookie, stringifySetCookie } from 'cookie'
 import { calculatePKCECodeChallenge, randomPKCECodeVerifier, randomState } from 'openid-client'
 import type { OidcClient } from '@/infra/oidcClient'
-import type { SessionStore } from '@/auth/sessionStore'
+import { SESSION_COOKIE_NAME, type SessionStore } from '@/auth/sessionStore'
 import { logError, logInfo, logWarn } from '@/logger'
 
 const TRANSACTION_COOKIE_PATH = '/auth/callback'
@@ -10,7 +10,6 @@ const TRANSACTION_COOKIE_MAX_AGE_SECONDS = 300
 const STATE_COOKIE_NAME = 'oauth_state'
 const VERIFIER_COOKIE_NAME = 'oauth_verifier'
 
-const SESSION_COOKIE_NAME = 'game_session'
 const DEFAULT_SESSION_EXPIRES_IN_SECONDS = 900
 
 export type AuthAppDeps = Readonly<{ oidcClient: OidcClient; sessionStore: SessionStore }>
