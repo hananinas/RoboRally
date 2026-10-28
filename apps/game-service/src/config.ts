@@ -14,7 +14,7 @@ export function parseGameServicePort(value: string | undefined): number {
 export const DEFAULT_HYDRA_ISSUER_URL = 'https://127.0.0.1:4444/'
 export const DEFAULT_OAUTH_CLIENT_ID = 'game-service'
 export const DEFAULT_OAUTH_CLIENT_SECRET = 'game-service-dev-secret'
-export const DEFAULT_AUTH_CALLBACK_URL = 'http://127.0.0.1:3001/auth/callback'
+export const DEFAULT_AUTH_CALLBACK_URL = 'https://127.0.0.1:3001/auth/callback'
 
 export function parseUrlEnv(value: string | undefined, fallback: string): URL {
   return new URL(value ?? fallback)

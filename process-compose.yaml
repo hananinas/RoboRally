@@ -65,14 +65,23 @@ processes:
   build-game-events:
     command: "pnpm --filter @robo-rally/game-events run build"
 
+  dev-tls-proxy:
+    command: "caddy run --config infra/Caddyfile.dev --adapter caddyfile"
+    depends_on:
+      generate-dev-tls-cert:
+        condition: process_completed_successfully
+
   client:
-    command: "pnpm --filter @robo-rally/client run dev"
+    command: >
+      export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem" &&
+      pnpm --filter @robo-rally/client run dev
     depends_on:
       build-game-events:
         condition: process_completed_successfully
 
   game-service:
     command: >
+      export PORT=3002 &&
       export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem" &&
       pnpm --filter @robo-rally/game-service run dev
     depends_on:
