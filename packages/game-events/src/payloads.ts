@@ -11,16 +11,6 @@ export type User = Readonly<{
   username: string
 }>
 
-export type LoginResult =
-  | Readonly<{ outcome: 'LOGGED_IN'; user: User }>
-  | Readonly<{
-      outcome:
-        | 'INVALID_USERNAME'
-        | 'INVALID_REQUEST'
-        | 'ALREADY_LOGGED_IN'
-        | 'INTERNAL_ERROR'
-    }>
-
 export type LeaveGame = Readonly<{ gameId: GameId }>
 
 export type PlayerAssignment = Readonly<{

@@ -28,16 +28,15 @@ describe('lobby lifecycle over Socket.IO', () => {
     for (const client of clients) client.disconnect()
     await new Promise<void>((resolve) => server.close(() => resolve()))
   })
-  async function connect(username?: string): Promise<Client> {
+  async function connect(username: string): Promise<Client> {
     const client: Client = io(url, {
       autoConnect: false, transports: ['websocket'], reconnection: false, ackTimeout: 1000,
-      extraHeaders: authCookieHeader(sessionStore),
+      extraHeaders: authCookieHeader(sessionStore, username, username),
     })
     clients.push(client)
     const connected = new Promise<void>((resolve) => client.once('connect', resolve))
     client.connect()
     await connected
-    if (username) await client.emitWithAck('user.login', { username })
     return client
   }
   async function create(client: Client): Promise<LobbyState> {
@@ -53,10 +52,8 @@ describe('lobby lifecycle over Socket.IO', () => {
     client.disconnect()
     await closed
   }
-  it('requires login and validates requests without allocating games or rooms', async () => {
-    const client = await connect()
-    expect(await client.emitWithAck('lobby.create', {})).toEqual({ outcome: 'LOGIN_REQUIRED' })
-    await client.emitWithAck('user.login', { username: 'Owner' })
+  it('validates requests without allocating games or rooms', async () => {
+    const client = await connect('Bence')
     const raw = client.emitWithAck.bind(client) as (event: string, payload: unknown) => Promise<unknown>
     expect(await raw('lobby.create', { name: 'Custom' })).toEqual({ outcome: 'INVALID_REQUEST' })
     expect(await raw('lobby.join', { lobbyId: 'invalid' })).toEqual({ outcome: 'INVALID_REQUEST' })
@@ -186,11 +183,10 @@ describe('lobby lifecycle over Socket.IO', () => {
     const owner = await connect('Owner')
     const lobby = await create(owner)
     const other = await connect('Other')
-    const login = await other.emitWithAck('user.login', { username: 'Other' })
     await other.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })
     const updated = new Promise<LobbyState>((resolve) => other.once('lobby.updated', ({ lobby: state }) => resolve(state)))
     expect(await owner.emitWithAck('lobby.leave', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'LEFT' })
-    expect((await updated).ownerUserId).toBe(login.outcome === 'LOGGED_IN' ? login.user.userId : '')
+    expect((await updated).ownerUserId).toBe('Other')
     await disconnect(other)
     expect(await owner.emitWithAck('lobby.list', {})).toEqual({ outcome: 'LOBBIES_FOUND', lobbies: [] })
     expect(server.sockets.adapter.rooms.has(`lobby:${lobby.lobbyId}`)).toBe(false)
