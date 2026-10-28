@@ -194,6 +194,19 @@ At the end of each register, the service checks each robot's final position for 
 
 The event follows the related `robot.actionResolved`.
 
+### Winning
+A player wins when their robot completes the final checkpoint, so `lastCheckpoint` reaches `checkpointCount`. Like every checkpoint, this is checked at the end of a register. Robots cannot share a space, so only one robot can win. A board without checkpoints has no winner.
+
+The game ends at once: remaining registers are not resolved and no new hand is dealt. The service broadcasts to the [public room](#rooms):
+
+`game.won {gameId, playerId}`
+
+The event follows the final `player.checkpointProgress`. `PublicGameState.winner` holds the winner's `playerId`, or `null` while the game runs, so reconnecting players also see the result.
+
+After a win, `program.submit` is rejected with `GAME_FINISHED`. Players leave with `game.leave`, and the game is removed when the last member leaves.
+
+The client shows the winner once the remaining actions have played, with a button to leave the game.
+
 ### Dealing the next hand
 
 After all five registers have been resolved, the service deals each player a private hand for the next programming round.
