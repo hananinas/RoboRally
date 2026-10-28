@@ -1,8 +1,8 @@
 import express, { type ErrorRequestHandler, type Express } from 'express'
-import { stringifySetCookie } from 'cookie'
+import { parseCookie, stringifySetCookie } from 'cookie'
 import { calculatePKCECodeChallenge, randomPKCECodeVerifier, randomState } from 'openid-client'
 import type { OidcClient } from '@/infra/oidcClient'
-import { logError } from '@/logger'
+import { logError, logInfo, logWarn } from '@/logger'
 
 const TRANSACTION_COOKIE_PATH = '/auth/callback'
 const TRANSACTION_COOKIE_MAX_AGE_SECONDS = 300
@@ -31,6 +31,40 @@ export function createAuthApp({ oidcClient }: AuthAppDeps): Express {
       transactionCookie(VERIFIER_COOKIE_NAME, codeVerifier, TRANSACTION_COOKIE_MAX_AGE_SECONDS),
     ])
     res.redirect(authorizationUrl.toString())
+  })
+
+  app.get('/auth/callback', async (req, res) => {
+    const clearTransactionCookies = [
+      transactionCookie(STATE_COOKIE_NAME, '', 0),
+      transactionCookie(VERIFIER_COOKIE_NAME, '', 0),
+    ]
+
+    const cookies = parseCookie(req.headers.cookie ?? '')
+    const state = cookies[STATE_COOKIE_NAME]
+    const codeVerifier = cookies[VERIFIER_COOKIE_NAME]
+
+    if (!state || !codeVerifier) {
+      logWarn('Rejected OIDC callback: missing or expired transaction cookies', { url: req.originalUrl })
+      res.setHeader('Set-Cookie', clearTransactionCookies)
+      res.status(400).type('text/plain').send('Login session expired or missing. Please try /auth/login again.')
+      return
+    }
+
+    try {
+      const tokens = await oidcClient.exchangeAuthorizationCode(req.originalUrl, {
+        pkceCodeVerifier: codeVerifier,
+        expectedState: state,
+      })
+      const claims = tokens.claims()
+      logInfo('OIDC callback succeeded', { sub: claims?.sub })
+
+      res.setHeader('Set-Cookie', clearTransactionCookies)
+      res.status(200).type('text/plain').send(`Login succeeded (temporary, no session yet). Subject: ${claims?.sub ?? 'unknown'}`)
+    } catch (error) {
+      logError('OIDC callback failed', error, { url: req.originalUrl })
+      res.setHeader('Set-Cookie', clearTransactionCookies)
+      res.status(400).type('text/plain').send('Login failed. Please try /auth/login again.')
+    }
   })
 
   app.use(handleAuthRouteError)
