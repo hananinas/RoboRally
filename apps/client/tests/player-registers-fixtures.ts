@@ -55,6 +55,7 @@ export function createRegisterState(executing = false): PublicGameState & { play
       base.robots[0],
       ...programmingPlayers.map((player, index) => ({
         robotId: REGISTER_ROBOT_IDS[index], playerId: player.playerId,
+        colour: ['#4D8DEB', '#4CAF70', '#A66BE0'][index],
         position: { coordinate: { x: 3 + index, y: 3 }, orientation: 'NORTH' as const },
       })),
     ],
