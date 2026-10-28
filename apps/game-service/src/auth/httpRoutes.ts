@@ -2,6 +2,7 @@ import express, { type ErrorRequestHandler, type Express } from 'express'
 import { parseCookie, stringifySetCookie } from 'cookie'
 import { calculatePKCECodeChallenge, randomPKCECodeVerifier, randomState } from 'openid-client'
 import type { OidcClient } from '@/infra/oidcClient'
+import type { SessionStore } from '@/auth/sessionStore'
 import { logError, logInfo, logWarn } from '@/logger'
 
 const TRANSACTION_COOKIE_PATH = '/auth/callback'
@@ -9,9 +10,12 @@ const TRANSACTION_COOKIE_MAX_AGE_SECONDS = 300
 const STATE_COOKIE_NAME = 'oauth_state'
 const VERIFIER_COOKIE_NAME = 'oauth_verifier'
 
-export type AuthAppDeps = Readonly<{ oidcClient: OidcClient }>
+const SESSION_COOKIE_NAME = 'game_session'
+const DEFAULT_SESSION_EXPIRES_IN_SECONDS = 900
 
-export function createAuthApp({ oidcClient }: AuthAppDeps): Express {
+export type AuthAppDeps = Readonly<{ oidcClient: OidcClient; sessionStore: SessionStore }>
+
+export function createAuthApp({ oidcClient, sessionStore }: AuthAppDeps): Express {
   const app = express()
 
   app.get('/auth/login', async (req, res) => {
@@ -55,11 +59,25 @@ export function createAuthApp({ oidcClient }: AuthAppDeps): Express {
         pkceCodeVerifier: codeVerifier,
         expectedState: state,
       })
-      const claims = tokens.claims()
-      logInfo('OIDC callback succeeded', { sub: claims?.sub })
+      const sub = tokens.claims()?.sub
+      if (!sub) {
+        throw new Error('ID token did not contain a subject claim')
+      }
 
-      res.setHeader('Set-Cookie', clearTransactionCookies)
-      res.status(200).type('text/plain').send(`Login succeeded (temporary, no session yet). Subject: ${claims?.sub ?? 'unknown'}`)
+      const expiresIn = tokens.expires_in ?? DEFAULT_SESSION_EXPIRES_IN_SECONDS
+      const sessionId = sessionStore.create(sub, expiresIn)
+      logInfo('OIDC callback succeeded', { sub })
+
+      res.setHeader('Set-Cookie', [
+        ...clearTransactionCookies,
+        stringifySetCookie(SESSION_COOKIE_NAME, sessionId, {
+          httpOnly: true,
+          sameSite: 'lax',
+          path: '/',
+          maxAge: expiresIn,
+        }),
+      ])
+      res.status(200).type('text/plain').send(`Login succeeded. Subject: ${sub}`)
     } catch (error) {
       logError('OIDC callback failed', error, { url: req.originalUrl })
       res.setHeader('Set-Cookie', clearTransactionCookies)
