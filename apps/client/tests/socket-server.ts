@@ -22,9 +22,9 @@ import {
   type FixtureControl,
   type FixtureSnapshot,
 } from './game-fixture-data.ts'
-import type { PublicRegisterEvents } from '../src/scenes/active-game/publicRegisters.ts'
+import type { PublicRegisterCommands, PublicRegisterEvents, PublicRegisters } from '../src/scenes/active-game/publicRegisters.ts'
 
-type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents & PublicRegisterEvents>
+type GameSocket = Socket<ClientToServerEvents & PublicRegisterCommands, ServerToClientEvents & PublicRegisterEvents>
 type Fixture = {
   id: string
   cards: readonly Card[]
@@ -227,7 +227,7 @@ const httpServer = createServer(async (request, response) => {
   send(200, snapshot(fixture))
 })
 
-const io = new Server<ClientToServerEvents, ServerToClientEvents & PublicRegisterEvents>(httpServer, {
+const io = new Server<ClientToServerEvents & PublicRegisterCommands, ServerToClientEvents & PublicRegisterEvents>(httpServer, {
   cors: { origin: 'http://127.0.0.1:4173', allowedHeaders: ['x-fixture-id'] },
 })
 
@@ -301,6 +301,26 @@ io.on('connection', (socket) => {
     fixture.started = false
     lobby = undefined
     acknowledge({ outcome: 'LEFT' })
+  })
+
+  socket.on('game.updateRegisters', (payload, acknowledge) => {
+    if (payload.gameId !== GAME_ID) return acknowledge({ outcome: 'NOT_A_MEMBER' })
+    if (payload.playerId !== PLAYER_ID) return acknowledge({ outcome: 'PLAYER_ID_MISMATCH' })
+    const registers: PublicRegisters = [
+      { status: payload.occupied[0] ? 'HIDDEN' : 'EMPTY' },
+      { status: payload.occupied[1] ? 'HIDDEN' : 'EMPTY' },
+      { status: payload.occupied[2] ? 'HIDDEN' : 'EMPTY' },
+      { status: payload.occupied[3] ? 'HIDDEN' : 'EMPTY' },
+      { status: payload.occupied[4] ? 'HIDDEN' : 'EMPTY' },
+    ]
+    fixture.state = {
+      ...fixture.state,
+      players: fixture.state.players.map((player) => player.playerId === PLAYER_ID ? { ...player, registers } : player),
+    }
+    acknowledge({ outcome: 'ACCEPTED' })
+    for (const observer of fixture.sockets) observer.emit('game.registersChanged', {
+      gameId: GAME_ID, playerId: PLAYER_ID, registers,
+    })
   })
 
   socket.on('program.submit', (payload, acknowledge) => {

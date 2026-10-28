@@ -28,11 +28,33 @@ export default function useGameConnection(socket: GameSocket) {
   const generation = useRef(0)
 
   // Keep event-time state current so submission checks see updates before React renders.
-  const dispatch = useCallback((event: GameStateEvent) => {
-    const next = gameStateReducer(current.current, event)
+  const dispatch = useCallback(function dispatch(event: GameStateEvent): void {
+    const previous = current.current
+    const next = gameStateReducer(previous, event)
     current.current = next
     setState(next)
-  }, [])
+    if (!socket.connected || !next.assignment || previous.registers === next.registers ||
+        !(event.type === 'place' || event.type === 'remove' || event.type === 'move' ||
+          event.type === 'clear' || event.type === 'undo' || event.type === 'redo') ||
+        !next.registers.some((card, index) => Boolean(card) !== Boolean(previous.registers[index]))) return
+    const requestGeneration = generation.current
+    const handVersion = next.handVersion
+    socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit('game.updateRegisters', {
+      gameId: next.assignment.gameId,
+      playerId: next.assignment.playerId,
+      occupied: [
+        !!next.registers[0], !!next.registers[1], !!next.registers[2],
+        !!next.registers[3], !!next.registers[4],
+      ],
+    }, (error, result) => {
+      if (!socket.connected || generation.current !== requestGeneration ||
+          current.current.handVersion !== handVersion || current.current.submission !== 'idle' ||
+          current.current.phase !== 'PROGRAMMING') return
+      if (error || result.outcome !== 'ACCEPTED') {
+        dispatch({ type: 'error', message: 'Could not share register progress with other players.' })
+      }
+    })
+  }, [socket])
 
   const initialize = useCallback((result: GameInitialization) => {
     generation.current += 1

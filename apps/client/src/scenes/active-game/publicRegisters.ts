@@ -31,6 +31,20 @@ export type PublicRegisterEvents = {
   'game.programmingStarted': (payload: ProgrammingStarted) => void
 }
 
+export type PublicRegisterCommands = {
+  'game.updateRegisters': (
+    payload: Readonly<{
+      gameId: GameId
+      playerId: PlayerId
+      occupied: readonly [boolean, boolean, boolean, boolean, boolean]
+    }>,
+    acknowledge: (result: Readonly<{
+      outcome: 'ACCEPTED' | 'INVALID_REQUEST' | 'NOT_A_MEMBER' | 'PLAYER_ID_MISMATCH'
+        | 'WRONG_PHASE' | 'ALREADY_SUBMITTED' | 'INTERNAL_ERROR'
+    }>) => void,
+  ) => void
+}
+
 // Presentation metadata is client-only, never part of PlayerState on the wire.
 export type OpponentPlayer = PublicPlayerState & Readonly<{
   robotId: string

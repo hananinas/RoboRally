@@ -76,19 +76,44 @@ describe('public registers', () => {
     expect(getOtherPlayers(completed)[1].registers).toBe(getOtherPlayers(state)[1].registers)
   })
 
-  it('resets public slots immediately but gates the next private hand behind queued playback', () => {
-    let state = gameStateReducer(joined(), { type: 'action', action })
-    state = gameStateReducer(state, { type: 'action', action: { ...action, registerIndex: 3 } })
+  it('keeps queued faces hidden and finishes playback before showing the next round', () => {
+    let state = gameStateReducer(joined(), {
+      type: 'registers-changed',
+      payload: { gameId: GAME_ID, playerId: ADA_ID, registers: createRegisterState().players[2].registers },
+    })
+    state = gameStateReducer(state, { type: 'action', action })
+    state = gameStateReducer(state, { type: 'action', action: { ...action, registerIndex: 3, instruction: 'BACK_UP' } })
+    expect(getOtherPlayers(state)[0].registers[3]).toEqual({ status: 'HIDDEN' })
     state = gameStateReducer(state, { type: 'programming-started', payload: { gameId: GAME_ID } })
-    expect(getOtherPlayers(state).every((player) => player.registers.every((slot) => slot.status === 'EMPTY') && !player.programSubmitted)).toBe(true)
-    expect(state.playback.active?.registerIndex).toBe(2)
     state = gameStateReducer(state, { type: 'dealt', hand: { gameId: GAME_ID, playerId: PLAYER_ID, cards: [{ id: 'next-private', instruction: 'BACK_UP' }] } })
+    expect(getOtherPlayers(state)[0].registers[2]).toEqual({ status: 'REVEALED', instruction: 'MOVE_2' })
     expect(state.hand[0].id).toBe('private-card')
+    const nextRegisters = createRegisterState().players[1].registers
+    state = gameStateReducer(state, { type: 'registers-changed', payload: { gameId: GAME_ID, playerId: ADA_ID, registers: nextRegisters } })
     state = gameStateReducer(state, { type: 'complete' })
+    expect(getOtherPlayers(state)[0].registers[3]).toEqual({ status: 'REVEALED', instruction: 'BACK_UP' })
     expect(canProgram(state)).toBe(false)
     state = gameStateReducer(state, { type: 'complete' })
     expect(state.hand[0].id).toBe('next-private')
-    expect(getOtherPlayers(state).every((player) => player.registers.every((slot) => slot.status === 'EMPTY'))).toBe(true)
+    expect(getOtherPlayers(state)[0].registers).toEqual(nextRegisters)
+    expect(getOtherPlayers(state).every((player) => !player.programSubmitted)).toBe(true)
+  })
+
+  it('keeps a new hand usable when the programming reset arrives after the deal', () => {
+    let state = gameStateReducer(joined(), { type: 'action', action })
+    state = gameStateReducer(state, { type: 'complete' })
+    state = gameStateReducer(state, {
+      type: 'player-connection-changed',
+      payload: { gameId: GAME_ID, playerId: ADA_ID, connected: true, paused: false },
+    })
+    state = gameStateReducer(state, {
+      type: 'dealt',
+      hand: { gameId: GAME_ID, playerId: PLAYER_ID, cards: [{ id: 'next-private', instruction: 'BACK_UP' }] },
+    })
+    state = gameStateReducer(state, { type: 'programming-started', payload: { gameId: GAME_ID } })
+    state = gameStateReducer(state, { type: 'place', cardId: 'next-private', registerIndex: 0 })
+    expect(state.registers[0]?.id).toBe('next-private')
+    expect(canProgram(state)).toBe(true)
   })
 
   it('replaces revealed registers from JOINED rather than carrying them into a reconnect', () => {

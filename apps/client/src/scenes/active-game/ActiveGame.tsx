@@ -104,7 +104,7 @@ function ActiveGame({ game, username, leaving, onLeave }: {
           <OtherPlayersPanel
             players={getOtherPlayers(state)}
             checkpointCount={state.checkpointCount}
-            phase={state.phase}
+            phase={state.playback.active ? 'EXECUTING' : state.phase}
             activeAction={state.playback.active}
             queuedActions={state.playback.pending}
             paused={state.paused || !state.connected}

@@ -1,5 +1,5 @@
 import type { GamePhase, RobotActionResolved } from '@robo-rally/game-events'
-import { useState, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import type { OpponentPlayer, PublicRegisterSlot } from '../publicRegisters.ts'
 import { cardPresentation } from './cardInstructions.ts'
 import './OtherPlayersPanel.css'
@@ -33,6 +33,14 @@ function OtherPlayerRow({ player, checkpointCount, phase, activeAction, queuedAc
   const [focused, setFocused] = useState(false)
   const [dismissed, setDismissed] = useState(false)
   const expanded = (hovered || focused) && !dismissed
+  useEffect(() => {
+    if (!expanded) return
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setDismissed(true)
+    }
+    window.addEventListener('keydown', dismiss)
+    return () => window.removeEventListener('keydown', dismiss)
+  }, [expanded])
   const filled = player.registers.filter((slot) => slot.status !== 'EMPTY').length
   const executing = phase === 'EXECUTING' && !paused && player.connected &&
     activeAction?.robotId === player.robotId && player.registers[activeAction.registerIndex]?.status === 'REVEALED'
@@ -65,12 +73,6 @@ function OtherPlayerRow({ player, checkpointCount, phase, activeAction, queuedAc
       onFocus={() => { setFocused(true); setDismissed(false) }}
       onBlur={() => { setFocused(false); setDismissed(false) }}
       onClick={() => setDismissed(false)}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') {
-          setDismissed(true)
-          event.stopPropagation()
-        }
-      }}
     >
       <strong className="other-player__name">{player.username}</strong>
       <small className="other-player__checkpoints">CP {player.lastCheckpoint}/{checkpointCount}</small>
