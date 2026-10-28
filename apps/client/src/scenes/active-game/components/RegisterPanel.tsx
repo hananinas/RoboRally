@@ -4,9 +4,11 @@ import {
   type ProgramCard as Card,
   type Registers,
 } from '../gameState.ts'
+import DraggedCard from './DraggedCard.tsx'
 import Panel from './Panel.tsx'
 import { cardPresentation } from './cardInstructions.ts'
 import ProgramCard from './ProgramCard.tsx'
+import useCardDrag from './useCardDrag.ts'
 
 type RegisterPanelProps = {
   registers: Registers
@@ -18,6 +20,7 @@ type RegisterPanelProps = {
   status: string
   error: string | null
   onRemove: (registerIndex: number) => void
+  onMove: (fromIndex: number, toIndex: number) => void
   onConfirm: () => void
 }
 
@@ -27,6 +30,8 @@ type RegisterSlotProps = {
   active: boolean
   disabled: boolean
   pendingDelete: boolean
+  dragging: boolean
+  dragHandlers: ReturnType<typeof useCardDrag>['dragHandlers']
   onRemove: (registerIndex: number) => void
 }
 
@@ -37,9 +42,11 @@ function RegisterSlot({
   active,
   disabled,
   pendingDelete,
+  dragging,
+  dragHandlers,
   onRemove,
 }: RegisterSlotProps) {
-  const cardClassName = card
+  const cardClassName = card && !dragging
     ? 'register__card register__card--filled'
     : 'register__card'
   const registerIndex = disabled ? undefined : index
@@ -60,12 +67,17 @@ function RegisterSlot({
       >
         {card && (
           <ProgramCard
-                  card={card}
-                  size="register"
-                  label={`${cardPresentation[card.instruction].label}, remove from register ${index + 1}`}
-                  disabled={disabled}
-                  onClick={() => onRemove(index)}
-                />
+            card={card}
+            size="register"
+            label={`${cardPresentation[card.instruction].label}, remove from register ${index + 1}`}
+            disabled={disabled}
+            dragging={dragging}
+            onClick={(event) => {
+              // Pointer taps are handled by the drag hook; this covers the keyboard.
+              if (event.detail === 0) onRemove(index)
+            }}
+            {...dragHandlers(card)}
+          />
         )}
       </div>
       <span>{index + 1}</span>
@@ -84,8 +96,22 @@ function RegisterPanel({
   status,
   error,
   onRemove,
+  onMove,
   onConfirm,
 }: RegisterPanelProps) {
+  const registerOf = (card: Card) =>
+    registers.findIndex((registeredCard) => registeredCard?.id === card.id)
+  const { drag, dragHandlers, isDragging } = useCardDrag({
+    onTap: (card) => onRemove(registerOf(card)),
+    onDrop: (card, registerIndex) => {
+      const fromIndex = registerOf(card)
+      // Dropped outside every register: take the card out.
+      if (registerIndex === null) onRemove(fromIndex)
+      // Dropped on another register: swap the two cards.
+      else if (registerIndex !== fromIndex) onMove(fromIndex, registerIndex)
+    },
+  })
+
   return (
     <Panel className="register-panel">
       <h2 className="register-panel__heading">Registers</h2>
@@ -102,10 +128,13 @@ function RegisterPanel({
             active={index === activeRegister}
             disabled={disabled}
             pendingDelete={pendingDelete}
+            dragging={card !== null && isDragging(card)}
+            dragHandlers={dragHandlers}
             onRemove={onRemove}
           />
         ))}
       </ol>
+      {drag?.moved && <DraggedCard drag={drag} />}
       <button
         className={
           'register-panel__done' +

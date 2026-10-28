@@ -69,6 +69,7 @@ export type GameStateEvent =
   | { type: 'complete' }
   | { type: 'place'; cardId: string; registerIndex: number }
   | { type: 'remove'; registerIndex: number }
+  | { type: 'move'; fromIndex: number; toIndex: number }
   | { type: 'clear' }
   | { type: 'undo' }
   | { type: 'redo' }
@@ -251,6 +252,7 @@ export function gameStateReducer(
           snapshot.board.width,
           snapshot.board.height,
           {
+            antenna: snapshot.antenna,
             hole: snapshot.board.tiles.filter((tile) => tile.type === 'PIT')
               .map((tile) => [tile.position.x, tile.position.y] as const),
             checkpoints: snapshot.board.tiles.flatMap((tile) => tile.checkpointNumber === undefined
@@ -316,6 +318,16 @@ export function gameStateReducer(
     case 'remove': {
       if (!canProgram(state)) return state
       const registers = removeCard(state.registers, event.registerIndex)
+      return registers === state.registers ? state : {
+        ...state,
+        registers,
+        registersPast: [...state.registersPast, state.registers],
+        registersFuture: [],
+      }
+    }
+    case 'move': {
+      if (!canProgram(state)) return state
+      const registers = moveCard(state.registers, event.fromIndex, event.toIndex)
       return registers === state.registers ? state : {
         ...state,
         registers,
@@ -428,6 +440,27 @@ export function removeCard(
   return registers.map((registeredCard, index) =>
     index === registerIndex ? null : registeredCard,
   )
+}
+export function moveCard(
+  registers: Registers,
+  fromIndex: number,
+  toIndex: number,
+): Registers {
+  const isRegister = (index: number) =>
+    Number.isInteger(index) && index >= 0 && index < registers.length
+  const cannotMove =
+    !isRegister(fromIndex) ||
+    !isRegister(toIndex) ||
+    fromIndex === toIndex ||
+    registers[fromIndex] === null
+
+  if (cannotMove) return registers
+
+  return registers.map((registeredCard, index) => {
+    if (index === fromIndex) return registers[toIndex]
+    if (index === toIndex) return registers[fromIndex]
+    return registeredCard
+  })
 }
 
 // Checks whether every register is filled.

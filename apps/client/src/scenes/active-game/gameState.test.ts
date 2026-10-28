@@ -11,6 +11,7 @@ import {
   createClientGameState,
   createSubmission,
   gameStateReducer,
+  moveCard,
   placeCard,
   REGISTER_COUNT,
   removeCard,
@@ -100,6 +101,7 @@ function programmingState(): ClientGameState {
 describe('join initialization', () => {
   it('initializes assignment, board and hand together and accepts subsequent events', () => {
     const state = gameStateReducer(createClientGameState(), { type: 'joined', result })
+    expect(state.board?.antenna).toEqual(publicState.antenna)
     expect(state.assignment).toEqual(result.assignment)
     expect(state.board).not.toBeNull()
     expect(state.hand).toEqual(cards)
@@ -186,6 +188,41 @@ describe('removeCard', () => {
     expect(removeCard(emptyRegisters, -1)).toBe(emptyRegisters)
     expect(removeCard(emptyRegisters, REGISTER_COUNT)).toBe(emptyRegisters)
     expect(removeCard(emptyRegisters, 1.5)).toBe(emptyRegisters)
+  })
+})
+describe('moveCard', () => {
+  const firstAndLast: Registers = [firstCard, null, null, null, secondCard]
+
+  it('swaps two cards without changing the original registers', () => {
+    const result = moveCard(firstAndLast, 0, 4)
+
+    expect(result).toEqual([secondCard, null, null, null, firstCard])
+    expect(result).not.toBe(firstAndLast)
+    expect(firstAndLast[0]).toBe(firstCard)
+  })
+
+  it('moves a card into an empty register', () => {
+    expect(moveCard(firstAndLast, 0, 2)).toEqual([null, null, firstCard, null, secondCard])
+  })
+
+  it('preserves the registers when no card can be moved', () => {
+    expect(moveCard(firstAndLast, 0, 0)).toBe(firstAndLast)
+    expect(moveCard(firstAndLast, 1, 4)).toBe(firstAndLast)
+    expect(moveCard(firstAndLast, -1, 4)).toBe(firstAndLast)
+    expect(moveCard(firstAndLast, 0, REGISTER_COUNT)).toBe(firstAndLast)
+    expect(moveCard(firstAndLast, 0, 1.5)).toBe(firstAndLast)
+  })
+
+  it('swaps through the reducer, and the swap can be undone', () => {
+    let state = programmingState()
+    state = gameStateReducer(state, { type: 'place', cardId: firstCard.id, registerIndex: 0 })
+    state = gameStateReducer(state, { type: 'place', cardId: secondCard.id, registerIndex: 4 })
+
+    const swapped = gameStateReducer(state, { type: 'move', fromIndex: 0, toIndex: 4 })
+    expect(swapped.registers[0]).toBe(secondCard)
+    expect(swapped.registers[4]).toBe(firstCard)
+
+    expect(gameStateReducer(swapped, { type: 'undo' }).registers).toEqual(state.registers)
   })
 })
 
