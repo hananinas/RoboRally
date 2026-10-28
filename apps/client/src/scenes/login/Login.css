@@ -44,36 +44,6 @@
   font-size: 22px;
 }
 
-.login-field {
-  display: block;
-  margin-bottom: 12px;
-}
-
-.login-field span {
-  display: block;
-  margin-bottom: 6px;
-  color: #9aa4b0;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.login-field input {
-  box-sizing: border-box;
-  width: 100%;
-  padding: 11px 12px;
-  border: 1px solid #4c5560;
-  border-radius: 9px;
-  outline: none;
-  background: #2b323b;
-  color: #eef1f4;
-  font: inherit;
-  font-size: 14px;
-}
-
-.login-field input:focus-visible {
-  border-color: #e0bb1f;
-}
-
 .login-validation {
   min-height: 18px;
   margin: 0 0 8px;
