@@ -10,7 +10,6 @@ export function parseGameServicePort(value: string | undefined): number {
   return port
 }
 
-// Matches the client registered in infra/hydra/clients/game-service.json.
 export const DEFAULT_HYDRA_ISSUER_URL = 'https://127.0.0.1:4444/'
 export const DEFAULT_OAUTH_CLIENT_ID = 'game-service'
 export const DEFAULT_OAUTH_CLIENT_SECRET = 'game-service-dev-secret'
