@@ -59,6 +59,28 @@ The recommended development environment uses Nix together with direnv. You do no
 
 The development shell provides the tools required by the project, including Node.js, pnpm, Process Compose, and project-specific development tooling.
 
+<details>
+<summary>Windows setup with WSL and Nix</summary>
+
+[**Download the Windows setup script**](./setup-roborally.bat)
+
+Run `setup-roborally.bat` to install the prerequisites, configure Ubuntu
+through WSL 2, set up Nix and direnv, and clone RoboRally into
+`%USERPROFILE%\GitHub\DTU\RoboRally`. It then installs project dependencies,
+builds the project, and runs type checks.
+
+You'll need administrator approval, hardware virtualization enabled, and
+a GitHub account with access to this repository. Follow the prompts.
+If Windows needs a restart, restart and run the script again.
+
+After setup, follow the printed instructions to enter Ubuntu and run
+`process-compose`, then open http://localhost:5173.
+
+Existing checkouts are preserved. Full installation testing on a fresh
+Windows VM is still in progress.
+
+</details>
+
 ### Nix
 #### Requirements
 
