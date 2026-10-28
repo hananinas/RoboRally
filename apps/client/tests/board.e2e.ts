@@ -31,9 +31,11 @@ test('renders sprite artwork at its configured aspect ratio', async ({ page }) =
         const symbol = element.querySelector('use')?.getAttribute('href')
         const expectedWidth = symbol?.startsWith('#laser')
           ? { rendered: 59.04, viewBox: 72 }
-          : symbol?.startsWith('#testTank')
-            ? { rendered: 46.8, viewBox: 57 }
-            : undefined
+          : symbol?.startsWith('#antenna')
+            ? { rendered: 84, viewBox: 84 }
+            : symbol?.startsWith('#testTank')
+              ? { rendered: 46.8, viewBox: 57 }
+              : undefined
         return (
           expectedWidth !== undefined &&
           viewBox.width === expectedWidth.viewBox &&

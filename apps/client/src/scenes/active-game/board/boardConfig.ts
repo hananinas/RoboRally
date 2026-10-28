@@ -42,9 +42,23 @@ export const BOARD_CONFIG: BoardRenderConfig = {
   },
 }
 
+function sprite(symbol: string, viewBox: string, width: number): BoardVisualComponent {
+  return { asset: { symbol, viewBox }, className: 'board-piece--asset', width }
+}
+
 export const BOARD_COMPONENTS: Readonly<
   Record<BoardComponentName, BoardVisualComponent>
 > = {
+  antenna1: sprite('antenna1', '0 0 84 84', 7 / 6),
+  antenna2: sprite('antenna2', '0 0 84 84', 7 / 6),
+  antenna3: sprite('antenna3', '0 0 84 84', 7 / 6),
+  antenna4: sprite('antenna4', '0 0 84 84', 7 / 6),
+  antenna5: sprite('antenna5', '0 0 84 84', 7 / 6),
+  antenna6: sprite('antenna6', '0 0 84 84', 7 / 6),
+  antenna7: sprite('antenna7', '0 0 84 84', 7 / 6),
+  antenna8: sprite('antenna8', '0 0 84 84', 7 / 6),
+  antenna9: sprite('antenna9', '0 0 84 84', 7 / 6),
+  antenna10: sprite('antenna10', '0 0 84 84', 7 / 6),
   ground: { className: 'board-piece--ground', width: 1 },
   surface: { className: 'board-piece--surface', width: 1 },
   wallBlack: { className: 'board-piece--wall-black', width: 0.6 },
@@ -57,46 +71,14 @@ export const BOARD_COMPONENTS: Readonly<
     className: 'board-piece--wall-edge board-piece--wall-edge-yellow',
     width: 1,
   },
-  laser1: {
-    asset: { symbol: 'laser1', viewBox: '0 0 72 72' },
-    className: 'board-piece--asset',
-    width: 0.82,
-  },
-  laser2: {
-    asset: { symbol: 'laser2', viewBox: '0 0 72 87' },
-    className: 'board-piece--asset',
-    width: 0.82,
-  },
-  laser3: {
-    asset: { symbol: 'laser3', viewBox: '0 0 72 72' },
-    className: 'board-piece--asset',
-    width: 0.82,
-  },
-  testTank1: {
-    asset: { symbol: 'testTank1', viewBox: '0 0 57 87' },
-    className: 'board-piece--asset',
-    width: 0.65,
-  },
-  testTank2: {
-    asset: { symbol: 'testTank2', viewBox: '0 0 57 87' },
-    className: 'board-piece--asset',
-    width: 0.65,
-  },
-  testTank3: {
-    asset: { symbol: 'testTank3', viewBox: '0 0 57 87' },
-    className: 'board-piece--asset',
-    width: 0.65,
-  },
-  testTank4: {
-    asset: { symbol: 'testTank4', viewBox: '0 0 57 87' },
-    className: 'board-piece--asset',
-    width: 0.65,
-  },
-  testTank5: {
-    asset: { symbol: 'testTank5', viewBox: '0 0 57 87' },
-    className: 'board-piece--asset',
-    width: 0.65,
-  },
+  laser1: sprite('laser1', '0 0 72 72', 0.82),
+  laser2: sprite('laser2', '0 0 72 87', 0.82),
+  laser3: sprite('laser3', '0 0 72 72', 0.82),
+  testTank1: sprite('testTank1', '0 0 57 87', 0.65),
+  testTank2: sprite('testTank2', '0 0 57 87', 0.65),
+  testTank3: sprite('testTank3', '0 0 57 87', 0.65),
+  testTank4: sprite('testTank4', '0 0 57 87', 0.65),
+  testTank5: sprite('testTank5', '0 0 57 87', 0.65),
 }
 
 const EMPTY_SLICES = [
@@ -110,6 +92,22 @@ export const BOARD_RECIPES: Readonly<
   Record<BoardRecipeName, BoardTileRecipe>
 > = {
   empty: { slices: EMPTY_SLICES },
+  antenna: {
+    stackBaseLayer: 3,
+    slices: [
+      { layer: 0, component: 'ground', shadow: true },
+      { layer: 1, component: 'antenna1' },
+      { layer: 2, component: 'antenna2' },
+      { layer: 3, component: 'antenna3' },
+      { layer: 4, component: 'antenna4' },
+      { layer: 5, component: 'antenna5' },
+      { layer: 6, component: 'antenna6' },
+      { layer: 7, component: 'antenna7' },
+      { layer: 8, component: 'antenna8' },
+      { layer: 9, component: 'antenna9' },
+      { layer: 10, component: 'antenna10' },
+    ],
+  },
   hole: { hole: true, slices: [] },
   pillar: {
     slices: [

@@ -69,6 +69,8 @@ sequenceDiagram
 After successful authentication, the client sends a `session.get` request to determine if the user has an existent session. 
 If he does not, `session.get` acknowledges with `NO_SESSION` and the client is shown the lobby screen.
 
+If a listed player disconnects before Start, `LOBBY_MEMBER_DISCONNECTED` leaves the lobby intact; the owner can retry after membership updates.
+
 ### Listing lobbies
 The client then requets a list of existant lobbies via
 
@@ -92,6 +94,8 @@ Both `lobby.join` and `lobby.create` acknowledge with `LOBBY_JOINED {lobby}` aft
 Once a game has successfully started , the onber receives `STARTED {gameId}` as the command acknowledgement. How the game is initialised is described in [Initialization](#initialization).
 
 ### Lobby Membership
+`LOBBY_JOINED`, `IN_LOBBY`, and `lobby.updated` include the full `lobby.players` roster (`userId`, `username`) in join order. Clients replace their roster on each snapshot; `lobby.list` returns summaries only.
+
 While waiting, `lobby.leave {lobbyId}` or disconnecting removes membership. Leaving returns `LEFT`. Ownership passes to the earliest remaining member, announced to the [lobby room](#rooms) through `lobby.updated {lobby}`. An empty lobby is deleted. A disconnected lobby member returns to browsing after reconnecting.
 
 The following diagram documents the lobby lifecycle:

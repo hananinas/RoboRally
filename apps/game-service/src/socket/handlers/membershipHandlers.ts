@@ -1,23 +1,18 @@
-import { err, ok, type Result } from 'neverthrow'
 import type { ZodError } from 'zod'
 import { withAcknowledgeOnce } from '@/socket/utilities/acknowledgeOnce'
+import { toRejection, type Rejection } from '@/socket/utilities/rejection'
+import { logError, logWarn } from '@/logger'
+import { err, ok, type Result } from 'neverthrow'
 import {
-  joinGameSchema,
   leaveGameSchema,
-  type JoinGame,
-  type JoinResult,
-  type JoinResultAcknowledgement,
+  type LeaveGame,
+  type GameInitialization,
+  type SessionResult,
   type LeaveResult,
   type PublicGameState,
   type User,
 } from '@robo-rally/game-events'
-import {
-  type AddPlayerError,
-  type Game,
-  type Player,
-} from '@/game/index'
-import { logError, logWarn } from '@/logger'
-import { toRejection, type Rejection } from '@/socket/utilities/rejection'
+import type { Player, Game } from '@/game/index'
 import { presentCardsDealt } from '@/socket/gamePresenter'
 import type { ActionScheduler } from '@/actionScheduler'
 import type { GameSocket, GameSocketServer } from '@/socket/gameServer'
@@ -67,7 +62,7 @@ type ValidateMembershipRequestError =
 
 function validateMembershipRequest(
   ctx: MembershipContext,
-  schema: typeof joinGameSchema | typeof leaveGameSchema,
+  schema: typeof leaveGameSchema,
   payload: unknown,
   user: User | undefined,
 ): Result<User, ValidateMembershipRequestError> {
@@ -92,117 +87,45 @@ export function reconnectIfRecovered(ctx: MembershipContext, socket: GameSocket)
   }
 }
 
-type MembershipSuccess = {
-  membership: GameMembership
-  isNew: boolean
-  reconnected: boolean
-  previousConnectionId: string | null
-}
-type MembershipFailure = 'USER_ALREADY_IN_GAME' | AddPlayerError
-type MembershipResolution = Result<MembershipSuccess, MembershipFailure>
-
-function addMembership(ctx: MembershipContext, socket: GameSocket, user: User): MembershipResolution {
-  const { game, memberships } = ctx
-  return game.addPlayer().map((player) => {
-    const membership: GameMembership = { user, player, connectionId: socket.id }
-    memberships.set(user.userId, membership)
-    return { membership, isNew: true, reconnected: false, previousConnectionId: null }
-  })
-}
-
-function reattachExistingMembership(
+// Published games have a fixed roster. Only an existing member can reattach.
+export function handleReattachGame(
   ctx: MembershipContext,
   socket: GameSocket,
-  membership: GameMembership,
-): MembershipResolution {
-  const previousConnectionId = membership.connectionId
-  const reconnected = reattachMembership(membership, socket.id)
-  if (reconnected) resumeUnlessStillDisconnected(ctx)
-  return ok({ membership, isNew: false, reconnected, previousConnectionId })
-}
-
-function joinOrReconnectMembership(
-  ctx: MembershipContext,
-  socket: GameSocket,
-  user: User,
-): MembershipResolution {
+  acknowledge: (result: SessionResult) => void,
+): void {
+  const user = socket.data.user
+  if (!user) return acknowledge({ outcome: 'LOGIN_REQUIRED' })
   const membership = ctx.memberships.get(user.userId)
-  if (membership?.connectionId && membership.connectionId !== socket.id) {
-    return err('USER_ALREADY_IN_GAME')
+  if (!membership) return acknowledge({ outcome: 'INTERNAL_ERROR' })
+  if (membership.connectionId && membership.connectionId !== socket.id) {
+    return acknowledge({ outcome: 'USER_ALREADY_IN_SESSION' })
   }
-  return membership
-    ? reattachExistingMembership(ctx, socket, membership)
-    : addMembership(ctx, socket, user)
-}
-
-function rollbackMembership(
-  ctx: MembershipContext,
-  { membership, isNew, previousConnectionId }: {
-    membership: GameMembership
-    isNew: boolean
-    previousConnectionId: string | null
-  },
-): void {
-  if (isNew) {
-    ctx.memberships.delete(membership.user.userId)
-    ctx.game.removePlayer(membership.player.id)
-  } else {
+  const previousRooms = new Set(socket.rooms)
+  const previousConnectionId = membership.connectionId
+  const wasPaused = ctx.game.paused
+  const reconnected = reattachMembership(membership, socket.id)
+  resumeUnlessStillDisconnected(ctx)
+  let initialization: GameInitialization
+  try {
+    initialization = presentInitialization(ctx, membership)
+    void socket.join([ctx.publicRoom, ctx.playerRoom(membership.player.id)])
+  } catch (error) {
+    for (const room of [ctx.publicRoom, ctx.playerRoom(membership.player.id)]) {
+      if (!previousRooms.has(room)) void socket.leave(room)
+    }
+    logError('Failed to reattach game membership', error, { command: 'session.get', gameId: ctx.gameId })
     membership.connectionId = previousConnectionId
+    if (wasPaused) ctx.game.pause()
+    return acknowledge({ outcome: 'INTERNAL_ERROR' })
   }
-}
-
-export function handleJoin(
-  ctx: MembershipContext,
-  socket: GameSocket,
-  payload: JoinGame,
-  acknowledge: JoinResultAcknowledgement,
-): void {
-  const { game, gameId, publicRoom, playerRoom, publicState } = ctx
-  let membershipSuccess: MembershipSuccess | undefined
-
-  withAcknowledgeOnce(acknowledge, (ack) => {
-    const resolution = validateMembershipRequest(ctx, joinGameSchema, payload, socket.data.user)
-      .andThen((user) => joinOrReconnectMembership(ctx, socket, user))
-      .mapErr(toRejection)
-    if (resolution.isErr()) {
-      const { outcome, detail } = resolution.error
-      logWarn('Rejected game.join request', { command: 'game.join', gameId, outcome, detail, payload })
-      ack({ outcome })
-      return
-    }
-    membershipSuccess = resolution.value
-    const { membership, reconnected } = resolution.value
-    const { player } = membership
-
-    const result: Extract<JoinResult, { outcome: 'JOINED' }> = {
-      outcome: 'JOINED',
-      assignment: { gameId, playerId: player.id, robotId: player.robot.id },
-      state: publicState(),
-      hand: presentCardsDealt(gameId, player).cards,
-      programSubmitted: game.hasSubmittedProgram(player.id),
-    }
-    void socket.join([publicRoom, playerRoom(player.id)])
-    ack(result)
-    if (membershipSuccess.isNew) {
-      socket.to(publicRoom).emit('game.playerJoined', {
-        gameId,
-        player: result.state.players.find((candidate) => candidate.playerId === player.id)!,
-        robot: result.state.robots.find((robot) => robot.robotId === player.robot.id)!,
-      })
-    } else if (reconnected) {
-      notifyReconnected(ctx, player.id)
-    }
-  }, (error, alreadyAcknowledged) => {
-    logError('Failed to process game join', error, { command: 'game.join', gameId, payload })
-    if (membershipSuccess && !alreadyAcknowledged) rollbackMembership(ctx, membershipSuccess)
-    return { outcome: 'INTERNAL_ERROR' } as const
-  })
+  acknowledge({ outcome: 'IN_GAME', initialization })
+  if (reconnected) notifyReconnected(ctx, membership.player.id)
 }
 
 export function handleLeave(
   ctx: MembershipContext,
   socket: GameSocket,
-  payload: JoinGame,
+  payload: LeaveGame,
   acknowledge: (result: LeaveResult) => void,
 ): void {
   const { io, game, gameId, memberships, publicRoom, playerRoom, actionScheduler } = ctx
@@ -254,5 +177,20 @@ export function handleDisconnect(ctx: MembershipContext, socket: GameSocket): vo
     })
   } catch (error) {
     logError('Failed to process player disconnect', error, { command: 'disconnect', gameId: ctx.gameId, playerId: membership.player.id })
+  }
+}
+
+export function presentInitialization(
+  ctx: MembershipContext,
+  membership: GameMembership,
+  state: PublicGameState = ctx.publicState(),
+): GameInitialization {
+  const { player } = membership
+  return {
+    outcome: 'JOINED',
+    assignment: { gameId: ctx.gameId, playerId: player.id, robotId: player.robot.id },
+    state,
+    hand: presentCardsDealt(ctx.gameId, player).cards,
+    programSubmitted: ctx.game.hasSubmittedProgram(player.id),
   }
 }

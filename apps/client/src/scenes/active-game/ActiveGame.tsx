@@ -47,6 +47,8 @@ function ActiveGame({ game, username, leaving, onLeave }: {
   } = useOverlayLayout(state.handVersion)
   const disabled = leaving || state.paused || !canProgram(state)
   const handleRemove = (registerIndex: number) => dispatch({ type: 'remove', registerIndex })
+  const handleMove = (fromIndex: number, toIndex: number) =>
+    dispatch({ type: 'move', fromIndex, toIndex })
   const handlePlaceCard = (card: ProgramCard, registerIndex: number) =>
     dispatch({ type: 'place', cardId: card.id, registerIndex })
   const handleClearRegisters = () => dispatch({ type: 'clear' })
@@ -93,6 +95,7 @@ function ActiveGame({ game, username, leaving, onLeave }: {
               pendingDelete={pendingDelete}
               awaitingSubmitConfirm={awaitingSubmitConfirm}
               onRemove={handleRemove}
+              onMove={handleMove}
               onConfirm={submit}
             />
           </div>

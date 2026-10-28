@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import type { Page } from '@playwright/test'
 import { expect, test } from './real-game-fixture.ts'
-import { login, robotIds } from './browserClient.ts'
+import { browse, login, robotIds } from './browserClient.ts'
 
 async function program(page: Page, cards: readonly string[]) {
   const hand = page.getByRole('region', { name: 'Programming hand' })
@@ -42,8 +42,14 @@ for (const scenario of scenarios) {
         const pages = [page, ...await Promise.all(contexts.map((context) => context.newPage()))]
         for (const [index, client] of pages.entries()) {
           await client.clock.install()
-          await login(client, `Push player ${index + 1}`)
+          await browse(client, `Push player ${index + 1}`)
+          if (index === 0) await client.getByRole('button', { name: 'Create lobby', exact: true }).click()
+          else {
+            await client.getByRole('list', { name: 'Lobbies' }).getByRole('button', { disabled: false }).first().click()
+            await client.getByRole('button', { name: 'Join game', exact: true }).click()
+          }
         }
+        await page.getByRole('button', { name: 'Start', exact: true }).click()
         await expect.poll(() => robotIds(page)).toHaveLength(3)
         const ids = await robotIds(page)
         for (const client of pages) {

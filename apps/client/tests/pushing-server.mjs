@@ -17,7 +17,7 @@ const board = new Board(tiles, { x: Integer(0), y: Integer(0), angle: 0 }, {
 })
 const game = new Game(board, [], createHand(), { x: Integer(5), y: Integer(5) }, 'Shared game')
 const server = createServer()
-const io = createGameSocketServer(server, { gameId: '00000000-0000-4000-8000-000000000001', game })
+const io = createGameSocketServer(server, () => ({ gameId: '00000000-0000-4000-8000-000000000001', game }))
 const port = parseGameServicePort(process.env.PORT)
 server.listen(port, '127.0.0.1', () => {
   console.log(`Game Service listening at http://127.0.0.1:${port}`)

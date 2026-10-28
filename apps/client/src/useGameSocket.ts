@@ -9,7 +9,7 @@ export type GameSocket = Socket<ServerToClientEvents & PublicRegisterEvents, Cli
 export type SocketStatus = 'connecting' | 'connected' | 'connection-error' | 'disconnected'
 
 export default function useGameSocket() {
-  const [socket] = useState<GameSocket>(() => io({
+  const [socket, setSocket] = useState<GameSocket>(() => io({
     autoConnect: false,
   }))
   const [status, setStatus] = useState<SocketStatus>('connecting')
@@ -26,7 +26,11 @@ export default function useGameSocket() {
       setStatus('connected')
       setError(null)
     }
-    const handleConnectError = () => {
+    const handleConnectError = (error: Error) => {
+      if (error.message === 'SESSION_EXPIRED') {
+        setSocket(io({ autoConnect: false, forceNew: true }))
+        return
+      }
       setStatus('connection-error')
       setError('Could not connect to the Game Service.')
     }
