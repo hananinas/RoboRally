@@ -31,9 +31,11 @@ test('renders sprite artwork at its configured aspect ratio', async ({ page }) =
         const symbol = element.querySelector('use')?.getAttribute('href')
         const expectedWidth = symbol?.startsWith('#laser')
           ? { rendered: 59.04, viewBox: 72 }
-          : symbol?.startsWith('#testTank')
-            ? { rendered: 46.8, viewBox: 57 }
-            : undefined
+          : symbol?.startsWith('#antenna')
+            ? { rendered: 84, viewBox: 84 }
+            : symbol?.startsWith('#testTank')
+              ? { rendered: 46.8, viewBox: 57 }
+              : undefined
         return (
           expectedWidth !== undefined &&
           viewBox.width === expectedWidth.viewBox &&
@@ -61,11 +63,11 @@ test('plays rapid server results one robot at a time without replacing its sprit
   if (!original) throw new Error('Robot sprite is unavailable')
 
   const steps = [
-    { gameId: 'demo', registerIndex: 0, pushedRobots: [], robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 6 }, orientation: 'NORTH' } },
-    { gameId: 'demo', registerIndex: 1, pushedRobots: [], robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 5 }, orientation: 'NORTH' } },
-    { gameId: 'demo', registerIndex: 2, pushedRobots: [], robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 10, y: 5 }, orientation: 'WEST' } },
-    { gameId: 'demo', registerIndex: 3, pushedRobots: [], robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 9, y: 5 }, orientation: 'WEST' } },
-    { gameId: 'demo', registerIndex: 4, pushedRobots: [], robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 9, y: 5 }, orientation: 'SOUTH' } },
+    { gameId: 'demo', playerId: 'red-player', registerIndex: 0, pushedRobots: [], robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 6 }, orientation: 'NORTH' } },
+    { gameId: 'demo', playerId: 'red-player', registerIndex: 1, pushedRobots: [], robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 5 }, orientation: 'NORTH' } },
+    { gameId: 'demo', playerId: 'red-player', registerIndex: 2, pushedRobots: [], robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 10, y: 5 }, orientation: 'WEST' } },
+    { gameId: 'demo', playerId: 'red-player', registerIndex: 3, pushedRobots: [], robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 9, y: 5 }, orientation: 'WEST' } },
+    { gameId: 'demo', playerId: 'red-player', registerIndex: 4, pushedRobots: [], robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 9, y: 5 }, orientation: 'SOUTH' } },
   ] as const
   await page.evaluate((actions) => {
     (window as Window & { boardFixture: BoardHarnessApi }).boardFixture.enqueue(actions)

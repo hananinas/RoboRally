@@ -3,7 +3,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { submitProgramSchema } from '@robo-rally/game-events'
 import type {
-  CardsDealt, ClientToServerEvents, GameStarted, JoinAccepted, LobbyState, PlayerConnectionChanged,
+  CardsDealt, ClientToServerEvents, GameInitialization, LobbyState, PlayerConnectionChanged,
   PlayerCheckpointProgress, RobotActionResolved, ServerToClientEvents,
 } from '@robo-rally/game-events'
 import { io as createClient, type Socket } from 'socket.io-client'
@@ -14,6 +14,7 @@ import { createGameSocketServer, type GameSession, type GameSocketServer } from 
 import { Integer } from '@/numbers'
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>
+type GameStarted = Parameters<ServerToClientEvents['game.started']>[0]
 
 describe('lobby and game sessions over Socket.IO', () => {
   let server: GameSocketServer
@@ -21,7 +22,6 @@ describe('lobby and game sessions over Socket.IO', () => {
   let factory: Mock<() => GameSession>
   let url: string
   let clients: Client[]
-
   beforeEach(async () => {
     shared = createGame('empty-map', 'Test game')
     factory = vi.fn(() => shared)
@@ -57,7 +57,7 @@ describe('lobby and game sessions over Socket.IO', () => {
     return result.lobby
   }
 
-  async function startGame(members: Client[]): Promise<JoinAccepted[]> {
+  async function startGame(members: Client[]): Promise<GameInitialization[]> {
     const waiting = await lobby(members[0])
     for (const client of members.slice(1)) {
       expect(await client.timeout(1000).emitWithAck('lobby.join', { lobbyId: waiting.lobbyId }))
@@ -76,7 +76,7 @@ describe('lobby and game sessions over Socket.IO', () => {
     })
   }
 
-  async function snapshot(client: Client): Promise<JoinAccepted> {
+  async function snapshot(client: Client): Promise<GameInitialization> {
     const result = await client.timeout(1000).emitWithAck('session.get', {})
     if (result.outcome !== 'IN_GAME') throw new Error(result.outcome)
     return result.initialization
@@ -108,7 +108,7 @@ describe('lobby and game sessions over Socket.IO', () => {
     return acknowledged.promise
   }
 
-  function submission(joined: JoinAccepted) {
+  function submission(joined: GameInitialization) {
     return submitProgramSchema.parse({ gameId: joined.assignment.gameId, playerId: joined.assignment.playerId,
       cardIds: joined.hand.slice(0, 5).map((card) => card.id) })
   }
@@ -135,7 +135,14 @@ describe('lobby and game sessions over Socket.IO', () => {
     for (const event of ['lobby.join', 'lobby.leave', 'lobby.start']) {
       expect(await raw(client, event, { lobbyId: 'bad' })).toEqual({ outcome: 'INVALID_REQUEST' })
       expect(await raw(client, event, { lobbyId: randomUUID(), extra: true })).toEqual({ outcome: 'INVALID_REQUEST' })
+    }
+    for (const event of ['lobby.join', 'lobby.start']) {
       expect(await raw(client, event, { lobbyId: randomUUID() })).toEqual({ outcome: 'LOBBY_NOT_FOUND' })
+    }
+    const absentLobbyId = randomUUID()
+    for (let attempt = 0; attempt < 2; attempt++) {
+      expect(await client.timeout(1000).emitWithAck('lobby.leave', { lobbyId: absentLobbyId }))
+        .toEqual({ outcome: 'LEFT' })
     }
     expect(factory).not.toHaveBeenCalled()
     expect(server.sockets.sockets.get(client.id!)?.rooms).toEqual(new Set([client.id]))
@@ -160,7 +167,11 @@ describe('lobby and game sessions over Socket.IO', () => {
     expect(await reader.timeout(1000).emitWithAck('lobby.list', {})).toEqual({ outcome: 'LOBBIES_FOUND', lobbies: [{
       lobbyId: waiting.lobbyId, name: waiting.name, playerCount: 6, maxPlayers: 6,
     }] })
-    expect(await owner.timeout(1000).emitWithAck('session.get', {})).toEqual({ outcome: 'IN_LOBBY', lobby: { ...waiting, playerCount: 6 } })
+    expect(await owner.timeout(1000).emitWithAck('session.get', {})).toEqual({ outcome: 'IN_LOBBY', lobby: {
+      ...waiting, playerCount: 6,
+      players: ['Owner', ...Array.from({ length: 5 }, (_, index) => `Member ${index}`)]
+        .map((username) => ({ userId: expect.any(String), username })),
+    } })
     expect(factory).not.toHaveBeenCalled()
     expect(server.sockets.sockets.get(reader.id!)?.rooms).toEqual(new Set([reader.id]))
   })
@@ -173,13 +184,19 @@ describe('lobby and game sessions over Socket.IO', () => {
     for (const member of [second, third]) await member.timeout(1000).emitWithAck('lobby.join', { lobbyId: waiting.lobbyId })
     expect(await third.timeout(1000).emitWithAck('lobby.start', { lobbyId: waiting.lobbyId })).toEqual({ outcome: 'NOT_LOBBY_OWNER' })
     const outsider = await connect('Outsider')
-    expect(await outsider.timeout(1000).emitWithAck('lobby.leave', { lobbyId: waiting.lobbyId })).toEqual({ outcome: 'NOT_LOBBY_MEMBER' })
+    expect(await outsider.timeout(1000).emitWithAck('lobby.leave', { lobbyId: waiting.lobbyId })).toEqual({ outcome: 'LEFT' })
+    expect(await owner.timeout(1000).emitWithAck('session.get', {}))
+      .toMatchObject({ outcome: 'IN_LOBBY', lobby: { ownerUserId: waiting.ownerUserId, playerCount: 3 } })
     expect(await outsider.timeout(1000).emitWithAck('lobby.start', { lobbyId: waiting.lobbyId })).toEqual({ outcome: 'NOT_LOBBY_MEMBER' })
     const transferred = new Promise((resolve) => second.once('lobby.updated', resolve))
     await owner.timeout(1000).emitWithAck('lobby.leave', { lobbyId: waiting.lobbyId })
     const secondUser = server.sockets.sockets.get(second.id!)!.data.user!
     expect(await transferred).toMatchObject({ lobby: { ownerUserId: secondUser.userId, playerCount: 2 } })
     expect(await owner.timeout(1000).emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION' })
+    expect(await owner.timeout(1000).emitWithAck('lobby.leave', { lobbyId: waiting.lobbyId }))
+      .toEqual({ outcome: 'LEFT' })
+    expect(await second.timeout(1000).emitWithAck('session.get', {}))
+      .toMatchObject({ outcome: 'IN_LOBBY', lobby: { ownerUserId: secondUser.userId, playerCount: 2 } })
     const disconnected = new Promise((resolve) => third.once('lobby.updated', resolve))
     await disconnectClient(second)
     expect(await disconnected).toMatchObject({ lobby: {
@@ -291,7 +308,8 @@ describe('lobby and game sessions over Socket.IO', () => {
     const second = await connect('Second')
     const [initial, other] = await startGame([first, second])
     const left = new Promise((resolve) => second.once('game.playerLeft', resolve))
-    expect(await first.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId })).toEqual({ outcome: 'LEFT' })
+    expect(await raw(first, 'game.leave', { gameId: shared.gameId, extra: true })).toEqual({ outcome: 'INVALID_REQUEST' })
+    expect(await first.emitWithAck('game.leave', { gameId: shared.gameId })).toEqual({ outcome: 'LEFT' })
     expect(await left).toEqual({ gameId: shared.gameId, playerId: initial.assignment.playerId, robotId: initial.assignment.robotId })
     expect(shared.game.board.occupantAt({ x: Integer(10), y: Integer(7) })).toBeUndefined()
     expect(server.sockets.sockets.get(first.id!)?.data.user?.username).toBe('First')
@@ -313,7 +331,7 @@ describe('lobby and game sessions over Socket.IO', () => {
     outside.onAny(excluded)
     await first.timeout(1000).emitWithAck('program.submit', submission(initial))
     const hand = new Promise((resolve) => first.once('cards.dealt', resolve))
-    await second.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId })
+    await second.emitWithAck('game.leave', { gameId: shared.gameId })
     expect(await hand).toEqual({ gameId: shared.gameId, playerId: initial.assignment.playerId, cards: initial.hand })
     await outside.timeout(1000).emitWithAck('session.get', {})
     expect(excluded).not.toHaveBeenCalled()
@@ -425,11 +443,23 @@ describe('lobby and game sessions over Socket.IO', () => {
   it('rejects recovered lobby rooms because waiting disconnects expire membership', async () => {
     const first = await connect('First', { reconnection: true, reconnectionDelay: 100, randomizationFactor: 0 })
     const waiting = await lobby(first)
-    // Fence lobby.updated so the client has a recovery offset before transport loss.
-    await first.timeout(1000).emitWithAck('session.get', {})
-    const rejected = new Promise<Error>((resolve) => first.once('connect_error', resolve))
+    // Lobby creation is acknowledgement-only. Receive an actual room event to
+    // establish a recovery offset, then return to a sole-member lobby.
+    const peer = await connect('Peer')
+    const joined = Promise.withResolvers<Parameters<ServerToClientEvents['lobby.updated']>[0]>()
+    first.once('lobby.updated', joined.resolve)
+    expect(await peer.timeout(1000).emitWithAck('lobby.join', { lobbyId: waiting.lobbyId }))
+      .toMatchObject({ outcome: 'LOBBY_JOINED' })
+    expect(await joined.promise).toMatchObject({ lobby: { playerCount: 2 } })
+    const left = Promise.withResolvers<Parameters<ServerToClientEvents['lobby.updated']>[0]>()
+    first.once('lobby.updated', left.resolve)
+    expect(await peer.timeout(1000).emitWithAck('lobby.leave', { lobbyId: waiting.lobbyId }))
+      .toEqual({ outcome: 'LEFT' })
+    expect(await left.promise).toMatchObject({ lobby: { playerCount: 1 } })
+    const rejected = Promise.withResolvers<Error>()
+    first.once('connect_error', rejected.resolve)
     await disconnectClient(first, true)
-    expect((await rejected).message).toBe('SESSION_EXPIRED')
+    expect((await rejected.promise).message).toBe('SESSION_EXPIRED')
     first.io.reconnection(false)
     const replacement = await connect('First')
     expect(await replacement.timeout(1000).emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION' })
@@ -481,16 +511,13 @@ describe('lobby and game sessions over Socket.IO', () => {
     shared.game.board.removeRobot(player.robot.id)
     shared.game.board.placeRobot(player.robot.id, { x: Integer(8), y: Integer(9) })
     const events: string[] = []
-    first.onAny((name) => {
-      if (['game.playerLeft', 'player.checkpointProgress', 'cards.dealt'].includes(name)) events.push(name)
-    })
+    first.onAny((name) => { if (['game.playerLeft', 'player.checkpointProgress', 'game.programmingStarted', 'cards.dealt'].includes(name)) events.push(name) })
     const progress = new Promise<PlayerCheckpointProgress>((resolve) => first.once('player.checkpointProgress', resolve))
     const hand = new Promise((resolve) => first.once('cards.dealt', resolve))
     expect(await second.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId })).toEqual({ outcome: 'LEFT' })
     expect(await hand).toEqual({ gameId: shared.gameId, playerId: initial.assignment.playerId, cards: initial.hand })
     expect(await progress).toEqual({ gameId: shared.gameId, playerId: player.id, lastCheckpoint: 2, checkpointCount: 2 })
-    expect(events).toEqual(['game.playerLeft', 'player.checkpointProgress', 'cards.dealt'])
-    expect(shared.game.phase).toBe('programming')
+    expect(events).toEqual(['game.playerLeft', 'player.checkpointProgress', 'game.programmingStarted', 'cards.dealt'])
   })
 
   it('preserves permanent abort state through snapshots and still permits explicit leave', async () => {
@@ -560,7 +587,7 @@ describe('lobby and game sessions over Socket.IO', () => {
       }
     })
 
-    function program(joined: JoinAccepted, indices: readonly number[]) {
+    function program(joined: GameInitialization, indices: readonly number[]) {
       return submitProgramSchema.parse({
         gameId: shared.gameId, playerId: joined.assignment.playerId,
         cardIds: indices.map((index) => joined.hand[index].id),
@@ -646,12 +673,13 @@ describe('lobby and game sessions over Socket.IO', () => {
       expect(events).toEqual([
         'robot.actionResolved', 'player.checkpointProgress',
         ...Array.from({ length: 4 }, () => 'robot.actionResolved'),
-        'cards.dealt', 'game.programmingStarted',
+        'game.programmingStarted', 'cards.dealt',
       ])
       const latest = await snapshot(client)
       expect(latest.state.phase).toBe('PROGRAMMING')
       expect(latest.state.robots).toMatchObject([{
         robotId: initial.assignment.robotId, playerId: initial.assignment.playerId,
+        colour: initial.state.robots[0].colour,
         position: actions[4].position,
       }])
       expect(latest.state.players[0].lastCheckpoint).toBe(1)

@@ -1,14 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import type { CardsDealt, ClientToServerEvents, GameStarted, ServerToClientEvents, SubmitProgram } from '@robo-rally/game-events'
+import type { CardsDealt, ClientToServerEvents, ServerToClientEvents, SubmitProgram } from '@robo-rally/game-events'
 import { io as connectSocket, type Socket } from 'socket.io-client'
 import { expect, it } from 'vitest'
 import { Board, Card, EmptyTile, Game } from '@/game/index.ts'
 import { createGameSocketServer } from '@/socket/gameServer.ts'
 import { Integer } from '@/numbers'
 
-it('starts a fixed roster, broadcasts register-major actions, and deals two private next rounds', async () => {
+it('keeps programs private, broadcasts register-major actions, and resets before dealing each next round', async () => {
   const gameId = randomUUID()
   const board = new Board(Array.from({ length: 3 }, () =>
     Array.from({ length: 3 }, () => new EmptyTile())), { x: Integer(1), y: Integer(0), angle: Math.PI / 2 })
@@ -41,7 +41,7 @@ it('starts a fixed roster, broadcasts register-major actions, and deals two priv
     expect(await clients[1].timeout(1000).emitWithAck('lobby.join', { lobbyId: created.lobby.lobbyId }))
       .toMatchObject({ outcome: 'LOBBY_JOINED' })
     const initializations = clients.map((socket) => {
-      const started = Promise.withResolvers<GameStarted>()
+      const started = Promise.withResolvers<Parameters<ServerToClientEvents['game.started']>[0]>()
       socket.once('game.started', started.resolve)
       return started.promise
     })
@@ -98,9 +98,17 @@ it('starts a fixed roster, broadcasts register-major actions, and deals two priv
         expect(events[index].map((event) => event.name)).toEqual([
           'program.submitted',
           ...Array.from({ length: 10 }, () => 'robot.actionResolved'),
-          'cards.dealt', 'game.programmingStarted',
+          'game.programmingStarted', 'cards.dealt',
         ])
         expect(events[index][0].payload).toEqual({ gameId, playerId: players[1 - index].id })
+        const firstActionIndex = events[index].findIndex((event) => event.name === 'robot.actionResolved')
+        const beforeActions = JSON.stringify(events[index].slice(0, firstActionIndex))
+        expect(beforeActions).not.toContain('instruction')
+        for (const submission of submissions) {
+          for (const cardId of submission.cardIds) expect(beforeActions).not.toContain(cardId)
+        }
+        expect(events[index].find((event) => event.name === 'game.programmingStarted')?.payload)
+          .toEqual({ gameId })
         const actions = events[index].filter((event) => event.name === 'robot.actionResolved')
         expect(actions.map((event) => event.payload)).toEqual(
           Array.from({ length: 5 }, (_, registerIndex) => [1, 0].map((playerIndex) => ({

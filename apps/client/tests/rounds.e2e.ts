@@ -32,8 +32,8 @@ test('plays every register of two consecutive programs through the real Game Ser
   await page.goto('/')
   await page.getByRole('textbox', { name: 'Username' }).fill('Round player')
   await page.getByRole('button', { name: 'Log in', exact: true }).click()
-  await page.getByRole('button', { name: /Shared game/ }).click()
-  await page.getByRole('button', { name: 'Join game', exact: true }).click()
+  await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
+  await page.getByRole('button', { name: 'Start', exact: true }).click()
 
   await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Checkpoints', exact: true }).locator('..')).toContainText('0/2')

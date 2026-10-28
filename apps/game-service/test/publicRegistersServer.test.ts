@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type {
-  CardsDealt, ClientToServerEvents, GameStarted, JoinAccepted, RegistersChanged,
+  CardsDealt, ClientToServerEvents, GameInitialization, RegistersChanged,
   RobotActionResolved, ServerToClientEvents,
 } from '@robo-rally/game-events'
 import { io as createClient, type Socket } from 'socket.io-client'
@@ -12,6 +12,7 @@ import { createGame } from '@/game/GameFactory'
 import { createGameSocketServer, type GameSession, type GameSocketServer } from '@/socket/gameServer'
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>
+type GameStarted = Parameters<ServerToClientEvents['game.started']>[0]
 const empty = Array.from({ length: 5 }, () => ({ status: 'EMPTY' }))
 const full = [true, true, true, true, true] as const
 const partial = [true, false, true, false, false] as const
@@ -56,7 +57,7 @@ describe('public registers over Socket.IO', () => {
     return client
   }
 
-  async function start(members: Client[]): Promise<JoinAccepted[]> {
+  async function start(members: Client[]): Promise<GameInitialization[]> {
     const created = await members[0].timeout(1000).emitWithAck('lobby.create', {})
     if (created.outcome !== 'LOBBY_JOINED') throw new Error(created.outcome)
     const { lobbyId } = created.lobby
@@ -68,7 +69,7 @@ describe('public registers over Socket.IO', () => {
     return (await Promise.all(started)).map((payload) => payload.initialization)
   }
 
-  async function snapshot(client: Client): Promise<JoinAccepted> {
+  async function snapshot(client: Client): Promise<GameInitialization> {
     const result = await client.timeout(1000).emitWithAck('session.get', {})
     if (result.outcome !== 'IN_GAME') throw new Error(result.outcome)
     return result.initialization
@@ -80,11 +81,11 @@ describe('public registers over Socket.IO', () => {
     return emit('game.updateRegisters', payload)
   }
 
-  function update(joined: JoinAccepted, occupied: readonly boolean[] = partial) {
+  function update(joined: GameInitialization, occupied: readonly boolean[] = partial) {
     return { gameId: joined.assignment.gameId, playerId: joined.assignment.playerId, occupied }
   }
 
-  function program(joined: JoinAccepted) {
+  function program(joined: GameInitialization) {
     return {
       gameId: joined.assignment.gameId, playerId: joined.assignment.playerId,
       cardIds: joined.hand.slice(0, 5).map((card) => card.id) as [string, string, string, string, string],
@@ -206,7 +207,7 @@ describe('public registers over Socket.IO', () => {
     expect(departedEvents).toEqual([])
   })
 
-  it('reveals each executing register in snapshots without instance IDs, deals privately, and resets before the next snapshot', async () => {
+  it('reveals only executed instructions, deals privately, and broadcasts the reset before either next hand', async () => {
     const first = await connect('A')
     const second = await connect('B')
     const createScheduler = actionScheduler.createActionScheduler
@@ -240,8 +241,12 @@ describe('public registers over Socket.IO', () => {
     })
     const actions: RobotActionResolved[] = []
     const registerEvents: RegistersChanged[] = []
-    const executionStates: JoinAccepted['state'][] = []
+    const executionStates: GameInitialization['state'][] = []
     const privateHands: CardsDealt[][] = [[], []]
+    const observed: { name: string; payload: unknown }[][] = [[], []]
+    ;[first, second].forEach((client, index) => client.onAny((name, payload: unknown) => {
+      observed[index].push({ name, payload })
+    }))
     first.on('robot.actionResolved', (event) => actions.push(event))
     first.on('game.registersChanged', (event) => registerEvents.push(event))
     ;[first, second].forEach((client, index) => client.on('cards.dealt', (event) => privateHands[index].push(event)))
@@ -254,6 +259,11 @@ describe('public registers over Socket.IO', () => {
     expect(activation.state.players.map((player) => player.registers)).toEqual([hidden, hidden])
     expect((await snapshot(second)).state).toEqual(activation.state)
     expect(actions).toEqual([])
+    for (const events of observed) {
+      expect(events.map((event) => event.name)).toEqual(['program.submitted'])
+      expect(JSON.stringify(events)).not.toContain('instruction')
+    }
+    expect(JSON.stringify(activation.state)).not.toContain('instruction')
     game.resume()
     scheduler!.scheduleNextAction()
     let action = await firstAction
@@ -307,6 +317,13 @@ describe('public registers over Socket.IO', () => {
     ])
     expect(next.hand.every((card) => !otherNext.hand.some((otherCard) => otherCard.id === card.id))).toBe(true)
     expect(registerEvents).toEqual([])
+    for (const events of observed) {
+      expect(events.filter((event) => event.name !== 'player.checkpointProgress').map((event) => event.name)).toEqual([
+        'program.submitted',
+        ...Array.from({ length: 10 }, () => 'robot.actionResolved'),
+        'game.programmingStarted', 'cards.dealt',
+      ])
+    }
     const publicPayloads = JSON.stringify([activation.state, actions, executionStates, next.state, otherNext.state])
     for (const card of [...a.hand, ...b.hand, ...next.hand, ...otherNext.hand]) expect(publicPayloads).not.toContain(card.id)
     expect(await raw(first, update(a))).toEqual({ outcome: 'ACCEPTED' })
@@ -387,6 +404,8 @@ describe('public registers over Socket.IO', () => {
     const restored = await snapshot(remaining)
     expect(restored.state.players.map((player) => player.registers)).toEqual([empty])
     expect(events.indexOf('game.playerLeft')).toBeLessThan(events.indexOf('game.programmingStarted'))
+    expect(events.filter((name) => name === 'game.programmingStarted' || name === 'cards.dealt'))
+      .toEqual(['game.programmingStarted', 'cards.dealt'])
     expect(count).toBe(9)
   })
 

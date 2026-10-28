@@ -14,24 +14,13 @@ export type {
   GameAborted,
   GameId,
   GamePhase,
-  GameStarted,
-  JoinAccepted,
   LeaveGame,
   LeaveResult,
-  LobbyFailure,
-  LobbyId,
-  LobbyJoinResult,
-  LobbyLeaveResult,
-  LobbyListResult,
-  LobbyStartResult,
-  LobbyState,
-  LobbySummary,
-  LobbyUpdated,
+  GameInitialization,
   LoginResult,
   Orientation,
   PlayerAssignment,
   PlayerId,
-  PlayerJoined,
   PlayerLeft,
   PlayerConnectionChanged,
   PlayerCheckpointProgress,
@@ -40,6 +29,7 @@ export type {
   ProgramResult,
   ProgramResultOutcome,
   ProgrammingStarted,
+  ProgrammingRegisterSlot,
   ProgramSubmitted,
   PublicGameState,
   PublicRegisterSlot,
@@ -48,7 +38,6 @@ export type {
   Robot,
   RobotId,
   RobotActionResolved,
-  SessionResult,
   Tile,
   UpdateRegistersResult,
   User,
@@ -56,8 +45,6 @@ export type {
 } from './payloads.js'
 export { loginSchema, parseLogin } from './login.js'
 export type { Login, LoginRequestRejection } from './login.js'
-export { emptyRequestSchema, lobbyRequestSchema } from './lifecycle.js'
-export type { EmptyRequest, LobbyRequest } from './lifecycle.js'
 export { leaveGameSchema } from './leaveGame.js'
 export { submitProgramSchema } from './submitProgram.js'
 export type { ProgramCardIds, SubmitProgram } from './submitProgram.js'
@@ -66,3 +53,5 @@ export type { RegisterOccupancy, UpdateRegisters } from './updateRegisters.js'
 
 export { instructions } from './instructions.js'
 export type { Instruction } from './instructions.js'
+
+export * from './lobby.js'

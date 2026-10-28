@@ -91,12 +91,6 @@ export type PlayerState = Readonly<{
   registers: PublicRegisters
 }>
 
-export type PlayerJoined = Readonly<{
-  gameId: GameId
-  player: PlayerState
-  robot: Robot
-}>
-
 export type PlayerLeft = Readonly<{ gameId: GameId; playerId: PlayerId; robotId: RobotId }>
 
 export type GameAborted = Readonly<{ gameId: GameId }>
@@ -181,67 +175,26 @@ export type UpdateRegistersResult = Readonly<{
     | 'INTERNAL_ERROR'
 }>
 
+export type ProgrammingRegisterSlot = Readonly<{ status: 'EMPTY' | 'HIDDEN' }>
+
 export type RegistersChanged = Readonly<{
   gameId: GameId
   playerId: PlayerId
-  registers: PublicRegisters
+  registers: readonly [
+    ProgrammingRegisterSlot,
+    ProgrammingRegisterSlot,
+    ProgrammingRegisterSlot,
+    ProgrammingRegisterSlot,
+    ProgrammingRegisterSlot,
+  ]
 }>
 
 export type ProgrammingStarted = Readonly<{ gameId: GameId }>
 
-export type JoinAccepted = Readonly<{
+export type GameInitialization = Readonly<{
   outcome: 'JOINED'
   assignment: PlayerAssignment
   state: PublicGameState
   hand: readonly Card[]
   programSubmitted: boolean
-}>
-
-export type LobbyId = string
-
-export type LobbySummary = Readonly<{
-  lobbyId: LobbyId
-  name: string
-  playerCount: number
-  maxPlayers: number
-}>
-
-export type LobbyState = Readonly<LobbySummary & { ownerUserId: UserId }>
-
-export type LobbyFailure = Readonly<{
-  outcome:
-    | 'LOGIN_REQUIRED'
-    | 'INVALID_REQUEST'
-    | 'INTERNAL_ERROR'
-    | 'LOBBY_NOT_FOUND'
-    | 'NOT_LOBBY_MEMBER'
-    | 'NOT_LOBBY_OWNER'
-    | 'LOBBY_FULL'
-    | 'USER_ALREADY_IN_SESSION'
-}>
-
-export type LobbyListResult =
-  | Readonly<{ outcome: 'LOBBIES_FOUND'; lobbies: readonly LobbySummary[] }>
-  | LobbyFailure
-
-export type LobbyJoinResult =
-  | Readonly<{ outcome: 'LOBBY_JOINED'; lobby: LobbyState }>
-  | LobbyFailure
-
-export type LobbyLeaveResult = Readonly<{ outcome: 'LEFT' }> | LobbyFailure
-
-export type LobbyStartResult =
-  | Readonly<{ outcome: 'STARTED'; gameId: GameId }>
-  | LobbyFailure
-
-export type SessionResult =
-  | Readonly<{ outcome: 'NO_SESSION' }>
-  | Readonly<{ outcome: 'IN_LOBBY'; lobby: LobbyState }>
-  | Readonly<{ outcome: 'IN_GAME'; initialization: JoinAccepted }>
-  | LobbyFailure
-
-export type LobbyUpdated = Readonly<{ lobby: LobbyState }>
-export type GameStarted = Readonly<{
-  lobbyId: LobbyId
-  initialization: JoinAccepted
 }>

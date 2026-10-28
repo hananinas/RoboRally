@@ -43,10 +43,10 @@ export function createActionScheduler(
   function dealHands(): void {
     // Reset registers before announcing the new programming phase.
     game.beginProgramming()
+    io.to(publicRoom).emit('game.programmingStarted', { gameId })
     for (const player of game.players) {
       io.to(playerRoom(player.id)).emit('cards.dealt', presentCardsDealt(gameId, player))
     }
-    io.to(publicRoom).emit('game.programmingStarted', { gameId })
   }
 
   function scheduleNextAction(): void {

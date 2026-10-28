@@ -1,14 +1,11 @@
 import { expect, test } from './real-game-fixture.ts'
-import { gameStatus, login, robotIds } from './browserClient.ts'
+import { gameStatus, login, robotIds, startTogether } from './browserClient.ts'
 
-test('replays a player-joined event missed during a recovered disconnect', async ({ browser, page, baseURL }) => {
+test('recovers the existing game after a temporary disconnect', async ({ browser, page, baseURL }) => {
   const contextB = await browser.newContext({ baseURL })
-  const contextC = await browser.newContext({ baseURL })
   const pageB = await contextB.newPage()
-  const pageC = await contextC.newPage()
   try {
-    await login(page, 'A')
-    await login(pageB, 'B')
+    await startTogether(page, pageB, 'A', 'B')
     await expect.poll(() => robotIds(page)).toHaveLength(2)
     await pageB.getByRole('region', { name: 'Programming hand' }).getByRole('button').first().click()
     const selected = pageB.getByRole('button', { name: 'Move 1, remove from register 1', exact: true })
@@ -28,21 +25,19 @@ test('replays a player-joined event missed during a recovered disconnect', async
       await expect(card).toBeDisabled()
     }
 
-    await login(pageC, 'C')
-    await expect.poll(() => robotIds(pageB)).toHaveLength(3)
+    await expect.poll(() => robotIds(pageB)).toHaveLength(2)
 
     await page.context().setOffline(false)
     await expect(gameStatus(page)).toHaveText('Programming', { timeout: 10000 })
     await expect(gameStatus(pageB)).toHaveText('Programming')
     await expect(overlay).toHaveCount(0)
-    await expect(pageC.locator('.disconnect-overlay')).toHaveCount(0)
+    await expect(page.locator('.disconnect-overlay')).toHaveCount(0)
     await expect(selected).toBeEnabled()
     await expect(pageB.getByRole('region', { name: 'Programming hand' }).getByRole('button', { name: 'Move 2', exact: true })).toBeEnabled()
 
-    await expect.poll(() => robotIds(page), { timeout: 10000 }).toHaveLength(3)
+    await expect.poll(() => robotIds(page), { timeout: 10000 }).toHaveLength(2)
   } finally {
     await contextB.close()
-    await contextC.close()
   }
 })
 
@@ -52,8 +47,7 @@ test('rejects a stale recovered connection once a second login has taken over th
   const witnessPage = await witnessContext.newPage()
   const newPage = await newContext.newPage()
   try {
-    await login(stalePage, 'D')
-    await login(witnessPage, 'E')
+    await startTogether(stalePage, witnessPage, 'D', 'E')
 
     await stalePage.context().setOffline(true)
     await expect(gameStatus(witnessPage)).toContainText('paused')
@@ -76,8 +70,7 @@ test('leaves a paused game through the disconnect overlay and returns to lobby s
   const otherContext = await browser.newContext({ baseURL })
   const other = await otherContext.newPage()
   try {
-    await login(page, 'Staying player')
-    await login(other, 'Disconnected player')
+    await startTogether(page, other, 'Staying player', 'Disconnected player')
     await expect.poll(() => robotIds(page)).toHaveLength(2)
 
     await otherContext.setOffline(true)
@@ -94,5 +87,33 @@ test('leaves a paused game through the disconnect overlay and returns to lobby s
     await expect(page.getByRole('button', { name: 'Join game', exact: true })).toBeDisabled()
   } finally {
     await otherContext.close()
+  }
+})
+
+test('a disconnected waiting owner returns to browsing while the remaining member becomes owner', async ({ browser, page, baseURL }) => {
+  const context = await browser.newContext({ baseURL })
+  const other = await context.newPage()
+  try {
+    for (const [client, username] of [[page, 'Owner'], [other, 'Other']] as const) {
+      await client.goto('/')
+      await client.getByRole('textbox', { name: 'Username' }).fill(username)
+      await client.getByRole('button', { name: 'Log in', exact: true }).click()
+      if (client === page) await client.getByRole('button', { name: 'Create lobby', exact: true }).click()
+      else {
+        await client.getByRole('list', { name: 'Lobbies' }).getByRole('button', { disabled: false }).first().click()
+        await client.getByRole('button', { name: 'Join game', exact: true }).click()
+      }
+    }
+    await expect(other.getByText('Waiting for the owner to start.', { exact: true })).toBeVisible()
+    await page.context().setOffline(true)
+    await expect(other.getByRole('button', { name: 'Start', exact: true })).toBeEnabled({ timeout: 10000 })
+    await page.context().setOffline(false)
+    await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeVisible({ timeout: 10000 })
+    await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
+    await page.getByRole('list', { name: 'Lobbies' }).getByRole('button', { disabled: false }).first().click()
+    await page.getByRole('button', { name: 'Join game', exact: true }).click()
+    await expect(page.getByText('Waiting for the owner to start.', { exact: true })).toBeVisible()
+  } finally {
+    await context.close()
   }
 })

@@ -54,7 +54,7 @@ function presentRobots(game: Game) {
   return game.players.map((player) => ({
     robotId: player.robot.id,
     playerId: player.id,
-    colour: player.colour,
+    colour: player.robot.colour,
     position: {
       coordinate: game.board.positionOf(player.robot.id),
       orientation: orientations[player.robot.direction],
@@ -87,21 +87,6 @@ export function presentPublicGameState(
     },
   }
 }
-
-export function presentPlayerStates(
-  game: Game,
-  members: readonly { user: { username: string }; player: Player; connectionId: string | null }[],
-): PlayerState[] {
-  return members.map(({ user, player, connectionId }) => ({
-    playerId: player.id,
-    lastCheckpoint: player.lastCheckpoint,
-    registers: player.registers,
-    username: user.username,
-    programSubmitted: game.hasSubmittedProgram(player.id),
-    connected: connectionId !== null,
-  }))
-}
-
 
 export function presentCardsDealt(
   gameId: GameId,

@@ -1,169 +1,200 @@
+import { err, ok, type Result } from 'neverthrow'
 import { randomUUID } from 'node:crypto'
+import type { Player } from '@/game/Player'
+import type { Lobby, SessionContext } from '@/socket/sessionContext'
+import { withSessionRequest } from '@/socket/utilities/withSessionRequest'
+import { ROBOT_COLOURS } from '@/game/Robot'
 import {
   emptyRequestSchema, lobbyRequestSchema,
-  type EmptyRequest, type LobbyRequest, type LobbySummary, type LobbyState, type LobbyFailure,
-  type LobbyListResult, type LobbyJoinResult, type LobbyLeaveResult, type LobbyStartResult, type SessionResult, type User,
+  type EmptyRequest, type LobbyRequest, type GameInitialization, type LobbyState, type User,
+  type LobbyListResult, type LobbyJoinResult, type LobbyLeaveResult, type LobbyStartResult,
 } from '@robo-rally/game-events'
-import { logError } from '@/logger'
-import { withAcknowledgeOnce } from '@/socket/utilities/acknowledgeOnce'
-import { handleGameSession, presentInitialization, type MembershipContext } from '@/socket/handlers/membershipHandlers'
+import { createGameContext } from '@/socket/gameContext'
+import { presentInitialization, type MembershipContext } from '@/socket/handlers/membershipHandlers'
 import type { GameSocket } from '@/socket/gameServer'
 
-export type WaitingLobby = {
-  lobbyId: string
-  name: string
-  members: Map<string, { user: User; connectionId: string }>
+const MAX_PLAYERS = 6
+const lobbyRoom = (id: string) => `lobby:${id}`
+export function presentLobby(lobby: Lobby): LobbyState {
+  return { lobbyId: lobby.lobbyId, name: lobby.name, ownerUserId: lobby.members.keys().next().value!,
+    playerCount: lobby.members.size, maxPlayers: MAX_PLAYERS,
+    players: [...lobby.members.values()].map(({ user }) => user) }
 }
 
-export type LobbyContext = {
-  lobbies: Map<string, WaitingLobby>
-  games: Map<string, MembershipContext>
-  createGameContext: () => MembershipContext
-}
-
-export const lobbyRoom = (lobbyId: string): string => `lobby:${lobbyId}`
-
-export function findGame(ctx: LobbyContext, userId: string): MembershipContext | undefined {
-  return [...ctx.games.values()].find((game) => game.memberships.has(userId))
-}
-
-function findLobby(ctx: LobbyContext, userId: string): WaitingLobby | undefined {
-  return [...ctx.lobbies.values()].find((lobby) => lobby.members.has(userId))
-}
-
-function summary(lobby: WaitingLobby): LobbySummary {
-  return { lobbyId: lobby.lobbyId, name: lobby.name, playerCount: lobby.members.size, maxPlayers: 6 }
-}
-
-function state(lobby: WaitingLobby): LobbyState {
-  return { ...summary(lobby), ownerUserId: lobby.members.keys().next().value! }
-}
-
-function validate(socket: GameSocket, payload: unknown, schema: typeof emptyRequestSchema | typeof lobbyRequestSchema): LobbyFailure | undefined {
-  if (!socket.data.user) return { outcome: 'LOGIN_REQUIRED' }
-  if (!schema.safeParse(payload).success) return { outcome: 'INVALID_REQUEST' }
-  return undefined
-}
-
-function reportFailure(command: string, error: unknown): LobbyFailure {
-  logError('Failed to process lobby request', error, { command })
-  return { outcome: 'INTERNAL_ERROR' }
-}
-
-export function handleLobbyList(ctx: LobbyContext, socket: GameSocket, payload: EmptyRequest, acknowledge: (result: LobbyListResult) => void): void {
-  withAcknowledgeOnce(acknowledge, (ack) => {
-    const failure = validate(socket, payload, emptyRequestSchema)
-    ack(failure ?? { outcome: 'LOBBIES_FOUND', lobbies: [...ctx.lobbies.values()].map(summary) })
-  }, (error) => reportFailure('lobby.list', error))
-}
-
-export function handleLobbyJoin(ctx: LobbyContext, socket: GameSocket, payload: EmptyRequest | LobbyRequest, acknowledge: (result: LobbyJoinResult) => void, create = false): void {
-  let joined: WaitingLobby | undefined
-  withAcknowledgeOnce(acknowledge, (ack) => {
-    const failure = validate(socket, payload, create ? emptyRequestSchema : lobbyRequestSchema)
-    if (failure) return ack(failure)
-    const user = socket.data.user!
-    if (findGame(ctx, user.userId) || findLobby(ctx, user.userId)) return ack({ outcome: 'USER_ALREADY_IN_SESSION' })
-    const lobbyId = create ? randomUUID() : (payload as LobbyRequest).lobbyId
-    const lobby = create
-      ? { lobbyId, name: `Rally ${lobbyId.slice(0, 8)}`, members: new Map<string, { user: User; connectionId: string }>() }
-      : ctx.lobbies.get(lobbyId)
-    if (!lobby) return ack({ outcome: 'LOBBY_NOT_FOUND' })
-    if (lobby.members.size >= 6) return ack({ outcome: 'LOBBY_FULL' })
-    joined = lobby
-    lobby.members.set(user.userId, { user, connectionId: socket.id })
-    ctx.lobbies.set(lobbyId, lobby)
-    void socket.join(lobbyRoom(lobbyId))
-    ack({ outcome: 'LOBBY_JOINED', lobby: state(lobby) })
-    socket.nsp.to(lobbyRoom(lobbyId)).emit('lobby.updated', { lobby: state(lobby) })
-  }, (error, acknowledged) => {
-    if (joined && !acknowledged) removeWaitingMember(ctx, socket, joined)
-    return reportFailure(create ? 'lobby.create' : 'lobby.join', error)
-  })
-}
-
-export function removeWaitingMember(ctx: LobbyContext, socket: GameSocket, lobby = findLobby(ctx, socket.data.user?.userId ?? '')): void {
-  if (!lobby || !socket.data.user || lobby.members.get(socket.data.user.userId)?.connectionId !== socket.id) return
-  lobby.members.delete(socket.data.user.userId)
+export function leaveLobby(context: SessionContext, socket: GameSocket): void {
+  const userId = socket.data.user?.userId ?? ''
+  const session = context.sessionsByUser.get(userId)
+  if (session?.kind !== 'lobby') return
+  const lobby = context.lobbies.get(session.lobbyId)
+  if (lobby?.members.get(userId)?.connectionId !== socket.id) return
+  lobby.members.delete(userId)
+  context.sessionsByUser.delete(userId)
   void socket.leave(lobbyRoom(lobby.lobbyId))
-  if (lobby.members.size === 0) ctx.lobbies.delete(lobby.lobbyId)
-  else socket.nsp.to(lobbyRoom(lobby.lobbyId)).emit('lobby.updated', { lobby: state(lobby) })
+  if (!lobby.members.size) context.lobbies.delete(lobby.lobbyId)
+  else {
+    context.io.to(lobbyRoom(lobby.lobbyId)).emit('lobby.updated', { lobby: presentLobby(lobby) })
+  }
 }
 
-export function handleLobbyLeave(ctx: LobbyContext, socket: GameSocket, payload: LobbyRequest, acknowledge: (result: LobbyLeaveResult) => void): void {
-  withAcknowledgeOnce(acknowledge, (ack) => {
-    const failure = validate(socket, payload, lobbyRequestSchema)
-    if (failure) return ack(failure)
-    const lobby = ctx.lobbies.get(payload.lobbyId)
-    if (!lobby) return ack({ outcome: 'LOBBY_NOT_FOUND' })
-    if (lobby.members.get(socket.data.user!.userId)?.connectionId !== socket.id) return ack({ outcome: 'NOT_LOBBY_MEMBER' })
-    removeWaitingMember(ctx, socket, lobby)
-    ack({ outcome: 'LEFT' })
-  }, (error) => reportFailure('lobby.leave', error))
-}
-
-export function handleLobbyStart(ctx: LobbyContext, socket: GameSocket, payload: LobbyRequest, acknowledge: (result: LobbyStartResult) => void): void {
-  let game: MembershipContext | undefined
-  let committed = false
-  withAcknowledgeOnce(acknowledge, (ack) => {
-    const failure = validate(socket, payload, lobbyRequestSchema)
-    if (failure) return ack(failure)
-    const lobby = ctx.lobbies.get(payload.lobbyId)
-    if (!lobby) return ack({ outcome: 'LOBBY_NOT_FOUND' })
-    const userId = socket.data.user!.userId
-    if (lobby.members.get(userId)?.connectionId !== socket.id) return ack({ outcome: 'NOT_LOBBY_MEMBER' })
-    if (lobby.members.keys().next().value !== userId) return ack({ outcome: 'NOT_LOBBY_OWNER' })
-    game = ctx.createGameContext()
-    if (ctx.games.has(game.gameId)) throw new Error('Game factory returned a duplicate game ID')
-    for (const { user, connectionId } of lobby.members.values()) {
-      const added = game.game.addPlayer()
-      if (added.isErr()) throw new Error(`Unable to build lobby roster: ${added.error}`)
-      game.memberships.set(user.userId, { user, player: added.value, connectionId })
-    }
-    game.game.start()
-    // Construct every private snapshot before granting rooms or committing the transition.
-    const initializations = [...game.memberships.values()].map((membership) => ({
-      membership, initialization: presentInitialization(game!, membership),
-    }))
-    for (const { membership } of initializations) {
-      const memberSocket = socket.nsp.sockets.get(membership.connectionId!)
-      if (!memberSocket) throw new Error('Lobby member disconnected before start')
-      void memberSocket.join([game.publicRoom, game.playerRoom(membership.player.id)])
-    }
-    ctx.games.set(game.gameId, game)
-    ctx.lobbies.delete(lobby.lobbyId)
-    socket.nsp.in(lobbyRoom(lobby.lobbyId)).socketsLeave(lobbyRoom(lobby.lobbyId))
-    committed = true
-    for (const { membership, initialization } of initializations) {
-      game.io.to(game.playerRoom(membership.player.id)).emit('game.started', { lobbyId: lobby.lobbyId, initialization })
-    }
-    ack({ outcome: 'STARTED', gameId: game.gameId })
-  }, (error) => {
-    if (game && !committed) {
-      game.actionScheduler.stop()
-      for (const membership of game.memberships.values()) {
-        const memberSocket = socket.nsp.sockets.get(membership.connectionId!)
-        void memberSocket?.leave(game.publicRoom)
-        void memberSocket?.leave(game.playerRoom(membership.player.id))
-        game.game.removePlayer(membership.player.id)
-      }
-      game.memberships.clear()
-    }
-    return reportFailure('lobby.start', error)
+export function handleListLobbies(
+  context: SessionContext,
+  socket: GameSocket,
+  payload: EmptyRequest,
+  acknowledge: (result: LobbyListResult) => void,
+): void {
+  withSessionRequest(socket, 'lobby.list', emptyRequestSchema, payload, acknowledge, (_user, ack) => {
+    ack({ outcome: 'LOBBIES_FOUND', lobbies: [...context.lobbies.values()].map((lobby) => {
+      const { ownerUserId: _, players: _players, ...summary } = presentLobby(lobby)
+      return summary
+    }) })
   })
 }
 
-export function handleSessionGet(ctx: LobbyContext, socket: GameSocket, payload: EmptyRequest, acknowledge: (result: SessionResult) => void): void {
-  withAcknowledgeOnce(acknowledge, (ack) => {
-    const failure = validate(socket, payload, emptyRequestSchema)
-    if (failure) return ack(failure)
-    const userId = socket.data.user!.userId
-    const lobby = findLobby(ctx, userId)
-    if (lobby) return ack(lobby.members.get(userId)!.connectionId === socket.id
-      ? { outcome: 'IN_LOBBY', lobby: state(lobby) }
-      : { outcome: 'USER_ALREADY_IN_SESSION' })
-    const game = findGame(ctx, userId)
-    if (game) handleGameSession(game, socket, ack)
-    else ack({ outcome: 'NO_SESSION' })
-  }, (error) => reportFailure('session.get', error))
+export function handleCreateLobby(
+  context: SessionContext,
+  socket: GameSocket,
+  payload: EmptyRequest,
+  acknowledge: (result: LobbyJoinResult) => void,
+): void {
+  withSessionRequest(socket, 'lobby.create', emptyRequestSchema, payload, acknowledge, (user, ack) => {
+    const session = context.sessionsByUser.get(user.userId)
+    if (session) {
+      const existing = session.kind === 'lobby' ? context.lobbies.get(session.lobbyId) : undefined
+      return ack(existing?.members.get(user.userId)?.connectionId === socket.id
+        ? { outcome: 'LOBBY_JOINED', lobby: presentLobby(existing) }
+        : { outcome: 'USER_ALREADY_IN_SESSION' })
+    }
+    const lobbyId = randomUUID()
+    const lobby: Lobby = { lobbyId, name: `Lobby ${lobbyId.slice(0, 8)}`,
+      members: new Map([[user.userId, { user, connectionId: socket.id }]]) }
+    void socket.join(lobbyRoom(lobbyId))
+    context.lobbies.set(lobbyId, lobby)
+    context.sessionsByUser.set(user.userId, { kind: 'lobby', lobbyId })
+    ack({ outcome: 'LOBBY_JOINED', lobby: presentLobby(lobby) })
+  })
+}
+
+export function handleJoinLobby(
+  context: SessionContext,
+  socket: GameSocket,
+  payload: LobbyRequest,
+  acknowledge: (result: LobbyJoinResult) => void,
+): void {
+  withSessionRequest(socket, 'lobby.join', lobbyRequestSchema, payload, acknowledge, (user, ack) => {
+    const lobby = context.lobbies.get(payload.lobbyId)
+    if (!lobby) return ack({ outcome: 'LOBBY_NOT_FOUND' })
+    const session = context.sessionsByUser.get(user.userId)
+    if (session) {
+      return ack(session.kind === 'lobby' && session.lobbyId === lobby.lobbyId
+        && lobby.members.get(user.userId)?.connectionId === socket.id
+        ? { outcome: 'LOBBY_JOINED', lobby: presentLobby(lobby) }
+        : { outcome: 'USER_ALREADY_IN_SESSION' })
+    }
+    if (lobby.members.size >= MAX_PLAYERS) return ack({ outcome: 'LOBBY_FULL' })
+    void socket.join(lobbyRoom(lobby.lobbyId))
+    lobby.members.set(user.userId, { user, connectionId: socket.id })
+    context.sessionsByUser.set(user.userId, { kind: 'lobby', lobbyId: lobby.lobbyId })
+    ack({ outcome: 'LOBBY_JOINED', lobby: presentLobby(lobby) })
+    socket.to(lobbyRoom(lobby.lobbyId)).emit('lobby.updated', { lobby: presentLobby(lobby) })
+  })
+}
+
+export function handleLeaveLobby(
+  context: SessionContext,
+  socket: GameSocket,
+  payload: LobbyRequest,
+  acknowledge: (result: LobbyLeaveResult) => void,
+): void {
+  withSessionRequest(socket, 'lobby.leave', lobbyRequestSchema, payload, acknowledge, (user, ack) => {
+    const session = context.sessionsByUser.get(user.userId)
+    if (!session) return ack({ outcome: 'LEFT' })
+    const lobby = context.lobbies.get(payload.lobbyId)
+    if (session.kind !== 'lobby' || session.lobbyId !== payload.lobbyId
+      || lobby?.members.get(user.userId)?.connectionId !== socket.id) {
+      return ack({ outcome: 'NOT_LOBBY_MEMBER' })
+    }
+    leaveLobby(context, socket)
+    ack({ outcome: 'LEFT' })
+  })
+}
+
+type ConnectedLobbyMember = { user: User; connectionId: string; socket: GameSocket }
+
+function getConnectedMembers(context: SessionContext, lobby: Lobby): Result<ConnectedLobbyMember[], 'LOBBY_MEMBER_DISCONNECTED'> {
+  const members: ConnectedLobbyMember[] = []
+  for (const member of lobby.members.values()) {
+    const socket = context.io.sockets.sockets.get(member.connectionId)
+    if (!socket?.connected) return err('LOBBY_MEMBER_DISCONNECTED')
+    members.push({ ...member, socket })
+  }
+  return ok(members)
+}
+
+export function handleStartLobby(
+  context: SessionContext,
+  socket: GameSocket,
+  payload: LobbyRequest,
+  acknowledge: (result: LobbyStartResult) => void,
+): void {
+  const { io } = context
+  withSessionRequest(socket, 'lobby.start', lobbyRequestSchema, payload, acknowledge, (user, ack) => {
+    const lobby = context.lobbies.get(payload.lobbyId)
+    if (!lobby) return ack({ outcome: 'LOBBY_NOT_FOUND' })
+    if (lobby.members.get(user.userId)?.connectionId !== socket.id) return ack({ outcome: 'NOT_LOBBY_MEMBER' })
+    if (lobby.members.keys().next().value !== user.userId) return ack({ outcome: 'NOT_LOBBY_OWNER' })
+
+    const connected = getConnectedMembers(context, lobby)
+    if (connected.isErr()) return ack({ outcome: connected.error })
+
+    // The in-memory adapter joins synchronously. Prepare everything before publishing
+    // or notifying clients; no event-loop yield can change the roster mid-transition.
+    let gameContext: MembershipContext | undefined
+    let prepared: { member: { user: User; player: Player }; socket: GameSocket; initialization: GameInitialization }[] = []
+    try {
+      const preparedContext = createGameContext(io, context.createGame())
+      gameContext = preparedContext
+      const members = connected.value.map(({ socket: connection, ...member }) => {
+        const result = preparedContext.game.addPlayer(ROBOT_COLOURS[preparedContext.memberships.size])
+        if (result.isErr()) throw new Error(result.error)
+        const membership = { ...member, player: result.value }
+        preparedContext.memberships.set(member.user.userId, membership)
+        return { member: membership, socket: connection }
+      })
+      const state = preparedContext.publicState()
+      prepared = members.map((entry) => ({
+        ...entry, initialization: presentInitialization(preparedContext, entry.member, state),
+      }))
+      for (const entry of prepared) {
+        for (const room of [gameContext.publicRoom, gameContext.playerRoom(entry.member.player.id)]) {
+          void entry.socket.join(room)
+        }
+      }
+    } catch (error) {
+      if (gameContext) {
+        for (const { socket: connection, member } of prepared) {
+          void connection.leave(gameContext.publicRoom)
+          void connection.leave(gameContext.playerRoom(member.player.id))
+        }
+        for (const { player } of gameContext.memberships.values()) {
+          gameContext.game.removePlayer(player.id)
+        }
+        gameContext.memberships.clear()
+      }
+      gameContext?.actionScheduler.stop()
+      throw error
+    }
+    gameContext.game.start()
+    context.games.set(gameContext.gameId, gameContext)
+    for (const entry of prepared) {
+      context.sessionsByUser.set(entry.member.user.userId, { kind: 'game', gameId: gameContext.gameId })
+      void entry.socket.leave(lobbyRoom(lobby.lobbyId))
+    }
+    context.lobbies.delete(lobby.lobbyId)
+    for (const entry of prepared) {
+      io.to(gameContext.playerRoom(entry.member.player.id)).emit('game.started', {
+        lobbyId: lobby.lobbyId, initialization: entry.initialization,
+      })
+    }
+    ack({ outcome: 'STARTED', gameId: gameContext.gameId })
+  })
 }

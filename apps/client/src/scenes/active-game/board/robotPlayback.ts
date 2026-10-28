@@ -33,7 +33,6 @@ export type RobotPlaybackEvent =
   | Readonly<{ type: 'enqueue'; action: ResolvedRobotAction }>
   | Readonly<{ type: 'complete' }>
   | Readonly<{ type: 'reset'; robots: readonly Robot[] }>
-  | Readonly<{ type: 'add'; robot: Robot }>
   | Readonly<{ type: 'remove'; robotId: string }>
 
 const orientationAngle: Record<Orientation, number> = {
@@ -87,10 +86,6 @@ export function robotPlaybackReducer(
   event: RobotPlaybackEvent,
 ): RobotPlaybackState {
   if (event.type === 'reset') return createRobotPlaybackState(event.robots)
-  if (event.type === 'add') {
-    if (state.robots.some((robot) => robot.robotId === event.robot.robotId)) return state
-    return { ...state, robots: [...state.robots, ...createRobotPlaybackState([event.robot]).robots] }
-  }
   if (event.type === 'remove') {
     const next = {
       ...state,

@@ -1,119 +1,74 @@
+import { handleListLobbies, handleCreateLobby, handleJoinLobby, handleLeaveLobby, handleStartLobby } from '@/socket/handlers/lobbyHandlers'
+import { handleGetSession, handleLeaveGame, handleDisconnectSession, handleSessionProgram, handleSessionRegisters, recoverSession } from '@/socket/handlers/sessionHandlers'
+import type { SessionContext } from '@/socket/sessionContext'
 import type { Server as HttpServer } from 'node:http'
-import { leaveGameSchema, type ClientToServerEvents, type LeaveResult, type ServerToClientEvents, type User } from '@robo-rally/game-events'
+import type {
+  ClientToServerEvents,
+  ServerToClientEvents,
+  User,
+} from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
 import type { Game } from '@/game/index'
-import {
-  presentPlayerStates, presentPublicGameState,
-} from '@/socket/gamePresenter'
 import { createUserRegistry } from '@/userRegistry'
-import { createGame } from '@/game/GameFactory'
-import { createActionScheduler } from '@/actionScheduler'
+import { createDefaultGame } from '@/game/GameFactory'
 import { handleLogin } from '@/socket/handlers/authHandlers'
-import {
-  handleDisconnect, handleLeave, reconnectIfRecovered,
-  type GameMembership, type MembershipContext,
-} from '@/socket/handlers/membershipHandlers'
-import {
-  findGame, handleLobbyList, handleLobbyJoin, handleLobbyLeave, handleLobbyStart, handleSessionGet,
-  removeWaitingMember, type LobbyContext,
-} from '@/socket/handlers/lobbyHandlers'
-import { handleSubmitProgram, handleUpdateRegisters } from '@/socket/handlers/gameplayHandlers'
-import { withAcknowledgeOnce } from '@/socket/utilities/acknowledgeOnce'
 import { authorizeGameRecovery } from '@/socket/gameRecovery'
 
 export type GameSocketData = { user?: User }
-export type GameSocketServer = Server<ClientToServerEvents, ServerToClientEvents, {}, GameSocketData>
+
+export type GameSocketServer = Server<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  {},
+  GameSocketData
+>
+
 export type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents, {}, GameSocketData>
+
 export type GameSession = Readonly<{ gameId: string; game: Game }>
 
 export function createGameSocketServer(
   httpServer: HttpServer,
-  factory: () => GameSession = () => createGame(),
+  createGame: () => GameSession = createDefaultGame,
 ): GameSocketServer {
-  const io = new Server<ClientToServerEvents, ServerToClientEvents, {}, GameSocketData>(httpServer, {
+  const io = new Server<
+    ClientToServerEvents,
+    ServerToClientEvents,
+    {},
+    GameSocketData
+  >(httpServer, {
     connectionStateRecovery: { skipMiddlewares: false },
     pingInterval: 1000,
     pingTimeout: 1000,
   })
   const users = createUserRegistry()
-  const lifecycle: LobbyContext = {
-    lobbies: new Map(),
-    games: new Map(),
-    createGameContext: () => {
-      const { gameId, game } = factory()
-      const publicRoom = `game:${gameId}:public`
-      const playerRoom = (playerId: string) => `game:${gameId}:player:${playerId}`
-      const memberships = new Map<string, GameMembership>()
-      const playerStates = () => presentPlayerStates(game, [...memberships.values()])
-      const publicState = () => presentPublicGameState(gameId, game, playerStates())
-      const broadcastRegisters = (playerId: string) => {
-        let membership: GameMembership | undefined
-        for (const candidate of memberships.values()) {
-          if (candidate.player.id === playerId) {
-            membership = candidate
-            break
-          }
-        }
-        if (!membership) return
-        io.to(publicRoom).emit('game.registersChanged', {
-          gameId,
-          playerId,
-          registers: membership.player.registers,
-        })
-      }
-      const actionScheduler = createActionScheduler({
-        io, game, gameId, publicRoom, playerRoom,
-      })
-      return {
-        io, game, gameId, publicRoom, playerRoom, memberships, actionScheduler,
-        publicState, broadcastRegisters,
-      }
-    },
+  const context: SessionContext = {
+    io, createGame, games: new Map(), lobbies: new Map(), sessionsByUser: new Map(),
   }
+  httpServer.once('close', () => { for (const ctx of context.games.values()) ctx.actionScheduler.stop() })
 
-  httpServer.once('close', () => {
-    for (const game of lifecycle.games.values()) game.actionScheduler.stop()
+  authorizeGameRecovery(io, (userId) => {
+    const session = context.sessionsByUser.get(userId)
+    return session?.kind === 'game' ? context.games.get(session.gameId) : undefined
   })
-
-  authorizeGameRecovery(io, (userId) => findGame(lifecycle, userId))
 
   io.on('connection', (socket) => {
     socket.on('user.login', (payload, acknowledge) => handleLogin(socket, { users }, payload, acknowledge))
-    const recoveredGame = socket.data.user && findGame(lifecycle, socket.data.user.userId)
-    if (recoveredGame) reconnectIfRecovered(recoveredGame, socket)
 
-    socket.on('lobby.list', (payload, acknowledge) => handleLobbyList(lifecycle, socket, payload, acknowledge))
-    socket.on('lobby.create', (payload, acknowledge) => handleLobbyJoin(lifecycle, socket, payload, acknowledge, true))
-    socket.on('lobby.join', (payload, acknowledge) => handleLobbyJoin(lifecycle, socket, payload, acknowledge))
-    socket.on('lobby.leave', (payload, acknowledge) => handleLobbyLeave(lifecycle, socket, payload, acknowledge))
-    socket.on('lobby.start', (payload, acknowledge) => handleLobbyStart(lifecycle, socket, payload, acknowledge))
-    socket.on('session.get', (payload, acknowledge) => handleSessionGet(lifecycle, socket, payload, acknowledge))
-    socket.on('game.leave', (payload, acknowledge) => {
-      const game = socket.data.user && findGame(lifecycle, socket.data.user.userId)
-      if (game) {
-        handleLeave(game, socket, payload, acknowledge)
-        return
-      }
-      withAcknowledgeOnce<LeaveResult>(acknowledge, (ack) => {
-        ack({ outcome: !socket.data.user ? 'LOGIN_REQUIRED'
-          : !leaveGameSchema.safeParse(payload).success ? 'INVALID_REQUEST' : 'GAME_NOT_FOUND' })
-      }, () => ({ outcome: 'INTERNAL_ERROR' } as const))
-    })
-    socket.on('program.submit', (payload, acknowledge) => {
-      const game = socket.data.user && findGame(lifecycle, socket.data.user.userId)
-      if (game) handleSubmitProgram(game, socket, payload, acknowledge)
-      else if (typeof acknowledge === 'function') acknowledge({ outcome: 'NOT_A_MEMBER' })
-    })
-    socket.on('game.updateRegisters', (payload, acknowledge) => {
-      const game = socket.data.user && findGame(lifecycle, socket.data.user.userId)
-      if (game) handleUpdateRegisters(game, socket, payload, acknowledge)
-      else if (typeof acknowledge === 'function') acknowledge({ outcome: 'NOT_A_MEMBER' })
-    })
-    socket.on('disconnect', () => {
-      removeWaitingMember(lifecycle, socket)
-      const game: MembershipContext | undefined = socket.data.user ? findGame(lifecycle, socket.data.user.userId) : undefined
-      if (game) handleDisconnect(game, socket)
-    })
+    recoverSession(context, socket)
+
+    socket.on('lobby.list', (payload, ack) => handleListLobbies(context, socket, payload, ack))
+    socket.on('lobby.create', (payload, ack) => handleCreateLobby(context, socket, payload, ack))
+    socket.on('lobby.join', (payload, ack) => handleJoinLobby(context, socket, payload, ack))
+    socket.on('lobby.leave', (payload, ack) => handleLeaveLobby(context, socket, payload, ack))
+    socket.on('lobby.start', (payload, ack) => handleStartLobby(context, socket, payload, ack))
+    socket.on('session.get', (payload, ack) => handleGetSession(context, socket, payload, ack))
+
+    socket.on('game.leave', (payload, ack) => handleLeaveGame(context, socket, payload, ack))
+    socket.on('disconnect', () => handleDisconnectSession(context, socket))
+    socket.on('program.submit', (payload, ack) => handleSessionProgram(context, socket, payload, ack))
+    socket.on('game.updateRegisters', (payload, ack) => handleSessionRegisters(context, socket, payload, ack))
   })
+
   return io
 }

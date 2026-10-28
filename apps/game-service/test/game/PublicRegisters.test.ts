@@ -73,14 +73,14 @@ describe('public register lifecycle', () => {
   it('locks the roster at lobby start and preserves colours across departure', () => {
     const { game } = createGame('empty-map')
     const first = game.addPlayer()._unsafeUnwrap()
-    const second = game.addPlayer()._unsafeUnwrap()
-    expect(first.colour).not.toBe(second.colour)
-    const colour = second.colour
+    const second = game.addPlayer('#4d8deb')._unsafeUnwrap()
+    expect(first.robot.colour).not.toBe(second.robot.colour)
+    const colour = second.robot.colour
     game.start()
     expect(game.addPlayer()._unsafeUnwrapErr()).toBe('GAME_ALREADY_STARTED')
     game.removePlayer(first.id)
     expect(game.players).toEqual([second])
-    expect(second.colour).toBe(colour)
+    expect(second.robot.colour).toBe(colour)
     expect(game.updateRegisters(first.id, occupied)).toEqual({ outcome: 'NOT_A_MEMBER' })
   })
 })

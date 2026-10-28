@@ -30,6 +30,34 @@ test('renders the programming interface', async ({ page }) => {
   await expect(controls.getByRole('heading', { name: 'Checkpoints', exact: true }).locator('..')).toContainText('0/0')
 })
 
+for (const antenna of [
+  { x: 5, y: 0, angle: Math.PI / 2 },
+  { x: 3, y: 2, angle: 0 },
+  { x: 8, y: 6, angle: Math.PI * 1.25 },
+]) {
+  test(`renders the configured antenna at ${antenna.x},${antenna.y} facing ${antenna.angle}`, async ({ page, game }) => {
+    await game.control({ type: 'joined-state', state: { ...game.initial.state, antenna }, hand: game.initial.cards, programSubmitted: false })
+    await openGame(page)
+    await expect(page.getByRole('img', { name: 'Priority antenna' })).toBeVisible()
+    const slices = page.locator('[data-board-component^="antenna"]')
+    await expect(slices).toHaveCount(10)
+    const bounds = await slices.first().locator('use').evaluate((element) => {
+      const box = (element as SVGUseElement).getBBox()
+      return { x: box.x, y: box.y, width: box.width }
+    })
+    expect(bounds.x).toBeCloseTo(6, 3)
+    expect(bounds.y).toBeCloseTo(6, 3)
+    expect(bounds.width).toBeCloseTo(72, 3)
+    expect(await slices.evaluateAll((elements) => elements.map((element) => ({
+      tile: element.getAttribute('data-board-tile'),
+      angle: (element as SVGSVGElement).style.getPropertyValue('--board-piece-angle'),
+      symbolExists: !!document.querySelector(element.querySelector('use')!.getAttribute('href')!),
+    })))).toEqual(Array(10).fill({
+      tile: `${antenna.x},${antenna.y}`, angle: `${antenna.angle * 180 / Math.PI - 90}deg`, symbolExists: true,
+    }))
+  })
+}
+
 test('shows checkpoint counts from snapshots and broadcasts without disrupting queued playback', async ({ page, game }) => {
   await page.clock.install()
   const state = {
@@ -41,6 +69,7 @@ test('shows checkpoint counts from snapshots and broadcasts without disrupting q
     },
     players: [...game.initial.state.players, {
       playerId: OTHER_PLAYER_ID, username: 'Other player', connected: true, programSubmitted: false, lastCheckpoint: 0,
+      registers: game.initial.state.players[0].registers,
     }],
   }
   await game.control({ type: 'joined-state', state, hand: game.initial.cards, programSubmitted: false })
@@ -197,6 +226,74 @@ test('drags a card into a register and ignores outside drops', async ({
   await page.mouse.up()
 
   await expect(registeredCards).toHaveCount(1)
+})
+test('swaps two register cards by dragging one onto the other', async ({ page }) => {
+  await openGame(page)
+  await fillProgram(page)
+
+  const firstSlotCard = page.getByRole('button', { name: 'Move 1, remove from register 1' })
+  await expect(firstSlotCard).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Turn Left, remove from register 5' })).toBeVisible()
+
+  const source = await firstSlotCard.boundingBox()
+  const target = await page.locator('[data-register-index="4"]').boundingBox()
+  if (!source || !target) throw new Error('Register positions are unavailable')
+
+  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 5 })
+  await page.mouse.up()
+
+  await expect(page.getByRole('button', { name: 'Turn Left, remove from register 1' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Move 1, remove from register 5' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /remove from register/ })).toHaveCount(5)
+  await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeEnabled()
+})
+
+test('drags a card out of a register to remove it', async ({ page }) => {
+  await openGame(page)
+  await fillProgram(page, [0, 1])
+
+  const handCards = page
+    .getByRole('region', { name: 'Programming hand' })
+    .getByRole('button')
+  const registeredCards = page.getByRole('button', {
+    name: /remove from register/,
+  })
+  await expect(registeredCards).toHaveCount(2)
+  await expect(handCards.first()).toBeDisabled()
+
+  async function dragRegisterCard(registerNumber: number, x: number, y: number) {
+    const card = page.getByRole('button', {
+      name: new RegExp(`remove from register ${registerNumber}$`),
+    })
+    const box = await card.boundingBox()
+    if (!box) throw new Error('Card position is unavailable')
+
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(x, y, { steps: 5 })
+  }
+
+  // Dropping back on its own register keeps the card.
+  const ownSlot = await page.locator('[data-register-index="0"]').boundingBox()
+  if (!ownSlot) throw new Error('Register position is unavailable')
+  await dragRegisterCard(1, ownSlot.x + 4, ownSlot.y + 4)
+  await expect(page.locator('.dragged-card')).toHaveCount(1)
+  await page.mouse.move(ownSlot.x + ownSlot.width / 2, ownSlot.y + ownSlot.height / 2)
+  await page.mouse.up()
+  await expect(registeredCards).toHaveCount(2)
+
+  // Dropping outside every register removes it and frees the hand card.
+  await dragRegisterCard(1, 300, 200)
+  await expect(page.locator('.dragged-card')).toHaveCount(1)
+  await expect(page.locator('[data-register-index="0"]')).toHaveCSS('border-top-style', 'dashed')
+  await page.mouse.up()
+
+  await expect(registeredCards).toHaveCount(1)
+  await expect(page.getByRole('button', { name: /remove from register 2$/ })).toBeVisible()
+  await expect(page.locator('.dragged-card')).toHaveCount(0)
+  await expect(handCards.first()).toBeEnabled()
 })
 
 test('navigates the hand with h/l, wrapping around and skipping registered cards', async ({ page }) => {
@@ -724,6 +821,7 @@ test('displays all basic cards and plays their results across two programs', asy
       gameId: GAME_ID,
       registerIndex,
       robotId: ROBOT_ID,
+      playerId: PLAYER_ID,
       instruction: step.instruction,
       position: { coordinate: { x: step.x, y: step.y }, orientation: step.orientation },
       pushedRobots: [],

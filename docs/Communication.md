@@ -66,34 +66,37 @@ sequenceDiagram
 ```
 
 ## Lobby
-After successful authentication, the client sends `session.get {}` to determine whether the user already has a session. `NO_SESSION` continues to lobby selection, `IN_LOBBY {lobby}` confirms waiting membership on the same live connection (for example, after a command acknowledgement times out), and `IN_GAME {initialization}` restores an existing game. Disconnecting removes lobby membership; reconnecting does not rejoin that lobby.
+After successful authentication, the client sends a `session.get` request to determine if the user has an existent session. 
+If he does not, `session.get` acknowledges with `NO_SESSION` and the client is shown the lobby screen.
+
+If a listed player disconnects before Start, `LOBBY_MEMBER_DISCONNECTED` leaves the lobby intact; the owner can retry after membership updates.
 
 ### Listing lobbies
-The client can ask which lobbies exist:
+The client then requets a list of existant lobbies via
 
-`lobby.list {}`
+`lobby.list`
 
 A successful request returns:
 
 `LOBBIES_FOUND {lobbies}`
 
-Each lobby includes its `lobbyId`, generated name, player count, and capacity. The client uses `lobbyId` to join. Listing is refreshed on entry or through Refresh. A connection that has not logged in receives `LOGIN_REQUIRED`, and a malformed request receives `INVALID_REQUEST`. From there the user can create or join a lobby.
+From there the user has two options, creating a lobby or joining a lobby.
 
 ### Creating a lobby
-The client sends `lobby.create {}`. The server generates the name and makes the creator the owner. A successful request returns `LOBBY_JOINED {lobby}` and the client enters the waiting screen.
+The client sends `lobby.create`. As of this version there are no options and the server just assigns values for name and map. The creator becomes the lobbies owner. 
 
 ### Joining a lobby
-The user joins an existing lobby with `lobby.join {lobbyId}`. Waiting lobbies hold at most six players. A successful request returns `LOBBY_JOINED {lobby}`. A failed join leaves the user logged in and the client may attempt another join later.
+Alternatively, the user can join an existing lobby. Once a lobby has been selected, the clients sends `lobby.join {lobbyId}`. 
 
 ### Starting a game
-Both `lobby.join` and `lobby.create` acknowledge with `LOBBY_JOINED {lobby}` after which the client enters the waiting screen.
+Both `lobby.join` and `lobby.create` acknowledge with `LOBBY_JOINED {lobby}` after which the client enters the waiting screen. All non owner users, then wait for the owner to start the game via `lobby.start {lobbyId}`. 
 
-Only the owner can send `lobby.start {lobbyId}`. The owner may start with one or more members; starting closes the game roster immediately, before any program submission, and there is no direct `game.join` command. The service creates a fresh game, moves every member into its public and private player rooms, and removes the lobby room and record. How the game is initialised is described in [Initialization](#initialization).
-
-The owner also receives `STARTED {gameId}` as the command acknowledgement. The service constructs each initialization with the player's robot assignment, public state including every player's registers, private hand, and program-submission status. The client must apply it before processing later live game events. If a command times out, `session.get` discovers the committed session without repeating the mutation.
+Once a game has successfully started , the onber receives `STARTED {gameId}` as the command acknowledgement. How the game is initialised is described in [Initialization](#initialization).
 
 ### Lobby Membership
-While waiting, `lobby.leave {lobbyId}` or disconnecting removes membership. Leaving returns `LEFT` and retains login. Ownership passes to the earliest remaining member, announced to the [lobby room](#rooms) through `lobby.updated {lobby}`. An empty lobby is deleted. A disconnected lobby member returns to browsing after reconnecting.
+`LOBBY_JOINED`, `IN_LOBBY`, and `lobby.updated` include the full `lobby.players` roster (`userId`, `username`) in join order. Clients replace their roster on each snapshot; `lobby.list` returns summaries only.
+
+While waiting, `lobby.leave {lobbyId}` or disconnecting removes membership. Leaving returns `LEFT`. Ownership passes to the earliest remaining member, announced to the [lobby room](#rooms) through `lobby.updated {lobby}`. An empty lobby is deleted. A disconnected lobby member returns to browsing after reconnecting.
 
 The following diagram documents the lobby lifecycle:
 
@@ -130,17 +133,13 @@ The service creates a fresh game, moves every member into its public and private
 
 `game.started {lobbyId, initialization: {outcome: JOINED, assignment, state, hand, programSubmitted}}`
 
-The public room `game:{gameId}:public` carries shared gameplay events. Initialization uses private rooms because it includes each player's hand.
-
-Robot colours are assigned once by the service at start and included in public state; clients retain them across departures and reconnects.
-
 
 ### Programming
 During the programming phase, each player submits five distinct card IDs in register order for the current round.
 
 The client sends:
 
-`program.submit {gameId, playerId, cardIds}`
+`program.submit {gameId, cardIds}`
 
 The service derives the player from the authenticated connection and the player's membership in the specified game. The service verifies that the submitted cards belong to that player and that the submission is valid for the current game phase.
 
@@ -156,23 +155,17 @@ to the [public room](#rooms).
 
 This informs other players that the player has submitted their program without revealing the submitted cards. The server waits until all players have successfully submitted before beginning activation.
 
+A player can also publish register occupancy before submitting, described in [Public registers](#public-registers).
+
 
 
 ### Public registers
 
-`PlayerState.registers` contains five slots in register order: `{status: EMPTY}` means no card is placed, `{status: HIDDEN}` means a card is placed without exposing its identity or instruction, and `{status: REVEALED, instruction}` shows an already-executed register. EMPTY and HIDDEN contain only their status; REVEALED contains the executed instruction without an instance ID. Each player's hand remains private.
+`PlayerState.registers` holds five slots in register order. `{status: EMPTY}` means no card is placed, `{status: HIDDEN}` means a card is placed without exposing its identity, and `{status: REVEALED, instruction}` shows an already-executed register. EMPTY and HIDDEN carry only their status. Each player's hand stays private.
 
-`game.updateRegisters {gameId, playerId, occupied}` sends exactly five booleans: `true` maps to HIDDEN and `false` maps to EMPTY. Its acknowledgement, `game.updateRegistersResult {outcome}`, returns `ACCEPTED`, `INVALID_REQUEST`, `NOT_A_MEMBER`, `PLAYER_ID_MISMATCH`, `WRONG_PHASE`, `ALREADY_SUBMITTED`, or `INTERNAL_ERROR`.
+Before submitting, the client can share which slots are occupied. `game.updateRegisters {gameId, playerId, occupied}` sends five booleans in register order, `true` for an occupied slot and `false` for an empty one. Its acknowledgement returns `ACCEPTED`, `INVALID_REQUEST`, `NOT_A_MEMBER`, `PLAYER_ID_MISMATCH`, `WRONG_PHASE`, `ALREADY_SUBMITTED` or `INTERNAL_ERROR`. An accepted update broadcasts `game.registersChanged {gameId, playerId, registers}` to the [public room](#rooms) with only HIDDEN and EMPTY slots.
 
-During programming, before final submission, the client sends an occupancy update whenever a card is placed in or removed from a register. This shares only which slots are occupied; it does not submit a program. The final `program.submit {gameId, playerId, cardIds}` sends five distinct card instance IDs in register order.
-
-`game.registersChanged {gameId, playerId, registers}` broadcasts that player's occupancy to `game:{gameId}:public` after an accepted occupancy update and carries only `HIDDEN` and `EMPTY` slots.
-
-The client reveals a slot from `robot.actionResolved`, which carries `playerId`, `registerIndex` and `instruction`.
-
-`game.started` and `session.get` include every player's registers, revealed slots included, until `game.programmingStarted` resets them.
-
-`game.programmingStarted {gameId}` announces the start of programming to the public room and resets every player's registers to five EMPTY slots.
+The client reveals a slot from `robot.actionResolved`, which carries `playerId`, `registerIndex` and `instruction`. `game.started` and `session.get` include every player's registers, revealed slots included, until `game.programmingStarted {gameId}` resets them to five EMPTY slots.
 
 ### Activation
 
@@ -182,9 +175,9 @@ Each resolved action is emitted to the [public room](#rooms) as:
 
 `robot.actionResolved`
 
-The required `playerId` identifies whose register executed.
-
 Clients must process resolved actions in the order in which they are received.
+
+The event carries `playerId`, `registerIndex` and `instruction`, so each client reveals that player's register as the action plays.
 
 A movement card can push a chain of robots. A wall or the antenna blocks the whole step. Pushed robots keep their facing direction and pending actions.
 
@@ -227,51 +220,13 @@ through the player's [private room](#rooms).
 
 A new hand may arrive while the client is still playing animations from the previous activation. The client should store the new hand immediately but must not enable programming until all queued resolved actions have finished playing.
 
+The service also announces `game.programmingStarted {gameId}` to the [public room](#rooms), which resets every player's registers to five EMPTY slots.
+
 ### Game sequence
 
-A round runs in two phases, so it is shown as two sequences. Both cover a connected, unpaused game and only successful requests. Parallel blocks do not impose an order between their branches.
+The following sequence shows one complete round while the game remains connected and unpaused.
 
-Both players have received their initial private hands through `game.started` or `session.get`. The occupancy update is shown for A, and B follows the same flow.
-
-#### Programming
-
-```mermaid
-sequenceDiagram
-    participant A as Client A
-    participant B as Client B
-    participant Server as Game Service
-    participant Public as game:{gameId}:public
-
-    Note over A,B: EMPTY = no card placed<br/>HIDDEN = occupied, card not disclosed
-    loop Each card placement or removal before submission
-        Note over A,Server: occupied is five booleans in register order, e.g. [true, false, true, false, false]
-        A->>Server: game.updateRegisters {gameId, playerId: A, occupied}
-        par Acknowledgement
-            Server-->>A: game.updateRegistersResult {outcome: ACCEPTED}
-        and Occupancy broadcast
-            Note over Server,Public: true maps to {status: HIDDEN}<br/>false maps to {status: EMPTY}
-            Server->>Public: game.registersChanged {gameId, playerId: A, registers}
-            Public-->>A: game.registersChanged {gameId, playerId: A, registers}
-            Public-->>B: game.registersChanged {gameId, playerId: A, registers}
-        end
-    end
-
-    Note over A,Server: Occupancy updates are not submission<br/>program.submit sends the card IDs
-    A->>Server: program.submit {gameId, playerId: A, cardIds}
-    Server-->>A: ACCEPTED
-    Server->>Public: program.submitted {gameId, playerId: A}
-    Public-->>B: program.submitted {gameId, playerId: A}
-
-    B->>Server: program.submit {gameId, playerId: B, cardIds}
-    Server-->>B: ACCEPTED
-    Server->>Public: program.submitted {gameId, playerId: B}
-    Public-->>A: program.submitted {gameId, playerId: B}
-
-    Note over Server,Public: The last submission starts activation and the phase becomes EXECUTING
-```
-
-#### Activation
-
+Both players have received their initial hands through game.started or session.get.
 ```mermaid
 sequenceDiagram
     participant A as Client A
@@ -281,30 +236,42 @@ sequenceDiagram
     participant PrivateB as game:{gameId}:player:{B}
     participant Public as game:{gameId}:public
 
-    loop Registers 1 through 5
-        loop Eligible robots in antenna order
-            Note over Server: Execute next instruction
-            Server->>Public: robot.actionResolved
-            Public-->>A: robot.actionResolved
-            Public-->>B: robot.actionResolved
-            Note over A,B: Each client reveals the player's slot from robot.actionResolved using playerId, registerIndex and instruction
-        end
-    end
+    loop Each round
+        Note over A,B: EMPTY = no card placed<br/>HIDDEN = occupied, card not disclosed
+        A->>Server: game.updateRegisters {gameId, playerId: A, occupied}
+        Server-->>A: Acknowledgement: ACCEPTED
+        Server->>Public: game.registersChanged {gameId, playerId: A, registers}
+        Public-->>B: game.registersChanged {gameId, playerId: A, registers}
+        Note over A,Server: Occupancy updates are not submission
+        A->>Server: program.submit {gameId, cardIds}
+        Server-->>A: Acknowledgement: ACCEPTED
+        Server->>Public: program.submitted {playerId: A}
+        Public-->>B: program.submitted
 
-    par Next-round hands
-        Server->>PrivateA: cards.dealt {cards}
-        PrivateA-->>A: cards.dealt {cards}
-        Server->>PrivateB: cards.dealt {cards}
-        PrivateB-->>B: cards.dealt {cards}
-    and Start of programming
+        B->>Server: program.submit {gameId, cardIds}
+        Server-->>B: Acknowledgement: ACCEPTED
+        Server->>Public: program.submitted {playerId: B}
+        Public-->>A: program.submitted
+        loop Registers 1 through 5
+            loop Eligible robots in antenna order
+                Note over Server: Execute next instruction
+                Server->>Public: robot.actionResolved
+                Public-->>A: robot.actionResolved
+                Public-->>B: robot.actionResolved
+            end
+        end
+
         Note over A,B: game.programmingStarted resets every player's registers to five EMPTY slots
         Server->>Public: game.programmingStarted {gameId}
         Public-->>A: game.programmingStarted {gameId}
         Public-->>B: game.programmingStarted {gameId}
+        Server->>PrivateA: cards.dealt {cards}
+        PrivateA-->>A: cards.dealt {cards}
+        Server->>PrivateB: cards.dealt {cards}
+        PrivateB-->>B: cards.dealt {cards}
     end
 ```
 
-## Reconnection
 
 ### Game Membership
 In case of disconnection during a game, existing members may reconnect at any time. If the tab is left open SocketIO will automatically try to reestablish the connection. In case of a closed tab, the player can reopen the webpage in another tab to reconnect. In case multiple tabs are used, the first connection to reclaim a disconnected membership becomes its owner. A later connection cannot replace that owner, even if its Socket.IO session was successfully recovered.
@@ -317,7 +284,7 @@ If another live connection attempts to claim the same session for that user, ses
 
 A `session.get` rejected with `USER_ALREADY_IN_SESSION` leaves the authenticated session unaffected, and the client may call `session.get` again later.
 
-An explicit `game.leave {gameId}` removes the owning connection's player and robot, frees the occupied tile, and revokes its public/private room access. Leaving returns `LEFT` and retains login. Leaving does not reopen a game that has already started. Remaining members receive `game.playerLeft {gameId, playerId, robotId}` through the [public room](#rooms). A disconnected player remains a member. Disconnecting is not leaving.
+An explicit `game.leave {gameId}` removes the owning connection's player and robot, frees the occupied tile, and revokes its public/private room access. Remaining members receive `game.playerLeft {gameId, playerId, robotId}` through the [public room](#rooms). A disconnected player remains a member. Disconnecting is not leaving.
 
 A player’s game membership is independent of their Socket.IO connection to the server. The authenticated browser session is also independent of the Socket.IO connection. When the connection is lost, the client must indicate that it is disconnected and prevent gameplay submissions until the connection and game state have been restored.
 

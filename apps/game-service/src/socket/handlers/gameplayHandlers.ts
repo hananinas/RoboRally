@@ -99,7 +99,19 @@ export function handleUpdateRegisters(
     }
     const result = ctx.game.updateRegisters(player.id, parsed.data.occupied)
     ack(result)
-    if (result.outcome === 'ACCEPTED') ctx.broadcastRegisters(player.id)
+    if (result.outcome === 'ACCEPTED') {
+      ctx.io.to(ctx.publicRoom).emit('game.registersChanged', {
+        gameId: ctx.gameId,
+        playerId: player.id,
+        registers: [
+          { status: parsed.data.occupied[0] ? 'HIDDEN' : 'EMPTY' },
+          { status: parsed.data.occupied[1] ? 'HIDDEN' : 'EMPTY' },
+          { status: parsed.data.occupied[2] ? 'HIDDEN' : 'EMPTY' },
+          { status: parsed.data.occupied[3] ? 'HIDDEN' : 'EMPTY' },
+          { status: parsed.data.occupied[4] ? 'HIDDEN' : 'EMPTY' },
+        ],
+      })
+    }
   }, (error) => {
     logError('Failed to update registers', error, { command: 'game.updateRegisters', gameId: ctx.gameId })
     return { outcome: 'INTERNAL_ERROR' } as const

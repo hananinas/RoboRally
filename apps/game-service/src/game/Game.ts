@@ -5,7 +5,7 @@ import { instructions, type PublicRegisters, type RegisterOccupancy, type Update
 import { Card } from '@/game/Card'
 import type { CardId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
-import { Robot } from '@/game/Robot'
+import { ROBOT_COLOURS, Robot } from '@/game/Robot'
 import { tileDefinitions } from '@/game/Tile'
 import { Direction, opposite, type Position } from '@/game/spatial'
 import { Integer, PositiveInteger, UnsignedInteger } from '@/numbers'
@@ -158,15 +158,12 @@ export class Game {
     return err('NO_SPAWN_AVAILABLE')
   }
 
-  addPlayer(): Result<Player, AddPlayerError> {
+  addPlayer(colour: string = ROBOT_COLOURS[0]): Result<Player, AddPlayerError> {
     return this.checkCanAddPlayer().andThen(() =>
       this.findSpawn().map((position) => {
-        const robot = new Robot(randomUUID(), Direction.NORTH)
+        const robot = new Robot(randomUUID(), Direction.NORTH, colour)
         const hand = this.deck.map((card) => new Card(randomUUID(), card.instruction))
-        const colours = ['red', 'blue', 'green', 'yellow', 'purple', 'orange']
-        const colour = colours.find((candidate) => !this.roster.some((member) => member.colour === candidate))
-        if (!colour) throw new Error('No robot colour available')
-        const player = new Player(randomUUID(), robot, hand, colour)
+        const player = new Player(randomUUID(), robot, hand)
         this.board.placeRobot(robot.id, position)
         this.roster.push(player)
         return player

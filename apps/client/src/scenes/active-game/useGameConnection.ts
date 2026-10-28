@@ -1,11 +1,10 @@
 import type {
   CardsDealt,
   GameAborted,
-  JoinResult,
+  GameInitialization,
   PlayerConnectionChanged,
   PlayerCheckpointProgress,
   RobotActionResolved,
-  PlayerJoined,
   PlayerLeft,
 } from '@robo-rally/game-events'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -33,7 +32,7 @@ export default function useGameConnection(socket: GameSocket) {
     setState(next)
   }, [])
 
-  const initialize = useCallback((result: Extract<JoinResult, { outcome: 'JOINED' }>) => {
+  const initialize = useCallback((result: GameInitialization) => {
     generation.current += 1
     dispatch({ type: 'joined', result })
   }, [dispatch])
@@ -58,7 +57,6 @@ export default function useGameConnection(socket: GameSocket) {
     }
     const handleCardsDealt = (hand: CardsDealt) => receive({ type: 'dealt', hand })
     const handleActionResolved = (action: RobotActionResolved) => receive({ type: 'action', action })
-    const handlePlayerJoined = (payload: PlayerJoined) => receive({ type: 'player-joined', payload })
     const handlePlayerLeft = (payload: PlayerLeft) => receive({ type: 'player-left', payload })
     const handlePlayerConnectionChanged = (payload: PlayerConnectionChanged) =>
       receive({ type: 'player-connection-changed', payload })
@@ -71,7 +69,6 @@ export default function useGameConnection(socket: GameSocket) {
     socket.on('connect_error', handleConnectError)
     socket.on('cards.dealt', handleCardsDealt)
     socket.on('robot.actionResolved', handleActionResolved)
-    socket.on('game.playerJoined', handlePlayerJoined)
     socket.on('game.playerLeft', handlePlayerLeft)
     socket.on('game.playerConnectionChanged', handlePlayerConnectionChanged)
     socket.on('game.aborted', handleAborted)
@@ -83,7 +80,6 @@ export default function useGameConnection(socket: GameSocket) {
       socket.off('connect_error', handleConnectError)
       socket.off('cards.dealt', handleCardsDealt)
       socket.off('robot.actionResolved', handleActionResolved)
-      socket.off('game.playerJoined', handlePlayerJoined)
       socket.off('game.playerLeft', handlePlayerLeft)
       socket.off('game.playerConnectionChanged', handlePlayerConnectionChanged)
       socket.off('game.aborted', handleAborted)

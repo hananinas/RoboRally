@@ -12,7 +12,6 @@ export class Player {
     readonly id: PlayerId,
     readonly robot: Robot,
     hand: readonly Card[] = [],
-    readonly colour: string = 'red',
   ) {
     this.currentHand = [...hand]
   }

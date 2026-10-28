@@ -151,8 +151,6 @@ channels:
         $ref: '#/components/messages/ProgrammingStarted'
       playerCheckpointProgress:
         $ref: '#/components/messages/PlayerCheckpointProgress'
-      playerJoined:
-        $ref: '#/components/messages/PlayerJoined'
       playerLeft:
         $ref: '#/components/messages/PlayerLeft'
       playerConnectionChanged:
@@ -547,37 +545,6 @@ components:
             playerId: 00000000-0000-4000-8000-000000000002
             robotId: 00000000-0000-4000-8000-000000000003
 
-    PlayerJoined:
-      name: game.playerJoined
-      description: Announces a new player with five empty registers and their robot to existing game participants.
-      payload:
-        $ref: '#/components/schemas/PlayerJoined'
-      examples:
-        - name: joined
-          payload:
-            gameId: 00000000-0000-4000-8000-000000000001
-            player:
-              playerId: 00000000-0000-4000-8000-000000000002
-              username: Dane
-              programSubmitted: false
-              connected: true
-              lastCheckpoint: 0
-              registers:
-                - status: EMPTY
-                - status: EMPTY
-                - status: EMPTY
-                - status: EMPTY
-                - status: EMPTY
-            robot:
-              robotId: 00000000-0000-4000-8000-000000000003
-              playerId: 00000000-0000-4000-8000-000000000002
-              colour: red
-              position:
-                coordinate:
-                  x: 0
-                  y: 0
-                orientation: NORTH
-
     SubmitProgram:
       name: program.submit
       payload:
@@ -962,12 +929,22 @@ components:
     LobbyState:
       type: object
       additionalProperties: false
+      examples:
+        - lobbyId: 00000000-0000-4000-8000-000000000001
+          name: Lobby 1
+          playerCount: 1
+          maxPlayers: 6
+          ownerUserId: 00000000-0000-4000-8000-000000000004
+          players:
+            - userId: 00000000-0000-4000-8000-000000000004
+              username: Dane
       required:
         - lobbyId
         - name
         - playerCount
         - maxPlayers
         - ownerUserId
+        - players
       properties:
         lobbyId:
           type: string
@@ -983,6 +960,12 @@ components:
         ownerUserId:
           type: string
           format: uuid
+        players:
+          type: array
+          description: Members in join order, with unique userIds. Length equals playerCount; ownerUserId identifies the first member.
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/User'
     LobbyFailure:
       type: object
       additionalProperties: false
@@ -1050,6 +1033,14 @@ components:
             gameId:
               type: string
               format: uuid
+        - type: object
+          additionalProperties: false
+          description: A listed player disconnected before Start. Remain in the lobby and retry.
+          required:
+            - outcome
+          properties:
+            outcome:
+              const: LOBBY_MEMBER_DISCONNECTED
         - $ref: '#/components/schemas/LobbyFailure'
     SessionResult:
       oneOf:
@@ -1084,6 +1075,7 @@ components:
     LobbyUpdated:
       type: object
       additionalProperties: false
+      description: Full lobby snapshot sent to existing members after a join and to remaining members after a leave or disconnect.
       required:
         - lobby
       properties:
@@ -1261,7 +1253,7 @@ components:
         registers:
           $ref: '#/components/schemas/PublicRegisters'
       description: >-
-        Public player participation, submission status, and registers.
+        Public participation and submission status; never contains cards.
 
     RegistersChanged:
       type: object
@@ -1295,48 +1287,27 @@ components:
       description: Five public slots in register order.
 
     PublicRegisterSlot:
-      oneOf:
-        - type: object
-          additionalProperties: false
-          required: [ status ]
-          properties:
-            status:
-              type: string
-              enum: [ EMPTY ]
-        - type: object
-          additionalProperties: false
-          required: [ status ]
-          properties:
-            status:
-              type: string
-              enum: [ HIDDEN ]
-        - type: object
-          additionalProperties: false
-          required: [ status, instruction ]
-          properties:
-            status:
-              type: string
-              enum: [ REVEALED ]
-            instruction:
-              $ref: '#/components/schemas/Instruction'
-          description: Already-executed register instruction.
-
-    PlayerJoined:
       type: object
       additionalProperties: false
-      required:
-        - gameId
-        - player
-        - robot
+      required: [ status ]
       properties:
-        gameId:
-          $ref: "#/components/schemas/GameId"
-        player:
-          $ref: "#/components/schemas/PlayerState"
-        robot:
-          $ref: "#/components/schemas/Robot"
+        status:
+          type: string
+          enum: [ EMPTY, HIDDEN, REVEALED ]
+        instruction:
+          $ref: '#/components/schemas/Instruction'
+      if:
+        properties:
+          status:
+            const: REVEALED
+      then:
+        required: [ instruction ]
+      else:
+        not:
+          required: [ instruction ]
       description: >-
-        player.playerId must equal robot.playerId.
+        One register slot in register order. EMPTY and HIDDEN carry only their status;
+        REVEALED carries the executed instruction.
 
     PublicGameState:
       description: >-

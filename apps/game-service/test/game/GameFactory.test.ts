@@ -1,6 +1,7 @@
 import { Integer } from '@/numbers'
 import { submitProgramSchema } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'
+import { createDefaultGame } from '@/game/GameFactory'
 import { boardMaps } from '@/game/boardMaps'
 import { Direction, createGame, createPlayer } from '@/game/index'
 
@@ -17,7 +18,7 @@ describe('game factory', () => {
   })
 
   it('uses the map reboot tile when a robot enters a test pit', () => {
-    const { game } = createGame('test-map')
+    const { game } = createDefaultGame()
     const player = game.addPlayer()._unsafeUnwrap()
     game.board.relocateRobot(player.robot.id, { x: Integer(5), y: Integer(11) })
     game.submitProgram(player.id, [0, 4, 5, 3, 6].map((index) => player.hand[index].id))._unsafeUnwrap()
@@ -33,6 +34,17 @@ describe('game factory', () => {
     expect(game.board.width).toBe(boardMaps['test-map'].width)
     expect(game.board.height).toBe(boardMaps['test-map'].height)
     expect(game.phase).toBe('programming')
+  })
+
+  it('creates a fresh lobby game on the test map', () => {
+    const first = createDefaultGame()
+    const second = createDefaultGame()
+
+    expect(first.gameId).not.toBe(second.gameId)
+    expect(first.game.board.map?.name).toBe(boardMaps['test-map'].name)
+    expect(first.game.board.antenna).toEqual(boardMaps['test-map'].antenna)
+    expect(first.game.rebootTile).toEqual(boardMaps['test-map'].rebootTile)
+    expect(first.game.players).toEqual([])
   })
 
   it('uses the antenna specified by the map', () => {
@@ -64,8 +76,9 @@ describe('game factory', () => {
 
   it('places an added player at the centre of the board', () => {
     const { game } = createGame('empty-map')
-    const player = game.addPlayer()._unsafeUnwrap()
+    const player = game.addPlayer('#4d8deb')._unsafeUnwrap()
 
+    expect(player.robot.colour).toBe('#4d8deb')
     expect(game.board.positionOf(player.robot.id)).toEqual({ x: 10, y: 7 })
   })
 
