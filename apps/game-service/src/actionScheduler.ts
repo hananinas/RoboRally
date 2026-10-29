@@ -14,6 +14,7 @@ export type ActionSchedulerDeps = {
 export type ActionScheduler = {
   scheduleNextAction: () => void
   broadcastCheckpointProgress: () => void
+  announceWinner: () => void
   dealHands: () => void
   stop: () => void
 }
@@ -24,6 +25,7 @@ export function createActionScheduler(
   let scheduledAction: NodeJS.Immediate | undefined
   let closed = false
   let checkpointProgress = new Map(game.players.map((player) => [player.id, player.lastCheckpoint]))
+  let winnerAnnounced = false
 
   function broadcastCheckpointProgress(): void {
     const nextProgress = new Map<string, number>()
@@ -40,7 +42,14 @@ export function createActionScheduler(
     checkpointProgress = nextProgress
   }
 
+  function announceWinner(): void {
+    if (game.winner === undefined || winnerAnnounced) return
+    winnerAnnounced = true
+    io.to(publicRoom).emit('game.won', { gameId, playerId: game.winner })
+  }
+
   function dealHands(): void {
+    if (game.winner !== undefined) return
     for (const player of game.players) {
       io.to(playerRoom(player.id)).emit('cards.dealt', presentCardsDealt(gameId, player))
     }
@@ -58,6 +67,7 @@ export function createActionScheduler(
           presentRobotActionResolved(gameId, result),
         )
         broadcastCheckpointProgress()
+        announceWinner()
         if (game.phase === 'activation') {
           scheduleNextAction()
         } else {
@@ -82,5 +92,5 @@ export function createActionScheduler(
     clearImmediate(scheduledAction)
   }
 
-  return { scheduleNextAction, broadcastCheckpointProgress, dealHands, stop }
+  return { scheduleNextAction, broadcastCheckpointProgress, announceWinner, dealHands, stop }
 }
