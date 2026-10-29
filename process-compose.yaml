@@ -21,6 +21,12 @@ processes:
       mailpit:
         condition: process_started
 
+  seed-kratos-identities:
+    command: "kratos import identities infra/kratos/fixtures/dev-users.json -e http://127.0.0.1:4434"
+    depends_on:
+      kratos:
+        condition: process_started
+
   reset-hydra-db:
     command: "rm -rf hydra/data && mkdir -p hydra/data"
 
