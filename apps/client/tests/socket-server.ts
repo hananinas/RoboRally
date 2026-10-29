@@ -254,7 +254,7 @@ io.on('connection', (socket) => {
     assignment: { gameId: GAME_ID, playerId: PLAYER_ID, robotId: ROBOT_ID },
     state: fixture.state, hand: fixture.cards, programSubmitted: fixture.programSubmitted,
   })
-  const lobbyState = (): LobbyState => ({ lobbyId: GAME_ID, name: 'Lobby 1', ownerUserId: user!.userId, playerCount: 1, maxPlayers: 6 })
+  const lobbyState = (): LobbyState => ({ lobbyId: GAME_ID, name: 'Lobby 1', ownerUserId: user!.userId, playerCount: 1, maxPlayers: 6, players: [user!] })
   socket.on('session.get', (_, acknowledge) => {
     fixture.entryRequests.push({ event: 'session.get', socketId: socket.id, payload: {} })
     if (!user) return acknowledge({ outcome: 'LOGIN_REQUIRED' })

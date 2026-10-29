@@ -761,12 +761,22 @@ components:
     LobbyState:
       type: object
       additionalProperties: false
+      examples:
+        - lobbyId: 00000000-0000-4000-8000-000000000001
+          name: Lobby 1
+          playerCount: 1
+          maxPlayers: 6
+          ownerUserId: 00000000-0000-4000-8000-000000000004
+          players:
+            - userId: 00000000-0000-4000-8000-000000000004
+              username: Dane
       required:
         - lobbyId
         - name
         - playerCount
         - maxPlayers
         - ownerUserId
+        - players
       properties:
         lobbyId:
           type: string
@@ -782,6 +792,12 @@ components:
         ownerUserId:
           type: string
           format: uuid
+        players:
+          type: array
+          description: Members in join order, with unique userIds. Length equals playerCount; ownerUserId identifies the first member.
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/User'
     LobbyFailure:
       type: object
       additionalProperties: false
@@ -891,6 +907,7 @@ components:
     LobbyUpdated:
       type: object
       additionalProperties: false
+      description: Full lobby snapshot sent to existing members after a join and to remaining members after a leave or disconnect.
       required:
         - lobby
       properties:

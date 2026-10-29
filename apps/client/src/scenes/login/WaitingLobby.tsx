@@ -6,6 +6,17 @@ export default function WaitingLobby({ lobby, userId, disabled, onStart, onLeave
   return <>
     <h2>{lobby.name}</h2>
     <p>{owner ? 'Waiting for players.' : 'Waiting for the owner to start.'}</p>
+    <div aria-live="polite" aria-atomic="true">
+      <p className="waiting-lobby__heading"><span>Players</span><span>{lobby.playerCount}/{lobby.maxPlayers} connected</span></p>
+      <ul className="waiting-lobby__players" aria-label="Connected players">
+        {lobby.players.map((player) => (
+          <li key={player.userId}>
+            <span>{player.username}</span>
+            <span>{[player.userId === userId ? 'You' : '', player.userId === lobby.ownerUserId ? 'Owner' : ''].filter(Boolean).join(' · ')}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
     {owner && <button className="login-primary-button" type="button" disabled={disabled} onClick={onStart}>Start</button>}
     <button className="login-secondary-button" type="button" disabled={disabled} onClick={onLeave}>Leave lobby</button>
   </>

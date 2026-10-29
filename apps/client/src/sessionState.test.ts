@@ -29,7 +29,7 @@ const joined: GameInitialization = {
   programSubmitted: false,
 }
 
-const lobby = { lobbyId: 'lobby-1', name: 'Lobby One', ownerUserId: user.userId, playerCount: 1, maxPlayers: 6 }
+const lobby = { lobbyId: 'lobby-1', name: 'Lobby One', ownerUserId: user.userId, playerCount: 1, maxPlayers: 6, players: [user] }
 const browsing: SessionState = { status: 'browsing', user, error: null }
 const waiting: SessionState = { status: 'waiting', user, lobby, error: null }
 
