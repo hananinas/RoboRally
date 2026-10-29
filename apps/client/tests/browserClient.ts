@@ -6,20 +6,26 @@ export function gameStatus(page: Page) {
   return page.getByRole('complementary', { name: 'Game controls' }).getByRole('status')
 }
 
-export async function browse(page: Page, username: string) {
+async function authenticate(page: Page, username: string) {
   await page.goto('/')
-  await page.getByRole('textbox', { name: 'Username' }).fill(username)
-  await page.getByRole('button', { name: 'Log in', exact: true }).click()
+  await page.locator('input[name="identifier"]').fill(username)
+  await page.locator('input[name="password"]').fill(username)
+  await page.getByRole('button', { name: 'Sign in with password' }).click()
+}
+export async function browse(page: Page, username: string) {
+  await authenticate(page, username)
   await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeVisible()
 }
 export async function login(page: Page, username: string) {
-  await page.goto('/')
-  await page.getByRole('textbox', { name: 'Username' }).fill(username)
-  await page.getByRole('button', { name: 'Log in', exact: true }).click()
+  await authenticate(page, username)
   // Returning game members are discovered automatically after login.
   await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
 }
-export async function startTogether(owner: Page, other: Page, ownerName = 'A', otherName = 'B') {
+export async function reconnect(page: Page) {
+  await page.reload()
+  await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
+}
+export async function startTogether(owner: Page, other: Page, ownerName = 'bence', otherName = 'dane') {
   await browse(owner, ownerName)
   await owner.getByRole('button', { name: 'Create lobby', exact: true }).click()
   await browse(other, otherName)

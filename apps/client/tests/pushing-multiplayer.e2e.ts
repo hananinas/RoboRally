@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import type { Page } from '@playwright/test'
 import { expect, test } from './real-game-fixture.ts'
-import { browse, login, robotIds } from './browserClient.ts'
+import { browse, reconnect, robotIds } from './browserClient.ts'
 
 async function program(page: Page, cards: readonly string[]) {
   const hand = page.getByRole('region', { name: 'Programming hand' })
@@ -40,9 +40,10 @@ for (const scenario of scenarios) {
       const contexts = await Promise.all([0, 1].map(() => browser.newContext({ baseURL, reducedMotion: 'reduce' })))
       try {
         const pages = [page, ...await Promise.all(contexts.map((context) => context.newPage()))]
+        const playerNames = ['bence', 'dane', 'abid']
         for (const [index, client] of pages.entries()) {
           await client.clock.install()
-          await browse(client, `Push player ${index + 1}`)
+          await browse(client, playerNames[index])
           if (index === 0) await client.getByRole('button', { name: 'Create lobby', exact: true }).click()
           else {
             await client.getByRole('list', { name: 'Lobbies' }).getByRole('button', { disabled: false }).first().click()
@@ -80,7 +81,7 @@ for (const scenario of scenarios) {
           await expect(client.getByRole('region', { name: 'Programming hand' }).getByRole('button').first()).toBeEnabled()
         }
 
-        await login(page, 'Push player 1')
+        await reconnect(page)
         await expectRobots(page, ids, scenario.final, [90, 90, 90])
         await expect(page.getByRole('status')).toHaveText('Programming')
       } finally {
