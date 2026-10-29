@@ -842,6 +842,41 @@ describe('checkpoint progress', () => {
     expect(gameStateReducer(state, { type: 'reset' }).checkpointCount).toBe(0)
   })
 })
+describe('winning', () => {
+  const won = { gameId: publicState.gameId, playerId: result.assignment.playerId }
+
+  it('records the winner from its own game and disables programming', () => {
+    const state = gameStateReducer(programmingState(), { type: 'won', payload: won })
+    expect(state.winner).toBe(won.playerId)
+    expect(canProgram(state)).toBe(false)
+    expect(gameStateReducer(state, { type: 'place', cardId: cards[0].id, registerIndex: 0 })).toBe(state)
+  })
+
+  it('ignores other games and a second announcement', () => {
+    const state = programmingState()
+    expect(gameStateReducer(state, { type: 'won', payload: { ...won, gameId: 'another-game' } })).toBe(state)
+    const first = gameStateReducer(state, { type: 'won', payload: won })
+    const other = { ...won, playerId: publicState.players[1].playerId }
+    expect(gameStateReducer(first, { type: 'won', payload: other })).toBe(first)
+  })
+
+  it('keeps queued playback running after the announcement', () => {
+    let state = selectProgram()
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, { type: 'won', payload: won })
+    expect(state.winner).toBe(won.playerId)
+    expect(state.playback.active).toEqual(actions[0])
+  })
+
+  it('restores the winner from a join snapshot', () => {
+    const state = gameStateReducer(createClientGameState(), {
+      type: 'joined', result: { ...result, state: { ...publicState, winner: won.playerId } },
+    })
+    expect(state.winner).toBe(won.playerId)
+    expect(canProgram(state)).toBe(false)
+    expect(gameStateReducer(state, { type: 'reset' }).winner).toBeNull()
+  })
+})
 
 describe('membership updates', () => {
   it('applies pushed results for a surviving robot when the acting robot is no longer present', () => {

@@ -3,6 +3,7 @@ import type {
   CardsDealt,
   GamePhase,
   GameInitialization,
+  GameWon,
   PlayerAssignment,
   PlayerConnectionChanged,
   PlayerCheckpointProgress,
@@ -50,6 +51,7 @@ export type ClientGameState = {
   pendingHand: CardsDealt | null
   submission: 'idle' | 'pending' | 'accepted' | 'uncertain'
   aborted: boolean
+  winner: PlayerId | null
   error: string | null
 }
 
@@ -62,6 +64,7 @@ export type GameStateEvent =
   | { type: 'reconnected' }
   | { type: 'connect-error'; message: string }
   | { type: 'aborted' }
+  | { type: 'won'; payload: GameWon }
   | { type: 'dealt'; hand: CardsDealt }
   | { type: 'reset' }
   | { type: 'error'; message: string }
@@ -110,6 +113,7 @@ export function createClientGameState(): ClientGameState {
     pendingHand: null,
     submission: 'idle',
     aborted: false,
+    winner:null,
     error: null,
   }
 }
@@ -118,6 +122,7 @@ export function canProgram(state: ClientGameState): boolean {
   return state.connected &&
     !state.paused &&
     !state.aborted &&
+    state.winner === null&&
     state.assignment !== null &&
     state.phase === 'PROGRAMMING' &&
     state.handReady &&
@@ -223,6 +228,10 @@ export function gameStateReducer(
         aborted: true,
         error: 'This game has encountered an error and cannot continue.',
       }
+    case 'won':
+      if (event.payload.gameId !== state.assignment?.gameId || state.winner !== null) return state
+      return { ...state, winner: event.payload.playerId }
+
     case 'reset':
       return createClientGameState()
     case 'joined': {
@@ -239,6 +248,7 @@ export function gameStateReducer(
         phase: snapshot.phase,
         paused: snapshot.paused,
         aborted: snapshot.aborted,
+        winner: snapshot.winner,
         error: snapshot.aborted ? 'This game has encountered an error and cannot continue.' : null,
         checkpointCount: snapshot.checkpointCount,
         players: snapshot.players.map((player) => ({
