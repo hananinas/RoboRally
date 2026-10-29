@@ -848,6 +848,7 @@ describe('winning', () => {
   it('records the winner from its own game and disables programming', () => {
     const state = gameStateReducer(programmingState(), { type: 'won', payload: won })
     expect(state.winner).toBe(won.playerId)
+    expect(state.winnerName).toBe('First')
     expect(canProgram(state)).toBe(false)
     expect(gameStateReducer(state, { type: 'place', cardId: cards[0].id, registerIndex: 0 })).toBe(state)
   })
@@ -868,11 +869,21 @@ describe('winning', () => {
     expect(state.playback.active).toEqual(actions[0])
   })
 
+  it("keeps the winner's name after the winner leaves", () => {
+    const state = gameStateReducer(programmingState(), { type: 'won', payload: won })
+    const departed = gameStateReducer(state, { type: 'player-left', payload: {
+      gameId: won.gameId, playerId: won.playerId, robotId,
+    } })
+    expect(departed.players.some((player) => player.playerId === won.playerId)).toBe(false)
+    expect(departed.winnerName).toBe('First')
+  })
+
   it('restores the winner from a join snapshot', () => {
     const state = gameStateReducer(createClientGameState(), {
       type: 'joined', result: { ...result, state: { ...publicState, winner: won.playerId } },
     })
     expect(state.winner).toBe(won.playerId)
+    expect(state.winnerName).toBe('First')
     expect(canProgram(state)).toBe(false)
     expect(gameStateReducer(state, { type: 'reset' }).winner).toBeNull()
   })

@@ -52,6 +52,7 @@ export type ClientGameState = {
   submission: 'idle' | 'pending' | 'accepted' | 'uncertain'
   aborted: boolean
   winner: PlayerId | null
+  winnerName: string | null
   error: string | null
 }
 
@@ -114,6 +115,7 @@ export function createClientGameState(): ClientGameState {
     submission: 'idle',
     aborted: false,
     winner:null,
+    winnerName: null,
     error: null,
   }
 }
@@ -122,7 +124,7 @@ export function canProgram(state: ClientGameState): boolean {
   return state.connected &&
     !state.paused &&
     !state.aborted &&
-    state.winner === null&&
+    state.winner === null &&
     state.assignment !== null &&
     state.phase === 'PROGRAMMING' &&
     state.handReady &&
@@ -168,6 +170,10 @@ function activateHand(state: ClientGameState): ClientGameState {
     submission: 'idle',
     error: state.connected ? null : state.error,
   }
+}
+
+function usernameOf(players: readonly { playerId: PlayerId; username: string }[], playerId: PlayerId | null): string | null {
+  return players.find((player) => player.playerId === playerId)?.username ?? null
 }
 
 export function gameStateReducer(
@@ -230,7 +236,11 @@ export function gameStateReducer(
       }
     case 'won':
       if (event.payload.gameId !== state.assignment?.gameId || state.winner !== null) return state
-      return { ...state, winner: event.payload.playerId }
+        return {
+        ...state,
+        winner: event.payload.playerId,
+        winnerName: usernameOf(state.players, event.payload.playerId),
+      }
 
     case 'reset':
       return createClientGameState()
@@ -249,6 +259,7 @@ export function gameStateReducer(
         paused: snapshot.paused,
         aborted: snapshot.aborted,
         winner: snapshot.winner,
+        winnerName: usernameOf(snapshot.players, snapshot.winner),
         error: snapshot.aborted ? 'This game has encountered an error and cannot continue.' : null,
         checkpointCount: snapshot.checkpointCount,
         players: snapshot.players.map((player) => ({

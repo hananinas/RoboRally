@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from './real-game-fixture.ts'
-import { gameStatus, startTogether } from './browserClient.ts'
+import { gameStatus, robotIds, startTogether } from './browserClient.ts'
 
 test.use({ reducedMotion: 'reduce' })
 
@@ -44,10 +44,13 @@ test('announces the winner to every player and lets them leave', async ({ browse
     }
     await expect(page.getByRole('heading', { name: 'Checkpoints', exact: true }).locator('..')).toContainText('2/2')
 
-    for (const client of [other, page]) {
-      await client.getByRole('dialog', { name: 'Game over' }).getByRole('button', { name: 'Leave game', exact: true }).click()
-      await expect(client.getByRole('button', { name: 'Create lobby', exact: true })).toBeVisible()
-    }
+    // The winner leaves first; the other player must still see who won.
+    await page.getByRole('dialog', { name: 'Game over' }).getByRole('button', { name: 'Leave game', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeVisible()
+    await expect.poll(() => robotIds(other)).toHaveLength(1)
+    await expect(other.getByRole('dialog', { name: 'Game over' }).getByRole('heading')).toHaveText('Winner wins!')
+    await other.getByRole('dialog', { name: 'Game over' }).getByRole('button', { name: 'Leave game', exact: true }).click()
+    await expect(other.getByRole('button', { name: 'Create lobby', exact: true })).toBeVisible()
   } finally {
     await context.close()
   }
