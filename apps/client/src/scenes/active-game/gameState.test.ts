@@ -49,6 +49,7 @@ const publicState: PublicGameState = {
   paused: false,
   aborted: false,
   checkpointCount: 0,
+  winner: null,
   players: [
     { playerId: '50000000-0000-4000-8000-000000000001', lastCheckpoint: 0, username: 'First', connected: true, programSubmitted: false },
     { playerId: '50000000-0000-4000-8000-000000000002', lastCheckpoint: 0, username: 'Second', connected: true, programSubmitted: false },

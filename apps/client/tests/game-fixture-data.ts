@@ -26,6 +26,7 @@ export function createPublicState(): PublicGameState {
     paused: false,
     aborted: false,
     checkpointCount: 0,
+    winner: null,
     antenna: { x: 5, y: 0, angle: Math.PI / 2 },
     board: {
       width: 11,

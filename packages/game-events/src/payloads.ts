@@ -80,6 +80,7 @@ export type PublicGameState = Readonly<{
   players: readonly PlayerState[]
   paused: boolean
   aborted: boolean
+  winner : PlayerId | null
 }>
 
 export type PlayerState = Readonly<{

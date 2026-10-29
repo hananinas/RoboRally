@@ -81,6 +81,7 @@ export function presentPublicGameState(
     phase: phases[game.phase],
     paused: game.paused,
     aborted: game.aborted,
+    winner: game.winner ?? null,
   }
 }
 

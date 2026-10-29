@@ -24,6 +24,7 @@ const joined: GameInitialization = {
     paused: false,
     aborted: false,
     checkpointCount: 0,
+    winner: null,
   },
   hand: [],
   programSubmitted: false,
