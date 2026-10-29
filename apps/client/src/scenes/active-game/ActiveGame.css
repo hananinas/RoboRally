@@ -430,7 +430,7 @@
 }
 
 /* Disconnect overlay */
-.disconnect-overlay {
+.disconnect-overlay, .winner-overlay {
   position: absolute;
   inset: 0;
   z-index: 100;
@@ -440,7 +440,7 @@
   backdrop-filter: blur(6px);
 }
 
-.disconnect-popup {
+.disconnect-popup, .winner-popup {
   padding: 2rem;
   border-radius: 1rem;
   background: white;
@@ -448,7 +448,7 @@
   text-align: center;
 }
 
-.disconnect-popup h2 {
+.disconnect-popup h2, .winner-popup h2 {
   margin: 0;
 }
 
@@ -468,7 +468,7 @@
   }
 }
 
-.disconnect-popup button {
+.disconnect-popup button, .winner-popup button  {
   margin-top: 1.5rem;
 }
 
