@@ -106,22 +106,22 @@ export function createAuthApp({ oidcClient, sessionStore }: AuthAppDeps): Expres
   return app
 }
 
-function transactionCookie(name: string, value: string, maxAge: number): string {
+function cookie(name: string, value: string, path: string, maxAge: number): string {
   return stringifySetCookie(name, value, {
     httpOnly: true,
     sameSite: 'lax',
-    path: TRANSACTION_COOKIE_PATH,
+    secure: true,
+    path,
     maxAge,
   })
 }
 
+function transactionCookie(name: string, value: string, maxAge: number): string {
+  return cookie(name, value, TRANSACTION_COOKIE_PATH, maxAge)
+}
+
 function sessionCookie(value: string, maxAge: number): string {
-  return stringifySetCookie(SESSION_COOKIE_NAME, value, {
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/',
-    maxAge,
-  })
+  return cookie(SESSION_COOKIE_NAME, value, '/', maxAge)
 }
 
 const handleAuthRouteError: ErrorRequestHandler = (err, req, res, _next) => {
