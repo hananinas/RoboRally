@@ -30,7 +30,7 @@ test('announces the winner to every player and lets them leave', async ({ browse
     await program(other, otherProgram)
     for (const client of [page, other]) {
       await expect(gameStatus(client)).toHaveText('Programming', { timeout: 15000 })
-      await expect(client.locator('.winner-confetti')).toBeHidden()
+      
     }
 
     await program(page, rounds[1])
@@ -39,6 +39,7 @@ test('announces the winner to every player and lets them leave', async ({ browse
       const dialog = client.getByRole('dialog', { name: 'Game over' })
       await expect(dialog.getByRole('heading')).toHaveText(heading, { timeout: 15000 })
       await expect(gameStatus(client)).toHaveText('Game over')
+      await expect(client.locator('.winner-confetti')).toBeHidden()
       for (const card of await client.getByRole('region', { name: 'Programming hand' }).getByRole('button').all()) {
         await expect(card).toBeDisabled()
       }
