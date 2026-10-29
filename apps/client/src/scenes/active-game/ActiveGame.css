@@ -472,6 +472,58 @@
   margin-top: 1.5rem;
 }
 
+
+/* Winner celebration */
+.winner-popup {
+  position: relative;
+  z-index: 1;
+}
+
+.winner-popup__trophy {
+  font-size: 3.5rem;
+  line-height: 1;
+  margin-bottom: 0.75rem;
+  animation: winner-trophy-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes winner-trophy-pop {
+  from {
+    opacity: 0;
+    transform: scale(0) rotate(-20deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+.winner-confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.winner-confetti__piece {
+  position: absolute;
+  top: -1rem;
+  width: 0.6rem;
+  height: 1rem;
+  border-radius: 2px;
+  animation-name: winner-confetti-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: 3;
+}
+
+@keyframes winner-confetti-fall {
+  from {
+    transform: translateY(0) rotate(var(--confetti-spin));
+  }
+  to {
+    transform: translateY(110vh) rotate(calc(var(--confetti-spin) + 720deg));
+  }
+}
+
 /* Wide layout */
 @media (width > 30rem) {
   .game-hud {
@@ -545,5 +597,11 @@
 @media (prefers-reduced-motion: reduce) {
   .dragged-card {
     transition: none;
+  }
+  .winner-confetti {
+    display: none;
+  }
+  .winner-popup__trophy {
+    animation: none;
   }
 }

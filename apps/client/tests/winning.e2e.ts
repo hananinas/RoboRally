@@ -30,6 +30,7 @@ test('announces the winner to every player and lets them leave', async ({ browse
     await program(other, otherProgram)
     for (const client of [page, other]) {
       await expect(gameStatus(client)).toHaveText('Programming', { timeout: 15000 })
+      await expect(client.locator('.winner-confetti')).toBeHidden()
     }
 
     await program(page, rounds[1])
