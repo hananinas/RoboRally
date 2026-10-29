@@ -8,12 +8,14 @@ import type {
   User,
 } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
+import { parseCookie } from 'cookie'
 import type { Game } from '@/game/index'
 import { createUserRegistry } from '@/userRegistry'
 import { createDefaultGame } from '@/game/GameFactory'
 import { handleLogin } from '@/socket/handlers/authHandlers'
+import { SESSION_COOKIE_NAME, type Session, type SessionStore } from '@/auth/sessionStore'
 
-export type GameSocketData = { user?: User }
+export type GameSocketData = { user?: User; authSession?: Session }
 
 export type GameSocketServer = Server<
   ClientToServerEvents,
@@ -26,8 +28,25 @@ export type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents, {}, 
 
 export type GameSession = Readonly<{ gameId: string; game: Game }>
 
+function authenticateSocket(sessionStore: SessionStore, socket: GameSocket, next: (error?: Error) => void): void {
+  const cookies = parseCookie(socket.handshake.headers.cookie ?? '')
+  const sessionId = cookies[SESSION_COOKIE_NAME]
+  const authSession = sessionId ? sessionStore.get(sessionId) : undefined
+  if (!authSession) {
+    next(new Error('UNAUTHENTICATED'))
+    return
+  }
+  if (socket.recovered && socket.data.authSession?.sub !== authSession.sub) {
+    next(new Error('SESSION_MISMATCH'))
+    return
+  }
+  socket.data.authSession = authSession
+  next()
+}
+
 export function createGameSocketServer(
   httpServer: HttpServer,
+  sessionStore: SessionStore,
   createGame: () => GameSession = createDefaultGame,
 ): GameSocketServer {
   const io = new Server<
@@ -45,6 +64,8 @@ export function createGameSocketServer(
     io, createGame, games: new Map(), lobbies: new Map(), sessionsByUser: new Map(),
   }
   httpServer.once('close', () => { for (const ctx of context.games.values()) ctx.actionScheduler.stop() })
+
+  io.use((socket, next) => authenticateSocket(sessionStore, socket, next))
 
   io.use((socket, next) => validateRecoveredSession(context, socket, next))
 
