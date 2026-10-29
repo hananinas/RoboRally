@@ -12,6 +12,7 @@ export type {
   CardsDealt,
   Coordinate,
   GameAborted,
+  GameWon,
   GameId,
   GamePhase,
   LeaveGame,

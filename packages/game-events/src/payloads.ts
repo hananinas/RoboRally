@@ -93,6 +93,8 @@ export type PlayerState = Readonly<{
 export type PlayerLeft = Readonly<{ gameId: GameId; playerId: PlayerId; robotId: RobotId }>
 
 export type GameAborted = Readonly<{ gameId: GameId }>
+export type GameWon = Readonly<{ gameId: GameId; playerId: PlayerId }>
+
 export type PlayerCheckpointProgress = Readonly<{
   gameId: GameId
   playerId: PlayerId
@@ -122,6 +124,7 @@ export type ProgramResultOutcome =
   | 'INVALID_PROGRAM'
   | 'GAME_PAUSED'
   | 'GAME_ABORTED'
+  | 'GAME_FINISHED'
   | 'ALREADY_SUBMITTED'
   | 'WRONG_PHASE'
   | 'NOT_A_MEMBER'
