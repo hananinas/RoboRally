@@ -29,7 +29,7 @@ export function handleGetSession(
 }
 
 export function validateRecoveredSession(context: SessionContext, socket: GameSocket, next: (error?: Error) => void): void {
-  if (socket.recovered && socket.data.user) {
+  if (socket.recovered) {
     const ctx = currentGame(context, socket)
     const membership = ctx?.memberships.get(socket.data.user.userId)
     if (membership?.connectionId && membership.connectionId !== socket.id) {
@@ -57,9 +57,9 @@ export function handleLeaveGame(
 ): void {
   if (typeof acknowledge !== 'function') return
   const game = currentGame(context, socket)
-  if (!game) return acknowledge({ outcome: socket.data.user ? 'GAME_NOT_FOUND' : 'LOGIN_REQUIRED' })
+  if (!game) return acknowledge({ outcome: 'GAME_NOT_FOUND' })
   handleLeave(game, socket, payload, (result) => {
-    if (result.outcome === 'LEFT') context.sessionsByUser.delete(socket.data.user!.userId)
+    if (result.outcome === 'LEFT') context.sessionsByUser.delete(socket.data.user.userId)
     acknowledge(result)
   })
   if (game.memberships.size === 0) {

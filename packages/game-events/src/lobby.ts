@@ -14,7 +14,7 @@ export type LobbySummary = Readonly<{
 }>
 export type LobbyState = LobbySummary & Readonly<{ ownerUserId: string; players: readonly User[] }>
 export type LobbyFailure = Readonly<{
-  outcome: 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'INTERNAL_ERROR'
+  outcome: 'INVALID_REQUEST' | 'INTERNAL_ERROR'
     | 'LOBBY_NOT_FOUND' | 'NOT_LOBBY_MEMBER' | 'NOT_LOBBY_OWNER'
     | 'LOBBY_FULL' | 'USER_ALREADY_IN_SESSION'
 }>

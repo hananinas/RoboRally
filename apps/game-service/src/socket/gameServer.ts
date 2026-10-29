@@ -13,7 +13,7 @@ import type { Game } from '@/game/index'
 import { createDefaultGame } from '@/game/GameFactory'
 import { SESSION_COOKIE_NAME, type Session, type SessionStore } from '@/auth/sessionStore'
 
-export type GameSocketData = { user?: User; authSession?: Session }
+export type GameSocketData = { user: User; authSession: Session }
 
 export type GameSocketServer = Server<
   ClientToServerEvents,
