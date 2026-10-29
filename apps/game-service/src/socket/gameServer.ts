@@ -36,6 +36,10 @@ function authenticateSocket(sessionStore: SessionStore, socket: GameSocket, next
     next(new Error('UNAUTHENTICATED'))
     return
   }
+  if (socket.recovered && socket.data.authSession?.sub !== authSession.sub) {
+    next(new Error('SESSION_MISMATCH'))
+    return
+  }
   socket.data.authSession = authSession
   next()
 }

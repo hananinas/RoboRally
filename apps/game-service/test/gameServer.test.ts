@@ -179,6 +179,16 @@ describe('started game membership over Socket.IO', () => {
     expect((await rejected).message).toBe('USER_ALREADY_IN_GAME')
     expect((await getSnapshot(replacement)).state.paused).toBe(false)
   })
+  it('rejects recovery when the reconnecting cookie belongs to a different session', async () => {
+    const { members: [first] } = await startGame(['First', 'Second'])
+    await disconnect(first, true)
+    expect(shared.game.paused).toBe(true)
+    first.io.opts.extraHeaders = authCookieHeader(sessionStore, 'different-subject')
+    const rejected = new Promise<Error>((resolve) => first.once('connect_error', resolve))
+    first.connect()
+    expect((await rejected).message).toBe('SESSION_MISMATCH')
+    expect(shared.game.paused).toBe(true)
+  })
   it('keeps the game paused when a reconnect snapshot fails and permits retry', async () => {
     const { members: [first], initializations: [initial] } = await startGame(['First'])
     await disconnect(first)
