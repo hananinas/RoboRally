@@ -1,23 +1,49 @@
 import type { LobbyState } from '@robo-rally/game-events'
+import RobotPreview from './RobotPreview.tsx'
+import './WaitingLobby.css'
 
 type Props = { lobby: LobbyState; userId: string; disabled: boolean; onStart: () => void; onLeave: () => void }
+
 export default function WaitingLobby({ lobby, userId, disabled, onStart, onLeave }: Props) {
   const owner = lobby.ownerUserId === userId
-  return <>
-    <h2>{lobby.name}</h2>
-    <p>{owner ? 'Waiting for players.' : 'Waiting for the owner to start.'}</p>
-    <div aria-live="polite" aria-atomic="true">
-      <p className="waiting-lobby__heading"><span>Players</span><span>{lobby.playerCount}/{lobby.maxPlayers} connected</span></p>
-      <ul className="waiting-lobby__players" aria-label="Connected players">
-        {lobby.players.map((player) => (
-          <li key={player.userId}>
-            <span>{player.username}</span>
-            <span>{[player.userId === userId ? 'You' : '', player.userId === lobby.ownerUserId ? 'Owner' : ''].filter(Boolean).join(' · ')}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-    {owner && <button className="login-primary-button" type="button" disabled={disabled} onClick={onStart}>Start</button>}
-    <button className="login-secondary-button" type="button" disabled={disabled} onClick={onLeave}>Leave lobby</button>
-  </>
+  const emptySeats = Math.max(0, lobby.maxPlayers - lobby.players.length)
+
+  return (
+    <section className="waiting-lobby" aria-labelledby="waiting-lobby-title">
+      <h2 id="waiting-lobby-title">{lobby.name}</h2>
+      <p className="waiting-lobby__status">{owner ? 'Waiting for players.' : 'Waiting for the owner to start.'}</p>
+      <div aria-live="polite" aria-atomic="true">
+        <p className="waiting-lobby__heading"><span>Players</span><span>{lobby.playerCount}/{lobby.maxPlayers} connected</span></p>
+        <ul className="waiting-lobby__players" aria-label="Connected players">
+          {lobby.players.map((player) => {
+            const self = player.userId === userId
+            const playerIsOwner = player.userId === lobby.ownerUserId
+            return (
+              <li className={`waiting-lobby__seat${self ? ' waiting-lobby__seat--self' : ''}`} key={player.userId}>
+                <span className="waiting-lobby__portrait"><RobotPreview /></span>
+                <span className="waiting-lobby__name">{player.username}</span>
+                <span className="waiting-lobby__roles">
+                  {playerIsOwner && <span className="waiting-lobby__badge waiting-lobby__badge--owner">Owner</span>}
+                  {self && <span className="waiting-lobby__badge">You</span>}
+                  {!self && !playerIsOwner && <span className="waiting-lobby__joined">Joined</span>}
+                </span>
+              </li>
+            )
+          })}
+          {Array.from({ length: emptySeats }, (_, index) => (
+            <li className="waiting-lobby__seat waiting-lobby__seat--empty" key={`empty-${index}`}>
+              <span className="waiting-lobby__empty-icon" aria-hidden="true">+</span>
+              <span className="waiting-lobby__name">Waiting for player</span>
+              <span className="waiting-lobby__seat-number" aria-hidden="true">{String(lobby.players.length + index + 1).padStart(2, '0')}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="waiting-lobby__actions">
+        <button className="login-secondary-button" type="button" disabled={disabled} onClick={onLeave}>Leave lobby</button>
+        <button className="login-primary-button" type="button" disabled title="Ready status is coming soon.">Ready</button>
+      </div>
+      {owner && <button className="login-primary-button waiting-lobby__start" type="button" disabled={disabled} onClick={onStart}>Start</button>}
+    </section>
+  )
 }

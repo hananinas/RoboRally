@@ -235,26 +235,6 @@
   opacity: 0.5;
 }
 
-.waiting-lobby__heading,
-.waiting-lobby__players li {
-  display: flex;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.waiting-lobby__players {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 24px;
-}
-
-.waiting-lobby__players li {
-  padding: 10px 0;
-  border-bottom: 1px solid var(--entry-border);
-  overflow-wrap: anywhere;
-}
-
 .entry-layout {
   display: grid;
   gap: var(--entry-space-4);
