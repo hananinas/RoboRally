@@ -1,21 +1,22 @@
-import { useId } from 'react'
-import tankSprites from '../active-game/board/assets/tanks.hbls?raw'
+import type { CSSProperties } from 'react'
+import { placeholderPreview, type RobotPreviewDefinition } from './robotPreviews.ts'
 import './RobotPreview.css'
 
-type Props = { model?: 'placeholder' | 'tank' }
+type Props = { sprite?: RobotPreviewDefinition }
 
 /** Decorative preview only; model selection is separate feature work. */
-export default function RobotPreview({ model = 'placeholder' }: Props) {
-  const spriteId = useId()
-
+export default function RobotPreview({ sprite = placeholderPreview }: Props) {
   return (
-    <span className={`robot-preview robot-preview--${model}`} aria-hidden="true">
-      {model === 'tank' && (
-        <span hidden dangerouslySetInnerHTML={{ __html: tankSprites.replaceAll('id="testTank', `id="${spriteId}-testTank`) }} />
-      )}
-      {Array.from({ length: 5 }, (_, index) => model === 'tank'
-        ? <svg className="robot-preview__layer" viewBox="0 0 57 87" key={index}><use href={`#${spriteId}-testTank${index + 1}`} /></svg>
-        : <span className="robot-preview__layer" key={index} />)}
+    <span className="robot-preview" style={{ '--robot-preview-size': `${sprite.previewSize}px` } as CSSProperties} aria-hidden="true">
+      {sprite.layers.map((layer, index) => (
+        <svg
+          className="robot-preview__layer"
+          viewBox={sprite.viewBox}
+          style={{ '--layer': index } as CSSProperties}
+          key={index}
+          dangerouslySetInnerHTML={{ __html: layer }}
+        />
+      ))}
     </span>
   )
 }
