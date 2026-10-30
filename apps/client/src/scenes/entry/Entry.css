@@ -40,8 +40,26 @@
 }
 
 .entry-panel h1 {
-  margin: 0 0 24px;
+  margin: 0;
   font-size: 22px;
+}
+
+.entry-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.entry-panel__logout {
+  padding: 6px 12px;
+  border: 1px solid #4c5560;
+  border-radius: 9px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
 }
 
 .entry-validation {

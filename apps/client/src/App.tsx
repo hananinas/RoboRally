@@ -28,9 +28,11 @@ function App() {
     if (connection.status === 'unauthenticated') window.location.href = '/auth/login'
   }, [connection.status])
 
+  const logout = () => { window.location.href = '/auth/logout' }
+
   // Keep the existing game visible while session.get restores membership after reconnecting.
   if ((session.status === 'joined' || session.status === 'resyncing') && session.user && game.state.assignment) {
-    return <ActiveGame game={game} username={session.user.username} leaving={busy} onLeave={leaveSession} />
+    return <ActiveGame game={game} username={session.user.username} leaving={busy} onLeave={leaveSession} onLogout={logout} />
   }
 
   if (connection.status === 'unauthenticated') {
@@ -58,7 +60,7 @@ function App() {
       <button className="entry-secondary-button" type="button" disabled={busy || connection.status === 'connecting'} onClick={retrySession}>Retry</button>
     </>
   }
-  return <EntryScreen>
+  return <EntryScreen onLogout={session.user ? logout : undefined}>
     {error && (session.status === 'waiting' || session.status === 'resyncing' || session.status === 'sync-failed') &&
       <p role="alert" className="entry-validation entry-validation--error">{error}</p>}
     {content}
