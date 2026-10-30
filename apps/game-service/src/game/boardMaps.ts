@@ -23,6 +23,12 @@ export type WallSpec = Readonly<{
   directions: readonly Direction[]
 }>
 
+export type ConveyorSpec = Readonly<{
+  at: readonly [x: number, y: number]
+  sprite: string
+  direction: Direction
+}>
+
 export type MapSpec = BoardMap & Readonly<{
   width: number
   height: number
@@ -30,6 +36,7 @@ export type MapSpec = BoardMap & Readonly<{
   walls: readonly WallSpec[]
   checkpoints: readonly (readonly [x: number, y: number])[]
   pits?: readonly (readonly [x: number, y: number])[]
+  conveyors?: readonly ConveyorSpec[]
   rebootTile?: Position
 }>
 
