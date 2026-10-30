@@ -142,7 +142,7 @@ describe('Tile and Board layout', () => {
 describe('Board robot ownership', () => {
   const destinations: Record<TileKind, { tile: Tile; canOccupy: boolean }> = {
     EMPTY: { tile: new EmptyTile(), canOccupy: true },
-    PIT: { tile: new PitTile(), canOccupy: false, entryEffect: 'reboot' },
+    PIT: { tile: new PitTile(), canOccupy: false},
     CONVEYOR: { tile: new ConveyorTile('conveyor-1-straight', Direction.NORTH), canOccupy: true },
   }
 

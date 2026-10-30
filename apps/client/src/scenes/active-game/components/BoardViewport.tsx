@@ -23,8 +23,6 @@ import type {
 import useBoardInteraction from '../board/useBoardInteraction.ts'
 import CheckpointPiece from './CheckpointPiece.tsx'
 import '../board/BoardViewport.css'
-import conveyorSprites from '../board/assets/conveyors.hbls?raw'
-
 type BoardViewportProps = Readonly<{
   board: BoardRenderModel
   robots: readonly DisplayRobot[]

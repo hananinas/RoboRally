@@ -37,7 +37,7 @@ export type MapSpec = BoardMap & Readonly<{
   checkpoints: readonly (readonly [x: number, y: number])[]
   pits?: readonly (readonly [x: number, y: number])[]
   conveyors?: readonly ConveyorSpec[]
-  rebootTile?: Position
+  rebootTile: Position
 }>
 
 export const boardMaps = {

@@ -2,9 +2,6 @@ import type { Orientation } from '@robo-rally/game-events'
 import type { Antenna } from '@robo-rally/game-events'
 
 export type BoardPoint = Readonly<{ x: number; y: number }>
-
-export type BoardTileType = 'empty' | 'hole' | 'laser'
-export type BoardRecipeName = BoardTileType | 'pillar' | 'antenna'
 export type BoardWallSide = 'north' | 'east' | 'south' | 'west'
 export type BoardTileWalls = Readonly<Record<BoardWallSide, boolean>>
 
@@ -19,7 +16,7 @@ export type BoardTile =
     }>
 
 export type BoardTileType = BoardTile['tile']
-export type BoardRecipeName = BoardTileType | 'pillar'
+export type BoardRecipeName = BoardTileType | 'pillar' | 'antenna'
 
 
 export type BoardCell = BoardPoint &
