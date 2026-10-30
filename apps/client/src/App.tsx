@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
 import { useEffect } from 'react'
 import ActiveGame from './scenes/active-game/ActiveGame.tsx'
-import EntryScreen from './scenes/login/EntryScreen.tsx'
-import LobbyScreen from './scenes/login/LobbyScreen.tsx'
-import WaitingLobby from './scenes/login/WaitingLobby.tsx'
+import EntryScreen from './scenes/entry/EntryScreen.tsx'
+import LobbyScreen from './scenes/entry/LobbyScreen.tsx'
+import WaitingLobby from './scenes/entry/WaitingLobby.tsx'
 import { USER_ALREADY_IN_GAME_MESSAGE } from './scenes/active-game/gameState.ts'
 import useSessionConnection from './useSessionConnection.ts'
 
@@ -55,12 +55,12 @@ function App() {
   } else {
     content = <>
       <p>Restoring session…</p>
-      <button className="login-secondary-button" type="button" disabled={busy || connection.status === 'connecting'} onClick={retrySession}>Retry</button>
+      <button className="entry-secondary-button" type="button" disabled={busy || connection.status === 'connecting'} onClick={retrySession}>Retry</button>
     </>
   }
   return <EntryScreen>
     {error && (session.status === 'waiting' || session.status === 'resyncing' || session.status === 'sync-failed') &&
-      <p role="alert" className="login-validation login-validation--error">{error}</p>}
+      <p role="alert" className="entry-validation entry-validation--error">{error}</p>}
     {content}
   </EntryScreen>
 }

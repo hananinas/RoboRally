@@ -1,4 +1,4 @@
-.login {
+.entry {
   position: relative;
   isolation: isolate;
   display: flex;
@@ -12,7 +12,7 @@
   font-family: system-ui, sans-serif;
 }
 
-.login-board-background {
+.entry-board-background {
   position: fixed;
   pointer-events: none;
   inset: 0;
@@ -24,12 +24,12 @@
   padding: 10px;
 }
 
-.login-board-background div {
+.entry-board-background div {
   border-radius: 10px;
   background: #3a424c;
 }
 
-.login-panel {
+.entry-panel {
   margin-block: auto;
   width: min(100% - 48px, 420px);
   padding: 32px 28px;
@@ -39,23 +39,23 @@
   box-shadow: 0 20px 60px rgb(0 0 0 / 35%);
 }
 
-.login-panel h1 {
+.entry-panel h1 {
   margin: 0 0 24px;
   font-size: 22px;
 }
 
-.login-validation {
+.entry-validation {
   min-height: 18px;
   margin: 0 0 8px;
   color: #9aa4b0;
   font-size: 12px;
 }
 
-.login-validation--error {
+.entry-validation--error {
   color: #e8786e;
 }
 
-.login-primary-button {
+.entry-primary-button {
   width: 100%;
   margin-top: 6px;
   padding: 12px 0;
@@ -69,7 +69,7 @@
   cursor: pointer;
 }
 
-.login-primary-button:disabled {
+.entry-primary-button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
@@ -157,7 +157,7 @@
   cursor: default;
 }
 
-.lobby--message .login-validation {
+.lobby--message .entry-validation {
   margin: 0;
 }
 
@@ -187,7 +187,7 @@
   outline: 3px solid #fff;
   outline-offset: 2px;
 }
-.login-secondary-button {
+.entry-secondary-button {
   width: 100%;
   margin-top: 6px;
   padding: 12px 0;
@@ -201,7 +201,7 @@
   cursor: pointer;
 }
 
-.login-secondary-button:disabled {
+.entry-secondary-button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
