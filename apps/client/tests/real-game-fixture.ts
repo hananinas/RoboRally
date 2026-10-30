@@ -5,7 +5,7 @@ import { test as base } from '@playwright/test'
 export const GAME_SERVICE_URL = 'http://127.0.0.1:4176'
 
 export const test = base.extend<{ realGameService: void; gameServiceArgs: readonly string[] }>({
-  gameServiceArgs: [[fileURLToPath(new URL('../../game-service/dist/main.js', import.meta.url))], { option: true }],
+  gameServiceArgs: [[fileURLToPath(new URL('./real-game-server.mjs', import.meta.url))], { option: true }],
   realGameService: [async ({ request, gameServiceArgs }, runTest) => {
     const service = spawn(process.execPath, gameServiceArgs, {
       env: { ...process.env, PORT: '4176' },
