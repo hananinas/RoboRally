@@ -140,6 +140,9 @@ const ROBOT_COMPONENTS = [
   'testTank3',
   'testTank4',
   'testTank5',
+  'testTank6',
+  'testTank7',
+  'testTank8',
 ] as const
 
 function RobotPiece({
