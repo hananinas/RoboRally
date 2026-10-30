@@ -1,4 +1,5 @@
 import RobotPreview from './RobotPreview.tsx'
+import { tankPreview } from './robotPreviews.ts'
 import './RobotPicker.css'
 
 const PREVIEW_MODELS = ['Tank', 'Model 02', 'Model 03', 'Model 04'] as const
@@ -23,7 +24,7 @@ export default function RobotPicker() {
             </svg>
           </span>
         </div>
-        <RobotPreview model="tank" />
+        <RobotPreview sprite={tankPreview} />
       </div>
       <div className="robot-picker__carousel">
         <button className="robot-picker__arrow" type="button" disabled aria-label="Previous robot model" title="Robot selection is coming soon.">‹</button>
