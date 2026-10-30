@@ -8,6 +8,7 @@ import {
 } from '../board/boardConfig.ts'
 import { tileCentre } from '../board/boardMath.ts'
 import {
+  orientationAngle,
   ROBOT_MOVE_DURATION_MS,
   ROBOT_TURN_DURATION_MS,
   type DisplayRobot,
@@ -21,6 +22,7 @@ import type {
 import useBoardInteraction from '../board/useBoardInteraction.ts'
 import CheckpointPiece from './CheckpointPiece.tsx'
 import '../board/BoardViewport.css'
+import conveyorSprites from '../board/assets/conveyors.hbls?raw'
 
 type BoardViewportProps = Readonly<{
   board: BoardRenderModel
@@ -58,6 +60,10 @@ function pieceStyle(piece: BoardScenePiece): PieceStyle {
     top: piece.tileCentre.worldY,
     width: BOARD_CONFIG.tile * piece.component.width,
     zIndex: piece.slice.order ?? 0,
+    '--board-piece-angle':
+      piece.componentName === 'conveyor' && piece.cell.tile === 'conveyor'
+        ? `${orientationAngle[piece.cell.direction]}deg`
+        : '0deg',   
   }
 
   if (!piece.slice.wall) return style
@@ -214,7 +220,7 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
       >
         <div
           aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: `${laserSprites}${tankSprites}` }}
+          dangerouslySetInnerHTML={{ __html: `${laserSprites}${tankSprites}${conveyorSprites}` }}
         />
         {scene.planes.map((pieces, layer) => {
           const robotComponent = ROBOT_COMPONENTS[layer - 3]

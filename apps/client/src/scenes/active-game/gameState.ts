@@ -286,6 +286,12 @@ export function gameStateReducer(
           {
             hole: snapshot.board.tiles.filter((tile) => tile.type === 'PIT')
               .map((tile) => [tile.position.x, tile.position.y] as const),
+            conveyor: snapshot.board.tiles.flatMap((tile) => tile.type === 'CONVEYOR' ? [{
+              ...tile.position,
+              sprite: tile.sprite,
+              direction: tile.direction,
+            }] : []),
+            
             checkpoints: snapshot.board.tiles.flatMap((tile) => tile.checkpointNumber === undefined
               ? [] : [{ ...tile.position, checkpointNumber: tile.checkpointNumber }]),
             walls: snapshot.board.tiles.map((tile) => ({

@@ -97,9 +97,25 @@ export function createBoardScene(
               height,
               stackBaseLayer / config.parallaxReferenceLayer,
             )
+      
+      const baseComponent = components[slice.component]
+
+      const component: BoardVisualComponent =
+        slice.component === 'conveyor' &&
+        cell.tile === 'conveyor' &&
+        baseComponent.asset
+          ? {
+              ...baseComponent,
+              asset: {
+                ...baseComponent.asset,
+                symbol: cell.sprite,
+              },
+            }
+          : baseComponent
+
       planes[slice.layer].push({
         cell,
-        component: components[slice.component],
+        component,
         componentName: slice.component,
         height,
         key: `${cell.x},${cell.y},${slice.layer},${slice.component},${slice.wall ?? 'tile'},${sliceIndex}`,

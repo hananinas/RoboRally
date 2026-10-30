@@ -1,3 +1,4 @@
+import type { Orientation } from '@robo-rally/game-events'
 export type BoardPoint = Readonly<{ x: number; y: number }>
 
 export type BoardWallSide = 'north' | 'east' | 'south' | 'west'
@@ -10,7 +11,7 @@ export type BoardTile =
   | Readonly<{
       tile: 'conveyor'
       sprite: string
-      direction: BoardWallSide
+      direction: Orientation
     }>
 
 export type BoardTileType = BoardTile['tile']
@@ -113,7 +114,7 @@ type BoardAssignments = Readonly<{
   laser?: readonly (readonly [number, number])[]
   conveyor?: readonly (BoardPoint & Readonly<{
     sprite: string
-    direction: BoardWallSide
+    direction: Orientation
   }>)[]
   walls?: readonly BoardWallAssignment[]
   checkpoints?: readonly (BoardPoint & { checkpointNumber: number })[]
