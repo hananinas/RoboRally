@@ -5,6 +5,7 @@ import {
   BOARD_RECIPES,
 } from './boardConfig.ts'
 import { createBoardScene } from './boardScene.ts'
+import { createBoardRenderModel } from './boardModel.ts'
 import { DEMO_BOARD } from './demoBoard.ts'
 
 describe('createBoardScene', () => {
@@ -17,10 +18,24 @@ describe('createBoardScene', () => {
 
   it('groups every solid slice into a global paint plane', () => {
     expect(scene.planes).toHaveLength(14)
-    expect(scene.planes.flat()).toHaveLength(1318)
+    expect(scene.planes.flat()).toHaveLength(1325)
     expect(scene.planes[0]).toHaveLength(316)
     expect(scene.planes[13]).toHaveLength(1)
   })
+
+  it.each([0, Math.PI / 2, Math.PI, Math.PI * 1.25])(
+    'places the complete antenna at its configured coordinate and facing %s', (angle) => {
+      const board = createBoardRenderModel(4, 3, { antenna: { x: 1, y: 2, angle } })
+      const scene = createBoardScene(board, BOARD_CONFIG, BOARD_COMPONENTS, BOARD_RECIPES)
+      const pieces = scene.planes.flat().filter(({ cell }) => cell.x === 1 && cell.y === 2)
+      expect(pieces.map(({ componentName }) => componentName)).toEqual([
+        'ground', ...Array.from({ length: 10 }, (_, i) => `antenna${i + 1}`),
+      ])
+      expect(pieces.every((piece) => piece.angle === angle * 180 / Math.PI - 90)).toBe(true)
+      expect(pieces.slice(3).every((piece) => piece.liftHeight === 1.5)).toBe(true)
+      expect(scene.planes.flat().filter(({ componentName }) => componentName.startsWith('antenna'))).toHaveLength(10)
+    },
+  )
 
   it('keeps hole depths local to their apertures', () => {
     expect(scene.holes).toHaveLength(6)

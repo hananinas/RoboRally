@@ -217,3 +217,41 @@
   outline: 3px solid #fff;
   outline-offset: 2px;
 }
+.login-secondary-button {
+  width: 100%;
+  margin-top: 6px;
+  padding: 12px 0;
+  border: 1px solid #4c5560;
+  border-radius: 9px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.login-secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.waiting-lobby__heading,
+.waiting-lobby__players li {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.waiting-lobby__players {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px;
+}
+
+.waiting-lobby__players li {
+  padding: 10px 0;
+  border-bottom: 1px solid #4c5560;
+  overflow-wrap: anywhere;
+}

@@ -1,8 +1,8 @@
-{ pkgs, gameId ? "" }:
+{ pkgs }:
 
 let
   client = import ./client.nix {
-    inherit pkgs gameId;
+    inherit pkgs;
   };
 
   game-service = import ./game-service.nix {

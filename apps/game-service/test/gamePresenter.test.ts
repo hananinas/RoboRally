@@ -19,7 +19,6 @@ import {
 } from '@/game/index.ts'
 import {
   presentCardsDealt,
-  presentLobbyDetails,
   presentPublicGameState,
   presentRobotActionResolved,
 } from '@/socket/gamePresenter.ts'
@@ -32,6 +31,23 @@ function createGameWithPlayer() {
 }
 
 describe('game presenter', () => {
+  it('serializes pushed robot positions and orientations alongside the acting robot', () => {
+    const { player } = createGameWithPlayer()
+    const resolved = presentRobotActionResolved('game', {
+      registerIndex: 0,
+      action: { robotId: player.robot.id, card: player.hand[0], position: { x: Integer(2), y: Integer(3) }, direction: Direction.EAST },
+      pushedRobots: [
+        { robotId: 'pushed', position: { x: Integer(3), y: Integer(3) }, direction: Direction.NORTH },
+        { robotId: 'rebooted', position: { x: Integer(0), y: Integer(0) }, direction: Direction.WEST },
+      ],
+    })
+
+    expect(resolved.pushedRobots).toEqual([
+      { robotId: 'pushed', position: { coordinate: { x: 3, y: 3 }, orientation: 'NORTH' } },
+      { robotId: 'rebooted', position: { coordinate: { x: 0, y: 0 }, orientation: 'WEST' } },
+    ])
+  })
+
   it('keeps domain tile kinds exhaustively compatible with public tile types', () => {
     expectTypeOf<TileKind>().toEqualTypeOf<TilePayload['type']>()
   })
@@ -44,7 +60,7 @@ describe('game presenter', () => {
       new EmptyTile([Direction.SOUTH], 1),
     ]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
-    const game = new Game(board, [], cards, undefined, { x: Integer(0), y: Integer(0) })
+    const game = new Game(board, [], cards, { x: Integer(0), y: Integer(0) })
     const state = presentPublicGameState('game', game)
 
     expect(state.checkpointCount).toBe(1)
@@ -69,6 +85,7 @@ describe('game presenter', () => {
       robots: [
         {
           robotId: player.robot.id,
+          colour: player.robot.colour,
           playerId: player.id,
           position: {
             coordinate: { x: 10, y: 7 },
@@ -98,7 +115,7 @@ describe('game presenter', () => {
         new EmptyTile([Direction.NORTH, Direction.WEST], 1),
         new EmptyTile(),
       ],
-    ], { x: Integer(0), y: Integer(0), angle: Math.PI / 2 })
+    ], { x: Integer(1), y: Integer(0), angle: Math.PI / 2 })
     const robot = new Robot('robot', Direction.EAST)
     board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })
     const player = new Player('player', robot)
@@ -106,7 +123,7 @@ describe('game presenter', () => {
       { length: 5 },
       (_, index) => new Card(`card-${index}`, 'MOVE_1'),
     )
-    const game = new Game(board, [player], cards)
+    const game = new Game(board, [player], cards, { x: Integer(0), y: Integer(0) })
     game.submitProgram(player.id, cards.map((card) => card.id))
 
     const state = presentPublicGameState('game', game)
@@ -162,7 +179,7 @@ describe('game presenter', () => {
       direction: Direction.SOUTH,
     }
 
-    const resolved = presentRobotActionResolved('game', { registerIndex: 4, action })
+    const resolved = presentRobotActionResolved('game', { registerIndex: 4, action, pushedRobots: [] })
 
     expectTypeOf(resolved).toEqualTypeOf<RobotActionResolved>()
     expect(resolved).toEqual({
@@ -170,6 +187,7 @@ describe('game presenter', () => {
       registerIndex: 4,
       robotId: player.robot.id,
       instruction,
+      pushedRobots: [],
       position: {
         coordinate: { x: 4, y: 5 },
         orientation: 'SOUTH',
@@ -177,27 +195,4 @@ describe('game presenter', () => {
     })
   })
 
-  it.each([
-    ['empty-map', 'Empty Map'],
-    ['test-map', 'Test Map'],
-  ] as const)('presents lobby details for the %s board map', (mapName, mapLabel) => {
-    const { gameId, game } = createGame(mapName, 'Game with map')
-    const players = [
-      { playerId: '00000000-0000-4000-8000-000000000011', username: 'Malte' },
-      { playerId: '00000000-0000-4000-8000-000000000012', username: 'Abid' },
-    ]
-    const lobby = presentLobbyDetails(gameId, game, players)
-
-    expect(lobby).toEqual({
-      gameId,
-      name: game.name,
-      players,
-      map: {
-        name: mapLabel,
-        icon: expect.stringMatching(/^data:image\/svg\+xml;base64,/),
-        maxPlayers: 6,
-      },
-    })
-    expect(lobby.map.icon).toBe(game.board.map?.icon)
-  })
 })

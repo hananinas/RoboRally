@@ -1,6 +1,10 @@
 import type { Orientation } from '@robo-rally/game-events'
+import type { Antenna } from '@robo-rally/game-events'
+
 export type BoardPoint = Readonly<{ x: number; y: number }>
 
+export type BoardTileType = 'empty' | 'hole' | 'laser'
+export type BoardRecipeName = BoardTileType | 'pillar' | 'antenna'
 export type BoardWallSide = 'north' | 'east' | 'south' | 'west'
 export type BoardTileWalls = Readonly<Record<BoardWallSide, boolean>>
 
@@ -28,11 +32,13 @@ export type BoardCell = BoardPoint &
 export type BoardRenderModel = Readonly<{
   columns: number
   rows: number
+  antenna?: Antenna
   cells: readonly BoardCell[]
 }>
 
 export type BoardComponentName =
   | 'conveyor'
+  | `antenna${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10}`
   | 'ground'
   | 'laser1'
   | 'laser2'
@@ -110,6 +116,7 @@ export type BoardRenderConfig = Readonly<{
 
 type BoardWallAssignment = BoardPoint & Partial<BoardTileWalls>
 type BoardAssignments = Readonly<{
+  antenna?: Antenna
   hole?: readonly (readonly [number, number])[]
   laser?: readonly (readonly [number, number])[]
   conveyor?: readonly (BoardPoint & Readonly<{
@@ -168,6 +175,13 @@ export function createBoardRenderModel(
     return `${x},${y}`
   }
 
+  if (assignments.antenna) {
+    positionKey(assignments.antenna.x, assignments.antenna.y)
+    if (!Number.isFinite(assignments.antenna.angle)) {
+      throw new RangeError('Board antenna angle must be finite')
+    }
+  }
+
   const tiles = new Map<string, BoardTile>()
   for (const tile of ['hole', 'laser'] as const) {
     const positions = assignments[tile] ?? []
@@ -224,7 +238,10 @@ export function createBoardRenderModel(
     ).flat(),
   )
 
-  return Object.freeze({ columns, rows, cells })
+  return Object.freeze({
+    columns, rows, cells,
+    ...(assignments.antenna ? { antenna: Object.freeze({ ...assignments.antenna }) } : {}),
+  })
 }
 
 export function validateBoardRendering(

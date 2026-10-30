@@ -48,6 +48,7 @@ export const boardMaps = {
     width: 21,
     height: 15,
     antenna: { x: Integer(10), y: Integer(0), angle: Math.PI / 2 },
+    rebootTile: { x: Integer(10), y: Integer(7) },
     walls: [],
     checkpoints: [[10, 6], [8, 9]],
   },

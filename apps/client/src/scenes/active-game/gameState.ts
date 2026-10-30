@@ -2,12 +2,11 @@ import type {
   Card,
   CardsDealt,
   GamePhase,
-  JoinResult,
+  GameInitialization,
   PlayerAssignment,
   PlayerConnectionChanged,
   PlayerCheckpointProgress,
   PlayerId,
-  PlayerJoined,
   PlayerLeft,
   ProgramResult,
   RobotActionResolved,
@@ -55,8 +54,7 @@ export type ClientGameState = {
 }
 
 export type GameStateEvent =
-  | { type: 'joined'; result: Extract<JoinResult, { outcome: 'JOINED' }> }
-  | { type: 'player-joined'; payload: PlayerJoined }
+  | { type: 'joined'; result: GameInitialization }
   | { type: 'player-left'; payload: PlayerLeft }
   | { type: 'player-connection-changed'; payload: PlayerConnectionChanged }
   | { type: 'checkpoint-progress'; payload: PlayerCheckpointProgress }
@@ -71,6 +69,7 @@ export type GameStateEvent =
   | { type: 'complete' }
   | { type: 'place'; cardId: string; registerIndex: number }
   | { type: 'remove'; registerIndex: number }
+  | { type: 'move'; fromIndex: number; toIndex: number }
   | { type: 'clear' }
   | { type: 'undo' }
   | { type: 'redo' }
@@ -86,23 +85,6 @@ const connectErrors: Record<string, string> = {
 }
 
 export const REGISTER_COUNT = 5
-
-const ROBOT_COLOURS = [
-  '#c74f4f', // 1. Red
-  '#4D8DEB', // 2. Blue
-  '#4CAF70', // 3. Green
-  '#E5C04D', // 4. Yellow
-  '#A66BE0', // 5. Purple
-  '#E58B4D', // 6. Orange
-  '#4DC9C0', // 7. Cyan
-  '#E56FA8', // 8. Pink
-  '#8B6548', // 9. Brown
-  '#A0A0A0', // 10. Grey
-]
-
-function getRobotColour(index: number): string {
-  return ROBOT_COLOURS[index % ROBOT_COLOURS.length]
-}
 
 function emptyRegisters(): Registers {
   return Array.from({ length: REGISTER_COUNT }, () => null)
@@ -190,20 +172,6 @@ export function gameStateReducer(
   switch (event.type) {
     case 'error':
       return { ...state, error: event.message }
-    case 'player-joined': {
-      const { gameId, player, robot } = event.payload
-      if (gameId !== state.assignment?.gameId || player.playerId !== robot.playerId ||
-          state.players.some((candidate) => candidate.playerId === player.playerId)) return state
-      const colour = getRobotColour(state.players.length)
-      return {
-        ...state,
-        players: [...state.players, {
-          playerId: player.playerId, username: player.username, connected: player.connected,
-          lastCheckpoint: player.lastCheckpoint,
-        }],
-        playback: robotPlaybackReducer(state.playback, { type: 'add', robot: { ...robot, colour: colour } }),
-      }
-    }
     case 'player-left': {
       const { gameId, playerId, robotId } = event.payload
       if (gameId !== state.assignment?.gameId ||
@@ -278,12 +246,13 @@ export function gameStateReducer(
           lastCheckpoint: player.lastCheckpoint,
         })),
         playback: createRobotPlaybackState(
-          snapshot.robots.map((robot,index) => ({ ...robot, colour: getRobotColour(index) })),
+          snapshot.robots,
         ),
         board: createBoardRenderModel(
           snapshot.board.width,
           snapshot.board.height,
           {
+            antenna: snapshot.antenna,
             hole: snapshot.board.tiles.filter((tile) => tile.type === 'PIT')
               .map((tile) => [tile.position.x, tile.position.y] as const),
             conveyor: snapshot.board.tiles.flatMap((tile) => tile.type === 'CONVEYOR' ? [{
@@ -318,7 +287,8 @@ export function gameStateReducer(
     }
     case 'action':
       if (event.action.gameId !== state.assignment?.gameId ||
-        !state.playback.robots.some((robot) => robot.robotId === event.action.robotId)) return state
+        !state.playback.robots.some((robot) => robot.robotId === event.action.robotId ||
+          event.action.pushedRobots.some((pushed) => pushed.robotId === robot.robotId))) return state
       return {
         ...state,
         phase: 'EXECUTING',
@@ -354,6 +324,16 @@ export function gameStateReducer(
     case 'remove': {
       if (!canProgram(state)) return state
       const registers = removeCard(state.registers, event.registerIndex)
+      return registers === state.registers ? state : {
+        ...state,
+        registers,
+        registersPast: [...state.registersPast, state.registers],
+        registersFuture: [],
+      }
+    }
+    case 'move': {
+      if (!canProgram(state)) return state
+      const registers = moveCard(state.registers, event.fromIndex, event.toIndex)
       return registers === state.registers ? state : {
         ...state,
         registers,
@@ -466,6 +446,27 @@ export function removeCard(
   return registers.map((registeredCard, index) =>
     index === registerIndex ? null : registeredCard,
   )
+}
+export function moveCard(
+  registers: Registers,
+  fromIndex: number,
+  toIndex: number,
+): Registers {
+  const isRegister = (index: number) =>
+    Number.isInteger(index) && index >= 0 && index < registers.length
+  const cannotMove =
+    !isRegister(fromIndex) ||
+    !isRegister(toIndex) ||
+    fromIndex === toIndex ||
+    registers[fromIndex] === null
+
+  if (cannotMove) return registers
+
+  return registers.map((registeredCard, index) => {
+    if (index === fromIndex) return registers[toIndex]
+    if (index === toIndex) return registers[fromIndex]
+    return registeredCard
+  })
 }
 
 // Checks whether every register is filled.

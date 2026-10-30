@@ -1,6 +1,6 @@
 import type {
   Card,
-  JoinResult,
+  GameInitialization,
   ProgramCardIds,
   PublicGameState,
   RobotActionResolved,
@@ -11,6 +11,7 @@ import {
   createClientGameState,
   createSubmission,
   gameStateReducer,
+  moveCard,
   placeCard,
   REGISTER_COUNT,
   removeCard,
@@ -64,26 +65,28 @@ const publicState: PublicGameState = {
   robots: [
     {
       robotId,
+      colour: '#A66BE0',
       playerId: '50000000-0000-4000-8000-000000000001',
       position: { coordinate: { x: 2, y: 3 }, orientation: 'NORTH' },
     },
     {
       robotId: stationaryRobotId,
+      colour: '#4DC9C0',
       playerId: '50000000-0000-4000-8000-000000000002',
       position: { coordinate: { x: 4, y: 4 }, orientation: 'EAST' },
     },
   ],
 }
 const actions: readonly RobotActionResolved[] = [
-  { gameId: publicState.gameId, registerIndex: 0, robotId, instruction: 'MOVE_1', position: { coordinate: { x: 2, y: 2 }, orientation: 'NORTH' } },
-  { gameId: publicState.gameId, registerIndex: 1, robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 2, y: 2 }, orientation: 'WEST' } },
-  { gameId: publicState.gameId, registerIndex: 2, robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 2 }, orientation: 'WEST' } },
-  { gameId: publicState.gameId, registerIndex: 3, robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 1, y: 2 }, orientation: 'SOUTH' } },
-  { gameId: publicState.gameId, registerIndex: 4, robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 3 }, orientation: 'SOUTH' } },
+  { gameId: publicState.gameId, registerIndex: 0, pushedRobots: [], robotId, instruction: 'MOVE_1', position: { coordinate: { x: 2, y: 2 }, orientation: 'NORTH' } },
+  { gameId: publicState.gameId, registerIndex: 1, pushedRobots: [], robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 2, y: 2 }, orientation: 'WEST' } },
+  { gameId: publicState.gameId, registerIndex: 2, pushedRobots: [], robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 2 }, orientation: 'WEST' } },
+  { gameId: publicState.gameId, registerIndex: 3, pushedRobots: [], robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 1, y: 2 }, orientation: 'SOUTH' } },
+  { gameId: publicState.gameId, registerIndex: 4, pushedRobots: [], robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 3 }, orientation: 'SOUTH' } },
 ]
 const hand = { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, cards }
 
-const result: Extract<JoinResult, { outcome: 'JOINED' }> = {
+const result: GameInitialization = {
   outcome: 'JOINED',
   assignment: { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, robotId },
   state: publicState,
@@ -98,6 +101,7 @@ function programmingState(): ClientGameState {
 describe('join initialization', () => {
   it('initializes assignment, board and hand together and accepts subsequent events', () => {
     const state = gameStateReducer(createClientGameState(), { type: 'joined', result })
+    expect(state.board?.antenna).toEqual(publicState.antenna)
     expect(state.assignment).toEqual(result.assignment)
     expect(state.board).not.toBeNull()
     expect(state.hand).toEqual(cards)
@@ -184,6 +188,41 @@ describe('removeCard', () => {
     expect(removeCard(emptyRegisters, -1)).toBe(emptyRegisters)
     expect(removeCard(emptyRegisters, REGISTER_COUNT)).toBe(emptyRegisters)
     expect(removeCard(emptyRegisters, 1.5)).toBe(emptyRegisters)
+  })
+})
+describe('moveCard', () => {
+  const firstAndLast: Registers = [firstCard, null, null, null, secondCard]
+
+  it('swaps two cards without changing the original registers', () => {
+    const result = moveCard(firstAndLast, 0, 4)
+
+    expect(result).toEqual([secondCard, null, null, null, firstCard])
+    expect(result).not.toBe(firstAndLast)
+    expect(firstAndLast[0]).toBe(firstCard)
+  })
+
+  it('moves a card into an empty register', () => {
+    expect(moveCard(firstAndLast, 0, 2)).toEqual([null, null, firstCard, null, secondCard])
+  })
+
+  it('preserves the registers when no card can be moved', () => {
+    expect(moveCard(firstAndLast, 0, 0)).toBe(firstAndLast)
+    expect(moveCard(firstAndLast, 1, 4)).toBe(firstAndLast)
+    expect(moveCard(firstAndLast, -1, 4)).toBe(firstAndLast)
+    expect(moveCard(firstAndLast, 0, REGISTER_COUNT)).toBe(firstAndLast)
+    expect(moveCard(firstAndLast, 0, 1.5)).toBe(firstAndLast)
+  })
+
+  it('swaps through the reducer, and the swap can be undone', () => {
+    let state = programmingState()
+    state = gameStateReducer(state, { type: 'place', cardId: firstCard.id, registerIndex: 0 })
+    state = gameStateReducer(state, { type: 'place', cardId: secondCard.id, registerIndex: 4 })
+
+    const swapped = gameStateReducer(state, { type: 'move', fromIndex: 0, toIndex: 4 })
+    expect(swapped.registers[0]).toBe(secondCard)
+    expect(swapped.registers[4]).toBe(firstCard)
+
+    expect(gameStateReducer(swapped, { type: 'undo' }).registers).toEqual(state.registers)
   })
 })
 
@@ -804,32 +843,49 @@ describe('checkpoint progress', () => {
 })
 
 describe('membership updates', () => {
-  const newcomer = {
-    gameId: publicState.gameId,
-    player: { playerId: 'new-player', lastCheckpoint: 0, username: 'New', connected: true, programSubmitted: false },
-    robot: { robotId: 'new-robot', playerId: 'new-player', position: { coordinate: { x: 1, y: 3 }, orientation: 'NORTH' as const } },
-  }
+  it('applies pushed results for a surviving robot when the acting robot is no longer present', () => {
+    const position = { coordinate: { x: 3, y: 4 }, orientation: 'EAST' as const }
+    const action = {
+      ...actions[0], robotId: 'departed-robot', pushedRobots: [{ robotId: stationaryRobotId, position }],
+    }
+    const state = gameStateReducer(programmingState(), { type: 'action', action })
 
-  it('adds a joined robot while preserving playback and ignoring duplicate or unrelated joins', () => {
-    let state = programmingState()
-    state = gameStateReducer(state, { type: 'action', action: actions[0] })
-    const updated = gameStateReducer(state, { type: 'player-joined', payload: newcomer })
-    expect(updated.players.map((player) => player.playerId)).toContain('new-player')
-    expect(updated.players.at(-1)?.lastCheckpoint).toBe(0)
-    expect(updated.playback.robots.at(-1)?.robotId).toBe('new-robot')
-    expect(updated.playback.active).toBe(state.playback.active)
-    expect(gameStateReducer(updated, { type: 'player-joined', payload: newcomer })).toBe(updated)
-    expect(gameStateReducer(state, { type: 'player-joined', payload: { ...newcomer, gameId: 'other' } })).toBe(state)
+    expect(state.playback.active).toBe(action)
+    expect(state.playback.robots.find((robot) => robot.robotId === stationaryRobotId)?.position).toEqual(position)
+    expect(state.playback.robots.some((robot) => robot.robotId === 'departed-robot')).toBe(false)
+  })
+
+  it('uses server colours across reordered snapshots and departures, including a fresh reconnect', () => {
+    const colours = (state: ClientGameState) => Object.fromEntries(
+      state.playback.robots.map((robot) => [robot.robotId, robot.colour]),
+    )
+    const initial = programmingState()
+    expect(colours(initial)).toEqual({ [robotId]: '#A66BE0', [stationaryRobotId]: '#4DC9C0' })
+    const reordered = gameStateReducer(initial, { type: 'joined', result: {
+      ...result, state: { ...publicState, robots: [...publicState.robots].reverse() },
+    } })
+    expect(colours(reordered)).toEqual(colours(initial))
+    const departed = gameStateReducer(reordered, { type: 'player-left', payload: {
+      gameId: publicState.gameId, playerId: publicState.robots[0].playerId, robotId,
+    } })
+    const reconnected = gameStateReducer(createClientGameState(), { type: 'joined', result: {
+      ...result, assignment: { ...result.assignment,
+        playerId: publicState.robots[1].playerId, robotId: stationaryRobotId },
+      state: { ...publicState,
+        players: publicState.players.slice(1), robots: publicState.robots.slice(1) },
+    } })
+    expect(colours(reconnected)).toEqual(colours(departed))
+    expect(colours(reconnected)).toEqual({ [stationaryRobotId]: '#4DC9C0' })
   })
 
   it('removes a departed robot and its queued actions without disturbing another robot', () => {
-    let state = gameStateReducer(programmingState(), { type: 'player-joined', payload: newcomer })
+    let state = programmingState()
     state = gameStateReducer(state, { type: 'action', action: actions[0] })
-    state = gameStateReducer(state, { type: 'action', action: { ...actions[0], robotId: 'new-robot' } })
-    const payload = { gameId: publicState.gameId, playerId: 'new-player', robotId: 'new-robot' }
+    state = gameStateReducer(state, { type: 'action', action: { ...actions[0], robotId: stationaryRobotId } })
+    const payload = { gameId: publicState.gameId, playerId: publicState.robots[1].playerId, robotId: stationaryRobotId }
     const updated = gameStateReducer(state, { type: 'player-left', payload })
-    expect(updated.players.map((player) => player.playerId)).not.toContain('new-player')
-    expect(updated.playback.robots.some((robot) => robot.robotId === 'new-robot')).toBe(false)
+    expect(updated.players.map((player) => player.playerId)).not.toContain(publicState.robots[1].playerId)
+    expect(updated.playback.robots.some((robot) => robot.robotId === stationaryRobotId)).toBe(false)
     expect(updated.playback.pending).toEqual([])
     expect(updated.playback.active).toBe(state.playback.active)
     expect(gameStateReducer(updated, { type: 'player-left', payload })).toBe(updated)

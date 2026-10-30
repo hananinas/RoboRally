@@ -3,10 +3,8 @@ import { createServer } from 'node:http'
 import type {
   Card,
   ClientToServerEvents,
-  JoinResult,
+  LobbyState,
   LoginResult,
-  LobbyDetails,
-  LobbyDetailsResult,
   ProgramResultAcknowledgement,
   ProgramResultOutcome,
   PublicGameState,
@@ -16,7 +14,6 @@ import type {
 } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
 import {
-  createLobby,
   createPublicState,
   GAME_ID,
   HAND_INSTRUCTIONS,
@@ -37,17 +34,13 @@ type Fixture = {
   deferred: boolean
   entryRequests: FixtureSnapshot['entryRequests'][number][]
   loginOutcome: LoginResult['outcome']
-  joinOutcome: JoinResult['outcome']
   deferLogin: boolean
-  deferJoin: boolean
+  deferStart: boolean
+  startOutcome: 'STARTED' | 'LOBBY_MEMBER_DISCONNECTED'
   programSubmitted: boolean
+  started: boolean
   pendingLogins: { socket: GameSocket; respond: () => void }[]
-  pendingJoins: { socket: GameSocket; respond: () => void }[]
-  lobbyOutcome: LobbyDetailsResult['outcome']
-  lobbies: readonly LobbyDetails[]
-  deferLobby: boolean
-  lobbyRequests: number
-  pendingLobbies: { socket: GameSocket; respond: () => void }[]
+  pendingStarts: { socket: GameSocket; respond: () => void }[]
   pending: { socket: GameSocket; acknowledge: ProgramResultAcknowledgement }[]
 }
 
@@ -68,9 +61,7 @@ function snapshot(fixture: Fixture): FixtureSnapshot {
     submissions: fixture.submissions,
     entryRequests: fixture.entryRequests,
     pendingLogins: fixture.pendingLogins.length,
-    pendingJoins: fixture.pendingJoins.length,
-    lobbyRequests: fixture.lobbyRequests,
-    pendingLobbies: fixture.pendingLobbies.length,
+    pendingStarts: fixture.pendingStarts.length,
   }
 }
 
@@ -120,23 +111,15 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
       fixture.loginOutcome = control.outcome
       fixture.deferLogin = control.deferred
       break
-    case 'join':
-      fixture.joinOutcome = control.outcome
-      fixture.deferJoin = control.deferred
+    case 'start':
+      fixture.startOutcome = control.outcome ?? 'STARTED'
+      fixture.deferStart = control.deferred
       break
     case 'respond-login':
       for (const pending of fixture.pendingLogins.splice(0)) pending.respond()
       break
-    case 'respond-join':
-      for (const pending of fixture.pendingJoins.splice(0)) pending.respond()
-      break
-    case 'lobby':
-      fixture.lobbyOutcome = control.outcome
-      fixture.deferLobby = control.deferred
-      if (control.lobbies) fixture.lobbies = control.lobbies
-      break
-    case 'respond-lobby':
-      for (const pending of fixture.pendingLobbies.splice(0)) pending.respond()
+    case 'respond-start':
+      for (const pending of fixture.pendingStarts.splice(0)) pending.respond()
       break
     case 'joined-state':
       fixture.state = control.state
@@ -155,9 +138,11 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
     case 'round': {
       let robots = fixture.state.robots
       for (const action of control.actions) {
-        robots = robots.map((robot) => robot.robotId === action.robotId
-          ? { ...robot, position: action.position }
-          : robot)
+        robots = robots.map((robot) => {
+          const position = robot.robotId === action.robotId ? action.position
+            : action.pushedRobots.find((pushed) => pushed.robotId === robot.robotId)?.position
+          return position === undefined ? robot : { ...robot, position }
+        })
       }
       fixture.state = { ...fixture.state, phase: 'PROGRAMMING', robots }
       fixture.cards = dealCards()
@@ -195,17 +180,13 @@ const httpServer = createServer(async (request, response) => {
       pending: [],
       entryRequests: [],
       loginOutcome: 'LOGGED_IN',
-      joinOutcome: 'JOINED',
       deferLogin: false,
-      deferJoin: false,
+      deferStart: false,
+      startOutcome: 'STARTED',
       programSubmitted: false,
+      started: false,
       pendingLogins: [],
-      lobbyOutcome: 'LOBBY_FOUND',
-      lobbies: [createLobby()],
-      deferLobby: false,
-      lobbyRequests: 0,
-      pendingLobbies: [],
-      pendingJoins: [],
+      pendingStarts: [],
     }
     fixtures.set(fixture.id, fixture)
     send(201, snapshot(fixture))
@@ -267,40 +248,49 @@ io.on('connection', (socket) => {
     else respond()
   })
 
-  socket.on('game.join', (payload, acknowledge) => {
-    fixture.entryRequests.push({ event: 'game.join', socketId: socket.id, payload })
+  let lobby: LobbyState | undefined
+  const initialization = () => ({
+    outcome: 'JOINED' as const,
+    assignment: { gameId: GAME_ID, playerId: PLAYER_ID, robotId: ROBOT_ID },
+    state: fixture.state, hand: fixture.cards, programSubmitted: fixture.programSubmitted,
+  })
+  const lobbyState = (): LobbyState => ({ lobbyId: GAME_ID, name: 'Lobby 1', ownerUserId: user!.userId, playerCount: 1, maxPlayers: 6, players: [user!] })
+  socket.on('session.get', (_, acknowledge) => {
+    fixture.entryRequests.push({ event: 'session.get', socketId: socket.id, payload: {} })
+    if (!user) return acknowledge({ outcome: 'LOGIN_REQUIRED' })
+    acknowledge(fixture.started ? { outcome: 'IN_GAME', initialization: initialization() }
+      : lobby ? { outcome: 'IN_LOBBY', lobby } : { outcome: 'NO_SESSION' })
+  })
+  socket.on('lobby.list', (_, acknowledge) => acknowledge({ outcome: 'LOBBIES_FOUND', lobbies: [lobbyState()] }))
+  socket.on('lobby.create', (_, acknowledge) => {
+    fixture.entryRequests.push({ event: 'lobby.create', socketId: socket.id, payload: {} })
+    lobby = lobbyState()
+    acknowledge({ outcome: 'LOBBY_JOINED', lobby })
+  })
+  socket.on('lobby.join', (payload, acknowledge) => {
+    fixture.entryRequests.push({ event: 'lobby.join', socketId: socket.id, payload })
+    lobby = lobbyState()
+    acknowledge({ outcome: 'LOBBY_JOINED', lobby })
+  })
+  socket.on('lobby.leave', (_, acknowledge) => {
+    lobby = undefined
+    acknowledge({ outcome: 'LEFT' })
+  })
+  socket.on('lobby.start', (payload, acknowledge) => {
+    fixture.entryRequests.push({ event: 'lobby.start', socketId: socket.id, payload })
+    if (fixture.startOutcome !== 'STARTED') return acknowledge({ outcome: fixture.startOutcome })
+    fixture.started = true
     const respond = () => {
-      if (!user || fixture.joinOutcome === 'LOGIN_REQUIRED') {
-        user = undefined
-        acknowledge({ outcome: 'LOGIN_REQUIRED' })
-      } else if (payload.gameId !== GAME_ID) {
-        acknowledge({ outcome: 'GAME_NOT_FOUND' })
-      } else if (fixture.joinOutcome !== 'JOINED') {
-        acknowledge({ outcome: fixture.joinOutcome })
-      } else {
-        acknowledge({
-          outcome: 'JOINED',
-          assignment: { gameId: GAME_ID, playerId: PLAYER_ID, robotId: ROBOT_ID },
-          state: fixture.state,
-          hand: fixture.cards,
-          programSubmitted: fixture.programSubmitted,
-        })
-      }
+      socket.emit('game.started', { lobbyId: GAME_ID, initialization: initialization() })
+      acknowledge({ outcome: 'STARTED', gameId: GAME_ID })
     }
-    if (fixture.deferJoin) fixture.pendingJoins.push({ socket, respond })
+    if (fixture.deferStart) fixture.pendingStarts.push({ socket, respond })
     else respond()
   })
-
-  socket.on('game.getLobbyDetails', (_payload, acknowledge) => {
-    fixture.lobbyRequests += 1
-    // Read the outcome when responding so tests can change it while a request is deferred.
-    const respond = () => {
-      if (!user) acknowledge({ outcome: 'LOGIN_REQUIRED' })
-      else if (fixture.lobbyOutcome !== 'LOBBY_FOUND') acknowledge({ outcome: fixture.lobbyOutcome })
-      else acknowledge({ outcome: 'LOBBY_FOUND', lobbies: fixture.lobbies })
-    }
-    if (fixture.deferLobby) fixture.pendingLobbies.push({ socket, respond })
-    else respond()
+  socket.on('game.leave', (_, acknowledge) => {
+    fixture.started = false
+    lobby = undefined
+    acknowledge({ outcome: 'LEFT' })
   })
 
   socket.on('program.submit', (payload, acknowledge) => {
@@ -323,8 +313,7 @@ io.on('connection', (socket) => {
     fixture.sockets.delete(socket)
     fixture.pending = fixture.pending.filter((pending) => pending.socket !== socket)
     fixture.pendingLogins = fixture.pendingLogins.filter((pending) => pending.socket !== socket)
-    fixture.pendingJoins = fixture.pendingJoins.filter((pending) => pending.socket !== socket)
-    fixture.pendingLobbies = fixture.pendingLobbies.filter((pending) => pending.socket !== socket)
+    fixture.pendingStarts = fixture.pendingStarts.filter((pending) => pending.socket !== socket)
   })
 })
 

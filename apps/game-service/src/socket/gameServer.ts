@@ -1,3 +1,6 @@
+import { handleListLobbies, handleCreateLobby, handleJoinLobby, handleLeaveLobby, handleStartLobby } from '@/socket/handlers/lobbyHandlers'
+import { handleGetSession, handleLeaveGame, handleDisconnectSession, handleSessionProgram, recoverSession, validateRecoveredSession } from '@/socket/handlers/sessionHandlers'
+import type { SessionContext } from '@/socket/sessionContext'
 import type { Server as HttpServer } from 'node:http'
 import type {
   ClientToServerEvents,
@@ -5,24 +8,14 @@ import type {
   User,
 } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
+import { parseCookie } from 'cookie'
 import type { Game } from '@/game/index'
-import { presentPublicGameState } from '@/socket/gamePresenter'
 import { createUserRegistry } from '@/userRegistry'
-import { createSharedGame } from '@/game/GameFactory'
-import { createActionScheduler } from '@/actionScheduler'
+import { createDefaultGame } from '@/game/GameFactory'
 import { handleLogin } from '@/socket/handlers/authHandlers'
-import {
-  handleDisconnect,
-  handleJoin,
-  handleLeave,
-  reconnectIfRecovered,
-  type GameMembership,
-  type MembershipContext,
-} from '@/socket/handlers/membershipHandlers'
-import { handleGetLobbyDetails } from '@/socket/handlers/lobbyHandlers'
-import { handleSubmitProgram } from '@/socket/handlers/gameplayHandlers'
+import { SESSION_COOKIE_NAME, type Session, type SessionStore } from '@/auth/sessionStore'
 
-export type GameSocketData = { user?: User }
+export type GameSocketData = { user?: User; authSession?: Session }
 
 export type GameSocketServer = Server<
   ClientToServerEvents,
@@ -35,9 +28,26 @@ export type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents, {}, 
 
 export type GameSession = Readonly<{ gameId: string; game: Game }>
 
+function authenticateSocket(sessionStore: SessionStore, socket: GameSocket, next: (error?: Error) => void): void {
+  const cookies = parseCookie(socket.handshake.headers.cookie ?? '')
+  const sessionId = cookies[SESSION_COOKIE_NAME]
+  const authSession = sessionId ? sessionStore.get(sessionId) : undefined
+  if (!authSession) {
+    next(new Error('UNAUTHENTICATED'))
+    return
+  }
+  if (socket.recovered && socket.data.authSession?.sub !== authSession.sub) {
+    next(new Error('SESSION_MISMATCH'))
+    return
+  }
+  socket.data.authSession = authSession
+  next()
+}
+
 export function createGameSocketServer(
   httpServer: HttpServer,
-  sharedGame: GameSession = createSharedGame(),
+  sessionStore: SessionStore,
+  createGame: () => GameSession = createDefaultGame,
 ): GameSocketServer {
   const io = new Server<
     ClientToServerEvents,
@@ -50,51 +60,30 @@ export function createGameSocketServer(
     pingTimeout: 1000,
   })
   const users = createUserRegistry()
-  const { gameId, game } = sharedGame
-  const publicRoom = `game:${gameId}:public`
-  const playerRoom = (playerId: string) => `game:${gameId}:player:${playerId}`
-  const memberships = new Map<string, GameMembership>()
-  const actionScheduler = createActionScheduler({ io, game, gameId, publicRoom, playerRoom })
-
-  const publicState = () => presentPublicGameState(gameId, game,
-    [...memberships.values()].map(({ user, player, connectionId }) => ({
-      playerId: player.id,
-      lastCheckpoint: player.lastCheckpoint,
-      username: user.username,
-      programSubmitted: game.hasSubmittedProgram(player.id),
-      connected: connectionId !== null,
-    })),
-  )
-
-  const membershipContext: MembershipContext = {
-    io, game, gameId, publicRoom, playerRoom, memberships, publicState, actionScheduler,
+  const context: SessionContext = {
+    io, createGame, games: new Map(), lobbies: new Map(), sessionsByUser: new Map(),
   }
+  httpServer.once('close', () => { for (const ctx of context.games.values()) ctx.actionScheduler.stop() })
 
-  httpServer.once('close', actionScheduler.stop)
+  io.use((socket, next) => authenticateSocket(sessionStore, socket, next))
 
-  io.use((socket, next) => {
-    if (socket.recovered && socket.data.user) {
-      const membership = memberships.get(socket.data.user.userId)
-      if (membership?.connectionId && membership.connectionId !== socket.id) {
-        next(new Error('USER_ALREADY_IN_GAME'))
-        return
-      }
-    }
-    next()
-  })
+  io.use((socket, next) => validateRecoveredSession(context, socket, next))
 
   io.on('connection', (socket) => {
     socket.on('user.login', (payload, acknowledge) => handleLogin(socket, { users }, payload, acknowledge))
 
-    reconnectIfRecovered(membershipContext, socket)
+    recoverSession(context, socket)
 
-    socket.on('game.join', (payload, acknowledge) => handleJoin(membershipContext, socket, payload, acknowledge))
-    socket.on('game.leave', (payload, acknowledge) => handleLeave(membershipContext, socket, payload, acknowledge))
-    socket.on('disconnect', () => handleDisconnect(membershipContext, socket))
-    socket.on('game.getLobbyDetails', (payload, acknowledge) =>
-      handleGetLobbyDetails(membershipContext, socket, payload, acknowledge))
-    socket.on('program.submit', (payload, acknowledge) =>
-      handleSubmitProgram(membershipContext, socket, payload, acknowledge))
+    socket.on('lobby.list', (payload, ack) => handleListLobbies(context, socket, payload, ack))
+    socket.on('lobby.create', (payload, ack) => handleCreateLobby(context, socket, payload, ack))
+    socket.on('lobby.join', (payload, ack) => handleJoinLobby(context, socket, payload, ack))
+    socket.on('lobby.leave', (payload, ack) => handleLeaveLobby(context, socket, payload, ack))
+    socket.on('lobby.start', (payload, ack) => handleStartLobby(context, socket, payload, ack))
+    socket.on('session.get', (payload, ack) => handleGetSession(context, socket, payload, ack))
+
+    socket.on('game.leave', (payload, ack) => handleLeaveGame(context, socket, payload, ack))
+    socket.on('disconnect', () => handleDisconnectSession(context, socket))
+    socket.on('program.submit', (payload, ack) => handleSessionProgram(context, socket, payload, ack))
   })
 
   return io

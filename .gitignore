@@ -21,3 +21,8 @@ test-results/
 # Logs
 *.log
 npm-debug.log*
+
+# Kratos & Hydra local dev data
+kratos/data/
+hydra/data/
+infra/dev-tls/

@@ -14,8 +14,8 @@ let
     {$WEB_SCHEME}://{$WEB_HOST}:{$WEB_PORT} {
       bind {$WEB_BIND}
 
-      @socketio path /socket.io /socket.io/*
-      handle @socketio {
+      @backend path /auth/* /socket.io /socket.io/*
+      handle @backend {
         reverse_proxy 127.0.0.1:{$GAME_PORT}
       }
 

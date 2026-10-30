@@ -33,7 +33,6 @@ export type RobotPlaybackEvent =
   | Readonly<{ type: 'enqueue'; action: ResolvedRobotAction }>
   | Readonly<{ type: 'complete' }>
   | Readonly<{ type: 'reset'; robots: readonly Robot[] }>
-  | Readonly<{ type: 'add'; robot: Robot }>
   | Readonly<{ type: 'remove'; robotId: string }>
 
 export const orientationAngle: Record<Orientation, number> = {
@@ -59,12 +58,14 @@ function applyAction(
   action: ResolvedRobotAction,
 ): readonly DisplayRobot[] {
   return robots.map((robot) => {
-    if (robot.robotId !== action.robotId) return robot
-    const target = orientationAngle[action.position.orientation]
+    const position = robot.robotId === action.robotId ? action.position
+      : action.pushedRobots.find((pushed) => pushed.robotId === robot.robotId)?.position
+    if (position === undefined) return robot
+    const target = orientationAngle[position.orientation]
     const delta = ((target - robot.angle + 540) % 360) - 180
     return {
       ...robot,
-      position: action.position,
+      position,
       angle: robot.angle + delta,
     }
   })
@@ -85,15 +86,12 @@ export function robotPlaybackReducer(
   event: RobotPlaybackEvent,
 ): RobotPlaybackState {
   if (event.type === 'reset') return createRobotPlaybackState(event.robots)
-  if (event.type === 'add') {
-    if (state.robots.some((robot) => robot.robotId === event.robot.robotId)) return state
-    return { ...state, robots: [...state.robots, ...createRobotPlaybackState([event.robot]).robots] }
-  }
   if (event.type === 'remove') {
     const next = {
       ...state,
       robots: state.robots.filter((robot) => robot.robotId !== event.robotId),
-      pending: state.pending.filter((action) => action.robotId !== event.robotId),
+      pending: state.pending.filter((action) => action.robotId !== event.robotId ||
+        action.pushedRobots.some((pushed) => pushed.robotId !== event.robotId)),
     }
     return state.active?.robotId === event.robotId ? startNext(next) : next
   }
