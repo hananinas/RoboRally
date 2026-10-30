@@ -244,3 +244,8 @@
     animation: none;
   }
 }
+
+.robot-picker__stage .robot-preview--tank {
+  width: 175px;
+  height: 175px;
+}

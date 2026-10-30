@@ -1,7 +1,7 @@
 import RobotPreview from './RobotPreview.tsx'
 import './RobotPicker.css'
 
-const PREVIEW_MODELS = ['Model 01', 'Model 02', 'Model 03', 'Model 04'] as const
+const PREVIEW_MODELS = ['Tank', 'Model 02', 'Model 03', 'Model 04'] as const
 const PREVIEW_COLOURS = ['Blue', 'Red', 'Yellow', 'Green', 'Purple', 'Pink'] as const
 
 /** Presentational only: selection and readiness are separate feature work. */
@@ -23,7 +23,7 @@ export default function RobotPicker() {
             </svg>
           </span>
         </div>
-        <RobotPreview />
+        <RobotPreview model="tank" />
       </div>
       <div className="robot-picker__carousel">
         <button className="robot-picker__arrow" type="button" disabled aria-label="Previous robot model" title="Robot selection is coming soon.">‹</button>
