@@ -113,6 +113,10 @@ processes:
     depends_on:
       build-game-events:
         condition: process_completed_successfully
+      kratos:
+        condition: process_healthy
+      hydra:
+        condition: process_healthy
 
   game-service:
     namespace: game
