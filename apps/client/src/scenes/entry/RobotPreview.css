@@ -1,0 +1,25 @@
+.robot-preview {
+  --robot-colour: var(--entry-muted);
+  --robot-layer-offset: 2px;
+  position: relative;
+  display: block;
+  width: 28px;
+  height: 28px;
+}
+
+.robot-preview__layer {
+  --layer: 0;
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: calc(100% - var(--layer) * 14%);
+  height: calc(100% - var(--layer) * 14%);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--robot-colour) calc(65% + var(--layer) * 8%), var(--entry-side));
+  transform: translateY(calc(var(--layer) * var(--robot-layer-offset) * -1)) rotate(-30deg);
+}
+
+.robot-preview__layer:nth-child(2) { --layer: 1; }
+.robot-preview__layer:nth-child(3) { --layer: 2; }
+.robot-preview__layer:nth-child(4) { --layer: 3; }
+.robot-preview__layer:nth-child(5) { --layer: 4; }

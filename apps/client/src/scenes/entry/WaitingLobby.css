@@ -1,0 +1,157 @@
+.waiting-lobby h2 {
+  margin: 0 0 var(--entry-space-3);
+  font-size: 25px;
+  overflow-wrap: anywhere;
+}
+
+.waiting-lobby__status {
+  display: flex;
+  align-items: center;
+  gap: var(--entry-space-2);
+  margin: 0 0 var(--entry-space-5);
+  color: var(--entry-muted);
+  font-size: 13px;
+}
+
+.waiting-lobby__status::before {
+  content: '';
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--entry-accent);
+}
+
+.waiting-lobby__heading {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--entry-space-2);
+  margin: 0 0 var(--entry-space-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.waiting-lobby__heading span:last-child {
+  color: var(--entry-muted);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.waiting-lobby__players {
+  display: grid;
+  gap: var(--entry-space-2);
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--entry-space-5);
+}
+
+.waiting-lobby__seat {
+  display: flex;
+  align-items: center;
+  gap: var(--entry-space-3);
+  min-height: 58px;
+  padding: var(--entry-space-2);
+  border: 1px solid var(--entry-border);
+  border-radius: var(--entry-radius-md);
+  background: var(--entry-inset);
+  box-shadow: 0 2px 0 var(--entry-side);
+}
+
+.waiting-lobby__seat--self {
+  border-color: var(--entry-border-strong);
+  background: var(--entry-selected);
+}
+
+.waiting-lobby__portrait,
+.waiting-lobby__empty-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--entry-border);
+  border-radius: var(--entry-radius-sm);
+  background: var(--entry-background);
+}
+
+.waiting-lobby__name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.waiting-lobby__roles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: var(--entry-space-1);
+  max-width: 35%;
+}
+
+.waiting-lobby__badge {
+  padding: var(--entry-space-1) var(--entry-space-2);
+  border: 1px solid var(--entry-border-strong);
+  border-radius: var(--entry-radius-sm);
+  background: var(--entry-selected);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.waiting-lobby__badge--owner {
+  border-color: color-mix(in srgb, var(--entry-accent) 25%, transparent);
+  color: color-mix(in srgb, var(--entry-accent) 65%, var(--entry-text));
+  background: color-mix(in srgb, var(--entry-accent) 6%, transparent);
+}
+
+.waiting-lobby__joined,
+.waiting-lobby__seat-number {
+  color: var(--entry-muted);
+  font-size: 10px;
+}
+
+.waiting-lobby__seat--empty {
+  border-style: dashed;
+  background: transparent;
+  color: var(--entry-muted);
+  box-shadow: none;
+}
+
+.waiting-lobby__seat--empty .waiting-lobby__name {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.waiting-lobby__empty-icon {
+  background: transparent;
+  font-size: 21px;
+  font-weight: 300;
+}
+
+.waiting-lobby__seat-number {
+  font-variant-numeric: tabular-nums;
+}
+
+.waiting-lobby__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--entry-space-3);
+}
+
+.waiting-lobby__actions button {
+  min-height: 44px;
+  margin: 0;
+  padding: var(--entry-space-3) var(--entry-space-2);
+  border-radius: var(--entry-radius-md);
+  font-size: 13px;
+}
+
+.waiting-lobby__actions .login-primary-button {
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--entry-accent) 65%, var(--entry-side));
+}
+
+.waiting-lobby__start {
+  margin-top: var(--entry-space-3);
+}
