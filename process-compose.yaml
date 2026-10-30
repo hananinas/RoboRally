@@ -83,6 +83,21 @@ processes:
     depends_on:
       generate-dev-tls-cert:
         condition: process_completed_successfully
+    readiness_probe:
+      exec:
+        command: "curl --fail --silent --max-time 2 --insecure https://127.0.0.1:3001"
+      initial_delay_seconds: 1
+      period_seconds: 1
+      timeout_seconds: 2
+      failure_threshold: 30
+
+  open-client:
+    command: "xdg-open https://127.0.0.1:3001"
+    depends_on:
+      dev-tls-proxy:
+        condition: process_healthy
+      client:
+        condition: process_started
 
   client:
     command: "pnpm --filter @robo-rally/client run dev"
