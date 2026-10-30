@@ -9,11 +9,6 @@ export default function EntryScreen({ children }: { children: ReactNode }) {
       </div>
       <section className="login-panel" aria-labelledby="login-heading">
         <h1 id="login-heading">RoboRally</h1>
-        <p>
-          <a href="/auth/login">Log in (OIDC)</a>
-          {' · '}
-          <a href="/auth/logout">Log out</a>
-        </p>
         {children}
       </section>
     </main>
