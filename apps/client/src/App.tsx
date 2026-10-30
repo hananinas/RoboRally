@@ -4,6 +4,7 @@ import ActiveGame from './scenes/active-game/ActiveGame.tsx'
 import EntryScreen from './scenes/entry/EntryScreen.tsx'
 import LobbyScreen from './scenes/entry/LobbyScreen.tsx'
 import WaitingLobby from './scenes/entry/WaitingLobby.tsx'
+import RobotPicker from './scenes/entry/RobotPicker.tsx'
 import { USER_ALREADY_IN_GAME_MESSAGE } from './scenes/active-game/gameState.ts'
 import useSessionConnection from './useSessionConnection.ts'
 
@@ -60,7 +61,7 @@ function App() {
       <button className="entry-secondary-button" type="button" disabled={busy || connection.status === 'connecting'} onClick={retrySession}>Retry</button>
     </>
   }
-  return <EntryScreen onLogout={connection.status === 'connected' || session.user ? logout : undefined}>
+  return <EntryScreen onLogout={connection.status === 'connected' || session.user ? logout : undefined} aside={session.status === 'waiting' ? <RobotPicker /> : undefined}>
     {error && (session.status === 'waiting' || session.status === 'resyncing' || session.status === 'sync-failed') &&
       <p role="alert" className="entry-validation entry-validation--error">{error}</p>}
     {content}
