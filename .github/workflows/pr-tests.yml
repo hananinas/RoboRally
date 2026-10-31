@@ -31,7 +31,7 @@ jobs:
 
       - name: Enter dev shell
         run: |
-          nix develop .#client -c bash -c 'echo "PATH=$PATH" >> "$GITHUB_ENV"; env | grep ^PLAYWRIGHT_ >> "$GITHUB_ENV"'
+          nix develop .#ci -c bash -c 'echo "PATH=$PATH" >> "$GITHUB_ENV"; env | grep ^PLAYWRIGHT_ >> "$GITHUB_ENV"'
 
       - name: Typecheck
         run: pnpm typecheck

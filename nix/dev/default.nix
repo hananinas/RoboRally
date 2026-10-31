@@ -58,6 +58,12 @@ in {
     withClient = true;
   };
 
+  # Full workspace install with a lean (no backend) toolchain, for CI typecheck/lint/build/test.
+  ci = mkProjectShell {
+    setupCommand = "pnpm run install-dev";
+    withClient = true;
+  };
+
   game-service = mkProjectShell {
     setupCommand = "pnpm --filter @robo-rally/game-service run install-dev";
     withGameService = true;
