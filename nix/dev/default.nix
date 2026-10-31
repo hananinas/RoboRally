@@ -29,6 +29,8 @@ let
         ++ pkgs.lib.optionals withEditor [ editor ]
         ++ pkgs.lib.optionals withBrowser [ pkgs.firefox ];
 
+      BROWSER = "firefox";
+
       shellHook = ''
         ${setupCommand} || return $?
       '';
