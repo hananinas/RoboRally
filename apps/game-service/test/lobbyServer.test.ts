@@ -94,7 +94,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(roster.players).toEqual([first, { userId: expect.any(String), username: 'Other' }])
     expect(roster.playerCount).toBe(2)
     expect(await other.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })).toEqual(result)
-    expect(await other.emitWithAck('session.get', {})).toEqual({ outcome: 'IN_LOBBY', lobby: roster })
+    expect(await other.emitWithAck('session.get', {})).toEqual({ outcome: 'IN_LOBBY', lobby: roster, user: { userId: 'Other', username: 'Other' } })
     const listed = await outsider.emitWithAck('lobby.list', {})
     if (listed.outcome !== 'LOBBIES_FOUND') throw new Error(listed.outcome)
     expect(listed.lobbies.find(({ lobbyId }) => lobbyId === lobby.lobbyId)).toEqual({

@@ -46,7 +46,7 @@ processes:
   generate-dev-tls-cert:
     command: >
       mkdir -p infra/dev-tls &&
-      mkcert -install &&
+      TRUST_STORES=nss mkcert -install &&
       mkcert -cert-file infra/dev-tls/cert.pem -key-file infra/dev-tls/key.pem 127.0.0.1 localhost
 
   hydra:
@@ -101,7 +101,8 @@ processes:
       failure_threshold: 30
 
   open-client:
-    command: "xdg-open https://127.0.0.1:3001"
+    namespace: dev-ui
+    command: "firefox https://127.0.0.1:3001"
     depends_on:
       dev-tls-proxy:
         condition: process_healthy

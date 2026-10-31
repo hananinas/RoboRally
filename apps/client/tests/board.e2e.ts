@@ -19,6 +19,9 @@ test.beforeEach(async ({ page }) => {
 test('renders sprite artwork at its configured aspect ratio', async ({ page }) => {
   const assets = page.locator('.board-piece--asset')
   await expect(assets.first()).toBeVisible()
+  for (const robotId of ['red', 'blue', 'green']) {
+    await expect(page.locator(`[data-robot-id="${robotId}"]`)).toHaveCount(8)
+  }
 
   expect(
     await assets.evaluateAll((elements) =>
@@ -78,6 +81,8 @@ test('plays rapid server results one robot at a time without replacing its sprit
       'data-board-tile',
       `${step.position.coordinate.x},${step.position.coordinate.y}`,
     )
+    expect(await red.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-board-tile'))))
+      .toEqual(Array(8).fill(`${step.position.coordinate.x},${step.position.coordinate.y}`))
     expect(await red.first().evaluate((element, first) => element === first, original)).toBe(true)
     await expect(blue.first()).toHaveAttribute('data-board-tile', '9,7')
     if (index === 0) {
