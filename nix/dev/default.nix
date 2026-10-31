@@ -23,9 +23,11 @@ let
     withEditor ? false
   }:
     pkgs.mkShell ({
-      packages = [ nodejs pnpm pkgs.process-compose pkgs.kratos pkgs.ory-hydra pkgs.mailpit pkgs.mkcert pkgs.nss.tools pkgs.caddy pkgs.xdg-utils ]
+      packages = [ nodejs pnpm pkgs.process-compose pkgs.kratos pkgs.ory-hydra pkgs.mailpit pkgs.mkcert pkgs.nss.tools pkgs.caddy pkgs.firefox ]
         ++ pkgs.lib.optionals withAsyncapi asyncapiPackages
         ++ pkgs.lib.optionals withEditor [ editor ];
+
+      BROWSER = "firefox";
 
       shellHook = ''
         ${setupCommand} || return $?
