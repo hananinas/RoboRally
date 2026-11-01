@@ -12,9 +12,13 @@ const VERIFIER_COOKIE_NAME = 'oauth_verifier'
 
 const DEFAULT_SESSION_EXPIRES_IN_SECONDS = 900
 
-export type AuthAppDeps = Readonly<{ oidcClient: OidcClient; sessionStore: SessionStore }>
+export type AuthAppDeps = Readonly<{
+  oidcClient: OidcClient
+  sessionStore: SessionStore
+  kratosSettingsUrl: URL
+}>
 
-export function createAuthApp({ oidcClient, sessionStore }: AuthAppDeps): Express {
+export function createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl }: AuthAppDeps): Express {
   const app = express()
 
   app.get('/auth/login', async (req, res) => {
@@ -104,6 +108,21 @@ export function createAuthApp({ oidcClient, sessionStore }: AuthAppDeps): Expres
 
     const endSessionUrl = await oidcClient.buildEndSessionUrl(session.idToken)
     res.redirect(endSessionUrl.toString())
+  })
+
+  app.get('/auth/settings', (req, res) => {
+    const cookies = parseCookie(req.headers.cookie ?? '')
+    const sessionId = cookies[SESSION_COOKIE_NAME]
+    const session = sessionId ? sessionStore.get(sessionId) : undefined
+
+    if (!session) {
+      res.redirect('/auth/login')
+      return
+    }
+
+    const settingsUrl = new URL(kratosSettingsUrl)
+    settingsUrl.searchParams.set('return_to', oidcClient.postLogoutRedirectUrl.toString())
+    res.redirect(settingsUrl.toString())
   })
 
   app.use(handleAuthRouteError)

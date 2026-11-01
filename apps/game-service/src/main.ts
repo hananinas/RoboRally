@@ -1,5 +1,5 @@
 import { createServer } from 'node:http'
-import { parseGameServicePort } from '@/config'
+import { parseGameServicePort, parseKratosSettingsUrl } from '@/config'
 import { createGameSocketServer } from '@/socket/gameServer'
 import { createAuthApp } from '@/auth/httpRoutes'
 import { createSessionStore } from '@/auth/sessionStore'
@@ -15,7 +15,8 @@ const port = parseGameServicePort(process.env.PORT)
 const oidcClient = await createOidcClient()
 const sessionStore = createSessionStore()
 const httpServer = createServer()
-const authApp = createAuthApp({ oidcClient, sessionStore })
+const kratosSettingsUrl = parseKratosSettingsUrl(process.env.KRATOS_SETTINGS_URL)
+const authApp = createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl })
 httpServer.on('request', (req, res) => {
   if (req.url?.startsWith('/auth/')) {
     authApp(req, res)

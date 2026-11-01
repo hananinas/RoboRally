@@ -29,10 +29,11 @@ function App() {
   }, [connection.status])
 
   const logout = () => { window.location.href = '/auth/logout' }
+  const openSettings = () => { window.location.href = '/auth/settings' }
 
   // Keep the existing game visible while session.get restores membership after reconnecting.
   if ((session.status === 'joined' || session.status === 'resyncing') && session.user && game.state.assignment) {
-    return <ActiveGame game={game} username={session.user.username} leaving={busy} onLeave={leaveSession} onLogout={logout} />
+    return <ActiveGame game={game} username={session.user.username} leaving={busy} onLeave={leaveSession} onLogout={logout} onSettings={openSettings} />
   }
 
   if (connection.status === 'unauthenticated') {
