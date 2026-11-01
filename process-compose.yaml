@@ -92,7 +92,12 @@ processes:
       failure_threshold: 30
 
   open-client:
-    command: "firefox https://127.0.0.1:3001"
+    command: >
+      if [ -n "$WSL_DISTRO_NAME" ]; then
+        firefox https://127.0.0.1:3001
+      else
+        xdg-open https://127.0.0.1:3001
+      fi
     depends_on:
       dev-tls-proxy:
         condition: process_healthy
