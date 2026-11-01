@@ -20,12 +20,16 @@ let
     withClient ? false,
     withGameService ? false,
     withAsyncapi ? false,
-    withEditor ? false
+    withEditor ? false,
+    withBrowser ? false
   }:
     pkgs.mkShell ({
-      packages = [ nodejs pnpm pkgs.process-compose pkgs.kratos pkgs.ory-hydra pkgs.mailpit ]
+      packages = [ nodejs pnpm pkgs.process-compose pkgs.kratos pkgs.ory-hydra pkgs.mailpit pkgs.mkcert pkgs.nss.tools pkgs.caddy pkgs.xdg-utils ]
         ++ pkgs.lib.optionals withAsyncapi asyncapiPackages
-        ++ pkgs.lib.optionals withEditor [ editor ];
+        ++ pkgs.lib.optionals withEditor [ editor ]
+        ++ pkgs.lib.optionals withBrowser [ pkgs.firefox ];
+
+      BROWSER = "firefox";
 
       shellHook = ''
         ${setupCommand} || return $?
@@ -34,6 +38,8 @@ let
       PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
       PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
+    } // pkgs.lib.optionalAttrs withBrowser {
+      BROWSER = "firefox";
     });
 in {
   default = mkProjectShell {
@@ -64,5 +70,15 @@ in {
     withGameService = true;
     withAsyncapi = true;
     withEditor = true;
+  };
+
+  # Full project environment with a bundled browser (e.g. for WSL, where no
+  # browser is auto-trusted/registered for xdg-open to find).
+  browser = mkProjectShell {
+    setupCommand = "pnpm run install-dev";
+    withClient = true;
+    withGameService = true;
+    withAsyncapi = true;
+    withBrowser = true;
   };
 }

@@ -8,11 +8,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Board, Direction, EmptyTile, PitTile, Game, type Tile } from '@/game/index'
 import { createGame, createHand } from '@/game/GameFactory'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
+import { createSessionStore, type SessionStore } from '@/auth/sessionStore'
+import { authCookieHeader } from './authTestHelper.ts'
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>
 describe('started game membership over Socket.IO', () => {
   let server: GameSocketServer
   let shared: ReturnType<typeof createGame>
+  let sessionStore: SessionStore
   let url: string
   let clients: Client[]
   beforeEach(async () => {
@@ -22,7 +25,8 @@ describe('started game membership over Socket.IO', () => {
   })
   async function start() {
     const http = createServer()
-    server = createGameSocketServer(http, () => shared)
+    sessionStore = createSessionStore()
+    server = createGameSocketServer(http, sessionStore, () => shared)
     await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve))
     url = `http://127.0.0.1:${(http.address() as AddressInfo).port}`
   }
@@ -31,7 +35,10 @@ describe('started game membership over Socket.IO', () => {
     await new Promise<void>((resolve) => server.close(() => resolve()))
   })
   async function connect(username?: string): Promise<Client> {
-    const client: Client = io(url, { autoConnect: false, transports: ['websocket'], reconnection: false, ackTimeout: 1000 })
+    const client: Client = io(url, {
+      autoConnect: false, transports: ['websocket'], reconnection: false, ackTimeout: 1000,
+      extraHeaders: authCookieHeader(sessionStore),
+    })
     clients.push(client)
     const connected = new Promise<void>((resolve) => client.once('connect', resolve))
     client.connect()
@@ -171,6 +178,16 @@ describe('started game membership over Socket.IO', () => {
     first.connect()
     expect((await rejected).message).toBe('USER_ALREADY_IN_GAME')
     expect((await getSnapshot(replacement)).state.paused).toBe(false)
+  })
+  it('rejects recovery when the reconnecting cookie belongs to a different session', async () => {
+    const { members: [first] } = await startGame(['First', 'Second'])
+    await disconnect(first, true)
+    expect(shared.game.paused).toBe(true)
+    first.io.opts.extraHeaders = authCookieHeader(sessionStore, 'different-subject')
+    const rejected = new Promise<Error>((resolve) => first.once('connect_error', resolve))
+    first.connect()
+    expect((await rejected).message).toBe('SESSION_MISMATCH')
+    expect(shared.game.paused).toBe(true)
   })
   it('keeps the game paused when a reconnect snapshot fails and permits retry', async () => {
     const { members: [first], initializations: [initial] } = await startGame(['First'])

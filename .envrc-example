@@ -1,2 +1,6 @@
-use flake
+if [ -n "$WSL_DISTRO_NAME" ]; then
+  use flake .#browser
+else
+  use flake
+fi
 export VITE_GAME_ID=00000000-0000-4000-8000-000000000001

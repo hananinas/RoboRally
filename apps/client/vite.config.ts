@@ -4,12 +4,14 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react()],
   server: {
-    open: true,
-    proxy: {
+    host: '127.0.0.1',
+    port: 5173,
+    strictPort: true,
+    proxy: process.env.GAME_SERVICE_URL ? {
       '/socket.io': {
-        target: process.env.GAME_SERVICE_URL || 'http://127.0.0.1:3001',
+        target: process.env.GAME_SERVICE_URL,
         ws: true,
       },
-    },
+    } : undefined,
   },
 })

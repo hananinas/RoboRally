@@ -79,6 +79,9 @@ export const BOARD_COMPONENTS: Readonly<
   testTank3: sprite('testTank3', '0 0 57 87', 0.65),
   testTank4: sprite('testTank4', '0 0 57 87', 0.65),
   testTank5: sprite('testTank5', '0 0 57 87', 0.65),
+  testTank6: sprite('testTank6', '0 0 57 87', 0.65),
+  testTank7: sprite('testTank7', '0 0 57 87', 0.65),
+  testTank8: sprite('testTank8', '0 0 57 87', 0.65),
 }
 
 const EMPTY_SLICES = [
