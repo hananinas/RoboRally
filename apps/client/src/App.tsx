@@ -60,7 +60,7 @@ function App() {
       <button className="entry-secondary-button" type="button" disabled={busy || connection.status === 'connecting'} onClick={retrySession}>Retry</button>
     </>
   }
-  return <EntryScreen onLogout={session.user ? logout : undefined}>
+  return <EntryScreen onLogout={connection.status === 'connected' || session.user ? logout : undefined}>
     {error && (session.status === 'waiting' || session.status === 'resyncing' || session.status === 'sync-failed') &&
       <p role="alert" className="entry-validation entry-validation--error">{error}</p>}
     {content}
