@@ -7,7 +7,7 @@ type NavigationMenuProps = {
   navTitle: string
   session?: Session
   logoutUrl?: string
-  selectedLink?: "welcome" | "sessions"
+  selectedLink?: "sessions"
 }
 /**
  * Renders the navigation bar with state
@@ -22,12 +22,6 @@ export const navigationMenu = ({
   selectedLink,
 }: NavigationMenuProps) => {
   const links = [
-    {
-      name: "Overview",
-      href: "welcome",
-      iconLeft: "house",
-      selected: false,
-    },
     {
       name: "Session Information",
       href: "sessions",
