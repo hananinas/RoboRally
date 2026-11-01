@@ -45,3 +45,17 @@ export function parseOidcConfig(env: Partial<Record<
 export function parseKratosSettingsUrl(value: string | undefined): URL {
   return parseUrlEnv(value, DEFAULT_KRATOS_SETTINGS_URL)
 }
+
+export type AppConfig = Readonly<{
+  port: number
+  kratosSettingsUrl: URL
+  oidc: OidcConfig
+}>
+
+export function parseAppConfig(env: NodeJS.ProcessEnv): AppConfig {
+  return {
+    port: parseGameServicePort(env.PORT),
+    kratosSettingsUrl: parseKratosSettingsUrl(env.KRATOS_SETTINGS_URL),
+    oidc: parseOidcConfig(env),
+  }
+}
