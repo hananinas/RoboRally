@@ -23,7 +23,7 @@ export function createAuthApp({ oidcClient, sessionStore }: AuthAppDeps): Expres
     const state = randomState()
 
     const authorizationUrl = await oidcClient.buildAuthorizationUrl({
-      scope: 'openid',
+      scope: 'openid profile',
       code_challenge: codeChallenge,
       code_challenge_method: 'S256',
       state,
@@ -58,16 +58,21 @@ export function createAuthApp({ oidcClient, sessionStore }: AuthAppDeps): Expres
         pkceCodeVerifier: codeVerifier,
         expectedState: state,
       })
-      const sub = tokens.claims()?.sub
+      const claims = tokens.claims()
+      const sub = claims?.sub
       if (!sub) {
         throw new Error('ID token did not contain a subject claim')
+      }
+      const username = claims?.preferred_username
+      if (typeof username !== 'string' || username.length === 0) {
+        throw new Error('ID token did not contain a preferred_username claim')
       }
       if (!tokens.id_token) {
         throw new Error('Token response did not contain an ID token')
       }
 
       const expiresIn = tokens.expires_in ?? DEFAULT_SESSION_EXPIRES_IN_SECONDS
-      const sessionId = sessionStore.create(sub, tokens.id_token, expiresIn)
+      const sessionId = sessionStore.create(sub, username, tokens.id_token, expiresIn)
       logInfo('OIDC callback succeeded', { sub })
 
       res.setHeader('Set-Cookie', [

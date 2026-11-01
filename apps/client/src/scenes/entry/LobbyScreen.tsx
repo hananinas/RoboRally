@@ -73,11 +73,11 @@ export default function LobbyScreen({ username, lobbies, pending, connected, err
           </li>
         ))}
       </ul>
-      <button className="login-secondary-button" type="button" disabled={pending || !connected} onClick={onCreate}>Create lobby</button>
-      <button className="login-secondary-button" type="button" disabled={pending || !connected} onClick={onRefresh}>Refresh</button>
-      {error && <p className="login-validation login-validation--error" role="alert">{error}</p>}
+      <button className="entry-secondary-button" type="button" disabled={pending || !connected} onClick={onCreate}>Create lobby</button>
+      <button className="entry-secondary-button" type="button" disabled={pending || !connected} onClick={onRefresh}>Refresh</button>
+      {error && <p className="entry-validation entry-validation--error" role="alert">{error}</p>}
       <button
-        className="login-primary-button"
+        className="entry-primary-button"
         disabled={pending || !connected || !selected || selected.playerCount >= selected.maxPlayers}
         onClick={() => selected && onJoin(selected.lobbyId)}
         type="button"

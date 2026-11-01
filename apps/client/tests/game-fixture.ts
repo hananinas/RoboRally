@@ -17,7 +17,7 @@ export const test = base.extend<{ game: GameFixture }>({
     expect(created.ok()).toBe(true)
     const initial: FixtureSnapshot = await created.json()
     const url = `${GAME_SERVICE_URL}/fixtures/${initial.id}`
-    await page.setExtraHTTPHeaders({ 'x-fixture-id': initial.id })
+    await page.setExtraHTTPHeaders({ 'x-fixture-id': initial.id, 'x-fixture-user': 'Player 1' })
 
     await use({
       initial,
@@ -42,8 +42,6 @@ export { expect }
 export async function openGame(page: Page, width?: number, height?: number) {
   if (width !== undefined && height !== undefined) await page.setViewportSize({ width, height })
   await page.goto('/')
-  await page.getByRole('textbox', { name: 'Username' }).fill('Player 1')
-  await page.getByRole('button', { name: 'Log in', exact: true }).click()
   const create = page.getByRole('button', { name: 'Create lobby', exact: true })
   await expect(create.or(page.getByRole('main', { name: 'Game board' }))).toBeVisible()
   if (await create.isVisible()) {

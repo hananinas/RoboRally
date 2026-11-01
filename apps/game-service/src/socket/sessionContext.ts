@@ -19,6 +19,6 @@ export type SessionContext = {
 }
 
 export function currentGame(context: SessionContext, socket: GameSocket): MembershipContext | undefined {
-  const session = context.sessionsByUser.get(socket.data.user?.userId ?? '')
+  const session = context.sessionsByUser.get(socket.data.user.userId)
   return session?.kind === 'game' ? context.games.get(session.gameId) : undefined
 }

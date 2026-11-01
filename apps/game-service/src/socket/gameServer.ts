@@ -10,12 +10,10 @@ import type {
 import { Server, type Socket } from 'socket.io'
 import { parseCookie } from 'cookie'
 import type { Game } from '@/game/index'
-import { createUserRegistry } from '@/userRegistry'
 import { createDefaultGame } from '@/game/GameFactory'
-import { handleLogin } from '@/socket/handlers/authHandlers'
 import { SESSION_COOKIE_NAME, type Session, type SessionStore } from '@/auth/sessionStore'
 
-export type GameSocketData = { user?: User; authSession?: Session }
+export type GameSocketData = { user: User; authSession: Session }
 
 export type GameSocketServer = Server<
   ClientToServerEvents,
@@ -41,6 +39,7 @@ function authenticateSocket(sessionStore: SessionStore, socket: GameSocket, next
     return
   }
   socket.data.authSession = authSession
+  socket.data.user = { userId: authSession.sub, username: authSession.username }
   next()
 }
 
@@ -59,7 +58,6 @@ export function createGameSocketServer(
     pingInterval: 1000,
     pingTimeout: 1000,
   })
-  const users = createUserRegistry()
   const context: SessionContext = {
     io, createGame, games: new Map(), lobbies: new Map(), sessionsByUser: new Map(),
   }
@@ -70,8 +68,6 @@ export function createGameSocketServer(
   io.use((socket, next) => validateRecoveredSession(context, socket, next))
 
   io.on('connection', (socket) => {
-    socket.on('user.login', (payload, acknowledge) => handleLogin(socket, { users }, payload, acknowledge))
-
     recoverSession(context, socket)
 
     socket.on('lobby.list', (payload, ack) => handleListLobbies(context, socket, payload, ack))

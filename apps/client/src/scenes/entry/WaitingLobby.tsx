@@ -17,7 +17,7 @@ export default function WaitingLobby({ lobby, userId, disabled, onStart, onLeave
         ))}
       </ul>
     </div>
-    {owner && <button className="login-primary-button" type="button" disabled={disabled} onClick={onStart}>Start</button>}
-    <button className="login-secondary-button" type="button" disabled={disabled} onClick={onLeave}>Leave lobby</button>
+    {owner && <button className="entry-primary-button" type="button" disabled={disabled} onClick={onStart}>Start</button>}
+    <button className="entry-secondary-button" type="button" disabled={disabled} onClick={onLeave}>Leave lobby</button>
   </>
 }

@@ -15,27 +15,32 @@ let
     exec ${nodejs}/bin/npm exec --yes --package=pnpm@10.9.0 -- pnpm "$@"
   '';
 
+  chromiumOnlyBrowsers = pkgs.playwright-driver.browsers.override {
+    withFirefox = false;
+    withWebkit = false;
+  };
+
   mkProjectShell = {
     setupCommand,
     withClient ? false,
     withGameService ? false,
     withAsyncapi ? false,
     withEditor ? false,
+    withBackend ? false,
     withBrowser ? false
   }:
     pkgs.mkShell ({
-      packages = [ nodejs pnpm pkgs.process-compose pkgs.kratos pkgs.ory-hydra pkgs.mailpit pkgs.mkcert pkgs.nss.tools pkgs.caddy pkgs.xdg-utils ]
+      packages = [ nodejs pnpm ]
+        ++ pkgs.lib.optionals withBackend [ pkgs.process-compose pkgs.kratos pkgs.ory-hydra pkgs.mailpit pkgs.mkcert pkgs.nss.tools pkgs.caddy pkgs.xdg-utils ]
         ++ pkgs.lib.optionals withAsyncapi asyncapiPackages
         ++ pkgs.lib.optionals withEditor [ editor ]
         ++ pkgs.lib.optionals withBrowser [ pkgs.firefox ];
-
-      BROWSER = "firefox";
 
       shellHook = ''
         ${setupCommand} || return $?
       '';
     } // pkgs.lib.optionalAttrs withClient {
-      PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
+      PLAYWRIGHT_BROWSERS_PATH = "${chromiumOnlyBrowsers}";
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
       PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
     } // pkgs.lib.optionalAttrs withBrowser {
@@ -47,10 +52,17 @@ in {
     withClient = true;
     withGameService = true;
     withAsyncapi = true;
+    withBackend = true;
   };
 
   client = mkProjectShell {
     setupCommand = "pnpm --filter @robo-rally/client run install-dev";
+    withClient = true;
+  };
+
+  # Full workspace install with a lean (no backend) toolchain, for CI typecheck/lint/build/test.
+  ci = mkProjectShell {
+    setupCommand = "pnpm run install-dev";
     withClient = true;
   };
 
@@ -70,6 +82,7 @@ in {
     withGameService = true;
     withAsyncapi = true;
     withEditor = true;
+    withBackend = true;
   };
 
   # Full project environment with a bundled browser (e.g. for WSL, where no
@@ -79,6 +92,7 @@ in {
     withClient = true;
     withGameService = true;
     withAsyncapi = true;
+    withBackend = true;
     withBrowser = true;
   };
 }

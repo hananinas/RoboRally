@@ -22,7 +22,7 @@ export function presentLobby(lobby: Lobby): LobbyState {
 }
 
 export function leaveLobby(context: SessionContext, socket: GameSocket): void {
-  const userId = socket.data.user?.userId ?? ''
+  const userId = socket.data.user.userId
   const session = context.sessionsByUser.get(userId)
   if (session?.kind !== 'lobby') return
   const lobby = context.lobbies.get(session.lobbyId)

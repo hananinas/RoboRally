@@ -28,8 +28,6 @@ channels:
         $ref: '#/components/messages/LobbyStart'
       getSession:
         $ref: '#/components/messages/SessionGet'
-      login:
-        $ref: '#/components/messages/Login'
       leaveGame:
         $ref: '#/components/messages/LeaveGame'
       submitProgram:
@@ -85,15 +83,6 @@ channels:
       updated:
         $ref: '#/components/messages/LobbyUpdated'
 
-  loginReplies:
-    address: null
-    description: |
-      Logical reply channel
-      Delivered through the acknowledgement of user.login
-    messages:
-      result:
-        $ref: '#/components/messages/LoginResult'
-
   leaveReplies:
     address: null
     description: |
@@ -145,20 +134,6 @@ channels:
         $ref: '#/components/messages/GameAborted'
 
 operations:
-  handleLogin:
-    action: receive
-    channel:
-      $ref: '#/channels/commands'
-    messages:
-      - $ref: '#/channels/commands/messages/login'
-    reply:
-      channel:
-        $ref: '#/channels/loginReplies'
-      messages:
-        - $ref: '#/channels/loginReplies/messages/result'
-      x-socketio:
-        acknowledgement: true
-
   handleLeaveGame:
     action: receive
     channel:
@@ -351,45 +326,14 @@ components:
       payload:
         $ref: '#/components/schemas/GameStarted'
 
-    Login:
-      name: user.login
-      description: Requests a user identity for a username.
-      payload:
-        $ref: '#/components/schemas/Login'
-
-      examples:
-        - name: "username"
-          summary: "Exact username, no normalization"
-          payload:
-            username: "Dane"
-
-    LoginResult:
-      name: user.loginResult
-      description: Returns an approved user identity or a rejection.
-      payload:
-        $ref: '#/components/schemas/LoginResult'
-
-      examples:
-        - name: "loggedIn"
-          summary: "Same shape for new and existing users"
-          payload:
-            outcome: "LOGGED_IN"
-            user:
-              userId: "00000000-0000-4000-8000-000000000004"
-              username: "Dane"
-        - name: "invalidUsername"
-          summary: "Empty or overlong username"
-          payload:
-            outcome: "INVALID_USERNAME"
-
     LeaveGame:
       name: game.leave
       description: >-
         Requests explicit departure for the membership owned by this connection.
         On success, removes the player and robot, frees the occupied tile, and
-        removes the connection from the public and private player rooms while
-        retaining login. Disconnecting retains membership and does not send
-        game.playerLeft. Leaving does not reopen a game that has already started.
+        removes the connection from the public and private player rooms.
+        Disconnecting retains membership and does not send game.playerLeft.
+        Leaving does not reopen a game that has already started.
       payload:
         $ref: '#/components/schemas/JoinGame'
       examples:
@@ -407,13 +351,9 @@ components:
         $ref: '#/components/schemas/LeaveResult'
       examples:
         - name: left
-          summary: Membership removed; the connection remains logged in
+          summary: Membership removed
           payload:
             outcome: LEFT
-        - name: loginRequired
-          summary: The connection has not logged in
-          payload:
-            outcome: LOGIN_REQUIRED
         - name: invalidRequest
           summary: The request is malformed
           payload:
@@ -787,7 +727,6 @@ components:
       properties:
         outcome:
           enum:
-            - LOGIN_REQUIRED
             - INVALID_REQUEST
             - INTERNAL_ERROR
             - LOBBY_NOT_FOUND
@@ -907,7 +846,7 @@ components:
         initialization:
           $ref: '#/components/schemas/JoinAccepted'
 
-    # Login
+    # User identity
     Username:
       type: string
       minLength: 1
@@ -924,45 +863,6 @@ components:
           $ref: '#/components/schemas/UserId'
         username:
           $ref: '#/components/schemas/Username'
-
-    Login:
-      type: object
-      additionalProperties: false
-      required: [ username ]
-      properties:
-        username:
-          $ref: '#/components/schemas/Username'
-
-    LoginResult:
-      oneOf:
-        - $ref: '#/components/schemas/LoginAccepted'
-        - $ref: '#/components/schemas/LoginRejected'
-
-    LoginAccepted:
-      type: object
-      additionalProperties: false
-      required: [ outcome, user ]
-      properties:
-        outcome:
-          type: string
-          enum: [ LOGGED_IN ]
-        user:
-          $ref: '#/components/schemas/User'
-
-    LoginRejected:
-      type: object
-      additionalProperties: false
-      required: [ outcome ]
-      properties:
-        outcome:
-          type: string
-          enum: [ INVALID_USERNAME, INVALID_REQUEST, ALREADY_LOGGED_IN, INTERNAL_ERROR ]
-      description: |
-        INVALID_USERNAME covers a missing/non-string username or a length outside 1–30.
-        INVALID_REQUEST: the request did not match the expected shape.
-        ALREADY_LOGGED_IN means this connection is bound to a different username.
-        Repeating login with the same username returns LOGGED_IN with the same user.
-        INTERNAL_ERROR is an unexpected service failure; do not expose internals.
 
     # Membership
     JoinGame:
@@ -1021,10 +921,9 @@ components:
       properties:
         outcome:
           type: string
-          enum: [ LEFT, LOGIN_REQUIRED, INVALID_REQUEST, GAME_NOT_FOUND, INTERNAL_ERROR ]
+          enum: [ LEFT, INVALID_REQUEST, GAME_NOT_FOUND, INTERNAL_ERROR ]
       description: |
-        LEFT: membership and robot removed, room access revoked, login retained.
-        LOGIN_REQUIRED: this connection has no approved user.
+        LEFT: membership and robot removed, room access revoked.
         INVALID_REQUEST: the request did not match the expected shape.
         GAME_NOT_FOUND: unavailable game or membership not owned by this connection;
         this also covers a repeated leave after a successful departure.
