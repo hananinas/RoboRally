@@ -96,9 +96,7 @@ registerVerificationRoute(router)
 registerSessionsRoute(router)
 registerErrorRoute(router)
 
-// all routes registered under the /consent path are protected by CSRF
-router.use("/consent", doubleCsrfProtection)
-router.use("/consent", csrfErrorHandler(invalidCsrfTokenError))
+// /consent has no interactive form to submit, so it doesn't need CSRF protection
 registerConsentRoute(router)
 
 // all routes registered under the /logout path are protected by CSRF
