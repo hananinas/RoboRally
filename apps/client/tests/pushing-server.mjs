@@ -1,7 +1,7 @@
 import { createServer } from 'node:http'
 import { Board, Direction, EmptyTile, Game, PitTile, createHand } from '../../game-service/dist/game/index.js'
 import { Integer } from '../../game-service/dist/numbers.js'
-import { parseGameServicePort } from '../../game-service/dist/config.js'
+import { parseAppConfig } from '../../game-service/dist/config.js'
 import { createGameSocketServer } from '../../game-service/dist/socket/gameServer.js'
 import { createAuthApp } from '../../game-service/dist/auth/httpRoutes.js'
 import { createSessionStore } from '../../game-service/dist/auth/sessionStore.js'
@@ -19,19 +19,19 @@ const board = new Board(tiles, { x: Integer(0), y: Integer(0), angle: 0 }, {
   name: 'Pushing test board', icon, maxPlayers: 6,
 })
 const game = new Game(board, [], createHand(), { x: Integer(5), y: Integer(5) }, 'Shared game')
-const oidcClient = await createOidcClient()
+const config = parseAppConfig(process.env)
+const oidcClient = await createOidcClient(config.oidc)
 const sessionStore = createSessionStore()
 const server = createServer()
-const authApp = createAuthApp({ oidcClient, sessionStore })
+const authApp = createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl: config.kratosSettingsUrl })
 server.on('request', (req, res) => {
   if (req.url?.startsWith('/auth/')) {
     authApp(req, res)
   }
 })
 const io = createGameSocketServer(server, sessionStore, () => ({ gameId: '00000000-0000-4000-8000-000000000001', game }))
-const port = parseGameServicePort(process.env.PORT)
-server.listen(port, '127.0.0.1', () => {
-  console.log(`Game Service listening at http://127.0.0.1:${port}`)
+server.listen(config.port, '127.0.0.1', () => {
+  console.log(`Game Service listening at http://127.0.0.1:${config.port}`)
 })
 process.once('SIGTERM', () => io.close())
 process.once('SIGINT', () => io.close())
