@@ -71,7 +71,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     const duplicate = await connect('Owner')
     expect(await duplicate.emitWithAck('lobby.create', {})).toEqual({ outcome: 'USER_ALREADY_IN_SESSION' })
     expect(await duplicate.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'USER_ALREADY_IN_SESSION' })
-    expect(await duplicate.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'NOT_LOBBY_MEMBER' })
+    expect(await duplicate.emitWithAck('lobby.start', {})).toEqual({ outcome: 'NOT_LOBBY_MEMBER' })
     expect(factory).not.toHaveBeenCalled()
   })
   it.each(['leave', 'disconnect'] as const)('updates the roster and owner on %s without notifying other lobbies', async (departure) => {
@@ -102,7 +102,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     })
 
     const left = new Promise<LobbyState>((resolve) => other.once('lobby.updated', ({ lobby: state }) => resolve(state)))
-    if (departure === 'leave') await owner.emitWithAck('lobby.leave', { lobbyId: lobby.lobbyId })
+    if (departure === 'leave') await owner.emitWithAck('lobby.leave', {})
     else await disconnect(owner)
     expect(await left).toEqual({ ...roster, ownerUserId: roster.players[1]!.userId, playerCount: 1, players: [roster.players[1]!] })
     await outsider.emitWithAck('session.get', {})
@@ -119,7 +119,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     const extra = await connect('Extra')
     expect(await extra.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'LOBBY_FULL' })
     const ready = started(owner)
-    await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })
+    await owner.emitWithAck('lobby.start', {})
     expect(new Set((await ready).state.robots.map((robot) => robot.colour)).size).toBe(6)
   })
   it('starts only for the owner, moves all members, and sends only their own hand', async () => {
@@ -127,9 +127,9 @@ describe('lobby lifecycle over Socket.IO', () => {
     const lobby = await create(owner)
     const other = await connect('Other')
     await other.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })
-    expect(await other.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'NOT_LOBBY_OWNER' })
+    expect(await other.emitWithAck('lobby.start', {})).toEqual({ outcome: 'NOT_LOBBY_OWNER' })
     const initializations = [started(owner), started(other)]
-    const result = await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })
+    const result = await owner.emitWithAck('lobby.start', {})
     expect(result.outcome).toBe('STARTED')
     const [first, second] = await Promise.all(initializations)
     expect(first.state).toEqual(second.state)
@@ -145,12 +145,11 @@ describe('lobby lifecycle over Socket.IO', () => {
     }
     expect(server.sockets.adapter.rooms.has(`lobby:${lobby.lobbyId}`)).toBe(false)
     expect(await owner.emitWithAck('lobby.list', {})).toEqual({ outcome: 'LOBBIES_FOUND', lobbies: [] })
-    expect(await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'LOBBY_NOT_FOUND' })
+    expect(await owner.emitWithAck('lobby.start', {})).toEqual({ outcome: 'NOT_LOBBY_MEMBER' })
     const outsider = await connect('Outsider')
     expect(await outsider.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION', user: { userId: 'Outsider', username: 'Outsider' } })
     expect(await outsider.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'LOBBY_NOT_FOUND' })
     expect(await outsider.emitWithAck('program.submit', {
-      gameId: first.assignment.gameId, playerId: first.assignment.playerId,
       cardIds: first.hand.slice(0, 5).map((card) => card.id) as [string, string, string, string, string],
     })).toEqual({ outcome: 'NOT_A_MEMBER' })
     expect(factory).toHaveBeenCalledTimes(1)
@@ -164,7 +163,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     if (state === 'missing') server.sockets.sockets.delete(other.id!)
     else connection.connected = false
     try {
-      expect(await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId }))
+      expect(await owner.emitWithAck('lobby.start', {}))
         .toEqual({ outcome: 'LOBBY_MEMBER_DISCONNECTED' })
       expect(factory).not.toHaveBeenCalled()
       expect(await owner.emitWithAck('session.get', {}))
@@ -175,7 +174,7 @@ describe('lobby lifecycle over Socket.IO', () => {
       connection.connected = true
     }
     const ready = started(owner)
-    expect((await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })).outcome).toBe('STARTED')
+    expect((await owner.emitWithAck('lobby.start', {})).outcome).toBe('STARTED')
     expect((await ready).state.players).toHaveLength(2)
   })
 
@@ -185,7 +184,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     const other = await connect('Other')
     await other.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })
     const updated = new Promise<LobbyState>((resolve) => other.once('lobby.updated', ({ lobby: state }) => resolve(state)))
-    expect(await owner.emitWithAck('lobby.leave', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'LEFT' })
+    expect(await owner.emitWithAck('lobby.leave', {})).toEqual({ outcome: 'LEFT' })
     expect((await updated).ownerUserId).toBe('Other')
     await disconnect(other)
     expect(await owner.emitWithAck('lobby.list', {})).toEqual({ outcome: 'LOBBIES_FOUND', lobbies: [] })
@@ -197,11 +196,11 @@ describe('lobby lifecycle over Socket.IO', () => {
     const events = vi.fn()
     owner.on('game.started', events)
     factory.mockImplementationOnce(() => { throw new Error('Cannot construct game') })
-    expect(await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'INTERNAL_ERROR' })
+    expect(await owner.emitWithAck('lobby.start', {})).toEqual({ outcome: 'INTERNAL_ERROR' })
     expect(server.sockets.sockets.get(owner.id!)!.rooms).toEqual(new Set([owner.id, `lobby:${lobby.lobbyId}`]))
     expect(events).not.toHaveBeenCalled()
     const ready = started(owner)
-    expect((await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })).outcome).toBe('STARTED')
+    expect((await owner.emitWithAck('lobby.start', {})).outcome).toBe('STARTED')
     await ready
   })
   it('isolates games and revokes room access on explicit game leave', async () => {
@@ -210,14 +209,13 @@ describe('lobby lifecycle over Socket.IO', () => {
     for (const owner of owners) {
       const lobby = await create(owner)
       const ready = started(owner)
-      await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })
+      await owner.emitWithAck('lobby.start', {})
       initializations.push(await ready)
     }
     expect(initializations[0].assignment.gameId).not.toBe(initializations[1].assignment.gameId)
     const foreignEvents = vi.fn()
     owners[1].onAny(foreignEvents)
-    expect(await owners[0].emitWithAck('game.leave', { gameId: initializations[1].assignment.gameId })).toEqual({ outcome: 'GAME_NOT_FOUND' })
-    expect(await owners[0].emitWithAck('game.leave', { gameId: initializations[0].assignment.gameId })).toEqual({ outcome: 'LEFT' })
+    expect(await owners[0].emitWithAck('game.leave', {})).toEqual({ outcome: 'LEFT' })
     await owners[1].emitWithAck('session.get', {})
     expect(foreignEvents).not.toHaveBeenCalled()
     expect(server.sockets.sockets.get(owners[0].id!)!.rooms).toEqual(new Set([owners[0].id]))
@@ -230,7 +228,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     const lobby = await create(owner)
     expect(await owner.emitWithAck('session.get', {})).toEqual({ outcome: 'IN_LOBBY', lobby, user: ownerUser })
     // Deliberately do not install a game.started listener or await its start ack.
-    owner.emit('lobby.start', { lobbyId: lobby.lobbyId }, () => {})
+    owner.emit('lobby.start', {}, () => {})
     const session = await owner.emitWithAck('session.get', {})
     expect(session.outcome).toBe('IN_GAME')
     if (session.outcome !== 'IN_GAME') throw new Error(session.outcome)
@@ -254,7 +252,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     await other.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })
     await disconnect(other)
     const ready = started(owner)
-    await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })
+    await owner.emitWithAck('lobby.start', {})
     expect((await ready).state.players).toHaveLength(1)
     const replacement = await connect('Other')
     expect(await replacement.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION', user: { userId: 'Other', username: 'Other' } })
@@ -288,7 +286,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     const serverSocket = server.sockets.sockets.get(owner.id!)!
     const original = serverSocket.join.bind(serverSocket)
     vi.spyOn(serverSocket, 'join').mockImplementationOnce(original).mockImplementationOnce(() => { throw new Error('Room failure') })
-    expect(await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'INTERNAL_ERROR' })
+    expect(await owner.emitWithAck('lobby.start', {})).toEqual({ outcome: 'INTERNAL_ERROR' })
     expect(serverSocket.rooms).toEqual(new Set([owner.id, `lobby:${lobby.lobbyId}`]))
     expect((await owner.emitWithAck('session.get', {})).outcome).toBe('IN_LOBBY')
     expect([...server.sockets.adapter.rooms.keys()].some((room) => room.startsWith('game:'))).toBe(false)
@@ -309,10 +307,10 @@ describe('lobby lifecycle over Socket.IO', () => {
     const owner = await connect('Owner')
     const lobby = await create(owner)
     factory.mockImplementationOnce(() => { throw new Error('Factory failure') })
-    expect(await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'INTERNAL_ERROR' })
+    expect(await owner.emitWithAck('lobby.start', {})).toEqual({ outcome: 'INTERNAL_ERROR' })
     expect(await owner.emitWithAck('session.get', {})).toEqual({ outcome: 'IN_LOBBY', lobby, user: { userId: 'Owner', username: 'Owner' } })
     const ready = started(owner)
-    expect((await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })).outcome).toBe('STARTED')
+    expect((await owner.emitWithAck('lobby.start', {})).outcome).toBe('STARTED')
     await ready
   })
 
@@ -320,7 +318,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     const owner = await connect('Owner')
     const lobby = await create(owner)
     const ready = started(owner)
-    await owner.emitWithAck('lobby.start', { lobbyId: lobby.lobbyId })
+    await owner.emitWithAck('lobby.start', {})
     const initialization = await ready
     await disconnect(owner)
     const returned = await connect('Owner')
