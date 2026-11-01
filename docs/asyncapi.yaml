@@ -147,8 +147,6 @@ channels:
         $ref: '#/components/messages/RobotActionResolved'
       registersChanged:
         $ref: '#/components/messages/RegistersChanged'
-      programmingStarted:
-        $ref: '#/components/messages/ProgrammingStarted'
       playerCheckpointProgress:
         $ref: '#/components/messages/PlayerCheckpointProgress'
       playerLeft:
@@ -705,21 +703,6 @@ components:
               - status: EMPTY
               - status: EMPTY
               - status: EMPTY
-
-    ProgrammingStarted:
-      name: game.programmingStarted
-      description: Announces the start of programming with all players' registers reset to EMPTY.
-      payload:
-        type: object
-        additionalProperties: false
-        required: [ gameId ]
-        properties:
-          gameId:
-            $ref: '#/components/schemas/GameId'
-      examples:
-        - name: started
-          payload:
-            gameId: 00000000-0000-4000-8000-000000000001
 
     RobotActionResolved:
       name: robot.actionResolved
@@ -1284,7 +1267,7 @@ components:
       maxItems: 5
       items:
         $ref: '#/components/schemas/PublicRegisterSlot'
-      description: Five public slots in register order.
+      description: Five public slots in register order, reset to EMPTY when a new hand is dealt.
 
     PublicRegisterSlot:
       type: object
