@@ -1,6 +1,7 @@
 import express, { type ErrorRequestHandler, type Express, type Request } from 'express'
 import { parseCookie, stringifySetCookie } from 'cookie'
 import { calculatePKCECodeChallenge, randomPKCECodeVerifier, randomState } from 'openid-client'
+import { err, ok, type Result } from 'neverthrow'
 import type { OidcClient } from '@/infra/oidcClient'
 import { SESSION_COOKIE_NAME, type Session, type SessionStore } from '@/auth/sessionStore'
 import { logError, logInfo, logWarn } from '@/logger'
@@ -47,48 +48,29 @@ export function createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl }: A
     ]
 
     const cookies = parseCookie(req.headers.cookie ?? '')
-    const state = cookies[STATE_COOKIE_NAME]
-    const codeVerifier = cookies[VERIFIER_COOKIE_NAME]
+    const result = await exchangeCallback(oidcClient, req, cookies)
 
-    if (!state || !codeVerifier) {
-      logWarn('Rejected OIDC callback: missing or expired transaction cookies', { url: req.originalUrl })
+    if (result.isErr()) {
       res.setHeader('Set-Cookie', clearTransactionCookies)
-      res.status(400).type('text/plain').send('Login session expired or missing. Please try /auth/login again.')
+      if (result.error === 'MISSING_TRANSACTION_COOKIES') {
+        logWarn('Rejected OIDC callback: missing or expired transaction cookies', { url: req.originalUrl })
+        res.status(400).type('text/plain').send('Login session expired or missing. Please try /auth/login again.')
+      } else {
+        logError('OIDC callback failed', new Error(result.error), { url: req.originalUrl })
+        res.status(400).type('text/plain').send('Login failed. Please try /auth/login again.')
+      }
       return
     }
 
-    try {
-      const tokens = await oidcClient.exchangeAuthorizationCode(req.originalUrl, {
-        pkceCodeVerifier: codeVerifier,
-        expectedState: state,
-      })
-      const claims = tokens.claims()
-      const sub = claims?.sub
-      if (!sub) {
-        throw new Error('ID token did not contain a subject claim')
-      }
-      const username = claims?.preferred_username
-      if (typeof username !== 'string' || username.length === 0) {
-        throw new Error('ID token did not contain a preferred_username claim')
-      }
-      if (!tokens.id_token) {
-        throw new Error('Token response did not contain an ID token')
-      }
+    const { sub, username, idToken, expiresIn } = result.value
+    const sessionId = sessionStore.create(sub, username, idToken, expiresIn)
+    logInfo('OIDC callback succeeded', { sub })
 
-      const expiresIn = tokens.expires_in ?? DEFAULT_SESSION_EXPIRES_IN_SECONDS
-      const sessionId = sessionStore.create(sub, username, tokens.id_token, expiresIn)
-      logInfo('OIDC callback succeeded', { sub })
-
-      res.setHeader('Set-Cookie', [
-        ...clearTransactionCookies,
-        sessionCookie(sessionId, expiresIn),
-      ])
-      res.redirect('/')
-    } catch (error) {
-      logError('OIDC callback failed', error, { url: req.originalUrl })
-      res.setHeader('Set-Cookie', clearTransactionCookies)
-      res.status(400).type('text/plain').send('Login failed. Please try /auth/login again.')
-    }
+    res.setHeader('Set-Cookie', [
+      ...clearTransactionCookies,
+      sessionCookie(sessionId, expiresIn),
+    ])
+    res.redirect('/')
   })
 
   app.get('/auth/logout', async (req, res) => {
@@ -124,6 +106,51 @@ export function createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl }: A
   app.use(handleAuthRouteError)
 
   return app
+}
+
+type CallbackError =
+  | 'MISSING_TRANSACTION_COOKIES'
+  | 'TOKEN_EXCHANGE_FAILED'
+  | 'MISSING_SUBJECT_CLAIM'
+  | 'MISSING_USERNAME_CLAIM'
+  | 'MISSING_ID_TOKEN'
+
+type CallbackSession = Readonly<{ sub: string; username: string; idToken: string; expiresIn: number }>
+
+async function exchangeCallback(
+  oidcClient: OidcClient,
+  req: Request,
+  cookies: Record<string, string | undefined>,
+): Promise<Result<CallbackSession, CallbackError>> {
+  const state = cookies[STATE_COOKIE_NAME]
+  const codeVerifier = cookies[VERIFIER_COOKIE_NAME]
+  if (!state || !codeVerifier) return err('MISSING_TRANSACTION_COOKIES')
+
+  let tokens
+  try {
+    tokens = await oidcClient.exchangeAuthorizationCode(req.originalUrl, {
+      pkceCodeVerifier: codeVerifier,
+      expectedState: state,
+    })
+  } catch {
+    return err('TOKEN_EXCHANGE_FAILED')
+  }
+
+  const claims = tokens.claims()
+  const sub = claims?.sub
+  if (!sub) return err('MISSING_SUBJECT_CLAIM')
+
+  const username = claims?.preferred_username
+  if (typeof username !== 'string' || username.length === 0) return err('MISSING_USERNAME_CLAIM')
+
+  if (!tokens.id_token) return err('MISSING_ID_TOKEN')
+
+  return ok({
+    sub,
+    username,
+    idToken: tokens.id_token,
+    expiresIn: tokens.expires_in ?? DEFAULT_SESSION_EXPIRES_IN_SECONDS,
+  })
 }
 
 function readSession(
