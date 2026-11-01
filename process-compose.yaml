@@ -20,6 +20,19 @@ processes:
         condition: process_completed_successfully
       mailpit:
         condition: process_started
+    readiness_probe:
+      exec:
+        command: "curl --fail --silent --max-time 2 http://127.0.0.1:4434/health/ready"
+      initial_delay_seconds: 1
+      period_seconds: 1
+      timeout_seconds: 2
+      failure_threshold: 15
+
+  seed-kratos-identities:
+    command: "kratos import identities infra/kratos/fixtures/dev-users.json -e http://127.0.0.1:4434"
+    depends_on:
+      kratos:
+        condition: process_healthy
 
   reset-hydra-db:
     command: "rm -rf hydra/data && mkdir -p hydra/data"
@@ -30,31 +43,97 @@ processes:
       reset-hydra-db:
         condition: process_completed_successfully
 
+  generate-dev-tls-cert:
+    command: >
+      mkdir -p infra/dev-tls &&
+      TRUST_STORES=nss mkcert -install &&
+      mkcert -cert-file infra/dev-tls/cert.pem -key-file infra/dev-tls/key.pem 127.0.0.1 localhost
+
   hydra:
     command: "hydra serve -c infra/hydra/hydra.yml all --dev"
     depends_on:
       migrate-hydra-db:
         condition: process_completed_successfully
+      generate-dev-tls-cert:
+        condition: process_completed_successfully
+    readiness_probe:
+      exec:
+        command: "curl --fail --silent --max-time 2 http://127.0.0.1:4445/health/ready"
+      initial_delay_seconds: 1
+      period_seconds: 1
+      timeout_seconds: 2
+      failure_threshold: 15
 
   kratos-hydra-ui:
     command: "pnpm --filter @robo-rally/kratos-hydra-ui run start"
+    environment:
+      - TRUSTED_CLIENT_IDS=game-service
     depends_on:
       kratos:
-        condition: process_started
+        condition: process_healthy
       hydra:
-        condition: process_started
+        condition: process_healthy
+
+  register-game-service-client:
+    command: >
+      curl --fail --silent --show-error
+      -X POST http://127.0.0.1:4445/admin/clients
+      -H "Content-Type: application/json"
+      -d @infra/hydra/clients/game-service.json
+    depends_on:
+      hydra:
+        condition: process_healthy
 
   build-game-events:
     command: "pnpm --filter @robo-rally/game-events run build"
+
+  dev-tls-proxy:
+    command: "caddy run --config infra/Caddyfile.dev --adapter caddyfile"
+    depends_on:
+      generate-dev-tls-cert:
+        condition: process_completed_successfully
+    readiness_probe:
+      exec:
+        command: "curl --fail --silent --max-time 2 --insecure https://127.0.0.1:3001"
+      initial_delay_seconds: 1
+      period_seconds: 1
+      timeout_seconds: 2
+      failure_threshold: 30
+
+  open-client:
+    namespace: dev-ui
+    command: >
+      if [ -n "$WSL_DISTRO_NAME" ]; then
+        firefox https://127.0.0.1:3001
+      else
+        xdg-open https://127.0.0.1:3001
+      fi
+    depends_on:
+      dev-tls-proxy:
+        condition: process_healthy
+      client:
+        condition: process_started
 
   client:
     command: "pnpm --filter @robo-rally/client run dev"
     depends_on:
       build-game-events:
         condition: process_completed_successfully
+      kratos:
+        condition: process_healthy
+      hydra:
+        condition: process_healthy
 
   game-service:
-    command: "pnpm --filter @robo-rally/game-service run dev"
+    namespace: game
+    command: >
+      export PORT=3002 &&
+      export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem" &&
+      pnpm --filter @robo-rally/game-service run dev
     depends_on:
       build-game-events:
+        condition: process_completed_successfully
+      register-game-service-client:
+        condition: process_completed_successfully
+      generate-dev-tls-cert:
         condition: process_completed_successfully

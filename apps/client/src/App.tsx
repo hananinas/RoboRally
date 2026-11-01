@@ -1,17 +1,15 @@
 import type { ReactNode } from 'react'
+import { useEffect } from 'react'
 import ActiveGame from './scenes/active-game/ActiveGame.tsx'
-import Login from './scenes/login/Login.tsx'
-import EntryScreen from './scenes/login/EntryScreen.tsx'
-import LobbyScreen from './scenes/login/LobbyScreen.tsx'
-import WaitingLobby from './scenes/login/WaitingLobby.tsx'
+import EntryScreen from './scenes/entry/EntryScreen.tsx'
+import LobbyScreen from './scenes/entry/LobbyScreen.tsx'
+import WaitingLobby from './scenes/entry/WaitingLobby.tsx'
 import { USER_ALREADY_IN_GAME_MESSAGE } from './scenes/active-game/gameState.ts'
 import useSessionConnection from './useSessionConnection.ts'
 
 function errorMessage(code: string): string {
   switch (code) {
     case 'USER_ALREADY_IN_SESSION': return USER_ALREADY_IN_GAME_MESSAGE
-    case 'INVALID_USERNAME': return 'Username must contain 1–30 characters.'
-    case 'ALREADY_LOGGED_IN': return 'This connection is already logged in with another username. Retry connection to use this name.'
     case 'LOBBY_NOT_FOUND': return 'This lobby is no longer available. Refresh and try again.'
     case 'LOBBY_MEMBER_DISCONNECTED': return 'A player disconnected before the game could start. Please try again.'
     case 'LOBBY_FULL': return 'This lobby is full. Choose another lobby.'
@@ -23,30 +21,29 @@ function errorMessage(code: string): string {
 function App() {
   const {
     connection, game, session, busy, lobbies, listError,
-    submitUsername, changeUsername, createLobby, joinLobby,
-    startLobby, leaveSession, refreshLobbies, retrySession,
+    createLobby, joinLobby, startLobby, leaveSession, refreshLobbies, retrySession,
   } = useSessionConnection()
 
+  useEffect(() => {
+    if (connection.status === 'unauthenticated') window.location.href = '/auth/login'
+  }, [connection.status])
+
+  const logout = () => { window.location.href = '/auth/logout' }
+
   // Keep the existing game visible while session.get restores membership after reconnecting.
-  if ((session.status === 'joined' || session.status === 'resyncing') && game.state.assignment) {
-    return <ActiveGame game={game} username={session.user.username} leaving={busy} onLeave={leaveSession} />
+  if ((session.status === 'joined' || session.status === 'resyncing') && session.user && game.state.assignment) {
+    return <ActiveGame game={game} username={session.user.username} leaving={busy} onLeave={leaveSession} onLogout={logout} />
+  }
+
+  if (connection.status === 'unauthenticated') {
+    return <EntryScreen><p>Redirecting to login…</p></EntryScreen>
   }
 
   const browsing = session.status === 'browsing' || session.status === 'joining'
   const errorCode = ('error' in session && session.error) || (browsing && listError)
   const error = errorCode ? errorMessage(errorCode) : connection.error
   let content: ReactNode
-  if (session.status === 'editing' || session.status === 'logging-in') {
-    content = <Login
-      connectionStatus={connection.status}
-      error={error}
-      onSubmitUsername={submitUsername}
-      onUsernameChange={changeUsername}
-      pending={session.status === 'logging-in'}
-      requiresReconnect={session.status === 'editing' && session.error === 'ALREADY_LOGGED_IN'}
-      username={session.username}
-    />
-  } else if (session.status === 'browsing' || session.status === 'joining') {
+  if (session.status === 'browsing' || session.status === 'joining') {
     content = <LobbyScreen
       username={session.user.username} error={error} lobbies={lobbies}
       pending={busy || session.status === 'joining'} connected={connection.status === 'connected'}
@@ -60,12 +57,12 @@ function App() {
   } else {
     content = <>
       <p>Restoring session…</p>
-      <button className="login-secondary-button" type="button" disabled={busy || connection.status !== 'connected'} onClick={retrySession}>Retry</button>
+      <button className="entry-secondary-button" type="button" disabled={busy || connection.status === 'connecting'} onClick={retrySession}>Retry</button>
     </>
   }
-  return <EntryScreen>
+  return <EntryScreen onLogout={connection.status === 'connected' || session.user ? logout : undefined}>
     {error && (session.status === 'waiting' || session.status === 'resyncing' || session.status === 'sync-failed') &&
-      <p role="alert" className="login-validation login-validation--error">{error}</p>}
+      <p role="alert" className="entry-validation entry-validation--error">{error}</p>}
     {content}
   </EntryScreen>
 }

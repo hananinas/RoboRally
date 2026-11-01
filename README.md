@@ -59,6 +59,12 @@ The recommended development environment uses Nix together with direnv. You do no
 
 The development shell provides the tools required by the project, including Node.js, pnpm, Process Compose, and project-specific development tooling.
 
+### Trusting the local dev certificate
+
+Hydra's public OIDC endpoint (`https://127.0.0.1:4444`) serves HTTPS even in local development. `process-compose` generates a certificate and key for `127.0.0.1`/`localhost` at `infra/dev-tls/cert.pem` and `infra/dev-tls/key.pem` on every run, and automatically trusts the issuing CA in your browser via `mkcert -install`.
+
+Without Nix, you must provide your own certificate and key for `127.0.0.1`/`localhost`, trusted by your browser and by Node, at those same paths.
+
 ### Nix
 #### Requirements
 
@@ -110,6 +116,7 @@ At minimum, you will need:
 - [Process Compose](https://f1bonacc1.github.io/process-compose/)
 - [Ory Kratos](https://www.ory.com/docs/kratos) and [Ory Hydra](https://www.ory.com/docs/hydra), the identity and OAuth2/OIDC providers used for authentication
 - [Mailpit](https://mailpit.axllent.org/), a local SMTP sink for viewing emails sent during development (e.g. verification codes)
+- A TLS certificate and key for `127.0.0.1`/`localhost`, trusted by your browser and by Node, placed at `infra/dev-tls/cert.pem` and `infra/dev-tls/key.pem` — see [Trusting the local dev certificate](#trusting-the-local-dev-certificate)
 - AsyncAPI tooling for writing and generating API documentation
 
 Then install the project dependencies:

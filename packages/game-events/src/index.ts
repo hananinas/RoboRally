@@ -1,6 +1,5 @@
 export type {
   ClientToServerEvents,
-  LoginAcknowledgement,
   ProgramResultAcknowledgement,
   ServerToClientEvents,
 } from './events.js'
@@ -16,7 +15,6 @@ export type {
   GamePhase,
   LeaveGame,
   GameInitialization,
-  LoginResult,
   Orientation,
   PlayerAssignment,
   PlayerId,
@@ -37,8 +35,6 @@ export type {
   User,
   UserId,
 } from './payloads.js'
-export { loginSchema, parseLogin } from './login.js'
-export type { Login, LoginRequestRejection } from './login.js'
 export { leaveGameSchema } from './leaveGame.js'
 export { submitProgramSchema } from './submitProgram.js'
 export type { ProgramCardIds, SubmitProgram } from './submitProgram.js'

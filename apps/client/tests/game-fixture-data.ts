@@ -1,8 +1,6 @@
 import type {
   Card,
   CardsDealt,
-  Login,
-  LoginResult,
   PlayerCheckpointProgress,
   ProgramResultOutcome,
   ProgramSubmitted,
@@ -72,9 +70,8 @@ export type FixtureControl =
   | { type: 'hand'; hand: CardsDealt }
   | { type: 'submitted'; submission: ProgramSubmitted }
   | { type: 'early-hand'; cards: readonly Card[] }
-  | { type: 'login'; outcome: LoginResult['outcome']; deferred: boolean }
   | { type: 'start'; deferred: boolean; outcome?: 'STARTED' | 'LOBBY_MEMBER_DISCONNECTED' }
-  | { type: 'respond-login' | 'respond-start' }
+  | { type: 'respond-start' }
   | { type: 'joined-state'; state: PublicGameState; hand: readonly Card[]; programSubmitted: boolean }
 
 export type FixtureSnapshot = {
@@ -83,10 +80,8 @@ export type FixtureSnapshot = {
   state: PublicGameState
   submissions: readonly SubmitProgram[]
   entryRequests: readonly (
-    | { event: 'user.login'; socketId: string; payload: Login }
     | { event: 'session.get' | 'lobby.create'; socketId: string; payload: Record<string, never> }
     | { event: 'lobby.join' | 'lobby.start'; socketId: string; payload: { lobbyId: string } }
   )[]
-  pendingLogins: number
   pendingStarts: number
 }

@@ -17,11 +17,12 @@ const MAX_PLAYERS = 6
 const lobbyRoom = (id: string) => `lobby:${id}`
 export function presentLobby(lobby: Lobby): LobbyState {
   return { lobbyId: lobby.lobbyId, name: lobby.name, ownerUserId: lobby.members.keys().next().value!,
-    playerCount: lobby.members.size, maxPlayers: MAX_PLAYERS }
+    playerCount: lobby.members.size, maxPlayers: MAX_PLAYERS,
+    players: [...lobby.members.values()].map(({ user }) => ({ userId: user.userId, username: user.username })) }
 }
 
 export function leaveLobby(context: SessionContext, socket: GameSocket): void {
-  const userId = socket.data.user?.userId ?? ''
+  const userId = socket.data.user.userId
   const session = context.sessionsByUser.get(userId)
   if (session?.kind !== 'lobby') return
   const lobby = context.lobbies.get(session.lobbyId)
@@ -43,8 +44,8 @@ export function handleListLobbies(
 ): void {
   withSessionRequest(socket, 'lobby.list', emptyRequestSchema, payload, acknowledge, (_user, ack) => {
     ack({ outcome: 'LOBBIES_FOUND', lobbies: [...context.lobbies.values()].map((lobby) => {
-      const { ownerUserId: _, ...summary } = presentLobby(lobby)
-      return summary
+      const { lobbyId, name, playerCount, maxPlayers } = presentLobby(lobby)
+      return { lobbyId, name, playerCount, maxPlayers }
     }) })
   })
 }

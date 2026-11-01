@@ -1,6 +1,9 @@
 import { createServer } from 'node:http'
 import { parseGameServicePort } from '@/config'
 import { createGameSocketServer } from '@/socket/gameServer'
+import { createAuthApp } from '@/auth/httpRoutes'
+import { createSessionStore } from '@/auth/sessionStore'
+import { createOidcClient } from '@/infra/oidcClient'
 import { logError } from '@/logger'
 
 process.on('uncaughtExceptionMonitor', (error, origin) => {
@@ -9,8 +12,16 @@ process.on('uncaughtExceptionMonitor', (error, origin) => {
 
 const host = '127.0.0.1'
 const port = parseGameServicePort(process.env.PORT)
+const oidcClient = await createOidcClient()
+const sessionStore = createSessionStore()
 const httpServer = createServer()
-const io = createGameSocketServer(httpServer)
+const authApp = createAuthApp({ oidcClient, sessionStore })
+httpServer.on('request', (req, res) => {
+  if (req.url?.startsWith('/auth/')) {
+    authApp(req, res)
+  }
+})
+const io = createGameSocketServer(httpServer, sessionStore)
 
 httpServer.listen(port, host, () => {
   console.log(`Game Service listening at http://${host}:${port}`)

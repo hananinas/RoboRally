@@ -29,11 +29,12 @@ function getGameStatus(state: ClientGameState): string {
   return 'Waiting'
 }
 
-function ActiveGame({ game, username, leaving, onLeave }: {
+function ActiveGame({ game, username, leaving, onLeave, onLogout }: {
   game: ReturnType<typeof useGameConnection>
   username: string
   leaving: boolean
   onLeave: () => void
+  onLogout: () => void
 }) {
   const { state, dispatch, submit } = game
   const {
@@ -82,6 +83,7 @@ function ActiveGame({ game, username, leaving, onLeave }: {
               checkpointCount={state.checkpointCount}
               onLeave={onLeave}
               leaveDisabled={leaving || !state.connected}
+              onLogout={onLogout}
             />
             <RegisterPanel
               registers={state.playbackProgram ?? state.registers}

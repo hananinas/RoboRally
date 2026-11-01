@@ -11,16 +11,6 @@ export type User = Readonly<{
   username: string
 }>
 
-export type LoginResult =
-  | Readonly<{ outcome: 'LOGGED_IN'; user: User }>
-  | Readonly<{
-      outcome:
-        | 'INVALID_USERNAME'
-        | 'INVALID_REQUEST'
-        | 'ALREADY_LOGGED_IN'
-        | 'INTERNAL_ERROR'
-    }>
-
 export type LeaveGame = Readonly<{ gameId: GameId }>
 
 export type PlayerAssignment = Readonly<{
@@ -108,7 +98,7 @@ export type PlayerConnectionChanged = Readonly<{
 }>
 
 export type LeaveResult = Readonly<{
-  outcome: 'LEFT' | 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND' | 'INTERNAL_ERROR'
+  outcome: 'LEFT' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND' | 'INTERNAL_ERROR'
 }>
 
 export type CardsDealt = Readonly<{
