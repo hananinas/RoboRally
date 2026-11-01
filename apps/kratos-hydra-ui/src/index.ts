@@ -10,7 +10,6 @@ import { logger, middleware as middlewareLogger } from "./pkg/logger"
 import {
   register404Route,
   register500Route,
-  registerConsentRoute,
   registerErrorRoute,
   registerHealthRoute,
   registerLoginRoute,
@@ -98,11 +97,6 @@ registerSessionsRoute(router)
 registerWelcomeRoute(router)
 registerErrorRoute(router)
 
-// all routes registered under the /consent path are protected by CSRF
-router.use("/consent", doubleCsrfProtection)
-router.use("/consent", csrfErrorHandler(invalidCsrfTokenError))
-registerConsentRoute(router)
-
 // all routes registered under the /logout path are protected by CSRF
 router.use("/logout", doubleCsrfProtection)
 router.use("/logout", csrfErrorHandler(invalidCsrfTokenError))
@@ -123,7 +117,7 @@ let listener = (proto: "http" | "https") => () => {
 }
 
 // When using the Ory Admin API Token, we assume that this application is also
-// handling OAuth2 Consent requests. In that case we need to ensure that the
+// handling OAuth2 Logout requests. In that case we need to ensure that the
 // COOKIE_SECRET and CSRF_COOKIE_SECRET environment variables are set.
 if (
   (process.env.ORY_ADMIN_API_TOKEN &&
