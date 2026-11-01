@@ -33,6 +33,24 @@ export const defaultConfig: RouteOptionsCreator = () => {
     kratosBrowserUrl: apiBaseUrl,
     faviconUrl: "favico.png",
     faviconType: "image/png",
+    isOAuthConsentRouteEnabled: () =>
+      (process.env.HYDRA_ADMIN_URL || process.env.ORY_SDK_URL) &&
+      process.env.CSRF_COOKIE_SECRET &&
+      process.env.CSRF_COOKIE_NAME
+        ? true
+        : false,
+    shouldSkipConsent: (challenge) => {
+      let trustedClients: string[] = []
+      if (process.env.TRUSTED_CLIENT_IDS) {
+        trustedClients = String(process.env.TRUSTED_CLIENT_IDS).split(",")
+      }
+      return challenge.skip ||
+        challenge.client?.skip_consent ||
+        (challenge.client?.client_id &&
+          trustedClients.indexOf(challenge.client?.client_id) > -1)
+        ? true
+        : false
+    },
     shouldSkipLogoutConsent: (challenge) => {
       return Boolean(
         (
