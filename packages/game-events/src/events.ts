@@ -2,7 +2,6 @@ import type { EmptyRequest, LobbyRequest, LobbyState, LobbyListResult, LobbyJoin
 import type {
   CardsDealt,
   GameAborted,
-  LeaveGame,
   GameInitialization,
   ProgramResult,
   ProgramSubmitted,
@@ -20,10 +19,10 @@ export interface ClientToServerEvents {
   'lobby.list': (payload: EmptyRequest, acknowledge: (result: LobbyListResult) => void) => void
   'lobby.create': (payload: EmptyRequest, acknowledge: (result: LobbyJoinResult) => void) => void
   'lobby.join': (payload: LobbyRequest, acknowledge: (result: LobbyJoinResult) => void) => void
-  'lobby.leave': (payload: LobbyRequest, acknowledge: (result: LobbyLeaveResult) => void) => void
-  'lobby.start': (payload: LobbyRequest, acknowledge: (result: LobbyStartResult) => void) => void
+  'lobby.leave': (payload: EmptyRequest, acknowledge: (result: LobbyLeaveResult) => void) => void
+  'lobby.start': (payload: EmptyRequest, acknowledge: (result: LobbyStartResult) => void) => void
   'session.get': (payload: EmptyRequest, acknowledge: (result: SessionResult) => void) => void
-  'game.leave': (payload: LeaveGame, acknowledge: (result: LeaveResult) => void) => void
+  'game.leave': (payload: EmptyRequest, acknowledge: (result: LeaveResult) => void) => void
   'program.submit': (
     payload: SubmitProgram,
     acknowledge: ProgramResultAcknowledgement,

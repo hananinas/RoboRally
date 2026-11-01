@@ -13,7 +13,6 @@ export type {
   GameAborted,
   GameId,
   GamePhase,
-  LeaveGame,
   GameInitialization,
   Orientation,
   PlayerAssignment,
@@ -35,7 +34,6 @@ export type {
   User,
   UserId,
 } from './payloads.js'
-export { leaveGameSchema } from './leaveGame.js'
 export { submitProgramSchema } from './submitProgram.js'
 export type { ProgramCardIds, SubmitProgram } from './submitProgram.js'
 

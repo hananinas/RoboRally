@@ -11,8 +11,6 @@ export type User = Readonly<{
   username: string
 }>
 
-export type LeaveGame = Readonly<{ gameId: GameId }>
-
 export type PlayerAssignment = Readonly<{
   gameId: GameId
   playerId: PlayerId
@@ -116,8 +114,6 @@ export type ProgramResultOutcome =
   | 'WRONG_PHASE'
   | 'NOT_A_MEMBER'
   | 'INVALID_REQUEST'
-  | 'GAME_ID_MISMATCH'
-  | 'PLAYER_ID_MISMATCH'
   | 'PLAYER_NOT_IN_GAME'
   | 'INTERNAL_ERROR'
 
