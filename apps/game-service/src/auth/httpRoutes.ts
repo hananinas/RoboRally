@@ -1,8 +1,8 @@
-import express, { type ErrorRequestHandler, type Express } from 'express'
+import express, { type ErrorRequestHandler, type Express, type Request } from 'express'
 import { parseCookie, stringifySetCookie } from 'cookie'
 import { calculatePKCECodeChallenge, randomPKCECodeVerifier, randomState } from 'openid-client'
 import type { OidcClient } from '@/infra/oidcClient'
-import { SESSION_COOKIE_NAME, type SessionStore } from '@/auth/sessionStore'
+import { SESSION_COOKIE_NAME, type Session, type SessionStore } from '@/auth/sessionStore'
 import { logError, logInfo, logWarn } from '@/logger'
 
 const TRANSACTION_COOKIE_PATH = '/auth/callback'
@@ -92,9 +92,7 @@ export function createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl }: A
   })
 
   app.get('/auth/logout', async (req, res) => {
-    const cookies = parseCookie(req.headers.cookie ?? '')
-    const sessionId = cookies[SESSION_COOKIE_NAME]
-    const session = sessionId ? sessionStore.get(sessionId) : undefined
+    const { sessionId, session } = readSession(req, sessionStore)
     if (sessionId) {
       sessionStore.destroy(sessionId)
     }
@@ -111,9 +109,7 @@ export function createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl }: A
   })
 
   app.get('/auth/settings', (req, res) => {
-    const cookies = parseCookie(req.headers.cookie ?? '')
-    const sessionId = cookies[SESSION_COOKIE_NAME]
-    const session = sessionId ? sessionStore.get(sessionId) : undefined
+    const { session } = readSession(req, sessionStore)
 
     if (!session) {
       res.redirect('/auth/login')
@@ -128,6 +124,15 @@ export function createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl }: A
   app.use(handleAuthRouteError)
 
   return app
+}
+
+function readSession(
+  req: Request,
+  sessionStore: SessionStore,
+): { sessionId: string | undefined; session: Session | undefined } {
+  const cookies = parseCookie(req.headers.cookie ?? '')
+  const sessionId = cookies[SESSION_COOKIE_NAME]
+  return { sessionId, session: sessionId ? sessionStore.get(sessionId) : undefined }
 }
 
 function cookie(name: string, value: string, path: string, maxAge: number): string {
