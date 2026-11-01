@@ -155,7 +155,17 @@ to the [public room](#rooms).
 
 This informs other players that the player has submitted their program without revealing the submitted cards. The server waits until all players have successfully submitted before beginning activation.
 
+A player can also publish register occupancy before submitting, described in [Public registers](#public-registers).
 
+
+
+### Public registers
+
+`PlayerState.registers` holds five slots in register order. `{status: EMPTY}` means no card is placed, `{status: HIDDEN}` means a card is placed without exposing its identity, and `{status: REVEALED, instruction}` shows an already-executed register. EMPTY and HIDDEN carry only their status. Each player's hand stays private.
+
+Before submitting, the client can share which slots are occupied. `game.updateRegisters {gameId, playerId, occupied}` sends five booleans in register order, `true` for an occupied slot and `false` for an empty one. Its acknowledgement returns `ACCEPTED`, `INVALID_REQUEST`, `NOT_A_MEMBER`, `PLAYER_ID_MISMATCH`, `WRONG_PHASE`, `ALREADY_SUBMITTED` or `INTERNAL_ERROR`. An accepted update broadcasts `game.registersChanged {gameId, playerId, registers}` to the [public room](#rooms) with only HIDDEN and EMPTY slots.
+
+The client reveals a slot from `robot.actionResolved`, which carries `playerId`, `registerIndex` and `instruction`. `game.started` and `session.get` include every player's registers, revealed slots included, until the next hand resets them to five EMPTY slots.
 
 ### Activation
 
@@ -166,6 +176,8 @@ Each resolved action is emitted to the [public room](#rooms) as:
 `robot.actionResolved`
 
 Clients must process resolved actions in the order in which they are received.
+
+The event carries `playerId`, `registerIndex` and `instruction`, so each client reveals that player's register as the action plays.
 
 A movement card can push a chain of robots. A wall or the antenna blocks the whole step. Pushed robots keep their facing direction and pending actions.
 
@@ -208,6 +220,8 @@ through the player's [private room](#rooms).
 
 A new hand may arrive while the client is still playing animations from the previous activation. The client should store the new hand immediately but must not enable programming until all queued resolved actions have finished playing.
 
+The new hand also opens the next programming round, so the client resets every player's registers to five EMPTY slots when its own hand arrives. A player who reconnects after that point gets the reset registers from `session.get`.
+
 ### Game sequence
 
 The following sequence shows one complete round while the game remains connected and unpaused.
@@ -223,6 +237,10 @@ sequenceDiagram
     participant Public as game:{gameId}:public
 
     loop Each round
+        A->>Server: game.updateRegisters {gameId, playerId: A, occupied}
+        Server-->>A: Acknowledgement: ACCEPTED
+        Server->>Public: game.registersChanged {gameId, playerId: A, registers}
+        Public-->>B: game.registersChanged {gameId, playerId: A, registers}
         A->>Server: program.submit {gameId, cardIds}
         Server-->>A: Acknowledgement: ACCEPTED
         Server->>Public: program.submitted {playerId: A}

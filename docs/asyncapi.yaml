@@ -32,6 +32,9 @@ channels:
         $ref: '#/components/messages/LeaveGame'
       submitProgram:
         $ref: '#/components/messages/SubmitProgram'
+      updateRegisters:
+        $ref: '#/components/messages/UpdateRegisters'
+
   lobbyListReplies:
     address: null
     description: Socket.IO acknowledgement of lobby.list.
@@ -101,6 +104,13 @@ channels:
       programResult:
         $ref: '#/components/messages/ProgramResult'
 
+  updateRegistersReplies:
+    address: null
+    description: Delivered through the acknowledgement of game.updateRegisters.
+    messages:
+      result:
+        $ref: '#/components/messages/UpdateRegistersResult'
+
   player:
     address: 'game:{gameId}:player:{playerId}'
     parameters:
@@ -124,6 +134,8 @@ channels:
         $ref: '#/components/messages/ProgramSubmitted'
       robotActionResolved:
         $ref: '#/components/messages/RobotActionResolved'
+      registersChanged:
+        $ref: '#/components/messages/RegistersChanged'
       playerCheckpointProgress:
         $ref: '#/components/messages/PlayerCheckpointProgress'
       playerLeft:
@@ -159,6 +171,20 @@ operations:
         $ref: '#/channels/programReplies'
       messages:
         - $ref: '#/channels/programReplies/messages/programResult'
+      x-socketio:
+        acknowledgement: true
+
+  handleUpdateRegisters:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/updateRegisters'
+    reply:
+      channel:
+        $ref: '#/channels/updateRegistersReplies'
+      messages:
+        - $ref: '#/channels/updateRegistersReplies/messages/result'
       x-socketio:
         acknowledgement: true
 
@@ -325,6 +351,77 @@ components:
       name: game.started
       payload:
         $ref: '#/components/schemas/GameStarted'
+      description: Initializes the player with their assignment, public state including every player's registers, private hand, and submission status.
+      examples:
+        - name: started
+          summary: One-tile illustrative board; normal initial hand
+          payload:
+            lobbyId: 00000000-0000-4000-8000-000000000005
+            initialization:
+              outcome: JOINED
+              assignment:
+                gameId: 00000000-0000-4000-8000-000000000001
+                playerId: 00000000-0000-4000-8000-000000000002
+                robotId: 00000000-0000-4000-8000-000000000003
+              state:
+                gameId: 00000000-0000-4000-8000-000000000001
+                checkpointCount: 0
+                board:
+                  width: 1
+                  height: 1
+                  tiles:
+                    - position:
+                        x: 0
+                        y: 0
+                      type: EMPTY
+                robots:
+                  - robotId: 00000000-0000-4000-8000-000000000003
+                    playerId: 00000000-0000-4000-8000-000000000002
+                    colour: red
+                    position:
+                      coordinate:
+                        x: 0
+                        y: 0
+                      orientation: NORTH
+                phase: PROGRAMMING
+                antenna:
+                  x: 0
+                  y: 0
+                  angle: 1.5707963267948966
+                players:
+                  - playerId: 00000000-0000-4000-8000-000000000002
+                    username: Dane
+                    lastCheckpoint: 0
+                    programSubmitted: false
+                    connected: true
+                    registers:
+                      - status: EMPTY
+                      - status: EMPTY
+                      - status: EMPTY
+                      - status: EMPTY
+                      - status: EMPTY
+                paused: false
+                aborted: false
+              hand:
+                - id: 00000000-0000-4000-8000-000000000101
+                  instruction: MOVE_1
+                - id: 00000000-0000-4000-8000-000000000102
+                  instruction: MOVE_2
+                - id: 00000000-0000-4000-8000-000000000103
+                  instruction: MOVE_3
+                - id: 00000000-0000-4000-8000-000000000104
+                  instruction: BACK_UP
+                - id: 00000000-0000-4000-8000-000000000105
+                  instruction: TURN_LEFT
+                - id: 00000000-0000-4000-8000-000000000106
+                  instruction: TURN_RIGHT
+                - id: 00000000-0000-4000-8000-000000000107
+                  instruction: U_TURN
+                - id: 00000000-0000-4000-8000-000000000108
+                  instruction: MOVE_1
+                - id: 00000000-0000-4000-8000-000000000109
+                  instruction: TURN_LEFT
+              programSubmitted: false
 
     LeaveGame:
       name: game.leave
@@ -478,12 +575,82 @@ components:
             gameId: 00000000-0000-4000-8000-000000000001
             playerId: 00000000-0000-4000-8000-000000000002
 
+    UpdateRegisters:
+      name: game.updateRegisters
+      description: Updates a player's register occupancy and returns an acknowledgement outcome.
+      payload:
+        type: object
+        additionalProperties: false
+        required: [ gameId, playerId, occupied ]
+        properties:
+          gameId:
+            $ref: '#/components/schemas/GameId'
+          playerId:
+            $ref: '#/components/schemas/PlayerId'
+          occupied:
+            type: array
+            minItems: 5
+            maxItems: 5
+            items:
+              type: boolean
+            description: 'Five occupancy flags in register order: true is HIDDEN; false is EMPTY.'
+      examples:
+        - name: partiallyOccupied
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            occupied: [ true, false, true, false, false ]
+
+    UpdateRegistersResult:
+      name: game.updateRegistersResult
+      description: Acknowledges a register occupancy update with ACCEPTED or a rejection.
+      payload:
+        type: object
+        additionalProperties: false
+        required: [ outcome ]
+        properties:
+          outcome:
+            type: string
+            enum: [ ACCEPTED, INVALID_REQUEST, NOT_A_MEMBER, PLAYER_ID_MISMATCH, WRONG_PHASE, ALREADY_SUBMITTED, INTERNAL_ERROR ]
+      examples:
+        - name: accepted
+          payload:
+            outcome: ACCEPTED
+
+    RegistersChanged:
+      name: game.registersChanged
+      description: Broadcasts a player's register occupancy during programming.
+      payload:
+        $ref: '#/components/schemas/RegistersChanged'
+      examples:
+        - name: occupancyChanged
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            registers:
+              - status: HIDDEN
+              - status: EMPTY
+              - status: HIDDEN
+              - status: EMPTY
+              - status: EMPTY
+        - name: occupancyCleared
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            registers:
+              - status: EMPTY
+              - status: EMPTY
+              - status: EMPTY
+              - status: EMPTY
+              - status: EMPTY
+
     RobotActionResolved:
       name: robot.actionResolved
       payload:
         type: object
         required:
           - robotId
+          - playerId
           - instruction
           - position
           - gameId
@@ -492,6 +659,8 @@ components:
         properties:
           robotId:
             $ref: "#/components/schemas/RobotId"
+          playerId:
+            $ref: "#/components/schemas/PlayerId"
           instruction:
             $ref: "#/components/schemas/Instruction"
           position:
@@ -525,6 +694,7 @@ components:
             gameId: 00000000-0000-4000-8000-000000000001
             registerIndex: 0
             robotId: 00000000-0000-4000-8000-000000000003
+            playerId: 00000000-0000-4000-8000-000000000002
             instruction: MOVE_1
             pushedRobots: []
             position:
@@ -950,6 +1120,7 @@ components:
         - programSubmitted
         - connected
         - lastCheckpoint
+        - registers
       properties:
         playerId:
           $ref: "#/components/schemas/PlayerId"
@@ -961,8 +1132,64 @@ components:
           type: boolean
         lastCheckpoint:
           $ref: '#/components/schemas/LastCheckpoint'
+        registers:
+          $ref: '#/components/schemas/PublicRegisters'
       description: >-
         Public participation and submission status; never contains cards.
+
+    RegistersChanged:
+      type: object
+      additionalProperties: false
+      required: [ gameId, playerId, registers ]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+        playerId:
+          $ref: '#/components/schemas/PlayerId'
+        registers:
+          type: array
+          minItems: 5
+          maxItems: 5
+          items:
+            type: object
+            additionalProperties: false
+            required: [ status ]
+            properties:
+              status:
+                type: string
+                enum: [ EMPTY, HIDDEN ]
+          description: Occupancy-only slots after an accepted update; revealed instructions arrive through robot.actionResolved.
+
+    PublicRegisters:
+      type: array
+      minItems: 5
+      maxItems: 5
+      items:
+        $ref: '#/components/schemas/PublicRegisterSlot'
+      description: Five public slots in register order, reset to EMPTY when a new hand is dealt.
+
+    PublicRegisterSlot:
+      type: object
+      additionalProperties: false
+      required: [ status ]
+      properties:
+        status:
+          type: string
+          enum: [ EMPTY, HIDDEN, REVEALED ]
+        instruction:
+          $ref: '#/components/schemas/Instruction'
+      if:
+        properties:
+          status:
+            const: REVEALED
+      then:
+        required: [ instruction ]
+      else:
+        not:
+          required: [ instruction ]
+      description: >-
+        One register slot in register order. EMPTY and HIDDEN carry only their status;
+        REVEALED carries the executed instruction.
 
     PublicGameState:
       description: >-
