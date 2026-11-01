@@ -148,7 +148,7 @@
   font-size: 13px;
 }
 
-.waiting-lobby__actions .login-primary-button {
+.waiting-lobby__actions .entry-primary-button {
   box-shadow: 0 3px 0 color-mix(in srgb, var(--entry-accent) 65%, var(--entry-side));
 }
 

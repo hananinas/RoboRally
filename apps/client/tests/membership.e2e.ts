@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { expect, test } from './real-game-fixture.ts'
 import { browse, gameStatus, reconnect, robotIds, startTogether } from './browserClient.ts'
 
@@ -32,6 +32,16 @@ test('two players wait for owner Start, play a round, and leave for the lobby br
   }
 })
 
+
+async function expectRoster(roster: Locator, names: string[], owner: string, self: string) {
+  const players = roster.locator('.waiting-lobby__seat:not(.waiting-lobby__seat--empty)')
+  await expect(players.locator('.waiting-lobby__name')).toHaveText(names)
+  await expect(roster.getByRole('listitem')).toHaveCount(6)
+  await expect(roster.locator('.waiting-lobby__seat--empty')).toHaveCount(6 - names.length)
+  await expect(players.filter({ has: roster.page().getByText(owner, { exact: true }) }).getByText('Owner', { exact: true })).toBeVisible()
+  await expect(players.filter({ has: roster.page().getByText(self, { exact: true }) }).getByText('You', { exact: true })).toBeVisible()
+}
+
 for (const departure of ['leaves', 'disconnects'] as const) {
   test(`the roster updates and the next member becomes owner when the creator ${departure}`, async ({ browser, page, baseURL }) => {
     const context = await browser.newContext({ baseURL })
@@ -47,7 +57,7 @@ for (const departure of ['leaves', 'disconnects'] as const) {
       await other.getByRole('button', { name: 'Join game', exact: true }).click()
       const otherRoster = other.getByRole('list', { name: 'Connected players' })
       await expect(ownerRoster.getByRole('listitem')).toHaveText(['benceYou · Owner', 'dane'])
-      await expect(otherRoster.getByRole('listitem')).toHaveText(['benceOwner', 'daneYou'])
+      await expectRoster(otherRoster, ['bence', 'dane'], 'bence', 'dane')
       for (const client of [page, other]) await expect(client.getByText('2/6 connected', { exact: true })).toBeVisible()
       await expect(other.getByRole('button', { name: 'Start', exact: true })).toHaveCount(0)
       if (departure === 'leaves') await page.getByRole('button', { name: 'Leave lobby', exact: true }).click()
