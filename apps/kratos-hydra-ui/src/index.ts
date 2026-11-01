@@ -16,7 +16,6 @@ import {
   registerLoginRoute,
   registerRecoveryRoute,
   registerRegistrationRoute,
-  registerSessionsRoute,
   registerSettingsRoute,
   registerStaticRoutes,
   registerVerificationRoute,
@@ -93,7 +92,6 @@ registerRecoveryRoute(router)
 registerRegistrationRoute(router)
 registerSettingsRoute(router)
 registerVerificationRoute(router)
-registerSessionsRoute(router)
 registerErrorRoute(router)
 
 // /consent has no interactive form to submit, so it doesn't need CSRF protection
