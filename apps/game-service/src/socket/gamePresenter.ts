@@ -1,8 +1,10 @@
 import type {
   Card as CardPayload,
   CardsDealt,
+  EnvironmentStepResolved,
   GamePhase as GamePhasePayload,
   Orientation,
+  Position as PositionPayload,
   PublicGameState,
   RobotActionResolved,
   PlayerState,
@@ -10,12 +12,15 @@ import type {
 } from '@robo-rally/game-events'
 import {
   Direction,
+  GearTile,
   type Card,
+  type EnvironmentStepResult,
   type Game,
   type GameId,
   type GamePhase,
   type NextActionResult,
   type Player,
+  type Position,
 } from '@/game/index'
 import { Integer } from '@/numbers'
 
@@ -35,6 +40,14 @@ function presentCard(card: Card): CardPayload {
   return { id: card.id, instruction: card.instruction }
 }
 
+function presentPosition(position: Position, direction: Direction): PositionPayload {
+  return { coordinate: position, orientation: orientations[direction] }
+}
+
+function presentRobotState(robot: NextActionResult['pushedRobots'][number]): RobotActionResolved['pushedRobots'][number] {
+  return { robotId: robot.robotId, position: presentPosition(robot.position, robot.direction) }
+}
+
 function presentTile(game: Game, x: number, y: number): TilePayload {
   const tile = game.board.getTile({ x: Integer(x), y: Integer(y) })
   if (tile === undefined) {
@@ -47,6 +60,7 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
     type: tile.kind,
     ...(walls.length === 0 ? {} : { walls }),
     ...(tile.checkpointNumber === undefined ? {} : { checkpointNumber: tile.checkpointNumber }),
+    ...(tile instanceof GearTile ? { rotation: tile.rotation } : {}),
   }
 }
 
@@ -73,12 +87,10 @@ export function presentPublicGameState(
       robotId: player.robot.id,
       playerId: player.id,
       colour: player.robot.colour,
-      position: {
-        coordinate: game.board.positionOf(player.robot.id),
-        orientation: orientations[player.robot.direction],
-      },
+      position: presentPosition(game.board.positionOf(player.robot.id), player.robot.direction),
     })),
     phase: phases[game.phase],
+    execution: game.executionState,
     paused: game.paused,
     aborted: game.aborted,
   }
@@ -101,13 +113,18 @@ export function presentRobotActionResolved(
     registerIndex,
     robotId: action.robotId,
     instruction: action.card.instruction,
-    position: {
-      coordinate: action.position,
-      orientation: orientations[action.direction],
-    },
-    pushedRobots: result.pushedRobots.map((robot) => ({
-      robotId: robot.robotId,
-      position: { coordinate: robot.position, orientation: orientations[robot.direction] },
-    })),
+    position: presentPosition(action.position, action.direction),
+    pushedRobots: result.pushedRobots.map(presentRobotState),
+  }
+}
+
+export function presentEnvironmentStepResolved(
+  gameId: GameId,
+  result: EnvironmentStepResult,
+): EnvironmentStepResolved {
+  return {
+    ...result,
+    gameId,
+    robots: result.robots.map(presentRobotState),
   }
 }

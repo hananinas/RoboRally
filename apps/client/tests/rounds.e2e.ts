@@ -99,9 +99,12 @@ test('plays every register of two consecutive programs through the real Game Ser
         await expect(registered).toHaveCount(5)
         for (const card of await hand.all()) await expect(card).toBeDisabled()
         for (const card of await registered.all()) await expect(card).toBeDisabled()
-        // Reduced motion keeps a 200ms playback slot per register, without
+        // Reduced motion keeps a 200ms playback slot per robot action, without
         // exercising the movement/turn animation already covered elsewhere.
         await page.clock.runFor(200)
+        await expect(page.locator('.register[data-active]')).toHaveCount(0)
+        await page.clock.runFor(1) // Empty GEARS step.
+        await page.clock.runFor(1) // Empty CHECKPOINTS step.
       })
     }
 

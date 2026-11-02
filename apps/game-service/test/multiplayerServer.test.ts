@@ -89,10 +89,15 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
         expect(hands[index]).toMatchObject({ gameId, playerId: players[index].id })
         expect(events[index].map((event) => event.name)).toEqual([
           'program.submitted',
-          ...Array.from({ length: 10 }, () => 'robot.actionResolved'),
+          ...Array.from({ length: 5 }, () => ['robot.actionResolved', 'robot.actionResolved', 'environment.stepResolved', 'environment.stepResolved']).flat(),
           'cards.dealt',
         ])
         expect(events[index][0].payload).toEqual({ gameId, playerId: players[1 - index].id })
+        expect(events[index].filter((event) => event.name === 'environment.stepResolved').map((event) => event.payload))
+          .toEqual(Array.from({ length: 5 }, (_, registerIndex) => ['GEARS', 'CHECKPOINTS'].map((kind, stepIndex) => ({
+            gameId, roundNumber: round, registerIndex, stepIndex, kind,
+            sequence: (round - 1) * 10 + registerIndex * 2 + stepIndex + 1, robots: [], checkpointProgress: [],
+          }))).flat())
         const actions = events[index].filter((event) => event.name === 'robot.actionResolved')
         expect(actions.map((event) => event.payload)).toEqual(
           Array.from({ length: 5 }, (_, registerIndex) => [1, 0].map((playerIndex) => ({

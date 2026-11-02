@@ -69,6 +69,13 @@ for (const scenario of scenarios) {
         // the sixth must apply the entire push, with no extra playback slots.
         for (let action = 0; action < 5; action++) {
           for (const client of pages) await client.clock.runFor(200)
+          if (action === 2) {
+            for (const client of pages) {
+              await expect(client.locator('.register[data-active]')).toHaveCount(0)
+              await client.clock.runFor(1) // Empty GEARS step.
+              await client.clock.runFor(1) // Empty CHECKPOINTS step.
+            }
+          }
         }
         for (const client of pages) {
           await expectRobots(client, ids, scenario.afterPush, [270, 90, 90])

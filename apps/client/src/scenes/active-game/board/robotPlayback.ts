@@ -1,5 +1,6 @@
 import { instructions } from '@robo-rally/game-events'
 import type {
+  EnvironmentStepResolved,
   Orientation,
   Position,
   RobotActionResolved,
@@ -14,24 +15,31 @@ export type Robot = Readonly<{
   position: RobotPosition
 }>
 export type ResolvedRobotAction = RobotActionResolved
+export type ResolvedPlaybackAction = RobotActionResolved | EnvironmentStepResolved
 export type DisplayRobot = Robot & Readonly<{ angle: number }>
+
+export function isEnvironmentStep(action: ResolvedPlaybackAction): action is EnvironmentStepResolved {
+  return 'kind' in action
+}
 
 export const ROBOT_MOVE_DURATION_MS = 600
 export const ROBOT_TURN_DURATION_MS = 300
-export function robotActionDuration(action: ResolvedRobotAction, reducedMotion: boolean): number {
-  return reducedMotion ? 200
-    : instructions[action.instruction].kind === 'turn' ? ROBOT_TURN_DURATION_MS : ROBOT_MOVE_DURATION_MS
+export function playbackDuration(action: ResolvedPlaybackAction, reducedMotion: boolean): number {
+  if (isEnvironmentStep(action) && action.robots.length === 0) return 0
+  if (reducedMotion) return 200
+  if (isEnvironmentStep(action)) return ROBOT_MOVE_DURATION_MS
+  return instructions[action.instruction].kind === 'turn' ? ROBOT_TURN_DURATION_MS : ROBOT_MOVE_DURATION_MS
 }
 
 export type RobotPlaybackState = Readonly<{
   robots: readonly DisplayRobot[]
-  pending: readonly ResolvedRobotAction[]
-  active: ResolvedRobotAction | null
+  pending: readonly ResolvedPlaybackAction[]
+  active: ResolvedPlaybackAction | null
 }>
 
 export type RobotPlaybackEvent =
-  | Readonly<{ type: 'enqueue'; action: ResolvedRobotAction }>
-  | Readonly<{ type: 'complete' }>
+  | Readonly<{ type: 'enqueue'; action: ResolvedPlaybackAction }>
+  | Readonly<{ type: 'complete'; action?: ResolvedPlaybackAction }>
   | Readonly<{ type: 'reset'; robots: readonly Robot[] }>
   | Readonly<{ type: 'remove'; robotId: string }>
 
@@ -55,14 +63,15 @@ export function createRobotPlaybackState(robots: readonly Robot[]): RobotPlaybac
 
 function applyAction(
   robots: readonly DisplayRobot[],
-  action: ResolvedRobotAction,
+  action: ResolvedPlaybackAction,
 ): readonly DisplayRobot[] {
+  const changes = isEnvironmentStep(action) ? action.robots
+    : [{ robotId: action.robotId, position: action.position }, ...action.pushedRobots]
   return robots.map((robot) => {
-    const position = robot.robotId === action.robotId ? action.position
-      : action.pushedRobots.find((pushed) => pushed.robotId === robot.robotId)?.position
+    const position = changes.find((change) => change.robotId === robot.robotId)?.position
     if (position === undefined) return robot
     const target = orientationAngle[position.orientation]
-    const delta = ((target - robot.angle + 540) % 360) - 180
+    const delta = ((target - robot.angle) % 360 + 540) % 360 - 180
     return {
       ...robot,
       position,
@@ -90,26 +99,29 @@ export function robotPlaybackReducer(
     const next = {
       ...state,
       robots: state.robots.filter((robot) => robot.robotId !== event.robotId),
-      pending: state.pending.filter((action) => action.robotId !== event.robotId ||
+      pending: state.pending.filter((action) => isEnvironmentStep(action) || action.robotId !== event.robotId ||
         action.pushedRobots.some((pushed) => pushed.robotId !== event.robotId)),
     }
-    return state.active?.robotId === event.robotId ? startNext(next) : next
+    return state.active && !isEnvironmentStep(state.active) && state.active.robotId === event.robotId
+      ? startNext(next) : next
   }
-  if (event.type === 'complete') return startNext(state)
+  if (event.type === 'complete') {
+    return event.action && event.action !== state.active ? state : startNext(state)
+  }
 
   const queued = { ...state, pending: [...state.pending, event.action] }
   return state.active ? queued : startNext(queued)
 }
 
-export function useRobotPlaybackTimer(
-  active: ResolvedRobotAction | null,
-  dispatch: (event: { type: 'complete' }) => void,
+export function usePlaybackTimer(
+  active: ResolvedPlaybackAction | null,
+  dispatch: (event: { type: 'complete'; action: ResolvedPlaybackAction }) => void,
 ) {
   useEffect(() => {
     if (!active) return
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const duration = robotActionDuration(active, reducedMotion)
-    const timer = window.setTimeout(() => dispatch({ type: 'complete' }), duration)
+    const duration = playbackDuration(active, reducedMotion)
+    const timer = window.setTimeout(() => dispatch({ type: 'complete', action: active }), duration)
     return () => window.clearTimeout(timer)
   }, [active, dispatch])
 }
@@ -120,9 +132,9 @@ export function useRobotPlayback(initialRobots: readonly Robot[]) {
     initialRobots,
     createRobotPlaybackState,
   )
-  useRobotPlaybackTimer(state.active, dispatch)
+  usePlaybackTimer(state.active, dispatch)
 
-  const enqueue = useCallback((action: ResolvedRobotAction) => {
+  const enqueue = useCallback((action: ResolvedPlaybackAction) => {
     dispatch({ type: 'enqueue', action })
   }, [])
 

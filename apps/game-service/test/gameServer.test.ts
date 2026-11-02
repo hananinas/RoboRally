@@ -1,15 +1,17 @@
+import { resolveRobotAction } from './activationTestHelper.ts'
 import { Integer } from '@/numbers'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { submitProgramSchema } from '@robo-rally/game-events'
-import type { ClientToServerEvents, CardsDealt, RobotActionResolved, GameInitialization, PlayerConnectionChanged, PlayerCheckpointProgress, ServerToClientEvents } from '@robo-rally/game-events'
+import type { ClientToServerEvents, CardsDealt, EnvironmentStepResolved, RobotActionResolved, GameInitialization, PlayerConnectionChanged, ServerToClientEvents } from '@robo-rally/game-events'
 import { io, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Board, Direction, EmptyTile, PitTile, Game, type Tile } from '@/game/index'
+import { Board, Card, Direction, EmptyTile, GearTile, PitTile, Game, type Tile } from '@/game/index'
 import { createGame, createHand } from '@/game/GameFactory'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
 import { createSessionStore, type SessionStore } from '@/auth/sessionStore'
 import { authCookieHeader } from './authTestHelper.ts'
+import * as scheduling from '@/actionScheduler'
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>
 describe('started game membership over Socket.IO', () => {
@@ -44,6 +46,14 @@ describe('started game membership over Socket.IO', () => {
     client.connect()
     await connected
     return client
+  }
+  function nextHand(client: Client): Promise<CardsDealt> {
+    return new Promise((resolve) => client.once('cards.dealt', resolve))
+  }
+  async function reconnect(client: Client): Promise<void> {
+    const connected = new Promise<void>((resolve) => client.once('connect', resolve))
+    client.connect()
+    await connected
   }
   async function getSnapshot(client: Client): Promise<GameInitialization> {
     const result = await client.emitWithAck('session.get', {})
@@ -110,7 +120,7 @@ describe('started game membership over Socket.IO', () => {
   it('completes the programming barrier when an unsubmitted member leaves', async () => {
     const { members: [first, second], initializations: [initial] } = await startGame(['First', 'Second'])
     await first.emitWithAck('program.submit', submission(initial))
-    const hand = new Promise((resolve) => first.once('cards.dealt', resolve))
+    const hand = nextHand(first)
     await second.emitWithAck('game.leave', { gameId: shared.gameId })
     expect(await hand).toEqual({ gameId: shared.gameId, playerId: initial.assignment.playerId, cards: initial.hand })
     expect(shared.game.phase).toBe('programming')
@@ -140,11 +150,11 @@ describe('started game membership over Socket.IO', () => {
   it('resumes mid-activation after reattaching the last disconnected member', async () => {
     const { members: [first, second] } = await startGame(['First', 'Second'])
     for (const player of shared.game.players) shared.game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
-    for (let action = 0; action < 9; action++) shared.game.executeNextAction()
+    for (let action = 0; action < 9; action++) resolveRobotAction(shared.game)
     await disconnect(first)
     const actions: unknown[] = []
     second.on('robot.actionResolved', (payload) => actions.push(payload))
-    const hand = new Promise((resolve) => second.once('cards.dealt', resolve))
+    const hand = nextHand(second)
     await getSnapshot(await connect('First'))
     await hand
     expect(actions).toHaveLength(1)
@@ -156,9 +166,7 @@ describe('started game membership over Socket.IO', () => {
     await disconnect(first, true)
     expect(shared.game.paused).toBe(true)
     const resumed = new Promise((resolve) => second.on('game.playerConnectionChanged', (event) => { if (event.connected) resolve(event) }))
-    const connected = new Promise<void>((resolve) => first.once('connect', resolve))
-    first.connect()
-    await connected
+    await reconnect(first)
     expect(first.recovered).toBe(true)
     expect(await resumed).toMatchObject({ connected: true, paused: false })
   })
@@ -196,19 +204,26 @@ describe('started game membership over Socket.IO', () => {
   it('broadcasts checkpoint progress before next hands when a departure completes the final register', async () => {
     const { members: [first, second], initializations: [initial] } = await startGame(['First', 'Second'])
     for (const player of shared.game.players) shared.game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
-    for (let action = 0; action < 9; action++) shared.game.executeNextAction()
+    for (let action = 0; action < 9; action++) resolveRobotAction(shared.game)
     const player = shared.game.players[0]
     expect(player.lastCheckpoint).toBe(1)
     shared.game.board.removeRobot(player.robot.id)
     shared.game.board.placeRobot(player.robot.id, { x: Integer(8), y: Integer(9) })
     const events: string[] = []
-    first.onAny((name) => { if (['game.playerLeft', 'player.checkpointProgress', 'cards.dealt'].includes(name)) events.push(name) })
-    const progress = new Promise<PlayerCheckpointProgress>((resolve) => first.once('player.checkpointProgress', resolve))
-    const hand = new Promise((resolve) => first.once('cards.dealt', resolve))
+    first.onAny((name) => { if (['game.playerLeft', 'environment.stepResolved', 'cards.dealt'].includes(name)) events.push(name) })
+    const progress: EnvironmentStepResolved[] = []
+    first.on('environment.stepResolved', (result) => progress.push(result))
+    const hand = nextHand(first)
     await second.emitWithAck('game.leave', { gameId: shared.gameId })
     expect(await hand).toEqual({ gameId: shared.gameId, playerId: initial.assignment.playerId, cards: initial.hand })
-    expect(await progress).toEqual({ gameId: shared.gameId, playerId: player.id, lastCheckpoint: 2, checkpointCount: 2 })
-    expect(events).toEqual(['game.playerLeft', 'player.checkpointProgress', 'cards.dealt'])
+    expect(progress).toEqual([
+      { gameId: shared.gameId, roundNumber: 1, registerIndex: 4, stepIndex: 0,
+        kind: 'GEARS', sequence: 9, robots: [], checkpointProgress: [] },
+      { gameId: shared.gameId, roundNumber: 1, registerIndex: 4, stepIndex: 1,
+        kind: 'CHECKPOINTS', sequence: 10, robots: [],
+        checkpointProgress: [{ playerId: player.id, lastCheckpoint: 2 }] },
+    ])
+    expect(events).toEqual(['game.playerLeft', 'environment.stepResolved', 'environment.stepResolved', 'cards.dealt'])
   })
   it('ignores commands without acknowledgements', async () => {
     const client = await connect('Abid')
@@ -233,6 +248,265 @@ describe('started game membership over Socket.IO', () => {
       .toMatchObject({ outcome: 'GAME_ABORTED' })
     expect(await first.timeout(1000).emitWithAck('game.leave', { gameId: shared.gameId }))
       .toEqual({ outcome: 'LEFT' })
+  })
+
+  describe('environment scheduling over Socket.IO', () => {
+    afterEach(() => vi.restoreAllMocks())
+
+    function pauseAt(registerIndex: number, stage: 'ROBOTS' | 'ENVIRONMENT' = 'ENVIRONMENT', stepIndex = 0) {
+      let reached: () => void = () => {}
+      const paused = new Promise<void>((resolve) => { reached = resolve })
+      const execute = shared.game.executeNextStep.bind(shared.game)
+      let held = false
+      const spy = vi.spyOn(shared.game, 'executeNextStep').mockImplementation(() => {
+        const result = execute()
+        const cursor = shared.game.executionState.activation
+        const atRequestedStep = cursor?.stage === 'ENVIRONMENT'
+          ? cursor.stepIndex === stepIndex : result.type === 'robot'
+        if (!held && cursor?.registerIndex === registerIndex && cursor.stage === stage && atRequestedStep) {
+          held = true
+          shared.game.pause()
+          reached()
+        }
+        return result
+      })
+      return { paused, spy }
+    }
+
+    function track(client: Client) {
+      const actions: RobotActionResolved[] = []
+      const environment: EnvironmentStepResolved[] = []
+      const hands: CardsDealt[] = []
+      const order: string[] = []
+      client.on('robot.actionResolved', (result) => actions.push(result))
+      client.on('environment.stepResolved', (result) => environment.push(result))
+      client.on('cards.dealt', (result) => hands.push(result))
+      client.onAny((name) => {
+        if (['robot.actionResolved', 'environment.stepResolved', 'cards.dealt', 'game.playerLeft', 'game.aborted'].includes(name)) order.push(name)
+      })
+      return { actions, environment, hands, order }
+    }
+
+    async function submitPair(members: Client[], initializations: GameInitialization[]) {
+      for (const [index, client] of members.entries()) {
+        const initial = initializations[index]
+        const indices = index === 0 ? [0, 4, 5, 6, 8] : [4, 5, 6, 8, 0]
+        expect(await client.emitWithAck('program.submit', submitProgramSchema.parse({
+          gameId: shared.gameId, playerId: initial.assignment.playerId,
+          cardIds: indices.map((index) => initial.hand[index].id),
+        }))).toEqual({ outcome: 'ACCEPTED' })
+      }
+    }
+
+    it.each([
+      { mode: 'snapshot', stepIndex: 0 },
+      { mode: 'snapshot', stepIndex: 1 },
+      { mode: 'recovery', stepIndex: 0 },
+      { mode: 'recovery', stepIndex: 1 },
+    ] as const)('resumes gears through $mode at step $stepIndex without repeating rotation', async ({ mode, stepIndex }) => {
+      const board = new Board([
+        [new EmptyTile(), new EmptyTile(), new EmptyTile()],
+        [new GearTile('COUNTERCLOCKWISE'), new GearTile('CLOCKWISE'), new EmptyTile()],
+        [new EmptyTile(), new EmptyTile(), new EmptyTile()],
+      ], { x: Integer(1), y: Integer(0), angle: Math.PI / 2 })
+      const deck = createHand().slice(0, 5).map((card) => new Card(card.id, 'TURN_LEFT'))
+      shared = { gameId: shared.gameId, game: new Game(board, [], deck, { x: Integer(2), y: Integer(2) }) }
+      const { members: [first, second], initializations } = await startGame(['First', 'Second'])
+      const events = track(first)
+      const boundary = pauseAt(0, 'ENVIRONMENT', stepIndex)
+      const firstHand = nextHand(first)
+      for (const [index, client] of [first, second].entries()) {
+        expect(await client.emitWithAck('program.submit', submission(initializations[index]))).toEqual({ outcome: 'ACCEPTED' })
+      }
+      await boundary.paused
+      await disconnect(second, mode === 'recovery')
+      const before = await getSnapshot(first)
+      expect(before.state.execution).toEqual({
+        roundNumber: 1, lastEnvironmentSequence: stepIndex,
+        activation: { stage: 'ENVIRONMENT', registerIndex: 0, stepIndex, kind: stepIndex === 0 ? 'GEARS' : 'CHECKPOINTS' },
+      })
+      expect(before.state.robots.map((robot) => robot.position)).toEqual([
+        { coordinate: { x: 1, y: 1 }, orientation: stepIndex === 0 ? 'WEST' : 'NORTH' },
+        { coordinate: { x: 0, y: 1 }, orientation: stepIndex === 0 ? 'WEST' : 'SOUTH' },
+      ])
+      const returned = mode === 'snapshot' ? await connect('Second') : second
+      const returnedHand = nextHand(returned)
+      if (mode === 'snapshot') {
+        expect((await getSnapshot(returned)).state.execution).toEqual(before.state.execution)
+      } else {
+        await reconnect(returned)
+        expect(returned.recovered).toBe(true)
+      }
+      await Promise.all([firstHand, returnedHand])
+      const [final, restored] = await Promise.all([getSnapshot(first), getSnapshot(returned)])
+      expect(final.state).toEqual(restored.state)
+      expect(final.state.execution).toEqual({ roundNumber: 2, lastEnvironmentSequence: 10, activation: null })
+      expect(events.environment.filter((step) => step.kind === 'GEARS')).toEqual(
+        Array.from({ length: 5 }, (_, registerIndex) => ({
+          gameId: shared.gameId, roundNumber: 1, registerIndex, stepIndex: 0,
+          kind: 'GEARS', sequence: registerIndex * 2 + 1, checkpointProgress: [],
+          robots: [
+            { robotId: initializations[0].assignment.robotId, position: { coordinate: { x: 1, y: 1 }, orientation: 'NORTH' } },
+            { robotId: initializations[1].assignment.robotId, position: { coordinate: { x: 0, y: 1 }, orientation: registerIndex % 2 === 0 ? 'SOUTH' : 'NORTH' } },
+          ],
+        })),
+      )
+      expect(events.hands).toHaveLength(1)
+      expect(final.state.robots.map((robot) => robot.position)).toEqual([
+        { coordinate: { x: 1, y: 1 }, orientation: 'NORTH' },
+        { coordinate: { x: 0, y: 1 }, orientation: 'SOUTH' },
+      ])
+    })
+
+    it('coalesces repeated scheduling requests during execution into one ordered stream', async () => {
+      const createScheduler = scheduling.createActionScheduler
+      let scheduler: scheduling.ActionScheduler | undefined
+      vi.spyOn(scheduling, 'createActionScheduler').mockImplementationOnce((deps) => {
+        scheduler = createScheduler(deps)
+        return scheduler
+      })
+      const { members, initializations } = await startGame(['First', 'Second'])
+      if (!scheduler) throw new Error('Scheduler was not created')
+      const activeScheduler = scheduler
+      const traces = members.map(track)
+      const execute = shared.game.executeNextStep.bind(shared.game)
+      const executed = vi.spyOn(shared.game, 'executeNextStep').mockImplementation(() => {
+        for (let request = 0; request < 5; request++) activeScheduler.scheduleNextAction()
+        return execute()
+      })
+      const hands = members.map(nextHand)
+      await submitPair(members, initializations)
+      const dealt = await Promise.all(hands)
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      const snapshots = await Promise.all(members.map(getSnapshot))
+      expect(snapshots[0].state).toEqual(snapshots[1].state)
+      expect(snapshots[0].state).toMatchObject({
+        phase: 'PROGRAMMING', aborted: false,
+        execution: { roundNumber: 2, lastEnvironmentSequence: 10, activation: null },
+      })
+      expect(executed).toHaveBeenCalledTimes(20)
+      expect(traces[0].actions).toEqual(traces[1].actions)
+      expect(traces[0].environment).toEqual(traces[1].environment)
+      expect(traces[0].environment.map((step) => step.sequence)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+      for (const [index, trace] of traces.entries()) {
+        expect(trace.order).toEqual([
+          ...Array.from({ length: 5 }, () => ['robot.actionResolved', 'robot.actionResolved', 'environment.stepResolved', 'environment.stepResolved']).flat(), 'cards.dealt',
+        ])
+        expect(trace.hands).toEqual([dealt[index]])
+        expect(dealt[index].playerId).toBe(initializations[index].assignment.playerId)
+      }
+    })
+
+    for (const registerIndex of [0, 4]) {
+      it.each(['snapshot', 'recovery'] as const)(`resumes register ${registerIndex + 1} through %s without repeated effects or hands`, async (mode) => {
+        const { members: [first, second], initializations } = await startGame(['First', 'Second'])
+        const firstEvents = track(first)
+        const secondEvents = track(second)
+        const boundary = pauseAt(registerIndex)
+        const firstHand = nextHand(first)
+        await submitPair([first, second], initializations)
+        await boundary.paused
+        await disconnect(second, mode === 'recovery')
+        const before = await getSnapshot(first)
+        expect(before.state.paused).toBe(true)
+        expect(before.state.execution).toEqual({
+          roundNumber: 1, lastEnvironmentSequence: registerIndex * 2,
+          activation: { stage: 'ENVIRONMENT', registerIndex, stepIndex: 0, kind: 'GEARS' },
+        })
+        expect(firstEvents.environment).toHaveLength(registerIndex * 2)
+        expect(firstEvents.hands).toEqual([])
+        await Promise.all(Array.from({ length: 3 }, () => getSnapshot(first)))
+        expect(shared.game.executionState).toEqual(before.state.execution)
+
+        const returned = mode === 'snapshot' ? await connect('Second') : second
+        const returnedEvents = mode === 'snapshot' ? track(returned) : secondEvents
+        const returnedHand = nextHand(returned)
+        if (mode === 'snapshot') {
+          const restored = await getSnapshot(returned)
+          expect(restored.assignment).toEqual(initializations[1].assignment)
+          expect(restored.state.execution).toEqual(before.state.execution)
+          expect(restored.state.paused).toBe(false)
+        } else {
+          await reconnect(returned)
+          expect(returned.recovered).toBe(true)
+        }
+        const hands = await Promise.all([firstHand, returnedHand])
+        const snapshots = await Promise.all([getSnapshot(first), getSnapshot(returned), getSnapshot(returned)])
+        expect(snapshots[0].state).toEqual(snapshots[1].state)
+        expect(snapshots[1].state).toEqual(snapshots[2].state)
+        expect(snapshots[0].state.execution).toEqual({ roundNumber: 2, lastEnvironmentSequence: 10, activation: null })
+        expect(firstEvents.order).toEqual([
+          ...Array.from({ length: 5 }, () => ['robot.actionResolved', 'robot.actionResolved', 'environment.stepResolved', 'environment.stepResolved']).flat(), 'cards.dealt',
+        ])
+        expect(firstEvents.environment.map((step) => step.sequence)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+        expect(firstEvents.environment.flatMap((step) => step.checkpointProgress))
+          .toEqual([{ playerId: initializations[0].assignment.playerId, lastCheckpoint: 1 }])
+        expect(returnedEvents.environment).toEqual(mode === 'recovery'
+          ? firstEvents.environment : firstEvents.environment.slice(registerIndex * 2))
+        expect(firstEvents.hands).toEqual([hands[0]])
+        expect(returnedEvents.hands).toEqual([hands[1]])
+        expect(hands.map((hand) => hand.playerId)).toEqual(initializations.map((initial) => initial.assignment.playerId))
+        expect(boundary.spy).toHaveBeenCalledTimes(20)
+      })
+    }
+
+    it.each(['ROBOTS', 'ENVIRONMENT'] as const)('finishes the last register once after a departure during %s', async (stage) => {
+      const { members: [first, second], initializations } = await startGame(['First', 'Second'])
+      const firstEvents = track(first)
+      const secondEvents = track(second)
+      const boundary = pauseAt(4, stage)
+      const hand = nextHand(first)
+      await submitPair([first, second], initializations)
+      await boundary.paused
+      await disconnect(first, true)
+      await getSnapshot(second)
+      expect(await second.emitWithAck('game.leave', { gameId: shared.gameId })).toEqual({ outcome: 'LEFT' })
+      expect(await second.emitWithAck('game.leave', { gameId: shared.gameId })).toEqual({ outcome: 'GAME_NOT_FOUND' })
+      expect(shared.game.executionState).toEqual({
+        roundNumber: 1, lastEnvironmentSequence: 8,
+        activation: { stage: 'ENVIRONMENT', registerIndex: 4, stepIndex: 0, kind: 'GEARS' },
+      })
+      expect(firstEvents.hands).toEqual([])
+      await reconnect(first)
+      expect(first.recovered).toBe(true)
+      await hand
+      const snapshot = await getSnapshot(first)
+      await getSnapshot(first)
+      expect(firstEvents.order).toEqual([
+        ...Array.from({ length: 4 }, () => ['robot.actionResolved', 'robot.actionResolved', 'environment.stepResolved', 'environment.stepResolved']).flat(),
+        'robot.actionResolved', ...(stage === 'ENVIRONMENT' ? ['robot.actionResolved'] : []),
+        'game.playerLeft', 'environment.stepResolved', 'environment.stepResolved', 'cards.dealt',
+      ])
+      expect(firstEvents.environment.map((step) => step.sequence)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+      expect(firstEvents.hands).toHaveLength(1)
+      expect(secondEvents.hands).toEqual([])
+      expect(snapshot.state.execution).toEqual({ roundNumber: 2, lastEnvironmentSequence: 10, activation: null })
+      expect(snapshot.state.players.map((player) => player.playerId)).toEqual([initializations[0].assignment.playerId])
+    })
+
+    it('broadcasts an environment failure without a result or hand and restores the aborted snapshot', async () => {
+      const { members: [first, second], initializations } = await startGame(['First', 'Second'])
+      const events = track(first)
+      const boundary = pauseAt(4)
+      await submitPair([first, second], initializations)
+      await boundary.paused
+      await disconnect(second)
+      const before = await getSnapshot(first)
+      boundary.spy.mockImplementationOnce(() => { throw new Error('Environment failed') })
+      const returned = await connect('Second')
+      const aborted = new Promise((resolve) => first.once('game.aborted', resolve))
+      const returnedAborted = new Promise((resolve) => returned.once('game.aborted', resolve))
+      await getSnapshot(returned)
+      await Promise.all([aborted, returnedAborted])
+      const snapshots = await Promise.all([getSnapshot(first), getSnapshot(returned), getSnapshot(returned)])
+      expect(snapshots.every((snapshot) => snapshot.state.aborted)).toBe(true)
+      expect(snapshots[0].state.execution).toEqual(before.state.execution)
+      expect(events.environment.map((step) => step.sequence)).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
+      expect(events.hands).toEqual([])
+      expect(events.order.at(-1)).toBe('game.aborted')
+      expect(boundary.spy).toHaveBeenCalledTimes(19)
+      expect(await first.emitWithAck('program.submit', submission(initializations[0]))).toEqual({ outcome: 'GAME_ABORTED' })
+    })
   })
 
   describe('pit results over Socket.IO', () => {
@@ -268,7 +542,7 @@ describe('started game membership over Socket.IO', () => {
       shared.game.players[2].robot.turn(1)
       const actions: RobotActionResolved[][] = members.map(() => [])
       members.forEach(({ client }, index) => client.on('robot.actionResolved', (action) => actions[index].push(action)))
-      const hands = members.map(({ client }) => new Promise<CardsDealt>((resolve) => client.once('cards.dealt', resolve)))
+      const hands = members.map(({ client }) => nextHand(client))
       for (const [index, { client, joined }] of members.entries()) {
         const indices = index === 0 ? [0, 4, 5, 6, 8] : [4, 5, 6, 8, 3]
         expect(await client.timeout(1000).emitWithAck('program.submit', program(joined, indices))).toEqual({ outcome: 'ACCEPTED' })
@@ -296,12 +570,12 @@ describe('started game membership over Socket.IO', () => {
       const outsideEvents = vi.fn()
       outsider.onAny(outsideEvents)
       const actions: RobotActionResolved[] = []
-      const progress: PlayerCheckpointProgress[] = []
+      const progress: EnvironmentStepResolved[] = []
       const events: string[] = []
       client.onAny((name) => events.push(name))
       client.on('robot.actionResolved', (action) => actions.push(action))
-      client.on('player.checkpointProgress', (payload) => progress.push(payload))
-      const hand = new Promise<CardsDealt>((resolve) => client.once('cards.dealt', resolve))
+      client.on('environment.stepResolved', (payload) => progress.push(payload))
+      const hand = nextHand(client)
 
       expect(await client.timeout(1000).emitWithAck('program.submit', program(initial, [2, 0, 4, 5, 3])))
         .toEqual({ outcome: 'ACCEPTED' })
@@ -319,12 +593,14 @@ describe('started game membership over Socket.IO', () => {
         pushedRobots: [],
         instruction: initial.hand[[2, 0, 4, 5, 3][registerIndex]].instruction, position,
       })))
-      expect(progress).toEqual([{
-        gameId: shared.gameId, playerId: initial.assignment.playerId, lastCheckpoint: 1, checkpointCount: 2,
-      }])
+      expect(progress).toEqual(Array.from({ length: 5 }, (_, registerIndex) => ['GEARS', 'CHECKPOINTS'].map((kind, stepIndex) => ({
+        gameId: shared.gameId, roundNumber: 1, registerIndex, stepIndex, kind,
+        sequence: registerIndex * 2 + stepIndex + 1, robots: [],
+        checkpointProgress: registerIndex === 0 && kind === 'CHECKPOINTS'
+          ? [{ playerId: initial.assignment.playerId, lastCheckpoint: 1 }] : [],
+      }))).flat())
       expect(events).toEqual([
-        'robot.actionResolved', 'player.checkpointProgress',
-        ...Array.from({ length: 4 }, () => 'robot.actionResolved'), 'cards.dealt',
+        ...Array.from({ length: 5 }, () => ['robot.actionResolved', 'environment.stepResolved', 'environment.stepResolved']).flat(), 'cards.dealt',
       ])
       const snapshot = await getSnapshot(client)
       expect(snapshot.outcome).toBe('JOINED')
@@ -360,7 +636,7 @@ describe('started game membership over Socket.IO', () => {
         client.on('robot.actionResolved', (action) => actions[index].push(action))
         client.on('cards.dealt', (hand) => dealt[index].push(hand))
       }
-      const hands = members.map(({ client }) => new Promise<CardsDealt>((resolve) => client.once('cards.dealt', resolve)))
+      const hands = members.map(({ client }) => nextHand(client))
       for (const [index, { client, joined }] of members.entries()) {
         const indices = index === 0 ? [2, 4, 5, 6, 8] : [4, 5, 6, 8, 3]
         expect(await client.timeout(1000).emitWithAck('program.submit', program(joined, indices)))

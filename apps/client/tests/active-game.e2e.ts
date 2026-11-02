@@ -1,19 +1,10 @@
 import type { Dialog, Page } from '@playwright/test'
-import { expect, openGame, test } from './game-fixture.ts'
+import { expect, openGame, pauseClock, test } from './game-fixture.ts'
 import { GAME_ID, OTHER_PLAYER_ID, OTHER_ROBOT_ID, PLAYER_ID, ROBOT_ID, ROUND_ACTIONS } from './game-fixture-data.ts'
 import { gameStatus } from './browserClient.ts'
 async function fillProgram(page: Page, indices = [0, 1, 2, 3, 4]) {
   const cards = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
   for (const index of indices) await cards.nth(index).click()
-}
-
-// The installed clock keeps ticking with real time until it is paused, so a
-// fixed pause time can already lie in the past after a slow cold-cache load
-// ("Cannot fast-forward to the past"). Pause one second past the current fake
-// time instead — still a small jump, because fast-forwarding past the
-// Socket.IO ping interval expires the heartbeat and disconnects the client.
-async function pauseClock(page: Page) {
-  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
 }
 
 test('renders the programming interface', async ({ page }) => {

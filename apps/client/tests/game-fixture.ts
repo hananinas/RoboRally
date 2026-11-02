@@ -5,7 +5,7 @@ import {
   type FixtureSnapshot,
 } from './game-fixture-data.ts'
 
-type GameFixture = {
+export type GameFixture = {
   initial: FixtureSnapshot
   snapshot: () => Promise<FixtureSnapshot>
   control: (control: FixtureControl) => Promise<FixtureSnapshot>
@@ -38,6 +38,15 @@ export const test = base.extend<{ game: GameFixture }>({
 })
 
 export { expect }
+
+// The installed clock keeps ticking with real time until it is paused, so a
+// fixed pause time can already lie in the past after a slow cold-cache load
+// ("Cannot fast-forward to the past"). Pause one second past the current fake
+// time instead — still a small jump, because fast-forwarding past the
+// Socket.IO ping interval expires the heartbeat and disconnects the client.
+export async function pauseClock(page: Page) {
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
+}
 
 export async function openGame(page: Page, width?: number, height?: number) {
   if (width !== undefined && height !== undefined) await page.setViewportSize({ width, height })

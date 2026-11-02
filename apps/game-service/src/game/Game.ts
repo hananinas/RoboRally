@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { err, ok, type Result } from 'neverthrow'
 import type { Board } from '@/game/Board'
-import { instructions } from '@robo-rally/game-events'
+import { instructions, type ActivationCursor, type EnvironmentStepKind, type ExecutionState } from '@robo-rally/game-events'
 import { Card } from '@/game/Card'
 import type { CardId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
 import { ROBOT_COLOURS, Robot } from '@/game/Robot'
-import { tileDefinitions } from '@/game/Tile'
+import { GearTile, tileDefinitions } from '@/game/Tile'
 import { Direction, opposite, type Position } from '@/game/spatial'
 import { Integer, PositiveInteger, UnsignedInteger } from '@/numbers'
 
@@ -19,15 +19,27 @@ export type RobotActionResult = Readonly<{
   direction: Direction
 }>
 
+type RobotState = Omit<RobotActionResult, 'card'>
+
 export type NextActionResult = Readonly<{
   registerIndex: number
   action: RobotActionResult
-  pushedRobots: readonly Readonly<{
-    robotId: RobotId
-    position: Position
-    direction: Direction
-  }>[]
+  pushedRobots: readonly RobotState[]
 }>
+
+export type EnvironmentStepResult = Readonly<{
+  roundNumber: number
+  registerIndex: number
+  stepIndex: number
+  kind: EnvironmentStepKind
+  sequence: number
+  robots: NextActionResult['pushedRobots']
+  checkpointProgress: readonly Readonly<{ playerId: PlayerId; lastCheckpoint: number }>[]
+}>
+
+export type ActivationStepResult =
+  | Readonly<{ type: 'robot'; result: NextActionResult }>
+  | Readonly<{ type: 'environment'; result: EnvironmentStepResult }>
 
 export type AddPlayerError = 'GAME_ALREADY_STARTED' | 'NO_SPAWN_AVAILABLE'
 
@@ -48,8 +60,16 @@ export class Game {
   private readonly deck: readonly Card[]
   private currentPhase: GamePhase = 'programming'
   private registerIndex = 0
+  private roundNumber = 1
+  private environmentStepIndex: number | null = null
+  private environmentSequence = 0
   private readonly submittedPlayerIds = new Set<PlayerId>()
   private readonly activatedRobotIds = new Set<RobotId>()
+  private readonly environmentSteps: readonly Readonly<{ kind: EnvironmentStepKind; execute: () => void }>[] = [
+    // Future conveyors and push panels precede gears; board lasers follow them.
+    { kind: 'GEARS', execute: () => this.activateGears() },
+    { kind: 'CHECKPOINTS', execute: () => this.activateCheckpoints() },
+  ]
   private started = false
   private isPaused = false
   private isAborted = false
@@ -98,6 +118,16 @@ export class Game {
 
   get currentRegister(): number {
     return this.registerIndex
+  }
+
+  get executionState(): ExecutionState {
+    let activation: ActivationCursor | null = null
+    if (this.currentPhase === 'activation') {
+      const stepIndex = this.environmentStepIndex
+      activation = stepIndex === null ? { stage: 'ROBOTS', registerIndex: this.registerIndex }
+        : { stage: 'ENVIRONMENT', registerIndex: this.registerIndex, stepIndex, kind: this.environmentSteps[stepIndex].kind }
+    }
+    return { roundNumber: this.roundNumber, lastEnvironmentSequence: this.environmentSequence, activation }
   }
 
   get players(): readonly Player[] {
@@ -171,14 +201,7 @@ export class Game {
     player.robot.clearProgram()
     this.submittedPlayerIds.delete(playerId)
     this.activatedRobotIds.delete(player.robot.id)
-    if (this.currentPhase === 'activation') {
-      if (this.roster.length === 0) {
-        this.finishRound()
-      } else if (this.activatedRobotIds.size === this.roster.length) {
-        this.activateBoardElements()
-        this.finishRegister()
-      }
-    }
+    this.prepareEnvironmentIfReady()
     this.recheckProgrammingPhase()
   }
 
@@ -244,17 +267,30 @@ export class Game {
     }
   }
 
-  executeNextAction(): NextActionResult {
+  private checkCanExecute(): void {
+    if (this.isAborted) throw new Error('An aborted game cannot execute')
+    if (this.isPaused) throw new Error('A paused game cannot execute')
     if (this.currentPhase !== 'activation') {
-      throw new Error('Robot actions can only execute during activation')
+      throw new Error('Steps can only execute during activation')
     }
+  }
+
+  executeNextStep(): ActivationStepResult {
+    if (this.environmentStepIndex === null) return { type: 'robot', result: this.executeNextAction() }
+    this.checkCanExecute()
+    return { type: 'environment', result: this.executeEnvironmentStep(this.environmentStepIndex) }
+  }
+
+  executeNextAction(): NextActionResult {
+    this.checkCanExecute()
+    if (this.environmentStepIndex !== null) throw new Error('Environment steps must finish before robot actions')
 
     const robot = this.nextRobotByPriority()
     if (!robot) throw new Error('No robots remain to activate')
 
     const registerIndex = this.registerIndex
     const card = robot.getProgramCard(UnsignedInteger(registerIndex))
-    const previousPositions = this.roster.map((player) => this.board.positionOf(player.robot.id))
+    const previousRobots = this.captureRobotStates()
     this.executeCard(robot, card)
     this.activatedRobotIds.add(robot.id)
     const action: RobotActionResult = {
@@ -263,19 +299,51 @@ export class Game {
       position: this.board.positionOf(robot.id),
       direction: robot.direction,
     }
-    const pushedRobots = this.roster.flatMap(({ robot: other }, index) => {
-      if (other.id === robot.id) return []
-      const position = this.board.positionOf(other.id)
-      const previous = previousPositions[index]
-      if (position.x === previous.x && position.y === previous.y) return []
-      return [{ robotId: other.id, position, direction: other.direction }]
+    const pushedRobots = this.changedRobotStates(previousRobots, {
+      includeDirection: false, excludeRobotId: robot.id,
     })
 
-    if (this.activatedRobotIds.size === this.players.length) {
-      this.activateBoardElements()
-      this.finishRegister()
-    }
+    this.prepareEnvironmentIfReady()
     return { registerIndex, action, pushedRobots }
+  }
+
+  private executeEnvironmentStep(stepIndex: number): EnvironmentStepResult {
+    const step = this.environmentSteps[stepIndex]
+    const previousRobots = this.captureRobotStates()
+    const previousProgress = new Map(this.roster.map((player) => [player.id, player.lastCheckpoint]))
+    step.execute()
+    const robots = this.changedRobotStates(previousRobots, { includeDirection: true })
+    const checkpointProgress = this.roster.flatMap((player) =>
+      player.lastCheckpoint === previousProgress.get(player.id) ? []
+        : [{ playerId: player.id, lastCheckpoint: player.lastCheckpoint }],
+    )
+    const result: EnvironmentStepResult = {
+      roundNumber: this.roundNumber, registerIndex: this.registerIndex,
+      stepIndex, kind: step.kind, sequence: ++this.environmentSequence, robots, checkpointProgress,
+    }
+    this.environmentStepIndex = stepIndex + 1
+    if (this.environmentStepIndex === this.environmentSteps.length) this.finishRegister()
+    return result
+  }
+
+  private captureRobotStates(): ReadonlyMap<RobotId, RobotState> {
+    return new Map(this.roster.map(({ robot }) => [robot.id, {
+      robotId: robot.id, position: this.board.positionOf(robot.id), direction: robot.direction,
+    }]))
+  }
+
+  private changedRobotStates(
+    previousRobots: ReadonlyMap<RobotId, RobotState>,
+    { includeDirection, excludeRobotId }: { includeDirection: boolean; excludeRobotId?: RobotId },
+  ): readonly RobotState[] {
+    return this.roster.flatMap(({ robot }) => {
+      if (robot.id === excludeRobotId) return []
+      const position = this.board.positionOf(robot.id)
+      const previous = previousRobots.get(robot.id)
+      if (previous?.position.x === position.x && previous.position.y === position.y &&
+          (!includeDirection || previous.direction === robot.direction)) return []
+      return [{ robotId: robot.id, position, direction: robot.direction }]
+    })
   }
 
   private dealCards(): void {
@@ -352,7 +420,14 @@ export class Game {
     // TODO: Add two SPAM cards and cancel this robot's remaining registers.
   }
 
-  private activateBoardElements(): void {
+  private activateGears(): void {
+    for (const { robot } of this.players) {
+      const tile = this.board.getTile(this.board.positionOf(robot.id))
+      if (tile instanceof GearTile) robot.turn(tile.rotation === 'COUNTERCLOCKWISE' ? 1 : 3)
+    }
+  }
+
+  private activateCheckpoints(): void {
     for (const player of this.players) {
       const position = this.board.positionOf(player.robot.id)
       const checkpoint = this.board.getTile(position)?.checkpointNumber
@@ -360,16 +435,33 @@ export class Game {
     }
   }
 
+  private prepareEnvironmentIfReady(): void {
+    if (this.currentPhase !== 'activation') return
+    if (this.roster.length === 0) {
+      this.finishRound()
+      return
+    }
+    if (this.environmentStepIndex !== null || this.activatedRobotIds.size !== this.roster.length) return
+
+    this.environmentStepIndex = 0
+  }
+
   private finishRegister(): void {
     this.activatedRobotIds.clear()
+    this.environmentStepIndex = null
     this.registerIndex++
-    if (this.registerIndex === 5) this.finishRound()
+    if (this.registerIndex === 5) {
+      this.roundNumber++
+      this.finishRound()
+    }
   }
 
   private finishRound(): void {
     for (const player of this.players) player.robot.clearProgram()
     this.submittedPlayerIds.clear()
+    this.activatedRobotIds.clear()
     this.registerIndex = 0
+    this.environmentStepIndex = null
     this.dealCards()
     this.currentPhase = 'programming'
   }

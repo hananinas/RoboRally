@@ -1,3 +1,4 @@
+import { resolveRobotAction } from '../activationTestHelper.ts'
 import { describe, expect, it } from 'vitest'
 import { Board, Direction, EmptyTile, PitTile, Game, Card, Player, Robot } from '@/game/index'
 import { Integer } from '@/numbers'
@@ -40,7 +41,7 @@ describe('Game programming', () => {
     const game = new Game(board, [player], deck, { x: Integer(0), y: Integer(0) })
     game.submitProgram(player.id, deck.map((card) => card.id))
 
-    const actions = Array.from({ length: 5 }, () => game.executeNextAction())
+    const actions = Array.from({ length: 5 }, () => resolveRobotAction(game))
     expect(actions.map(({ registerIndex, action }) => ({
       registerIndex,
       position: action.position,
@@ -128,13 +129,13 @@ describe('Game programming', () => {
     expect(game.phase).toBe('activation')
   })
 
-  it('still executes an already-committed action while paused', () => {
+  it('does not start a new action while paused', () => {
     const { player, deck, game } = createGame()
     game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
 
     game.pause()
-    expect(() => game.executeNextAction()).not.toThrow()
-    expect(game.currentRegister).toBe(1)
+    expect(() => game.executeNextAction()).toThrow('paused')
+    expect(game.currentRegister).toBe(0)
   })
 
   it('blocks program submission once aborted, even over a pause', () => {

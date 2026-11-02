@@ -1,7 +1,9 @@
 import type {
   Card,
   CardsDealt,
+  EnvironmentStepResolved,
   PlayerCheckpointProgress,
+  PlayerLeft,
   ProgramResultOutcome,
   ProgramSubmitted,
   PublicGameState,
@@ -61,11 +63,13 @@ export const ROUND_ACTIONS: readonly RobotActionResolved[] = [
 ]
 
 export type FixtureControl =
+  | { type: 'player-left'; player: PlayerLeft }
   | { type: 'checkpoint-progress'; progress: PlayerCheckpointProgress }
   | { type: 'submission'; outcome: ProgramResultOutcome; deferred: boolean }
   | { type: 'acknowledge'; outcome: ProgramResultOutcome }
   | { type: 'disconnect' }
-  | { type: 'round'; actions: readonly RobotActionResolved[]; deferHand?: boolean }
+  | { type: 'inject-environment'; result: EnvironmentStepResolved }
+  | { type: 'round'; actions: readonly (RobotActionResolved | EnvironmentStepResolved)[]; deferHand?: boolean }
   | { type: 'deal' }
   | { type: 'hand'; hand: CardsDealt }
   | { type: 'submitted'; submission: ProgramSubmitted }

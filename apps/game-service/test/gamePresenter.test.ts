@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import type {
   CardsDealt,
+  EnvironmentStepResolved,
   PublicGameState,
   RobotActionResolved,
   Tile as TilePayload,
@@ -11,6 +12,7 @@ import {
   Direction,
   EmptyTile,
   Game,
+  GearTile,
   PitTile,
   Player,
   Robot,
@@ -19,6 +21,7 @@ import {
 } from '@/game/index.ts'
 import {
   presentCardsDealt,
+  presentEnvironmentStepResolved,
   presentPublicGameState,
   presentRobotActionResolved,
 } from '@/socket/gamePresenter.ts'
@@ -31,6 +34,51 @@ function createGameWithPlayer() {
 }
 
 describe('game presenter', () => {
+  it('presents environment results without a card or domain directions', () => {
+    const resolved = presentEnvironmentStepResolved('game', {
+      roundNumber: 1, registerIndex: 4, stepIndex: 1, kind: 'CHECKPOINTS', sequence: 10,
+      robots: [
+        { robotId: 'robot', position: { x: Integer(2), y: Integer(3) }, direction: Direction.WEST },
+        { robotId: 'other', position: { x: Integer(4), y: Integer(5) }, direction: Direction.EAST },
+      ],
+      checkpointProgress: [{ playerId: 'player', lastCheckpoint: 1 }],
+    })
+    expectTypeOf(resolved).toEqualTypeOf<EnvironmentStepResolved>()
+    expect(resolved).toEqual({
+      gameId: 'game', roundNumber: 1, registerIndex: 4, stepIndex: 1, kind: 'CHECKPOINTS', sequence: 10,
+      robots: [
+        { robotId: 'robot', position: { coordinate: { x: 2, y: 3 }, orientation: 'WEST' } },
+        { robotId: 'other', position: { coordinate: { x: 4, y: 5 }, orientation: 'EAST' } },
+      ],
+      checkpointProgress: [{ playerId: 'player', lastCheckpoint: 1 }],
+    })
+  })
+
+  it('includes pending activation and the completed environment sequence in snapshots', () => {
+    const { gameId, game, player } = createGameWithPlayer()
+    expect(presentPublicGameState(gameId, game).execution).toEqual({
+      roundNumber: 1, lastEnvironmentSequence: 0, activation: null,
+    })
+    game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
+    const first = presentPublicGameState(gameId, game)
+    expect(first.execution?.activation).toEqual({ stage: 'ROBOTS', registerIndex: 0 })
+    game.executeNextStep()
+    expect(presentPublicGameState(gameId, game).execution).toEqual({
+      roundNumber: 1, lastEnvironmentSequence: 0,
+      activation: { stage: 'ENVIRONMENT', registerIndex: 0, stepIndex: 0, kind: 'GEARS' },
+    })
+    game.executeNextStep()
+    expect(presentPublicGameState(gameId, game).execution).toEqual({
+      roundNumber: 1, lastEnvironmentSequence: 1,
+      activation: { stage: 'ENVIRONMENT', registerIndex: 0, stepIndex: 1, kind: 'CHECKPOINTS' },
+    })
+    game.executeNextStep()
+    expect(presentPublicGameState(gameId, game).execution).toEqual({
+      roundNumber: 1, lastEnvironmentSequence: 2, activation: { stage: 'ROBOTS', registerIndex: 1 },
+    })
+    expect(first.execution?.activation).toEqual({ stage: 'ROBOTS', registerIndex: 0 })
+  })
+
   it('serializes pushed robot positions and orientations alongside the acting robot', () => {
     const { player } = createGameWithPlayer()
     const resolved = presentRobotActionResolved('game', {
@@ -69,6 +117,24 @@ describe('game presenter', () => {
       { position: { x: 1, y: 0 }, type: 'PIT' },
       { position: { x: 2, y: 0 }, type: 'PIT', walls: ['NORTH', 'WEST'] },
       { position: { x: 3, y: 0 }, type: 'EMPTY', walls: ['SOUTH'], checkpointNumber: 1 },
+    ])
+  })
+
+  it('serializes gear directions and walls without adding rotation to other tiles', () => {
+    const board = new Board([[
+      new EmptyTile(),
+      new GearTile('CLOCKWISE', [Direction.NORTH]),
+      new GearTile('COUNTERCLOCKWISE', [Direction.SOUTH, Direction.WEST]),
+      new PitTile(),
+    ]], { x: Integer(3), y: Integer(0), angle: 0 })
+    const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
+    const game = new Game(board, [], cards, { x: Integer(0), y: Integer(0) })
+
+    expect(presentPublicGameState('game', game).board.tiles).toEqual([
+      { position: { x: 0, y: 0 }, type: 'EMPTY' },
+      { position: { x: 1, y: 0 }, type: 'GEAR', rotation: 'CLOCKWISE', walls: ['NORTH'] },
+      { position: { x: 2, y: 0 }, type: 'GEAR', rotation: 'COUNTERCLOCKWISE', walls: ['SOUTH', 'WEST'] },
+      { position: { x: 3, y: 0 }, type: 'PIT' },
     ])
   })
 

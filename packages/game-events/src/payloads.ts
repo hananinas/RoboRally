@@ -43,11 +43,15 @@ export type Robot = Readonly<{
   position: Position
 }>
 
+export type GearRotation = 'CLOCKWISE' | 'COUNTERCLOCKWISE'
+
 export type Tile = Readonly<{
   position: Coordinate
-  type: 'EMPTY' | 'PIT'
+  type: 'EMPTY' | 'PIT' | 'GEAR'
   walls?: readonly Orientation[]
   checkpointNumber?: number
+  // Present on GEAR tiles only.
+  rotation?: GearRotation
 }>
 
 export type Board = Readonly<{
@@ -58,7 +62,7 @@ export type Board = Readonly<{
 
 export type GamePhase = 'PROGRAMMING' | 'EXECUTING'
 
-export type EnvironmentStepKind = 'CHECKPOINTS'
+export type EnvironmentStepKind = 'GEARS' | 'CHECKPOINTS'
 
 export type ActivationCursor =
   | Readonly<{ stage: 'ROBOTS'; registerIndex: number }>

@@ -714,14 +714,28 @@ components:
       payload:
         $ref: '#/components/schemas/EnvironmentStepResolved'
       examples:
-        - name: firstCheckpointStep
+        - name: firstGearStep
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
             roundNumber: 1
             registerIndex: 0
             stepIndex: 0
-            kind: CHECKPOINTS
+            kind: GEARS
             sequence: 1
+            robots:
+              - robotId: 00000000-0000-4000-8000-000000000003
+                position:
+                  coordinate: { x: 10, y: 6 }
+                  orientation: EAST
+            checkpointProgress: []
+        - name: firstCheckpointStep
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            roundNumber: 1
+            registerIndex: 0
+            stepIndex: 1
+            kind: CHECKPOINTS
+            sequence: 2
             robots: []
             checkpointProgress:
               - playerId: 00000000-0000-4000-8000-000000000002
@@ -1259,7 +1273,12 @@ components:
 
     EnvironmentStepKind:
       type: string
-      enum: [ CHECKPOINTS ]
+      enum: [ GEARS, CHECKPOINTS ]
+      description: >-
+        Implemented steps run in this order after each register: GEARS, CHECKPOINTS.
+        GEARS turns every robot currently on a gear once, without moving it.
+        In the full environment order, gears follow blue belts, green belts and
+        push panels, and precede board lasers; those steps are not implemented yet.
 
     RoundNumber:
       type: integer
@@ -1486,10 +1505,12 @@ components:
           $ref: '#/components/schemas/Coordinate'
         type:
           type: string
-          enum: [ EMPTY, PIT ]
+          enum: [ EMPTY, PIT, GEAR ]
           description: >-
             PIT triggers an immediate server-side reboot on entry during movement,
             discarding the remaining steps of that instruction. Walls can block entry.
+            GEAR is occupiable and has no movement-entry effect; its rotation is
+            applied during gear activation.
         walls:
           type: array
           uniqueItems: true
@@ -1502,6 +1523,13 @@ components:
             Optional checkpoint on an EMPTY tile, independent of its walls.
             Omit when absent. Numbers are unique and consecutive from 1 on a board.
             Checkpoints stay at their fixed positions and are available to every player.
+        rotation:
+          type: string
+          enum: [ CLOCKWISE, COUNTERCLOCKWISE ]
+          description: >-
+            Present only on GEAR tiles. CLOCKWISE indicates a green gear that turns
+            a robot 90 degrees right; COUNTERCLOCKWISE indicates a red gear that
+            turns a robot 90 degrees left. Rotation changes orientation only.
     Antenna:
       type: object
       additionalProperties: false

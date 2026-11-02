@@ -144,7 +144,6 @@ export function handleLeave(
     const { player, user } = result.value
     playerId = player.id
 
-    const phaseBeforeLeave = game.phase
     game.removePlayer(player.id)
     memberships.delete(user.userId)
     void socket.leave(publicRoom)
@@ -153,8 +152,6 @@ export function handleLeave(
     io.to(publicRoom).emit('game.playerLeft', {
       gameId, playerId: player.id, robotId: player.robot.id,
     })
-    actionScheduler.broadcastCheckpointProgress()
-    if (phaseBeforeLeave === 'activation' && game.phase === 'programming') actionScheduler.dealHands()
     actionScheduler.scheduleNextAction()
   }, (error) => {
     logError('Failed to process player leaving', error, { command: 'game.leave', gameId, playerId })

@@ -12,6 +12,7 @@ import {
 } from './gameState.ts'
 import type useGameConnection from './useGameConnection.ts'
 import useOverlayLayout from './useOverlayLayout.ts'
+import { isEnvironmentStep } from './board/robotPlayback.ts'
 
 function getGameStatus(state: ClientGameState): string {
   if (!state.connected) return 'Not connected'
@@ -87,7 +88,8 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout }: {
             />
             <RegisterPanel
               registers={state.playbackProgram ?? state.registers}
-              activeRegister={state.playback.active?.registerIndex ?? null}
+              activeRegister={state.playback.active && !isEnvironmentStep(state.playback.active)
+                ? state.playback.active.registerIndex : null}
               disabled={disabled}
               submission={state.submission}
               status={status}

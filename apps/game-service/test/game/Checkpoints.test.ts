@@ -1,3 +1,4 @@
+import { resolveRobotAction } from '../activationTestHelper.ts'
 import { describe, expect, it } from 'vitest'
 import { Board, Card, Direction, EmptyTile, Game, Player, Robot } from '@/game/index'
 import { Integer } from '@/numbers'
@@ -33,9 +34,9 @@ describe('checkpoint activation', () => {
     ])
     for (const player of players) game.submitProgram(player.id, [c.step, c.left, c.right, c.uturn, c.back].map((card) => card.id))
 
-    expect(game.executeNextAction().action.robotId).toBe(players[0].robot.id)
+    expect(resolveRobotAction(game).action.robotId).toBe(players[0].robot.id)
     expect(players[0].lastCheckpoint).toBe(0)
-    game.executeNextAction()
+    resolveRobotAction(game)
     expect(players.map((player) => player.lastCheckpoint)).toEqual([1, 0])
     expect(game.currentRegister).toBe(1)
   })
@@ -45,7 +46,7 @@ describe('checkpoint activation', () => {
     const program = [c.move2, c.back, c.step, c.stepAgain, c.left]
     game.submitProgram(player.id, program.map((card) => card.id))
     const progress = program.map(() => {
-      game.executeNextAction()
+      resolveRobotAction(game)
       return player.lastCheckpoint
     })
 
@@ -55,7 +56,7 @@ describe('checkpoint activation', () => {
     expect(game.phase).toBe('programming')
     game.submitProgram(player.id, program.map((card) => card.id))
     expect(game.phase).toBe('activation')
-    game.executeNextAction()
+    resolveRobotAction(game)
     expect(player.lastCheckpoint).toBe(2)
   })
 
@@ -63,7 +64,7 @@ describe('checkpoint activation', () => {
     const { players: [player], cards: c, game } = createGame([{ x: 2, y: 1, direction: Direction.EAST }])
     game.submitProgram(player.id, [c.step, c.left, c.right, c.uturn, c.back].map((card) => card.id))
     for (let register = 0; register < 4; register++) {
-      game.executeNextAction()
+      resolveRobotAction(game)
       expect(player.lastCheckpoint).toBe(0)
     }
   })
@@ -74,7 +75,7 @@ describe('checkpoint activation', () => {
     game.submitProgram(player.id, [c.left, c.right, c.uturn, c.step, c.back].map((card) => card.id))
     expect(player.lastCheckpoint).toBe(0)
     for (let register = 0; register < 3; register++) {
-      game.executeNextAction()
+      resolveRobotAction(game)
       expect(player.lastCheckpoint).toBe(1)
     }
   })
@@ -86,14 +87,14 @@ describe('checkpoint activation', () => {
     ])
     game.submitProgram(players[0].id, [c.step, c.stepAgain, c.left, c.right, c.uturn].map((card) => card.id))
     game.submitProgram(players[1].id, [c.left, c.right, c.step, c.stepAgain, c.uturn].map((card) => card.id))
-    game.executeNextAction()
-    game.executeNextAction()
+    resolveRobotAction(game)
+    resolveRobotAction(game)
     expect(players.map((player) => player.lastCheckpoint)).toEqual([1, 0])
-    game.executeNextAction()
-    game.executeNextAction()
+    resolveRobotAction(game)
+    resolveRobotAction(game)
     expect(players.map((player) => player.lastCheckpoint)).toEqual([1, 0])
-    game.executeNextAction()
-    game.executeNextAction()
+    resolveRobotAction(game)
+    resolveRobotAction(game)
     expect(players.map((player) => player.lastCheckpoint)).toEqual([1, 1])
   })
 
@@ -103,9 +104,13 @@ describe('checkpoint activation', () => {
       { x: 4, y: 2, direction: Direction.NORTH },
     ])
     for (const player of players) game.submitProgram(player.id, [c.step, c.left, c.right, c.uturn, c.back].map((card) => card.id))
-    game.executeNextAction()
+    resolveRobotAction(game)
     expect(players[0].lastCheckpoint).toBe(0)
     game.removePlayer(players[1].id)
+    expect(players[0].lastCheckpoint).toBe(0)
+    game.executeNextStep()
+    expect(players[0].lastCheckpoint).toBe(0)
+    game.executeNextStep()
     expect(players.map((player) => player.lastCheckpoint)).toEqual([1, 0])
     expect(game.currentRegister).toBe(1)
   })

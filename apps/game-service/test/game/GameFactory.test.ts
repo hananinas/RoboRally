@@ -6,6 +6,12 @@ import { boardMaps } from '@/game/boardMaps'
 import { Direction, createGame, createPlayer } from '@/game/index'
 
 describe('game factory', () => {
+  it('includes both gear directions in the test map', () => {
+    const { game } = createGame('test-map')
+    expect(game.board.getTile({ x: Integer(9), y: Integer(6) })).toMatchObject({ kind: 'GEAR', rotation: 'CLOCKWISE' })
+    expect(game.board.getTile({ x: Integer(11), y: Integer(8) })).toMatchObject({ kind: 'GEAR', rotation: 'COUNTERCLOCKWISE' })
+  })
+
   it.each(['empty-map', 'test-map'] as const)('reboots at the configured destination after falling off %s', (mapName) => {
     const { game } = createGame(mapName)
     const player = game.addPlayer()._unsafeUnwrap()

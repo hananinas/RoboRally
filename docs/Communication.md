@@ -185,6 +185,13 @@ Movement resolves one square at a time. Robots entering pits or leaving the boar
 
 The event includes final positions after reboots: `position` for the acting robot and `pushedRobots` for other robots whose positions changed. Clients apply them together when the action plays.
 
+Board snapshots represent gears as `type: GEAR` with a `rotation` of `CLOCKWISE`
+(green, 90 degrees right) or `COUNTERCLOCKWISE` (red, 90 degrees left). Gears can
+have walls and allow robot placement and movement. Entering or passing through
+a gear does not rotate a robot; rotation belongs to the gear environment step.
+Every robot occupying a gear when it activates rotates once without changing
+coordinates. A robot remaining on a gear rotates again after the next register.
+
 #### Activation ordering
 
 The antenna is located at the top centre of the board and faces south.
@@ -200,7 +207,14 @@ The priority algorithm calculates the activation order based on the game rules.
 
 #### Environment execution contract
 
-`environment.stepResolved {gameId, roundNumber, registerIndex, stepIndex, kind, sequence, robots, checkpointProgress}` reports one completed environment step to the [public room](#rooms). Only `CHECKPOINTS` is defined so far. The client queues these with robot actions.
+`environment.stepResolved {gameId, roundNumber, registerIndex, stepIndex, kind, sequence, robots, checkpointProgress}` reports one completed environment step to the [public room](#rooms). Each register currently executes `GEARS` (step 0), then `CHECKPOINTS` (step 1), including steps with no changes. The client queues these with robot actions.
+
+The full environment order places gears fourth: blue conveyor belts, green
+conveyor belts, push panels, gears, then board lasers. Conveyors, push panels,
+and board lasers are not implemented yet. When added, movers must update robot
+positions before gears check occupancy, and board lasers must use the resulting
+orientations. `stepIndex` identifies the implemented list, not the position in
+the full rulebook order.
 
 Rounds start at 1; register and step indices start at 0. `sequence` starts at 1 and increases for each environment step across rounds, including steps with no changes. Apply all changes together when the step starts, after the register's robot actions and before the next register or hand. Environment results do not reveal cards. Steps without robot changes add no animation delay.
 

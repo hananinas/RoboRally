@@ -1,3 +1,4 @@
+import type { GearRotation } from '@robo-rally/game-events'
 import type { Antenna, BoardMap } from '@/game/Board'
 import { Direction, type Position } from '@/game/spatial'
 import { Integer } from '@/numbers'
@@ -30,7 +31,13 @@ export type MapSpec = BoardMap & Readonly<{
   walls: readonly WallSpec[]
   checkpoints: readonly (readonly [x: number, y: number])[]
   pits?: readonly (readonly [x: number, y: number])[]
+  gears?: readonly GearSpec[]
   rebootTile: Position
+}>
+
+export type GearSpec = Readonly<{
+  at: readonly [x: number, y: number]
+  rotation: GearRotation
 }>
 
 export const boardMaps = {
@@ -52,6 +59,10 @@ export const boardMaps = {
     width: 16,
     height: 15,
     pits: [[3, 3], [13, 4], [12, 7], [15, 9], [5, 10], [12, 11]],
+    gears: [
+      { at: [9, 6], rotation: 'CLOCKWISE' },
+      { at: [11, 8], rotation: 'COUNTERCLOCKWISE' },
+    ],
     rebootTile: { x: Integer(10), y: Integer(7) },
     antenna: { x: Integer(10), y: Integer(0), angle: Math.PI / 2 },
     checkpoints: [[10, 6], [8, 9]],

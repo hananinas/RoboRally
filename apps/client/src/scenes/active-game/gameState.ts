@@ -1,6 +1,7 @@
 import type {
   Card,
   CardsDealt,
+  EnvironmentStepResolved,
   GamePhase,
   GameInitialization,
   PlayerAssignment,
@@ -12,10 +13,13 @@ import type {
   RobotActionResolved,
   SubmitProgram,
 } from '@robo-rally/game-events'
-import { createBoardRenderModel, type BoardRenderModel } from './board/boardModel.ts'
+import type { BoardRenderModel } from './board/boardModel.ts'
+import { createBoardFromSnapshot } from './board/boardFromSnapshot.ts'
 import {
   createRobotPlaybackState,
+  isEnvironmentStep,
   robotPlaybackReducer,
+  type ResolvedPlaybackAction,
   type RobotPlaybackState,
 } from './board/robotPlayback.ts'
 
@@ -39,6 +43,7 @@ export type ClientGameState = {
   checkpointCount: number
   board: BoardRenderModel | null
   playback: RobotPlaybackState
+  lastEnvironmentSequence: number
   hand: readonly ProgramCard[]
   registers: Registers
   registersPast: readonly Registers[]
@@ -66,7 +71,8 @@ export type GameStateEvent =
   | { type: 'reset' }
   | { type: 'error'; message: string }
   | { type: 'action'; action: RobotActionResolved }
-  | { type: 'complete' }
+  | { type: 'environment'; result: EnvironmentStepResolved }
+  | { type: 'complete'; action?: ResolvedPlaybackAction }
   | { type: 'place'; cardId: string; registerIndex: number }
   | { type: 'remove'; registerIndex: number }
   | { type: 'move'; fromIndex: number; toIndex: number }
@@ -100,6 +106,7 @@ export function createClientGameState(): ClientGameState {
     checkpointCount: 0,
     board: null,
     playback: createRobotPlaybackState([]),
+    lastEnvironmentSequence: 0,
     hand: [],
     registers: emptyRegisters(),
     registersPast: [],
@@ -123,6 +130,7 @@ export function canProgram(state: ClientGameState): boolean {
     state.handReady &&
     state.hand.length > 0 &&
     !state.playback.active &&
+    state.playback.pending.length === 0 &&
     state.submission === 'idle'
 }
 
@@ -147,7 +155,7 @@ function activateHand(state: ClientGameState): ClientGameState {
   const hand = state.pendingHand
   if (!hand) return state
   if (!isHandEligible(state, hand)) return { ...state, pendingHand: null }
-  if (state.phase !== 'PROGRAMMING' || state.playback.active) {
+  if (state.phase !== 'PROGRAMMING' || state.playback.active || state.playback.pending.length > 0) {
     return state
   }
   return {
@@ -165,6 +173,50 @@ function activateHand(state: ClientGameState): ClientGameState {
   }
 }
 
+function applyCheckpointProgress(state: ClientGameState, payload: PlayerCheckpointProgress): ClientGameState {
+  const { gameId, playerId, lastCheckpoint, checkpointCount } = payload
+  const player = state.players.find((candidate) => candidate.playerId === playerId)
+  if (gameId !== state.assignment?.gameId || !player ||
+      !Number.isSafeInteger(lastCheckpoint) || !Number.isSafeInteger(checkpointCount) ||
+      lastCheckpoint > checkpointCount || lastCheckpoint <= player.lastCheckpoint) return state
+  return {
+    ...state,
+    checkpointCount,
+    players: state.players.map((candidate) =>
+      candidate.playerId === playerId ? { ...candidate, lastCheckpoint } : candidate),
+  }
+}
+
+function applyPlayback(state: ClientGameState, playback: RobotPlaybackState): ClientGameState {
+  if (playback === state.playback) return state
+  let next = { ...state, playback }
+  const active = playback.active
+  if (active && active !== state.playback.active && isEnvironmentStep(active)) {
+    for (const progress of active.checkpointProgress) {
+      next = applyCheckpointProgress(next, {
+        ...progress, gameId: active.gameId, checkpointCount: state.checkpointCount,
+      })
+    }
+  }
+  if (active || state.phase !== 'PROGRAMMING') return next
+  return activateHand({
+    ...next,
+    playbackProgram: null,
+    registers: state.playbackProgram ? emptyRegisters() : state.registers,
+  })
+}
+
+function enqueuePlayback(state: ClientGameState, action: ResolvedPlaybackAction): ClientGameState {
+  return applyPlayback({
+    ...state,
+    phase: 'EXECUTING',
+    handReady: false,
+    pendingHand: null,
+    playbackProgram: state.playbackProgram ??
+      (state.registers.some((card) => card !== null) ? state.registers : null),
+  }, robotPlaybackReducer(state.playback, { type: 'enqueue', action }))
+}
+
 export function gameStateReducer(
   state: ClientGameState,
   event: GameStateEvent,
@@ -176,25 +228,13 @@ export function gameStateReducer(
       const { gameId, playerId, robotId } = event.payload
       if (gameId !== state.assignment?.gameId ||
         !state.players.some((player) => player.playerId === playerId)) return state
-      return {
+      return applyPlayback({
         ...state,
         players: state.players.filter((player) => player.playerId !== playerId),
-        playback: robotPlaybackReducer(state.playback, { type: 'remove', robotId }),
-      }
+      }, robotPlaybackReducer(state.playback, { type: 'remove', robotId }))
     }
-    case 'checkpoint-progress': {
-      const { gameId, playerId, lastCheckpoint, checkpointCount } = event.payload
-      const player = state.players.find((candidate) => candidate.playerId === playerId)
-      if (gameId !== state.assignment?.gameId || !player ||
-          !Number.isSafeInteger(lastCheckpoint) || !Number.isSafeInteger(checkpointCount) ||
-          lastCheckpoint > checkpointCount || lastCheckpoint <= player.lastCheckpoint) return state
-      return {
-        ...state,
-        checkpointCount,
-        players: state.players.map((candidate) =>
-          candidate.playerId === playerId ? { ...candidate, lastCheckpoint } : candidate),
-      }
-    }
+    case 'checkpoint-progress':
+      return applyCheckpointProgress(state, event.payload)
     case 'player-connection-changed': {
       const { gameId, playerId, connected, paused } = event.payload
       if (gameId !== state.assignment?.gameId) return state
@@ -241,6 +281,7 @@ export function gameStateReducer(
         aborted: snapshot.aborted,
         error: snapshot.aborted ? 'This game has encountered an error and cannot continue.' : null,
         checkpointCount: snapshot.checkpointCount,
+        lastEnvironmentSequence: snapshot.execution?.lastEnvironmentSequence ?? 0,
         players: snapshot.players.map((player) => ({
           playerId: player.playerId, username: player.username, connected: player.connected,
           lastCheckpoint: player.lastCheckpoint,
@@ -248,24 +289,7 @@ export function gameStateReducer(
         playback: createRobotPlaybackState(
           snapshot.robots,
         ),
-        board: createBoardRenderModel(
-          snapshot.board.width,
-          snapshot.board.height,
-          {
-            antenna: snapshot.antenna,
-            hole: snapshot.board.tiles.filter((tile) => tile.type === 'PIT')
-              .map((tile) => [tile.position.x, tile.position.y] as const),
-            checkpoints: snapshot.board.tiles.flatMap((tile) => tile.checkpointNumber === undefined
-              ? [] : [{ ...tile.position, checkpointNumber: tile.checkpointNumber }]),
-            walls: snapshot.board.tiles.map((tile) => ({
-              ...tile.position,
-              north: tile.walls?.includes('NORTH'),
-              east: tile.walls?.includes('EAST'),
-              south: tile.walls?.includes('SOUTH'),
-              west: tile.walls?.includes('WEST'),
-            })),
-          },
-        ),
+        board: createBoardFromSnapshot(snapshot.board, snapshot.antenna),
       }
     }
     case 'dealt': {
@@ -283,26 +307,15 @@ export function gameStateReducer(
       if (event.action.gameId !== state.assignment?.gameId ||
         !state.playback.robots.some((robot) => robot.robotId === event.action.robotId ||
           event.action.pushedRobots.some((pushed) => pushed.robotId === robot.robotId))) return state
-      return {
-        ...state,
-        phase: 'EXECUTING',
-        handReady: false,
-        pendingHand: null,
-        playbackProgram: state.playbackProgram ??
-          (state.registers.some((card) => card !== null) ? state.registers : null),
-        playback: robotPlaybackReducer(state.playback, { type: 'enqueue', action: event.action }),
-      }
-    case 'complete': {
-      const playback = robotPlaybackReducer(state.playback, { type: 'complete' })
-      if (playback.active) return { ...state, playback }
-      if (state.phase !== 'PROGRAMMING') return { ...state, playback }
-      return activateHand({
-        ...state,
-        playback,
-        playbackProgram: null,
-        registers: state.playbackProgram ? emptyRegisters() : state.registers,
-      })
+      return enqueuePlayback(state, event.action)
+    case 'environment': {
+      const result = event.result
+      if (result.gameId !== state.assignment?.gameId ||
+          !Number.isSafeInteger(result.sequence) || result.sequence <= state.lastEnvironmentSequence) return state
+      return enqueuePlayback({ ...state, lastEnvironmentSequence: result.sequence }, result)
     }
+    case 'complete':
+      return applyPlayback(state, robotPlaybackReducer(state.playback, event))
     case 'place': {
       if (!canProgram(state)) return state
       const card = state.hand.find((candidate) => candidate.id === event.cardId)

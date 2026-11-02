@@ -17,6 +17,7 @@ export type {
   GameAborted,
   GameId,
   GamePhase,
+  GearRotation,
   LeaveGame,
   GameInitialization,
   Orientation,

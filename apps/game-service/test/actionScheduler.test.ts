@@ -1,0 +1,114 @@
+import { createServer } from 'node:http'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Board, Card, Direction, EmptyTile, Game, Player, Robot } from '@/game/index'
+import { createActionScheduler, type ActionScheduler } from '@/actionScheduler'
+import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
+import { createSessionStore } from '@/auth/sessionStore'
+import { Integer } from '@/numbers'
+
+describe('activation scheduler', () => {
+  let io: GameSocketServer
+  let scheduler: ActionScheduler
+
+  beforeEach(() => vi.useFakeTimers({ toFake: ['setImmediate', 'clearImmediate'] }))
+  afterEach(() => {
+    scheduler.stop()
+    void io.close()
+    vi.restoreAllMocks()
+    vi.useRealTimers()
+  })
+
+  function createGame() {
+    const board = new Board([
+      [new EmptyTile(), new EmptyTile(), new EmptyTile()],
+      [new EmptyTile(), new EmptyTile([], 1), new EmptyTile()],
+    ], { x: Integer(0), y: Integer(0), angle: 0 })
+    const robot = new Robot('robot', Direction.NORTH)
+    board.placeRobot(robot.id, { x: Integer(1), y: Integer(1) })
+    const player = new Player('player', robot)
+    const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'TURN_LEFT'))
+    const game = new Game(board, [player], cards, { x: Integer(0), y: Integer(1) })
+    game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
+    io = createGameSocketServer(createServer(), createSessionStore())
+    const broadcast = vi.spyOn(io.of('/').adapter, 'broadcast')
+    scheduler = createActionScheduler({ io, game, gameId: 'game', publicRoom: 'public', playerRoom: (id) => `private:${id}` })
+    const events = () => broadcast.mock.calls.map(([packet, options]) => ({
+      name: packet.data[0], payload: packet.data[1], rooms: [...options.rooms],
+    }))
+    return { game, board, player, events }
+  }
+
+  it('rechecks pause inside queued callbacks and resumes without duplicate steps or hands', () => {
+    const { game, player, events } = createGame()
+    scheduler.scheduleNextAction()
+    scheduler.scheduleNextAction()
+    game.pause()
+    vi.runAllTimers()
+    expect(events()).toEqual([])
+    expect(game.executionState.activation?.stage).toBe('ROBOTS')
+
+    game.resume()
+    scheduler.scheduleNextAction()
+    scheduler.scheduleNextAction()
+    vi.advanceTimersToNextTimer()
+    expect(events().map((event) => event.name)).toEqual(['robot.actionResolved'])
+    expect(game.executionState.activation?.stage).toBe('ENVIRONMENT')
+    game.pause()
+    vi.runAllTimers()
+    expect(player.lastCheckpoint).toBe(0)
+    expect(events()).toHaveLength(1)
+
+    game.resume()
+    scheduler.scheduleNextAction()
+    scheduler.scheduleNextAction()
+    vi.runAllTimers()
+    expect(events().map((event) => event.name)).toEqual([
+      ...Array.from({ length: 5 }, () => ['robot.actionResolved', 'environment.stepResolved', 'environment.stepResolved']).flat(), 'cards.dealt',
+    ])
+    expect(events().filter((event) => event.name === 'environment.stepResolved').map((event) => event.payload.sequence))
+      .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    expect(events().at(-1)?.rooms).toEqual(['private:player'])
+    expect(game.executionState).toEqual({ roundNumber: 2, lastEnvironmentSequence: 10, activation: null })
+    scheduler.scheduleNextAction()
+    vi.runAllTimers()
+    expect(events()).toHaveLength(16)
+  })
+
+  it.each(['abort', 'stop'] as const)('does not execute an already queued callback after %s', (action) => {
+    const { game, events } = createGame()
+    scheduler.scheduleNextAction()
+    if (action === 'abort') game.abort()
+    else scheduler.stop()
+    vi.runAllTimers()
+    expect(events()).toEqual([])
+    expect(game.executionState.lastEnvironmentSequence).toBe(0)
+  })
+
+  it('aborts on an environment failure without publishing a result or dealing hands', () => {
+    const { game, board, events } = createGame()
+    scheduler.scheduleNextAction()
+    vi.advanceTimersToNextTimer()
+    const before = game.executionState
+    vi.spyOn(board, 'getTile').mockImplementationOnce(() => { throw new Error('Environment failed') })
+    vi.runAllTimers()
+    expect(game.aborted).toBe(true)
+    expect(game.executionState).toEqual(before)
+    expect(events().map((event) => event.name)).toEqual(['robot.actionResolved', 'game.aborted'])
+    game.resume()
+    scheduler.scheduleNextAction()
+    vi.runAllTimers()
+    expect(events()).toHaveLength(2)
+  })
+
+  it('cancels queued environment work when the last member leaves', () => {
+    const { game, player, events } = createGame()
+    scheduler.scheduleNextAction()
+    vi.advanceTimersToNextTimer()
+    expect(game.executionState.activation?.stage).toBe('ENVIRONMENT')
+    game.removePlayer(player.id)
+    vi.runAllTimers()
+    expect(events().map((event) => event.name)).toEqual(['robot.actionResolved'])
+    expect(game.executionState.lastEnvironmentSequence).toBe(0)
+    expect(player.lastCheckpoint).toBe(0)
+  })
+})

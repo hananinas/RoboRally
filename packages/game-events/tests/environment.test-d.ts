@@ -2,11 +2,25 @@ import { expectTypeOf, test } from 'vitest'
 import type {
   ActivationCursor,
   EnvironmentStepResolved,
+  EnvironmentStepKind,
   ExecutionState,
   PublicGameState,
   RobotActionResolved,
   ServerToClientEvents,
 } from '../src/index.js'
+
+test('gear results and pending cursors use the existing environment contract', () => {
+  expectTypeOf<EnvironmentStepKind>().toEqualTypeOf<'GEARS' | 'CHECKPOINTS'>()
+  const result = {
+    gameId: 'game', roundNumber: 1, registerIndex: 0, stepIndex: 0,
+    kind: 'GEARS', sequence: 1,
+    robots: [{ robotId: 'robot', position: { coordinate: { x: 1, y: 2 }, orientation: 'EAST' } }],
+    checkpointProgress: [],
+  } satisfies EnvironmentStepResolved
+  expectTypeOf<ServerToClientEvents['environment.stepResolved']>().toBeCallableWith(result)
+  expectTypeOf({ stage: 'ENVIRONMENT', registerIndex: 0, stepIndex: 0, kind: 'GEARS' } satisfies ActivationCursor)
+    .toMatchTypeOf<ActivationCursor>()
+})
 
 test('environment results do not require or reveal a programming card', () => {
   const result = {

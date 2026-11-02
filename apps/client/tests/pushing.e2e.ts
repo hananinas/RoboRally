@@ -1,4 +1,4 @@
-import { test, expect, openGame } from './game-fixture.ts'
+import { test, expect, openGame, pauseClock } from './game-fixture.ts'
 import { GAME_ID, ROBOT_ID, OTHER_ROBOT_ID } from './game-fixture-data.ts'
 
 test('plays a push as one action and updates a robot that already acted', async ({ page, game }) => {
@@ -18,7 +18,7 @@ test('plays a push as one action and updates a robot that already acted', async 
     programSubmitted: false,
   })
   await openGame(page)
-  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
+  await pauseClock(page)
   const actor = page.locator(`[data-robot-id="${ROBOT_ID}"]`).first()
   const pushed = page.locator(`[data-robot-id="${OTHER_ROBOT_ID}"]`).first()
   const actorSprite = await actor.elementHandle()

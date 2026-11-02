@@ -1,5 +1,5 @@
 import type { Game } from '@/game/index'
-import { presentCardsDealt, presentRobotActionResolved } from '@/socket/gamePresenter'
+import { presentCardsDealt, presentEnvironmentStepResolved, presentRobotActionResolved } from '@/socket/gamePresenter'
 import type { GameSocketServer } from '@/socket/gameServer'
 import { logError } from '@/logger'
 
@@ -13,8 +13,6 @@ export type ActionSchedulerDeps = {
 
 export type ActionScheduler = {
   scheduleNextAction: () => void
-  broadcastCheckpointProgress: () => void
-  dealHands: () => void
   stop: () => void
 }
 
@@ -23,22 +21,6 @@ export function createActionScheduler(
 ): ActionScheduler {
   let scheduledAction: NodeJS.Immediate | undefined
   let closed = false
-  let checkpointProgress = new Map(game.players.map((player) => [player.id, player.lastCheckpoint]))
-
-  function broadcastCheckpointProgress(): void {
-    const nextProgress = new Map<string, number>()
-    for (const player of game.players) {
-      nextProgress.set(player.id, player.lastCheckpoint)
-      if (player.lastCheckpoint === (checkpointProgress.get(player.id) ?? 0)) continue
-      io.to(publicRoom).emit('player.checkpointProgress', {
-        gameId,
-        playerId: player.id,
-        lastCheckpoint: player.lastCheckpoint,
-        checkpointCount: game.board.checkpointCount,
-      })
-    }
-    checkpointProgress = nextProgress
-  }
 
   function dealHands(): void {
     for (const player of game.players) {
@@ -47,24 +29,24 @@ export function createActionScheduler(
   }
 
   function scheduleNextAction(): void {
-    if (closed || game.phase !== 'activation' || scheduledAction || game.paused) return
+    if (closed || game.phase !== 'activation' || scheduledAction || game.paused || game.aborted) return
     scheduledAction = setImmediate(() => {
       scheduledAction = undefined
-      if (closed || game.phase !== 'activation') return
+      if (closed || game.phase !== 'activation' || game.paused || game.aborted) return
       try {
-        const result = game.executeNextAction()
-        io.to(publicRoom).emit(
-          'robot.actionResolved',
-          presentRobotActionResolved(gameId, result),
-        )
-        broadcastCheckpointProgress()
+        const step = game.executeNextStep()
+        if (step.type === 'robot') {
+          io.to(publicRoom).emit('robot.actionResolved', presentRobotActionResolved(gameId, step.result))
+        } else {
+          io.to(publicRoom).emit('environment.stepResolved', presentEnvironmentStepResolved(gameId, step.result))
+        }
         if (game.phase === 'activation') {
           scheduleNextAction()
         } else {
           dealHands()
         }
       } catch (error) {
-        logError('Failed to execute next robot action', error, {
+        logError('Failed to execute next activation step', error, {
           source: 'actionScheduler',
           gameId,
           phase: game.phase,
@@ -82,5 +64,5 @@ export function createActionScheduler(
     clearImmediate(scheduledAction)
   }
 
-  return { scheduleNextAction, broadcastCheckpointProgress, dealHands, stop }
+  return { scheduleNextAction, stop }
 }

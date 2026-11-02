@@ -1,5 +1,6 @@
 import type {
   Card,
+  EnvironmentStepResolved,
   GameInitialization,
   ProgramCardIds,
   PublicGameState,
@@ -99,6 +100,20 @@ function programmingState(): ClientGameState {
 }
 
 describe('join initialization', () => {
+  it('restores both gear directions and walls from snapshots', () => {
+    const snapshot: PublicGameState = {
+      ...publicState,
+      board: { ...publicState.board, tiles: publicState.board.tiles.map((tile, index) =>
+        index < 2 ? { ...tile, type: 'GEAR', rotation: index === 0 ? 'CLOCKWISE' : 'COUNTERCLOCKWISE', walls: ['NORTH'] } : tile) },
+    }
+    const state = gameStateReducer(createClientGameState(), { type: 'joined', result: { ...result, state: snapshot } })
+    expect(state.board?.cells.slice(0, 2).map(({ tile, walls }) => ({ tile, north: walls.north }))).toEqual([
+      { tile: 'gearClockwise', north: true }, { tile: 'gearCounterclockwise', north: true },
+    ])
+    const replaced = gameStateReducer(state, { type: 'joined', result })
+    expect(replaced.board?.cells.slice(0, 2).map(({ tile }) => tile)).toEqual(['empty', 'empty'])
+  })
+
   it('initializes assignment, board and hand together and accepts subsequent events', () => {
     const state = gameStateReducer(createClientGameState(), { type: 'joined', result })
     expect(state.board?.antenna).toEqual(publicState.antenna)
@@ -902,5 +917,162 @@ describe('membership updates', () => {
     } })
     expect(updated.playback.active).toBe(next)
     expect(updated.playback.robots.some((robot) => robot.robotId === robotId)).toBe(false)
+  })
+})
+
+describe('environment execution', () => {
+  const environment: EnvironmentStepResolved = {
+    gameId: publicState.gameId, roundNumber: 1, registerIndex: 0, stepIndex: 0,
+    kind: 'CHECKPOINTS', sequence: 1,
+    robots: [
+      { robotId, position: { coordinate: { x: 3, y: 3 }, orientation: 'WEST' } },
+      { robotId: stationaryRobotId, position: { coordinate: { x: 2, y: 3 }, orientation: 'NORTH' } },
+    ],
+    checkpointProgress: publicState.players.map(({ playerId }) => ({ playerId, lastCheckpoint: 1 })),
+  }
+  const initial = () => selectProgram(gameStateReducer(createClientGameState(), {
+    type: 'joined', result: { ...result, state: { ...publicState, checkpointCount: 2 } },
+  }))
+
+  it('applies positions and checkpoint progress together when the queued step starts', () => {
+    let state = initial()
+    const program = state.registers
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, { type: 'environment', result: environment })
+    state = gameStateReducer(state, { type: 'action', action: actions[1] })
+    expect(state.players.map((player) => player.lastCheckpoint)).toEqual([0, 0])
+    expect(state.playback.robots[1].position).toEqual(publicState.robots[1].position)
+
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(state.playback.active).toBe(environment)
+    expect(state.playback.robots.map((robot) => robot.position)).toEqual(environment.robots.map((robot) => robot.position))
+    expect(state.players.map((player) => player.lastCheckpoint)).toEqual([1, 1])
+    expect(state.playbackProgram).toEqual(program)
+    expect(state.registers).toEqual(program)
+    expect(canProgram(state)).toBe(false)
+
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(state.playback.active).toBe(actions[1])
+    expect(state.playback.robots[0].position).toEqual(actions[1].position)
+  })
+
+  it('keeps the next hand pending through environment steps, including empty results', () => {
+    let state = initial()
+    const empty = { ...environment, sequence: 2, robots: [], checkpointProgress: [] }
+    const nextHand = { ...hand, cards: cards.map((card) => ({ ...card, id: `next-${card.id}` })) }
+    state = gameStateReducer(state, { type: 'environment', result: environment })
+    state = gameStateReducer(state, { type: 'environment', result: empty })
+    state = gameStateReducer(state, { type: 'dealt', hand: nextHand })
+    expect(canProgram(state)).toBe(false)
+    expect(state.hand).toEqual(cards)
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(state.playback.active).toBe(empty)
+    expect(canProgram(state)).toBe(false)
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(state.playback.active).toBeNull()
+    expect(state.registers).toEqual(emptyRegisters)
+    expect(state.hand).toEqual(nextHand.cards)
+    expect(canProgram(state)).toBe(true)
+  })
+
+  it('ignores foreign, duplicate and invalid sequences without disturbing playback or pending hands', () => {
+    let state = initial()
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, { type: 'environment', result: environment })
+    state = gameStateReducer(state, { type: 'dealt', hand })
+    for (const invalid of [
+      environment, { ...environment, gameId: 'other', sequence: 2 },
+      ...[0, -1, 0.5, NaN, Infinity].map((sequence) => ({ ...environment, sequence })),
+    ]) expect(gameStateReducer(state, { type: 'environment', result: invalid })).toBe(state)
+    state = gameStateReducer(state, { type: 'complete' })
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(canProgram(state)).toBe(true)
+    expect(gameStateReducer(state, { type: 'environment', result: environment })).toBe(state)
+    const next = { ...environment, roundNumber: 2, sequence: 6, robots: [] }
+    state = gameStateReducer(state, { type: 'environment', result: next })
+    expect(state.playback.active).toBe(next)
+    expect(state.lastEnvironmentSequence).toBe(6)
+  })
+
+  it('replaces queued playback with a snapshot and ignores already resolved steps', () => {
+    let state = initial()
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, { type: 'environment', result: environment })
+    state = gameStateReducer(state, { type: 'dealt', hand })
+    state = gameStateReducer(state, { type: 'joined', result: {
+      ...result, programSubmitted: true,
+      state: {
+        ...publicState, phase: 'EXECUTING', checkpointCount: 2,
+        execution: {
+          roundNumber: 2, lastEnvironmentSequence: 5,
+          activation: { stage: 'ENVIRONMENT', registerIndex: 0, stepIndex: 0, kind: 'CHECKPOINTS' },
+        },
+      },
+    } })
+    expect(state.playback.active).toBeNull()
+    expect(state.playback.pending).toEqual([])
+    expect(state.playback.robots.map((robot) => robot.position)).toEqual(publicState.robots.map((robot) => robot.position))
+    expect(state.pendingHand).toBeNull()
+    expect(canProgram(state)).toBe(false)
+    const stale = { ...environment, sequence: 5 }
+    expect(gameStateReducer(state, { type: 'environment', result: stale })).toBe(state)
+    const next = { ...environment, roundNumber: 2, sequence: 6 }
+    state = gameStateReducer(state, { type: 'environment', result: next })
+    expect(state.playback.active).toBe(next)
+    expect(state.lastEnvironmentSequence).toBe(6)
+  })
+
+  it('preserves the mixed queue and sequence after successful connection recovery', () => {
+    let state = initial()
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, { type: 'environment', result: environment })
+    const before = state
+    state = gameStateReducer(state, { type: 'disconnected' })
+    state = gameStateReducer(state, { type: 'reconnected' })
+    expect(state.playback).toBe(before.playback)
+    expect(state.lastEnvironmentSequence).toBe(1)
+    expect(gameStateReducer(state, { type: 'environment', result: environment })).toBe(state)
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(state.playback.active).toBe(environment)
+    expect(state.players.map((player) => player.lastCheckpoint)).toEqual([1, 1])
+  })
+
+  it('starts a queued environment result when the acting robot leaves', () => {
+    const action = { ...actions[0], robotId: stationaryRobotId }
+    let state = initial()
+    state = gameStateReducer(state, { type: 'action', action })
+    state = gameStateReducer(state, { type: 'environment', result: environment })
+    state = gameStateReducer(state, { type: 'dealt', hand })
+    state = gameStateReducer(state, { type: 'player-left', payload: {
+      gameId: publicState.gameId, playerId: publicState.players[1].playerId, robotId: stationaryRobotId,
+    } })
+    expect(state.playback.active).toBe(environment)
+    expect(state.players.map((player) => player.lastCheckpoint)).toEqual([1])
+    expect(state.playback.robots.map((robot) => robot.robotId)).toEqual([robotId])
+    expect(canProgram(state)).toBe(false)
+    expect(gameStateReducer(state, { type: 'complete', action })).toBe(state)
+    state = gameStateReducer(state, { type: 'complete', action: environment })
+    expect(canProgram(state)).toBe(true)
+  })
+
+  it('releases a pending hand when a departure removes the last queued card action', () => {
+    let state = initial()
+    state = gameStateReducer(state, { type: 'action', action: { ...actions[0], robotId: stationaryRobotId } })
+    state = gameStateReducer(state, { type: 'dealt', hand })
+    state = gameStateReducer(state, { type: 'player-left', payload: {
+      gameId: publicState.gameId, playerId: publicState.players[1].playerId, robotId: stationaryRobotId,
+    } })
+    expect(state.playback.active).toBeNull()
+    expect(canProgram(state)).toBe(true)
+  })
+
+  it('ignores stale environment results after reconnecting to programming', () => {
+    let state = gameStateReducer(initial(), { type: 'joined', result: {
+      ...result, state: { ...publicState, execution: { roundNumber: 2, lastEnvironmentSequence: 5, activation: null } },
+    } })
+    expect(canProgram(state)).toBe(true)
+    state = gameStateReducer(state, { type: 'environment', result: { ...environment, sequence: 5 } })
+    expect(canProgram(state)).toBe(true)
+    expect(state.playback.active).toBeNull()
   })
 })

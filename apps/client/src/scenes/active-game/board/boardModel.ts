@@ -2,7 +2,7 @@ import type { Antenna } from '@robo-rally/game-events'
 
 export type BoardPoint = Readonly<{ x: number; y: number }>
 
-export type BoardTileType = 'empty' | 'hole' | 'laser'
+export type BoardTileType = 'empty' | 'hole' | 'laser' | 'gearClockwise' | 'gearCounterclockwise'
 export type BoardRecipeName = BoardTileType | 'pillar' | 'antenna'
 export type BoardWallSide = 'north' | 'east' | 'south' | 'west'
 export type BoardTileWalls = Readonly<Record<BoardWallSide, boolean>>
@@ -23,6 +23,9 @@ export type BoardRenderModel = Readonly<{
 
 export type BoardComponentName =
   | `antenna${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10}`
+  | `gear${1 | 2 | 3 | 4 | 5 | 6 | 7}`
+  | 'gearClockwise'
+  | 'gearCounterclockwise'
   | 'ground'
   | 'laser1'
   | 'laser2'
@@ -64,6 +67,7 @@ export type BoardVisualComponent = Readonly<{
   asset?: BoardSpriteAsset
   className: string
   width: number
+  label?: string
 }>
 
 export type BoardRenderConfig = Readonly<{
@@ -106,6 +110,8 @@ type BoardAssignments = Readonly<{
   antenna?: Antenna
   hole?: readonly (readonly [number, number])[]
   laser?: readonly (readonly [number, number])[]
+  gearClockwise?: readonly (readonly [number, number])[]
+  gearCounterclockwise?: readonly (readonly [number, number])[]
   walls?: readonly BoardWallAssignment[]
   checkpoints?: readonly (BoardPoint & { checkpointNumber: number })[]
 }>
@@ -166,7 +172,7 @@ export function createBoardRenderModel(
   }
 
   const tiles = new Map<string, BoardTileType>()
-  for (const tile of ['hole', 'laser'] as const) {
+  for (const tile of ['hole', 'laser', 'gearClockwise', 'gearCounterclockwise'] as const) {
     const positions = assignments[tile] ?? []
     for (const [x, y] of positions) {
       const key = positionKey(x, y)

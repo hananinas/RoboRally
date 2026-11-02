@@ -1,5 +1,6 @@
 import type {
   CardsDealt,
+  EnvironmentStepResolved,
   GameAborted,
   GameInitialization,
   PlayerConnectionChanged,
@@ -12,7 +13,7 @@ import {
   ACKNOWLEDGEMENT_TIMEOUT_MS,
   type GameSocket,
 } from '../../useGameSocket.ts'
-import { useRobotPlaybackTimer } from './board/robotPlayback.ts'
+import { usePlaybackTimer } from './board/robotPlayback.ts'
 import {
   createClientGameState,
   createSubmission,
@@ -57,6 +58,7 @@ export default function useGameConnection(socket: GameSocket) {
     }
     const handleCardsDealt = (hand: CardsDealt) => receive({ type: 'dealt', hand })
     const handleActionResolved = (action: RobotActionResolved) => receive({ type: 'action', action })
+    const handleEnvironmentResolved = (result: EnvironmentStepResolved) => receive({ type: 'environment', result })
     const handlePlayerLeft = (payload: PlayerLeft) => receive({ type: 'player-left', payload })
     const handlePlayerConnectionChanged = (payload: PlayerConnectionChanged) =>
       receive({ type: 'player-connection-changed', payload })
@@ -69,6 +71,7 @@ export default function useGameConnection(socket: GameSocket) {
     socket.on('connect_error', handleConnectError)
     socket.on('cards.dealt', handleCardsDealt)
     socket.on('robot.actionResolved', handleActionResolved)
+    socket.on('environment.stepResolved', handleEnvironmentResolved)
     socket.on('game.playerLeft', handlePlayerLeft)
     socket.on('game.playerConnectionChanged', handlePlayerConnectionChanged)
     socket.on('game.aborted', handleAborted)
@@ -80,6 +83,7 @@ export default function useGameConnection(socket: GameSocket) {
       socket.off('connect_error', handleConnectError)
       socket.off('cards.dealt', handleCardsDealt)
       socket.off('robot.actionResolved', handleActionResolved)
+      socket.off('environment.stepResolved', handleEnvironmentResolved)
       socket.off('game.playerLeft', handlePlayerLeft)
       socket.off('game.playerConnectionChanged', handlePlayerConnectionChanged)
       socket.off('game.aborted', handleAborted)
@@ -87,7 +91,7 @@ export default function useGameConnection(socket: GameSocket) {
     }
   }, [dispatch, socket])
 
-  useRobotPlaybackTimer(state.playback.active, dispatch)
+  usePlaybackTimer(state.playback.active, dispatch)
 
   const submit = useCallback(() => {
     const payload = createSubmission(current.current)
