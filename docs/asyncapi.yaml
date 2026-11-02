@@ -134,6 +134,8 @@ channels:
         $ref: '#/components/messages/ProgramSubmitted'
       robotActionResolved:
         $ref: '#/components/messages/RobotActionResolved'
+      environmentStepResolved:
+        $ref: '#/components/messages/EnvironmentStepResolved'
       registersChanged:
         $ref: '#/components/messages/RegistersChanged'
       playerCheckpointProgress:
@@ -703,14 +705,35 @@ components:
                 y: 6
               orientation: NORTH
 
+    EnvironmentStepResolved:
+      name: environment.stepResolved
+      description: >-
+        Reports one completed environment step, including steps with no changes.
+        Apply all changes together after the register's robot actions and before
+        the next register or hand. Does not reveal a programming card.
+      payload:
+        $ref: '#/components/schemas/EnvironmentStepResolved'
+      examples:
+        - name: firstCheckpointStep
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            roundNumber: 1
+            registerIndex: 0
+            stepIndex: 0
+            kind: CHECKPOINTS
+            sequence: 1
+            robots: []
+            checkpointProgress:
+              - playerId: 00000000-0000-4000-8000-000000000002
+                lastCheckpoint: 1
+
     PlayerCheckpointProgress:
       name: player.checkpointProgress
       description: >-
-        Broadcasts changed player checkpoint progress to game:{gameId}:public after the
-        related robot.actionResolved, or game.playerLeft when a departure finishes a
-        register, and before subsequent actions or private hands. Unchanged progress
-        produces no event. Clients apply progress on receipt without changing movement
-        playback or programming availability. Replayed events must not reduce progress.
+        Legacy checkpoint progress event. The service now includes checkpoint
+        changes in environment.stepResolved. Clients receiving this legacy event
+        apply progress on receipt without changing playback or programming
+        availability. Replayed events must not reduce progress.
       payload:
         type: object
         additionalProperties: false
@@ -1217,6 +1240,8 @@ components:
             $ref: "#/components/schemas/Robot"
         phase:
           $ref: "#/components/schemas/GamePhase"
+        execution:
+          $ref: '#/components/schemas/ExecutionState'
         antenna:
           $ref: "#/components/schemas/Antenna"
         players:
@@ -1231,6 +1256,117 @@ components:
           description: Whether gameplay has stopped irrecoverably after an unexpected service failure.
         checkpointCount:
           $ref: '#/components/schemas/CheckpointCount'
+
+    EnvironmentStepKind:
+      type: string
+      enum: [ CHECKPOINTS ]
+
+    RoundNumber:
+      type: integer
+      minimum: 1
+      description: Current round, starting at 1. Advances after the fifth register's environment steps.
+
+    RegisterIndex:
+      type: integer
+      minimum: 0
+      maximum: 4
+      description: Zero-based register index; display 1–5.
+
+    EnvironmentStepIndex:
+      type: integer
+      minimum: 0
+      description: Zero-based index in the ordered environment steps; resets each register.
+
+    ActivationCursor:
+      description: Next pending activation. Pausing preserves this cursor.
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [ stage, registerIndex ]
+          properties:
+            stage:
+              type: string
+              const: ROBOTS
+            registerIndex:
+              $ref: '#/components/schemas/RegisterIndex'
+        - type: object
+          additionalProperties: false
+          required: [ stage, registerIndex, stepIndex, kind ]
+          properties:
+            stage:
+              type: string
+              const: ENVIRONMENT
+            registerIndex:
+              $ref: '#/components/schemas/RegisterIndex'
+            stepIndex:
+              $ref: '#/components/schemas/EnvironmentStepIndex'
+            kind:
+              $ref: '#/components/schemas/EnvironmentStepKind'
+
+    ExecutionState:
+      type: object
+      additionalProperties: false
+      required: [ roundNumber, lastEnvironmentSequence, activation ]
+      properties:
+        roundNumber:
+          $ref: '#/components/schemas/RoundNumber'
+        lastEnvironmentSequence:
+          type: integer
+          minimum: 0
+          description: Last completed environment sequence, initially 0. Never resets between rounds.
+        activation:
+          oneOf:
+            - $ref: '#/components/schemas/ActivationCursor'
+            - type: 'null'
+      description: >-
+        Omitted by servers without environment scheduling. activation is null during
+        programming. On snapshot replacement, clear queued playback and ignore
+        environment results at or below lastEnvironmentSequence. Successful
+        Socket.IO recovery keeps the queue and processes missed events in order.
+
+    EnvironmentStepResolved:
+      type: object
+      additionalProperties: false
+      required: [ gameId, roundNumber, registerIndex, stepIndex, kind, sequence, robots, checkpointProgress ]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+        roundNumber:
+          $ref: '#/components/schemas/RoundNumber'
+        registerIndex:
+          $ref: '#/components/schemas/RegisterIndex'
+        stepIndex:
+          $ref: '#/components/schemas/EnvironmentStepIndex'
+        kind:
+          $ref: '#/components/schemas/EnvironmentStepKind'
+        sequence:
+          type: integer
+          minimum: 1
+          description: Per-game sequence starting at 1. Increases for every environment step across rounds, even with no changes.
+        robots:
+          type: array
+          description: Final positions of changed robots. Apply together; each robotId appears at most once.
+          items:
+            type: object
+            additionalProperties: false
+            required: [ robotId, position ]
+            properties:
+              robotId:
+                $ref: '#/components/schemas/RobotId'
+              position:
+                $ref: '#/components/schemas/Position'
+        checkpointProgress:
+          type: array
+          description: Changed checkpoint progress. Each playerId appears at most once; checkpointCount comes from the public state.
+          items:
+            type: object
+            additionalProperties: false
+            required: [ playerId, lastCheckpoint ]
+            properties:
+              playerId:
+                $ref: '#/components/schemas/PlayerId'
+              lastCheckpoint:
+                $ref: '#/components/schemas/LastCheckpoint'
 
     LastCheckpoint:
       type: integer

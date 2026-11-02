@@ -198,15 +198,19 @@ Robots cannot enter the antenna square.
 
 The priority algorithm calculates the activation order based on the game rules.
 
+#### Environment execution contract
+
+`environment.stepResolved {gameId, roundNumber, registerIndex, stepIndex, kind, sequence, robots, checkpointProgress}` reports one completed environment step to the [public room](#rooms). Only `CHECKPOINTS` is defined so far. The client queues these with robot actions.
+
+Rounds start at 1; register and step indices start at 0. `sequence` starts at 1 and increases for each environment step across rounds, including steps with no changes. Apply all changes together when the step starts, after the register's robot actions and before the next register or hand. Environment results do not reveal cards. Steps without robot changes add no animation delay.
+
+Snapshots include `execution {roundNumber, lastEnvironmentSequence, activation}`. `activation` is null during programming; otherwise it identifies the pending register and stage, plus the environment step when applicable. On snapshot replacement, clear queued playback and ignore environment results at or below `lastEnvironmentSequence`. Successful Socket.IO recovery keeps the existing queue and processes missed events in order.
+
 
 ### Checkpoint progress
 Some tiles hold checkpoints. The demo board places checkpoint 1 at `(10, 6)` and checkpoint 2 at `(8, 9)`.
 
-At the end of each register, the service checks each robot's final position for its next checkpoint. It broadcasts progress to the [public room](#rooms):
-
-`player.checkpointProgress {gameId, playerId, lastCheckpoint, checkpointCount}`
-
-The event follows the related `robot.actionResolved`.
+At the end of each register, the checkpoint environment step checks each robot's final position for its next checkpoint. `environment.stepResolved.checkpointProgress` contains changed progress as `{playerId, lastCheckpoint}`. Clients apply it when the step plays. The service no longer emits the legacy `player.checkpointProgress` event.
 
 ### Dealing the next hand
 
@@ -257,6 +261,9 @@ sequenceDiagram
                 Public-->>A: robot.actionResolved
                 Public-->>B: robot.actionResolved
             end
+            Server->>Public: environment.stepResolved
+            Public-->>A: environment.stepResolved
+            Public-->>B: environment.stepResolved
         end
 
         Server->>PrivateA: cards.dealt {cards}

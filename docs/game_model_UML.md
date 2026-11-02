@@ -131,7 +131,7 @@ Definitions contain no callbacks. Walls, optional checkpoint numbers, and future
 4. Add map construction and, for public kinds, shared types, AsyncAPI, the board adapter, and rendering. The presenter serializes `tile.kind` directly.
 5. Test placement, movement, effect timing, and presentation through public APIs.
 
-Register-end effects need their own ordered phase when implemented. Conveyors and push panels remain unimplemented. Pit animations, damage, register cancellation, and direction selection remain deferred.
+Register-end effects run as ordered environment steps, starting with checkpoints. Conveyors and push panels remain unimplemented. Pit animations, damage, register cancellation, and direction selection remain deferred.
 
 ## Action playback
 
@@ -178,12 +178,11 @@ Later, directional board elements such as lasers or conveyor belts can use Direc
 ```
 # submitProgram enters activation once all players have submitted.
 while game.phase == "activation":
-    result = game.executeNextAction()             # Select next pending robot by current priority
-    # Execute its card: Game.moveRobot resolves entries; Robot handles turning.
-    # Mark this robot as activated and capture the final position after any reboot.
-    # After the last robot: evaluate checkpoints and advance the register.
-    # After the fifth register: clear programs and return to programming.
-    # The socket layer publishes the action before associated checkpoint updates.
+    step = game.executeNextStep()                # One robot action or environment step
+    # Robot priority is recalculated before each card.
+    # After all robots act, run environment steps before advancing the register.
+    # After register five's environment steps, return to programming.
+    # Publish each result before the next step or private hands.
 ```
 
 ## Laser obstacle:

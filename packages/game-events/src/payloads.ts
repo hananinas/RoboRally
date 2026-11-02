@@ -58,6 +58,23 @@ export type Board = Readonly<{
 
 export type GamePhase = 'PROGRAMMING' | 'EXECUTING'
 
+export type EnvironmentStepKind = 'CHECKPOINTS'
+
+export type ActivationCursor =
+  | Readonly<{ stage: 'ROBOTS'; registerIndex: number }>
+  | Readonly<{
+    stage: 'ENVIRONMENT'
+    registerIndex: number
+    stepIndex: number
+    kind: EnvironmentStepKind
+  }>
+
+export type ExecutionState = Readonly<{
+  roundNumber: number
+  lastEnvironmentSequence: number
+  activation: ActivationCursor | null
+}>
+
 export type Antenna = Readonly<Coordinate & { angle: number }>
 
 export type PublicGameState = Readonly<{
@@ -67,6 +84,7 @@ export type PublicGameState = Readonly<{
   board: Board
   robots: readonly Robot[]
   phase: GamePhase
+  execution?: ExecutionState
   players: readonly PlayerState[]
   paused: boolean
   aborted: boolean
@@ -137,6 +155,17 @@ export type RobotActionResolved = Readonly<{
   instruction: Instruction
   position: Position
   pushedRobots: readonly Pick<Robot, 'robotId' | 'position'>[]
+}>
+
+export type EnvironmentStepResolved = Readonly<{
+  gameId: GameId
+  roundNumber: number
+  registerIndex: number
+  stepIndex: number
+  kind: EnvironmentStepKind
+  sequence: number
+  robots: readonly Pick<Robot, 'robotId' | 'position'>[]
+  checkpointProgress: readonly Pick<PlayerState, 'playerId' | 'lastCheckpoint'>[]
 }>
 
 export type GameInitialization = Readonly<{

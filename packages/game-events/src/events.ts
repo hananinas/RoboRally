@@ -1,6 +1,7 @@
 import type { EmptyRequest, LobbyRequest, LobbyState, LobbyListResult, LobbyJoinResult, LobbyLeaveResult, LobbyStartResult, SessionResult } from './lobby.js'
 import type {
   CardsDealt,
+  EnvironmentStepResolved,
   GameAborted,
   LeaveGame,
   GameInitialization,
@@ -39,5 +40,6 @@ export interface ServerToClientEvents {
   'cards.dealt': (payload: CardsDealt) => void
   'program.submitted': (payload: ProgramSubmitted) => void
   'robot.actionResolved': (payload: RobotActionResolved) => void
+  'environment.stepResolved': (payload: EnvironmentStepResolved) => void
   'game.aborted': (payload: GameAborted) => void
 }

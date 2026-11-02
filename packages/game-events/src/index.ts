@@ -4,12 +4,16 @@ export type {
   ServerToClientEvents,
 } from './events.js'
 export type {
+  ActivationCursor,
   Antenna,
   Board,
   Card,
   CardId,
   CardsDealt,
   Coordinate,
+  EnvironmentStepKind,
+  EnvironmentStepResolved,
+  ExecutionState,
   GameAborted,
   GameId,
   GamePhase,
