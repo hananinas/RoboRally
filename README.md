@@ -80,6 +80,7 @@ Existing checkouts are preserved. Full installation testing on a fresh
 Windows VM is still in progress.
 
 </details>
+
 ### Trusting the local dev certificate
 
 Hydra's public OIDC endpoint (`https://127.0.0.1:4444`) serves HTTPS even in local development. `process-compose` generates a certificate and key for `127.0.0.1`/`localhost` at `infra/dev-tls/cert.pem` and `infra/dev-tls/key.pem` on every run, and automatically trusts the issuing CA in your browser via `mkcert -install`.
