@@ -76,8 +76,6 @@ If Windows needs a restart, restart and run the script again.
 After setup, follow the printed instructions to enter Ubuntu and run
 `process-compose`, then open http://localhost:5173.
 
-Existing checkouts are preserved. Full installation testing on a fresh
-Windows VM is still in progress.
 
 </details>
 
