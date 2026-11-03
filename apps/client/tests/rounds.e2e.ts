@@ -1,5 +1,6 @@
 import type { Locator } from '@playwright/test'
 import { expect, test } from './real-game-fixture.ts'
+import { browse } from './browserClient.ts'
 
 async function expectRobot(
   robot: Locator,
@@ -29,9 +30,7 @@ test.use({ reducedMotion: 'reduce' })
 
 test('plays every register of two consecutive programs through the real Game Service', async ({ page }) => {
   await page.clock.install()
-  await page.goto('/')
-  await page.getByRole('textbox', { name: 'Username' }).fill('Round player')
-  await page.getByRole('button', { name: 'Log in', exact: true }).click()
+  await browse(page, 'bence')
   await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
   await page.getByRole('button', { name: 'Start', exact: true }).click()
 

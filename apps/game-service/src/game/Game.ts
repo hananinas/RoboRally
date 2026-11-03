@@ -14,7 +14,6 @@ export type GamePhase = 'programming' | 'activation'
 
 export type RobotActionResult = Readonly<{
   robotId: RobotId
-  playerId: PlayerId
   card: Card
   position: Position
   direction: Direction
@@ -24,7 +23,6 @@ export type NextActionResult = Readonly<{
   registerIndex: number
   action: RobotActionResult
   registers: PublicRegisters
-  roundComplete: boolean
   pushedRobots: readonly Readonly<{
     robotId: RobotId
     position: Position
@@ -54,7 +52,6 @@ export class Game {
   private readonly submittedPlayerIds = new Set<PlayerId>()
   private readonly activatedRobotIds = new Set<RobotId>()
   private started = false
-  private roundFinished = false
   private isPaused = false
   private isAborted = false
 
@@ -110,10 +107,6 @@ export class Game {
 
   get hasStarted(): boolean {
     return this.started
-  }
-
-  start(): void {
-    this.started = true
   }
 
   get paused(): boolean {
@@ -230,29 +223,13 @@ export class Game {
   updateRegisters(playerId: PlayerId, occupied: RegisterOccupancy): UpdateRegistersResult {
     const player = this.roster.find((candidate) => candidate.id === playerId)
     if (!player) return { outcome: 'NOT_A_MEMBER' }
-    // The occupancy contract has no paused/aborted outcomes: only writable
-    // programming accepts updates, including when the nominal phase is preserved.
+    // The occupancy contract has no paused/aborted outcomes.
     if (this.isPaused || this.isAborted || this.currentPhase !== 'programming') {
       return { outcome: 'WRONG_PHASE' }
     }
     if (this.submittedPlayerIds.has(playerId)) return { outcome: 'ALREADY_SUBMITTED' }
     player.updateRegisters(occupied)
     return { outcome: 'ACCEPTED' }
-  }
-
-  get awaitingProgrammingStart(): boolean {
-    return this.roundFinished
-  }
-
-  /**
-   * Starts the next programming phase: clears every player's shared slots and
-   * flips the phase. The completed round's reveals stay published until this runs.
-   */
-  beginProgramming(): void {
-    if (!this.roundFinished) return
-    for (const player of this.roster) player.resetRegisters()
-    this.currentPhase = 'programming'
-    this.roundFinished = false
   }
 
   recheckProgrammingPhase(): void {
@@ -297,7 +274,6 @@ export class Game {
     const registers = player.revealRegister(registerIndex, card.instruction)
     const action: RobotActionResult = {
       robotId: robot.id,
-      playerId: player.id,
       card,
       position: this.board.positionOf(robot.id),
       direction: robot.direction,
@@ -310,18 +286,18 @@ export class Game {
       return [{ robotId: other.id, position, direction: other.direction }]
     })
 
-    let roundComplete = false
     if (this.activatedRobotIds.size === this.players.length) {
       this.activateBoardElements()
-      roundComplete = this.finishRegister()
+      this.finishRegister()
     }
-    return { registerIndex, action, registers, roundComplete, pushedRobots }
+    return { registerIndex, action, registers, pushedRobots }
   }
 
   private dealCards(): void {
     // V0 uses the supplied deck as a fixed hand, without drawing or shuffling.
     for (const player of this.players) {
       if (player.hand.length === 0) player.setHand(this.deck)
+      player.resetRegisters()
     }
   }
 
@@ -400,23 +376,17 @@ export class Game {
     }
   }
 
-  private finishRegister(): boolean {
+  private finishRegister(): void {
     this.activatedRobotIds.clear()
     this.registerIndex++
-    if (this.registerIndex < 5) return false
-    this.finishRound()
-    return true
+    if (this.registerIndex === 5) this.finishRound()
   }
 
   private finishRound(): void {
-    for (const player of this.players) {
-      player.robot.clearProgram()
-    }
+    for (const player of this.players) player.robot.clearProgram()
     this.submittedPlayerIds.clear()
     this.registerIndex = 0
     this.dealCards()
-    // The phase flips when programming starts, so the final register's reveal is
-    // still published while the game reports EXECUTING.
-    this.roundFinished = true
+    this.currentPhase = 'programming'
   }
 }

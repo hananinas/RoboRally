@@ -18,11 +18,11 @@ const lobbyRoom = (id: string) => `lobby:${id}`
 export function presentLobby(lobby: Lobby): LobbyState {
   return { lobbyId: lobby.lobbyId, name: lobby.name, ownerUserId: lobby.members.keys().next().value!,
     playerCount: lobby.members.size, maxPlayers: MAX_PLAYERS,
-    players: [...lobby.members.values()].map(({ user }) => user) }
+    players: [...lobby.members.values()].map(({ user }) => ({ userId: user.userId, username: user.username })) }
 }
 
 export function leaveLobby(context: SessionContext, socket: GameSocket): void {
-  const userId = socket.data.user?.userId ?? ''
+  const userId = socket.data.user.userId
   const session = context.sessionsByUser.get(userId)
   if (session?.kind !== 'lobby') return
   const lobby = context.lobbies.get(session.lobbyId)
@@ -44,8 +44,8 @@ export function handleListLobbies(
 ): void {
   withSessionRequest(socket, 'lobby.list', emptyRequestSchema, payload, acknowledge, (_user, ack) => {
     ack({ outcome: 'LOBBIES_FOUND', lobbies: [...context.lobbies.values()].map((lobby) => {
-      const { ownerUserId: _, players: _players, ...summary } = presentLobby(lobby)
-      return summary
+      const { lobbyId, name, playerCount, maxPlayers } = presentLobby(lobby)
+      return { lobbyId, name, playerCount, maxPlayers }
     }) })
   })
 }
@@ -175,15 +175,10 @@ export function handleStartLobby(
           void connection.leave(gameContext.publicRoom)
           void connection.leave(gameContext.playerRoom(member.player.id))
         }
-        for (const { player } of gameContext.memberships.values()) {
-          gameContext.game.removePlayer(player.id)
-        }
-        gameContext.memberships.clear()
       }
       gameContext?.actionScheduler.stop()
       throw error
     }
-    gameContext.game.start()
     context.games.set(gameContext.gameId, gameContext)
     for (const entry of prepared) {
       context.sessionsByUser.set(entry.member.user.userId, { kind: 'game', gameId: gameContext.gameId })

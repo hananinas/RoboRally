@@ -1,4 +1,4 @@
-.login {
+.entry {
   position: relative;
   isolation: isolate;
   display: flex;
@@ -12,7 +12,7 @@
   font-family: system-ui, sans-serif;
 }
 
-.login-board-background {
+.entry-board-background {
   position: fixed;
   pointer-events: none;
   inset: 0;
@@ -24,12 +24,12 @@
   padding: 10px;
 }
 
-.login-board-background div {
+.entry-board-background div {
   border-radius: 10px;
   background: #3a424c;
 }
 
-.login-panel {
+.entry-panel {
   margin-block: auto;
   width: min(100% - 48px, 420px);
   padding: 32px 28px;
@@ -39,53 +39,41 @@
   box-shadow: 0 20px 60px rgb(0 0 0 / 35%);
 }
 
-.login-panel h1 {
-  margin: 0 0 24px;
+.entry-panel h1 {
+  margin: 0;
   font-size: 22px;
 }
 
-.login-field {
-  display: block;
-  margin-bottom: 12px;
+.entry-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
 }
 
-.login-field span {
-  display: block;
-  margin-bottom: 6px;
-  color: #9aa4b0;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.login-field input {
-  box-sizing: border-box;
-  width: 100%;
-  padding: 11px 12px;
+.entry-panel__logout {
+  padding: 6px 12px;
   border: 1px solid #4c5560;
   border-radius: 9px;
-  outline: none;
-  background: #2b323b;
-  color: #eef1f4;
+  background: transparent;
+  color: inherit;
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
+  cursor: pointer;
 }
 
-.login-field input:focus-visible {
-  border-color: #e0bb1f;
-}
-
-.login-validation {
+.entry-validation {
   min-height: 18px;
   margin: 0 0 8px;
   color: #9aa4b0;
   font-size: 12px;
 }
 
-.login-validation--error {
+.entry-validation--error {
   color: #e8786e;
 }
 
-.login-primary-button {
+.entry-primary-button {
   width: 100%;
   margin-top: 6px;
   padding: 12px 0;
@@ -99,7 +87,7 @@
   cursor: pointer;
 }
 
-.login-primary-button:disabled {
+.entry-primary-button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
@@ -187,7 +175,7 @@
   cursor: default;
 }
 
-.lobby--message .login-validation {
+.lobby--message .entry-validation {
   margin: 0;
 }
 
@@ -217,7 +205,7 @@
   outline: 3px solid #fff;
   outline-offset: 2px;
 }
-.login-secondary-button {
+.entry-secondary-button {
   width: 100%;
   margin-top: 6px;
   padding: 12px 0;
@@ -231,7 +219,27 @@
   cursor: pointer;
 }
 
-.login-secondary-button:disabled {
+.entry-secondary-button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+.waiting-lobby__heading,
+.waiting-lobby__players li {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.waiting-lobby__players {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px;
+}
+
+.waiting-lobby__players li {
+  padding: 10px 0;
+  border-bottom: 1px solid #4c5560;
+  overflow-wrap: anywhere;
 }

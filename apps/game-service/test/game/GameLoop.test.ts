@@ -32,29 +32,25 @@ describe('Game activation loop', () => {
       const result = game.executeNextAction()
       expect(result).toEqual({
         registerIndex,
-        roundComplete: registerIndex === 4,
+        pushedRobots: [],
         registers: Array.from({ length: 5 }, (_, index) => index <= registerIndex
           ? { status: 'REVEALED', instruction: 'TURN_LEFT' }
           : { status: 'EMPTY' }),
-        pushedRobots: [],
         action: {
           robotId: robot.id,
-          playerId: player.id,
           card: deck[registerIndex],
           position: { x: 1, y: 1 },
           direction: directions[registerIndex],
         },
       })
       expect(game.currentRegister).toBe(registerIndex === 4 ? 0 : registerIndex + 1)
-      expect(game.phase).toBe('activation')
+      expect(game.phase).toBe(registerIndex === 4 ? 'programming' : 'activation')
     }
 
     expect(robot.program).toEqual([])
     expect(player.hand).toEqual(deck)
     expect(() => game.executeNextAction()).toThrow()
-    expect(game.awaitingProgrammingStart).toBe(true)
 
-    game.beginProgramming()
     game.submitProgram(player.id, deck.map((card) => card.id))
     expect(game.executeNextAction()).toMatchObject({ registerIndex: 0 })
     expect(robot.direction).toBe(Direction.WEST)

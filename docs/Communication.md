@@ -165,7 +165,7 @@ A player can also publish register occupancy before submitting, described in [Pu
 
 Before submitting, the client can share which slots are occupied. `game.updateRegisters {gameId, playerId, occupied}` sends five booleans in register order, `true` for an occupied slot and `false` for an empty one. Its acknowledgement returns `ACCEPTED`, `INVALID_REQUEST`, `NOT_A_MEMBER`, `PLAYER_ID_MISMATCH`, `WRONG_PHASE`, `ALREADY_SUBMITTED` or `INTERNAL_ERROR`. An accepted update broadcasts `game.registersChanged {gameId, playerId, registers}` to the [public room](#rooms) with only HIDDEN and EMPTY slots.
 
-The client reveals a slot from `robot.actionResolved`, which carries `playerId`, `registerIndex` and `instruction`. `game.started` and `session.get` include every player's registers, revealed slots included, until `game.programmingStarted {gameId}` resets them to five EMPTY slots.
+The client reveals a slot from `robot.actionResolved`, which carries `playerId`, `registerIndex` and `instruction`. `game.started` and `session.get` include every player's registers, revealed slots included, until the next hand resets them to five EMPTY slots.
 
 ### Activation
 
@@ -220,7 +220,7 @@ through the player's [private room](#rooms).
 
 A new hand may arrive while the client is still playing animations from the previous activation. The client should store the new hand immediately but must not enable programming until all queued resolved actions have finished playing.
 
-The service also announces `game.programmingStarted {gameId}` to the [public room](#rooms), which resets every player's registers to five EMPTY slots.
+The new hand also opens the next programming round, so the client resets every player's registers to five EMPTY slots when its own hand arrives. A player who reconnects after that point gets the reset registers from `session.get`.
 
 ### Game sequence
 
@@ -237,12 +237,10 @@ sequenceDiagram
     participant Public as game:{gameId}:public
 
     loop Each round
-        Note over A,B: EMPTY = no card placed<br/>HIDDEN = occupied, card not disclosed
         A->>Server: game.updateRegisters {gameId, playerId: A, occupied}
         Server-->>A: Acknowledgement: ACCEPTED
         Server->>Public: game.registersChanged {gameId, playerId: A, registers}
         Public-->>B: game.registersChanged {gameId, playerId: A, registers}
-        Note over A,Server: Occupancy updates are not submission
         A->>Server: program.submit {gameId, cardIds}
         Server-->>A: Acknowledgement: ACCEPTED
         Server->>Public: program.submitted {playerId: A}
@@ -261,10 +259,6 @@ sequenceDiagram
             end
         end
 
-        Note over A,B: game.programmingStarted resets every player's registers to five EMPTY slots
-        Server->>Public: game.programmingStarted {gameId}
-        Public-->>A: game.programmingStarted {gameId}
-        Public-->>B: game.programmingStarted {gameId}
         Server->>PrivateA: cards.dealt {cards}
         PrivateA-->>A: cards.dealt {cards}
         Server->>PrivateB: cards.dealt {cards}

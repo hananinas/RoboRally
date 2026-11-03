@@ -46,7 +46,6 @@ describe('pit entry and rebooting', () => {
 
     expect(game.executeNextAction()).toMatchObject({
       registerIndex: 0,
-      roundComplete: false,
       pushedRobots: [],
       action: { robotId: robot.id, card: first, position: { x: Integer(0), y: Integer(2) }, direction },
     })
@@ -104,7 +103,7 @@ describe('pit entry and rebooting', () => {
       { position: { x: Integer(0), y: Integer(2) }, direction: Direction.EAST },
     ])
     expect(board.positionOf(robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
-    expect(game.awaitingProgrammingStart).toBe(true)
+    expect(game.phase).toBe('programming')
     expect(robot.program).toEqual([])
     expect(player.hand).toEqual(Object.values(c))
   })
@@ -123,7 +122,7 @@ describe('pit entry and rebooting', () => {
     }
     expect(game.executeNextAction().action.direction).toBe(Direction.NORTH)
     expect(game.executeNextAction().action.direction).toBe(Direction.EAST)
-    expect(game.awaitingProgrammingStart).toBe(true)
+    expect(game.phase).toBe('programming')
   })
 
   it('skips the antenna when choosing a fallback for an occupied reboot tile', () => {

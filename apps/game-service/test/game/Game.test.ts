@@ -52,8 +52,10 @@ describe('Game programming', () => {
       { registerIndex: 3, position: { x: 9, y: 5 }, direction: Direction.SOUTH },
       { registerIndex: 4, position: { x: 9, y: 5 }, direction: Direction.NORTH },
     ])
-    expect(game.awaitingProgrammingStart).toBe(true)
-    game.beginProgramming()
+    expect(actions.map(({ registers }, index) => registers[index])).toEqual(
+      deck.map((card) => ({ status: 'REVEALED', instruction: card.instruction })),
+    )
+    expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
     expect(game.phase).toBe('programming')
   })
 
@@ -69,6 +71,33 @@ describe('Game programming', () => {
 
     deck.pop()
     expect(player.hand).toHaveLength(6)
+  })
+
+  it('resets existing register state for every player at the initial deal', () => {
+    const board = new Board([
+      [new EmptyTile(), new EmptyTile()],
+      [new EmptyTile(), new EmptyTile()],
+    ], { x: Integer(1), y: Integer(1), angle: Math.PI / 2 })
+    const deck = Array.from({ length: 5 }, (_, index) => new Card(`left-${index}`, 'TURN_LEFT'))
+    const players = [0, 1].map((index) => {
+      const robot = new Robot(`robot-${index}`, Direction.EAST)
+      board.placeRobot(robot.id, { x: Integer(index), y: Integer(0) })
+      const player = new Player(`player-${index}`, robot, index === 0 ? deck : [])
+      player.updateRegisters([true, true, true, true, true])
+      player.revealRegister(0, 'TURN_LEFT')
+      return player
+    })
+    const snapshots = players.map((player) => player.registers)
+
+    new Game(board, players, deck, { x: Integer(0), y: Integer(1) })
+
+    for (const player of players) {
+      expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
+      expect(player.hand).toEqual(deck)
+    }
+    for (const snapshot of snapshots) {
+      expect(snapshot[0]).toEqual({ status: 'REVEALED', instruction: 'TURN_LEFT' })
+    }
   })
 
   it('preserves the selected order and enters activation after a valid submission', () => {

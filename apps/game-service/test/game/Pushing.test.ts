@@ -45,6 +45,11 @@ describe('robot pushing', () => {
       { robotId: robots[2].id, position: reboot, direction: Direction.WEST },
     ]
     expect(result.pushedRobots).toEqual(expected)
+    expect(result.registers[0]).toEqual({ status: 'REVEALED', instruction: move.instruction })
+    expect(players[0].registers).toEqual(result.registers)
+    for (const player of players.slice(1)) {
+      expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
+    }
     game.moveRobot(robots[1], Direction.NORTH, PositiveInteger(1))
     expect(result.pushedRobots).toEqual(expected)
   })

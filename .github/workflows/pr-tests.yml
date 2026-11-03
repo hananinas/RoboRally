@@ -23,20 +23,15 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: pnpm
+      - name: Enable Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Install Chromium and system dependencies
-        run: pnpm --dir apps/client exec playwright install --with-deps chromium
+      - name: Enter dev shell
+        run: |
+          nix develop .#ci -c bash -c 'echo "PATH=$PATH" >> "$GITHUB_ENV"; env | grep ^PLAYWRIGHT_ >> "$GITHUB_ENV"'
 
       - name: Typecheck
         run: pnpm typecheck
@@ -47,14 +42,51 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Run unit and browser tests
-        run: pnpm test
+      - name: Run unit tests
+        run: pnpm --recursive --if-present run test:unit
+
+      - name: Run browser tests
+        run: pnpm --dir apps/client exec playwright test
 
       - name: Upload browser test failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: browser-test-results
+          path: |
+            apps/client/test-results/
+            apps/client/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  e2e-membership:
+    name: Membership e2e tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CI: true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Enable Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Build game-events and game-service
+        run: nix develop .#default -c bash -c 'pnpm --filter @robo-rally/game-events build && pnpm --filter @robo-rally/game-service build'
+
+      - name: Run membership e2e tests
+        run: nix develop .#default -c pnpm --dir apps/client exec playwright test --config playwright.membership.config.ts
+
+      - name: Upload membership e2e failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: membership-e2e-results
           path: |
             apps/client/test-results/
             apps/client/playwright-report/

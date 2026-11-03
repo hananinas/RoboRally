@@ -124,9 +124,6 @@ describe('board-edge falls', () => {
       expect(board.occupantAt(reboot)).toBe(robot.id)
       expect(robot.direction).toBe(Direction.WEST)
     }
-    expect(game.awaitingProgrammingStart).toBe(true)
-    expect(game.phase).toBe('activation')
-    game.beginProgramming()
     expect(game.phase).toBe('programming')
   })
 })

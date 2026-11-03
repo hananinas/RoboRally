@@ -28,7 +28,7 @@ export default function useSessionConnection() {
     setSession(next)
   }, [initialize, dispatchGame])
 
-  const run = useCallback(async (operation: () => Promise<SessionEvent | undefined>, kind: 'login' | 'sync' | 'command' | 'start' = 'command') => {
+  const run = useCallback(async (operation: () => Promise<SessionEvent | undefined>, kind: 'sync' | 'command' | 'start' = 'command') => {
     if (pending.current || !socket.connected) return
     pending.current = true
     setBusy(true)
@@ -39,8 +39,7 @@ export default function useSessionConnection() {
     } catch {
       // A timed-out lobby command may have succeeded; query membership before choosing a screen.
       if (generation.current === attempt && socket.connected && !(kind === 'start' && current.current.status === 'joined')) {
-        dispatch(kind === 'login' ? { type: 'login-error', error: 'TIMEOUT' }
-          : kind === 'sync' ? { type: 'error', error: 'TIMEOUT' } : { type: 'sync-requested' })
+        dispatch(kind === 'sync' ? { type: 'error', error: 'TIMEOUT' } : { type: 'sync-requested' })
       }
     } finally {
       if (generation.current === attempt) {
@@ -59,7 +58,7 @@ export default function useSessionConnection() {
       dispatch({ type: 'disconnected' })
     }
     const connected = () => {
-      if ('user' in current.current && !(current.current.status === 'joined' && socket.recovered)) dispatch({ type: 'sync-requested', requiresLogin: true })
+      if (!(current.current.status === 'joined' && socket.recovered)) dispatch({ type: 'sync-requested' })
     }
     const started: ServerToClientEvents['game.started'] = (payload) => {
       if (socket.connected) dispatch({ type: 'game-started', ...payload })
@@ -82,13 +81,7 @@ export default function useSessionConnection() {
 
   useEffect(() => {
     if (session.status !== 'resyncing' || !socket.connected || busy) return
-    const attempt = generation.current
     void run(async () => {
-      if (session.requiresLogin) {
-        const login = await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('user.login', { username: session.user.username })
-        if (attempt !== generation.current || !socket.connected) return
-        if (login.outcome !== 'LOGGED_IN') return { type: 'login-result', result: login }
-      }
       const result = await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('session.get', {})
       return { type: 'session-result', result }
     }, 'sync')
@@ -111,18 +104,6 @@ export default function useSessionConnection() {
     if (session.status === 'browsing') refreshLobbies()
   }, [session.status, refreshLobbies])
 
-  function submitUsername(username: string) {
-    if (current.current.status !== 'editing' || pending.current) return
-    if (current.current.error === 'ALREADY_LOGGED_IN') {
-      socket.disconnect()
-      socket.connect()
-      return
-    }
-    if (!socket.connected) return connection.connect()
-    dispatch({ type: 'username-changed', username })
-    dispatch({ type: 'login-submitted' })
-    void run(async () => ({ type: 'login-result', result: await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('user.login', { username }) }), 'login')
-  }
   function joinLobby(lobbyId: string | null) {
     if (pending.current || !socket.connected) return
     dispatch({ type: 'lobby-requested', lobbyId })
@@ -153,9 +134,8 @@ export default function useSessionConnection() {
 
   return {
     connection, game, session, busy, lobbies, listError,
-    submitUsername, joinLobby, startLobby, leaveSession, refreshLobbies,
+    joinLobby, startLobby, leaveSession, refreshLobbies,
     createLobby: () => joinLobby(null),
-    changeUsername: (username: string) => dispatch({ type: 'username-changed', username }),
-    retrySession: () => dispatch({ type: 'sync-requested' }),
+    retrySession: () => socket.connected ? dispatch({ type: 'sync-requested' }) : connection.connect(),
   }
 }

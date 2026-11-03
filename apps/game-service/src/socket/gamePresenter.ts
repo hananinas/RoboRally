@@ -50,18 +50,6 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
   }
 }
 
-function presentRobots(game: Game) {
-  return game.players.map((player) => ({
-    robotId: player.robot.id,
-    playerId: player.id,
-    colour: player.robot.colour,
-    position: {
-      coordinate: game.board.positionOf(player.robot.id),
-      orientation: orientations[player.robot.direction],
-    },
-  }))
-}
-
 export function presentPublicGameState(
   gameId: GameId,
   game: Game,
@@ -76,15 +64,23 @@ export function presentPublicGameState(
     checkpointCount: game.board.checkpointCount,
     players,
     antenna: game.board.antenna,
-    robots: presentRobots(game),
-    phase: phases[game.phase],
-    paused: game.paused,
-    aborted: game.aborted,
     board: {
       width: game.board.width,
       height: game.board.height,
       tiles,
     },
+    robots: game.players.map((player) => ({
+      robotId: player.robot.id,
+      playerId: player.id,
+      colour: player.robot.colour,
+      position: {
+        coordinate: game.board.positionOf(player.robot.id),
+        orientation: orientations[player.robot.direction],
+      },
+    })),
+    phase: phases[game.phase],
+    paused: game.paused,
+    aborted: game.aborted,
   }
 }
 
@@ -97,14 +93,17 @@ export function presentCardsDealt(
 
 export function presentRobotActionResolved(
   gameId: GameId,
-  result: Pick<NextActionResult, 'action' | 'registerIndex' | 'pushedRobots'>,
+  game: Game,
+  result: NextActionResult,
 ): RobotActionResolved {
   const { action, registerIndex } = result
+  const player = game.players.find((candidate) => candidate.robot.id === action.robotId)
+  if (!player) throw new Error(`Missing owner for robot ${action.robotId}`)
   return {
     gameId,
     registerIndex,
     robotId: action.robotId,
-    playerId: action.playerId,
+    playerId: player.id,
     instruction: action.card.instruction,
     position: {
       coordinate: action.position,

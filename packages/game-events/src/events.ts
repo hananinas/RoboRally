@@ -2,26 +2,22 @@ import type { EmptyRequest, LobbyRequest, LobbyState, LobbyListResult, LobbyJoin
 import type {
   CardsDealt,
   GameAborted,
-  RegistersChanged,
   LeaveGame,
-  LeaveResult,
   GameInitialization,
-  LoginResult,
   ProgramResult,
-  ProgrammingStarted,
   ProgramSubmitted,
   RobotActionResolved,
   PlayerLeft,
   PlayerConnectionChanged,
   PlayerCheckpointProgress,
+  LeaveResult,
+  RegistersChanged,
+  UpdateRegisters,
   UpdateRegistersResult,
 } from './payloads.js'
 import type { SubmitProgram } from './submitProgram.js'
-import type { UpdateRegisters } from './updateRegisters.js'
-import type { Login } from './login.js'
 
 export type ProgramResultAcknowledgement = (result: ProgramResult) => void
-export type LoginAcknowledgement = (result: LoginResult) => void
 
 export interface ClientToServerEvents {
   'lobby.list': (payload: EmptyRequest, acknowledge: (result: LobbyListResult) => void) => void
@@ -31,7 +27,6 @@ export interface ClientToServerEvents {
   'lobby.start': (payload: LobbyRequest, acknowledge: (result: LobbyStartResult) => void) => void
   'session.get': (payload: EmptyRequest, acknowledge: (result: SessionResult) => void) => void
   'game.leave': (payload: LeaveGame, acknowledge: (result: LeaveResult) => void) => void
-  'user.login': (payload: Login, acknowledge: LoginAcknowledgement) => void
   'game.updateRegisters': (payload: UpdateRegisters, acknowledge: (result: UpdateRegistersResult) => void) => void
   'program.submit': (
     payload: SubmitProgram,
@@ -43,7 +38,6 @@ export interface ServerToClientEvents {
   'lobby.updated': (payload: { lobby: LobbyState }) => void
   'game.started': (payload: { lobbyId: string; initialization: GameInitialization }) => void
   'game.registersChanged': (payload: RegistersChanged) => void
-  'game.programmingStarted': (payload: ProgrammingStarted) => void
   'player.checkpointProgress': (payload: PlayerCheckpointProgress) => void
   'game.playerLeft': (payload: PlayerLeft) => void
   'game.playerConnectionChanged': (payload: PlayerConnectionChanged) => void

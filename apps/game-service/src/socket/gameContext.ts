@@ -14,10 +14,10 @@ export function createGameContext(io: GameSocketServer, session: GameSession): M
     [...memberships.values()].map(({ user, player, connectionId }) => ({
       playerId: player.id,
       lastCheckpoint: player.lastCheckpoint,
-      registers: player.registers,
       username: user.username,
       programSubmitted: game.hasSubmittedProgram(player.id),
       connected: connectionId !== null,
+      registers: player.registers,
     })),
   )
 

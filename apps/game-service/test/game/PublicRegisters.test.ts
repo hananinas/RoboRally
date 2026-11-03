@@ -45,38 +45,46 @@ describe('public register lifecycle', () => {
     expect(first.robot.program).toEqual(program)
   })
 
-  it('reveals only the executed instruction and clears slots when programming starts', () => {
+  it('rejects register updates after aborting without changing the snapshot', () => {
+    const { game } = createGame('empty-map')
+    const player = game.addPlayer()._unsafeUnwrap()
+    game.updateRegisters(player.id, occupied)
+    const snapshot = player.registers
+    game.abort()
+
+    expect(game.phase).toBe('programming')
+    expect(game.updateRegisters(player.id, [false, false, false, false, false])).toEqual({ outcome: 'WRONG_PHASE' })
+    expect(player.registers).toBe(snapshot)
+  })
+
+  it('reveals only the executed instruction and clears slots when the next hand is dealt', () => {
     const { game } = createGame('empty-map')
     const player = game.addPlayer()._unsafeUnwrap()
     game.updateRegisters(player.id, [true, true, true, true, true])
     game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
     for (let index = 0; index < 5; index++) {
       const result = game.executeNextAction()
-      expect(result.action.playerId).toBe(player.id)
+      expect(result.action.robotId).toBe(player.robot.id)
       expect(result.registers).toEqual(Array.from({ length: 5 }, (_, slot) => slot <= index
         ? { status: 'REVEALED', instruction: player.hand[slot].instruction }
         : { status: 'HIDDEN' }))
       expect(result.registers[index]).not.toHaveProperty('id')
-      expect(result.roundComplete).toBe(index === 4)
-      expect(player.registers).toEqual(result.registers)
+      expect(player.registers).toEqual(index === 4 ? empty : result.registers)
+      expect(game.phase).toBe(index === 4 ? 'programming' : 'activation')
     }
-    // The completed round keeps its reveals and stays in activation until programming starts.
-    expect(game.phase).toBe('activation')
-    expect(game.awaitingProgrammingStart).toBe(true)
-    game.beginProgramming()
     expect(game.phase).toBe('programming')
     expect(player.registers).toEqual(empty)
     expect(game.hasSubmittedProgram(player.id)).toBe(false)
     expect(game.updateRegisters(player.id, occupied)).toEqual({ outcome: 'ACCEPTED' })
   })
 
-  it('locks the roster at lobby start and preserves colours across departure', () => {
+  it('locks the roster after program submission and preserves colours across departure', () => {
     const { game } = createGame('empty-map')
     const first = game.addPlayer()._unsafeUnwrap()
     const second = game.addPlayer('#4d8deb')._unsafeUnwrap()
     expect(first.robot.colour).not.toBe(second.robot.colour)
     const colour = second.robot.colour
-    game.start()
+    game.submitProgram(first.id, first.hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
     expect(game.addPlayer()._unsafeUnwrapErr()).toBe('GAME_ALREADY_STARTED')
     game.removePlayer(first.id)
     expect(game.players).toEqual([second])

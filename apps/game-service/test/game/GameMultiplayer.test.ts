@@ -104,8 +104,6 @@ describe('Game multiplayer activation', () => {
 
     game.removePlayer(players[0].id)
 
-    expect(game.awaitingProgrammingStart).toBe(true)
-    game.beginProgramming()
     expect(game.phase).toBe('programming')
     expect(game.currentRegister).toBe(0)
     expect(game.players).toEqual([])
@@ -125,6 +123,8 @@ describe('Game multiplayer activation', () => {
     for (let round = 1; round <= 2; round++) {
       players.forEach((player, index) => {
         expect(player.hand).toEqual(deck)
+        expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
+        expect(game.updateRegisters(player.id, [true, true, true, true, true])).toEqual({ outcome: 'ACCEPTED' })
         game.submitProgram(player.id, programs[index].map((card) => card.id))
         expect(game.phase).toBe(index === players.length - 1 ? 'activation' : 'programming')
         player.setHand([])
@@ -137,19 +137,22 @@ describe('Game multiplayer activation', () => {
           expect(result.registerIndex).toBe(registerIndex)
           expect(result.action.robotId).toBe(player.robot.id)
           expect(result.action.card).toBe(programs[players.indexOf(player)][registerIndex])
+          expect(result.registers).toEqual(Array.from({ length: 5 }, (_, index) => index <= registerIndex
+            ? { status: 'REVEALED', instruction: programs[players.indexOf(player)][index].instruction }
+            : { status: 'HIDDEN' }))
           const registerFinished = robotIndex === expectedOrder.length - 1
           expect(game.currentRegister).toBe(registerFinished ? (registerIndex + 1) % 5 : registerIndex)
-          expect(game.phase).toBe('activation')
+          expect(game.phase).toBe(registerFinished && registerIndex === 4 ? 'programming' : 'activation')
         }
       }
 
       for (const player of players) {
         expect(player.robot.program).toEqual([])
         expect(player.hand).toEqual(deck)
+        expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
         expect(game.hasSubmittedProgram(player.id)).toBe(false)
       }
-      expect(game.awaitingProgrammingStart).toBe(true)
-      game.beginProgramming()
+      game.recheckProgrammingPhase()
       expect(game.phase).toBe('programming')
       expect(() => game.executeNextAction()).toThrow()
     }

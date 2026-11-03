@@ -32,10 +32,11 @@ function createGameWithPlayer() {
 
 describe('game presenter', () => {
   it('serializes pushed robot positions and orientations alongside the acting robot', () => {
-    const { player } = createGameWithPlayer()
-    const resolved = presentRobotActionResolved('game', {
+    const { game, player } = createGameWithPlayer()
+    const resolved = presentRobotActionResolved('game', game, {
       registerIndex: 0,
-      action: { robotId: player.robot.id, playerId: player.id, card: player.hand[0], position: { x: Integer(2), y: Integer(3) }, direction: Direction.EAST },
+      registers: player.registers,
+      action: { robotId: player.robot.id, card: player.hand[0], position: { x: Integer(2), y: Integer(3) }, direction: Direction.EAST },
       pushedRobots: [
         { robotId: 'pushed', position: { x: Integer(3), y: Integer(3) }, direction: Direction.NORTH },
         { robotId: 'rebooted', position: { x: Integer(0), y: Integer(0) }, direction: Direction.WEST },
@@ -171,16 +172,15 @@ describe('game presenter', () => {
     { cardIndex: 3, instruction: 'BACK_UP' }, { cardIndex: 4, instruction: 'TURN_LEFT' },
     { cardIndex: 5, instruction: 'TURN_RIGHT' }, { cardIndex: 6, instruction: 'U_TURN' },
   ] as const)('presents a resolved $instruction action', ({ cardIndex, instruction }) => {
-    const { player } = createGameWithPlayer()
+    const { game, player } = createGameWithPlayer()
     const action = {
       robotId: player.robot.id,
-      playerId: player.id,
       card: player.hand[cardIndex],
       position: { x: Integer(4), y: Integer(5) },
       direction: Direction.SOUTH,
     }
 
-    const resolved = presentRobotActionResolved('game', { registerIndex: 4, action, pushedRobots: [] })
+    const resolved = presentRobotActionResolved('game', game, { registerIndex: 4, action, pushedRobots: [], registers: player.registers })
 
     expectTypeOf(resolved).toEqualTypeOf<RobotActionResolved>()
     expect(resolved).toEqual({

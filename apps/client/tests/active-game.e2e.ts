@@ -749,7 +749,6 @@ for (const submitting of [false, true]) {
     await expect(overlay.getByRole('button', {name: 'Leave game', exact: true,})).toBeDisabled()
     await expect(page.getByRole('alert')).toContainText('Connection lost. Reconnecting… Your program was not resent.')
     await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
-    await expect(page.getByRole('textbox', { name: 'Username' })).toHaveCount(0)
     await expect(registered).toHaveCount(5)
     expect(await registered.allTextContents()).toEqual(selection)
     for (const card of await registered.all()) await expect(card).toBeDisabled()

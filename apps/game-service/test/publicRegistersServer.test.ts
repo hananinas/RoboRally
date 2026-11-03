@@ -10,6 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as actionScheduler from '@/actionScheduler'
 import { createGame } from '@/game/GameFactory'
 import { createGameSocketServer, type GameSession, type GameSocketServer } from '@/socket/gameServer'
+import { createSessionStore, type SessionStore } from '@/auth/sessionStore'
+import { authCookieHeader } from './authTestHelper.ts'
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>
 type GameStarted = Parameters<ServerToClientEvents['game.started']>[0]
@@ -23,13 +25,15 @@ describe('public registers over Socket.IO', () => {
   let url: string
   let clients: Client[]
   let sessions: GameSession[]
+  let sessionStore: SessionStore
 
   beforeEach(async () => {
     clients = []
     sessions = []
     const http = createServer()
-    server = createGameSocketServer(http, () => {
-      const session = createGame('empty-map')
+    sessionStore = createSessionStore()
+    server = createGameSocketServer(http, sessionStore, () => {
+      const session = { ...createGame('empty-map'), gameId: randomUUID() }
       sessions.push(session)
       return session
     })
@@ -46,6 +50,7 @@ describe('public registers over Socket.IO', () => {
   async function connect(username: string): Promise<Client> {
     const client: Client = createClient(url, {
       transports: ['websocket'], autoConnect: false, reconnection: false,
+      extraHeaders: authCookieHeader(sessionStore, username, username),
     })
     clients.push(client)
     await new Promise<void>((resolve, reject) => {
@@ -53,7 +58,6 @@ describe('public registers over Socket.IO', () => {
       client.once('connect_error', reject)
       client.connect()
     })
-    expect((await client.timeout(1000).emitWithAck('user.login', { username })).outcome).toBe('LOGGED_IN')
     return client
   }
 
@@ -203,11 +207,13 @@ describe('public registers over Socket.IO', () => {
     expect(await raw(returning, update(a))).toEqual({ outcome: 'NOT_A_MEMBER' })
     expect(await raw(second, update(remaining))).toEqual({ outcome: 'ACCEPTED' })
     await snapshot(second)
-    expect(await returning.timeout(1000).emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION' })
+    expect(await returning.timeout(1000).emitWithAck('session.get', {})).toEqual({
+      outcome: 'NO_SESSION', user: { userId: 'Returning', username: 'Returning' },
+    })
     expect(departedEvents).toEqual([])
   })
 
-  it('reveals only executed instructions, deals privately, and broadcasts the reset before either next hand', async () => {
+  it('reveals only executed instructions, then resets slots and deals privately at round completion', async () => {
     const first = await connect('A')
     const second = await connect('B')
     const createScheduler = actionScheduler.createActionScheduler
@@ -224,14 +230,10 @@ describe('public registers over Socket.IO', () => {
     await snapshot(second)
     const game = sessions[0].game
     const execute = game.executeNextAction.bind(game)
-    let count = 0
     vi.spyOn(game, 'executeNextAction').mockImplementation(() => {
       const result = execute()
-      count++
-      expect(result.roundComplete).toBe(count === 10)
-      game.pause()
-      // Hold the final scheduler reset until a real session.get observes every revealed slot.
-      return { ...result, roundComplete: false }
+      if (game.phase === 'activation') game.pause()
+      return result
     })
     const submit = game.submitProgram.bind(game)
     vi.spyOn(game, 'submitProgram').mockImplementation((...args) => {
@@ -283,9 +285,9 @@ describe('public registers over Socket.IO', () => {
           : { status: 'HIDDEN' }))
       const current = await snapshot(first)
       executionStates.push(current.state)
-      expect(current.state.phase).toBe('EXECUTING')
+      expect(current.state.phase).toBe(index < 9 ? 'EXECUTING' : 'PROGRAMMING')
       expect(current.state).toHaveProperty('board')
-      expect(current.state.players.map((player) => player.registers)).toEqual(expected)
+      expect(current.state.players.map((player) => player.registers)).toEqual(index < 9 ? expected : [empty, empty])
       expect(current.hand).toEqual(a.hand)
       expect((await snapshot(second)).state).toEqual(current.state)
       expect(actions).toHaveLength(index + 1)
@@ -297,14 +299,6 @@ describe('public registers over Socket.IO', () => {
       }
     }
     expect(actions.map((resolved) => resolved.registerIndex)).toEqual([0, 0, 1, 1, 2, 2, 3, 3, 4, 4])
-    expect(game.awaitingProgrammingStart).toBe(true)
-    expect((await snapshot(first)).state).toEqual(executionStates[9])
-    expect(privateHands).toEqual([[], []])
-    expect(registerEvents).toEqual([])
-    const reset = new Promise<void>((resolve) => first.once('game.programmingStarted', () => resolve()))
-    game.resume()
-    scheduler!.dealHands()
-    await reset
     const next = await snapshot(first)
     const otherNext = await snapshot(second)
     expect(next.state.phase).toBe('PROGRAMMING')
@@ -321,7 +315,7 @@ describe('public registers over Socket.IO', () => {
       expect(events.filter((event) => event.name !== 'player.checkpointProgress').map((event) => event.name)).toEqual([
         'program.submitted',
         ...Array.from({ length: 10 }, () => 'robot.actionResolved'),
-        'game.programmingStarted', 'cards.dealt',
+        'cards.dealt',
       ])
     }
     const publicPayloads = JSON.stringify([activation.state, actions, executionStates, next.state, otherNext.state])
@@ -370,7 +364,7 @@ describe('public registers over Socket.IO', () => {
       .toEqual(executedPlayer.registers)
   })
 
-  it('announces the next programming reset when a departure completes the final register', async () => {
+  it('resets registers before dealing the next hand when a departure completes the final register', async () => {
     const first = await connect('A')
     const second = await connect('B')
     const joined = await start([first, second])
@@ -383,7 +377,7 @@ describe('public registers over Socket.IO', () => {
     vi.spyOn(game, 'executeNextAction').mockImplementation(() => {
       const result = execute()
       count++
-      lastActor = result.action.playerId
+      lastActor = game.players.find((player) => player.robot.id === result.action.robotId)!.id
       if (count === 9) game.pause()
       return result
     })
@@ -398,49 +392,47 @@ describe('public registers over Socket.IO', () => {
     const departing = [first, second][1 - remainingIndex]
     const events: string[] = []
     remaining.onAny((name) => events.push(name))
-    const reset = new Promise<void>((resolve) => remaining.once('game.programmingStarted', () => resolve()))
+    const dealt = new Promise<void>((resolve) => remaining.once('cards.dealt', () => resolve()))
     expect(await departing.timeout(1000).emitWithAck('game.leave', { gameId: joined[0].assignment.gameId })).toEqual({ outcome: 'LEFT' })
-    await reset
+    await dealt
     const restored = await snapshot(remaining)
     expect(restored.state.players.map((player) => player.registers)).toEqual([empty])
-    expect(events.indexOf('game.playerLeft')).toBeLessThan(events.indexOf('game.programmingStarted'))
-    expect(events.filter((name) => name === 'game.programmingStarted' || name === 'cards.dealt'))
-      .toEqual(['game.programmingStarted', 'cards.dealt'])
+    expect(events.indexOf('game.playerLeft')).toBeLessThan(events.indexOf('cards.dealt'))
+    expect(events.filter((name) => name !== 'player.checkpointProgress'))
+      .toEqual(['game.playerLeft', 'cards.dealt'])
     expect(count).toBe(9)
   })
 
-  it('admits only one simultaneous recovery of the same Socket.IO session without evicting its owner', async () => {
+  it('preserves occupancy and private hands during authenticated Socket.IO recovery', async () => {
     const original = await connect('Recovering')
     const peer = await connect('Peer')
-    const [initial] = await start([original, peer])
-    await snapshot(original)
-    const recovery = original as unknown as { _pid: string; _lastOffset: string }
-    const auth = { pid: recovery._pid, offset: recovery._lastOffset }
+    const [initial, other] = await start([original, peer])
+    expect(await raw(original, update(initial))).toEqual({ outcome: 'ACCEPTED' })
+    const before = await snapshot(original)
     const disconnected = Promise.withResolvers<void>()
     server.sockets.sockets.get(original.id!)!.once('disconnect', () => disconnected.resolve())
     original.io.engine.close()
     await disconnected.promise
-    const attempts = [0, 1].map(() => {
-      const client: Client = createClient(url, {
-        auth, transports: ['websocket'], autoConnect: false, reconnection: false, forceNew: true,
-      })
-      clients.push(client)
-      const result = Promise.withResolvers<string>()
-      client.once('connect', () => result.resolve('CONNECTED'))
-      client.once('connect_error', (error) => result.resolve(error.message))
-      client.connect()
-      return { client, result: result.promise }
+    const recovered = original
+    await new Promise<void>((resolve, reject) => {
+      recovered.once('connect', resolve)
+      recovered.once('connect_error', reject)
+      recovered.connect()
     })
-    const outcomes = await Promise.all(attempts.map((attempt) => attempt.result))
-    expect([...outcomes].sort((a, b) => a.localeCompare(b))).toEqual(['CONNECTED', 'USER_ALREADY_IN_SESSION'])
-    const winner = attempts[outcomes.indexOf('CONNECTED')].client
-    expect((await snapshot(winner)).assignment).toEqual(initial.assignment)
+    expect(recovered.recovered).toBe(true)
+    const restored = await snapshot(recovered)
+    expect(restored.assignment).toEqual(initial.assignment)
+    expect(restored.hand).toEqual(initial.hand)
+    expect(restored.state.players[0].registers).toEqual(before.state.players[0].registers)
+    expect((await snapshot(peer)).hand).toEqual(other.hand)
+    for (const card of [...initial.hand, ...other.hand]) {
+      expect(JSON.stringify(restored.state)).not.toContain(card.id)
+    }
     const changed = Promise.withResolvers<RegistersChanged>()
-    winner.once('game.registersChanged', changed.resolve)
-    expect(await raw(winner, update(initial))).toEqual({ outcome: 'ACCEPTED' })
+    recovered.once('game.registersChanged', changed.resolve)
+    expect(await raw(recovered, update(initial, [false, false, false, false, false]))).toEqual({ outcome: 'ACCEPTED' })
     expect(await changed.promise).toEqual({
-      gameId: initial.assignment.gameId, playerId: initial.assignment.playerId,
-      registers: [{ status: 'HIDDEN' }, { status: 'EMPTY' }, { status: 'HIDDEN' }, { status: 'EMPTY' }, { status: 'EMPTY' }],
+      gameId: initial.assignment.gameId, playerId: initial.assignment.playerId, registers: empty,
     })
     expect((await snapshot(peer)).state.players.find((player) => player.playerId === initial.assignment.playerId)?.connected).toBe(true)
   })

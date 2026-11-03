@@ -1,6 +1,5 @@
 export type {
   ClientToServerEvents,
-  LoginAcknowledgement,
   ProgramResultAcknowledgement,
   ServerToClientEvents,
 } from './events.js'
@@ -15,23 +14,21 @@ export type {
   GameId,
   GamePhase,
   LeaveGame,
-  LeaveResult,
   GameInitialization,
-  LoginResult,
   Orientation,
   PlayerAssignment,
   PlayerId,
   PlayerLeft,
   PlayerConnectionChanged,
   PlayerCheckpointProgress,
+  LeaveResult,
   PlayerState,
   Position,
   ProgramResult,
   ProgramResultOutcome,
-  ProgrammingStarted,
-  ProgrammingRegisterSlot,
   ProgramSubmitted,
   PublicGameState,
+  PublicRegisterStatus,
   PublicRegisterSlot,
   PublicRegisters,
   RegistersChanged,
@@ -39,17 +36,16 @@ export type {
   RobotId,
   RobotActionResolved,
   Tile,
+  UpdateRegisters,
   UpdateRegistersResult,
   User,
   UserId,
 } from './payloads.js'
-export { loginSchema, parseLogin } from './login.js'
-export type { Login, LoginRequestRejection } from './login.js'
 export { leaveGameSchema } from './leaveGame.js'
 export { submitProgramSchema } from './submitProgram.js'
 export type { ProgramCardIds, SubmitProgram } from './submitProgram.js'
 export { updateRegistersSchema } from './updateRegisters.js'
-export type { RegisterOccupancy, UpdateRegisters } from './updateRegisters.js'
+export type { RegisterOccupancy } from './updateRegisters.js'
 
 export { instructions } from './instructions.js'
 export type { Instruction } from './instructions.js'

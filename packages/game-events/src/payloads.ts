@@ -1,5 +1,7 @@
 import type { Instruction } from './instructions.js'
 
+export type { UpdateRegisters } from './updateRegisters.js'
+
 export type GameId = string
 export type PlayerId = string
 export type RobotId = string
@@ -10,16 +12,6 @@ export type User = Readonly<{
   userId: UserId
   username: string
 }>
-
-export type LoginResult =
-  | Readonly<{ outcome: 'LOGGED_IN'; user: User }>
-  | Readonly<{
-      outcome:
-        | 'INVALID_USERNAME'
-        | 'INVALID_REQUEST'
-        | 'ALREADY_LOGGED_IN'
-        | 'INTERNAL_ERROR'
-    }>
 
 export type LeaveGame = Readonly<{ gameId: GameId }>
 
@@ -109,7 +101,7 @@ export type PlayerConnectionChanged = Readonly<{
 }>
 
 export type LeaveResult = Readonly<{
-  outcome: 'LEFT' | 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND' | 'INTERNAL_ERROR'
+  outcome: 'LEFT' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND' | 'INTERNAL_ERROR'
 }>
 
 export type CardsDealt = Readonly<{
@@ -151,6 +143,8 @@ export type RobotActionResolved = Readonly<{
   pushedRobots: readonly Pick<Robot, 'robotId' | 'position'>[]
 }>
 
+export type PublicRegisterStatus = 'EMPTY' | 'HIDDEN' | 'REVEALED'
+
 export type PublicRegisterSlot =
   | Readonly<{ status: 'EMPTY' }>
   | Readonly<{ status: 'HIDDEN' }>
@@ -175,7 +169,7 @@ export type UpdateRegistersResult = Readonly<{
     | 'INTERNAL_ERROR'
 }>
 
-export type ProgrammingRegisterSlot = Readonly<{ status: 'EMPTY' | 'HIDDEN' }>
+type ProgrammingRegisterSlot = Readonly<{ status: 'EMPTY' | 'HIDDEN' }>
 
 export type RegistersChanged = Readonly<{
   gameId: GameId
@@ -188,8 +182,6 @@ export type RegistersChanged = Readonly<{
     ProgrammingRegisterSlot,
   ]
 }>
-
-export type ProgrammingStarted = Readonly<{ gameId: GameId }>
 
 export type GameInitialization = Readonly<{
   outcome: 'JOINED'

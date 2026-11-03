@@ -14,18 +14,34 @@ export function handleGetSession(
 ): void {
   withSessionRequest(socket, 'session.get', emptyRequestSchema, payload, acknowledge, (user, ack) => {
     const session = context.sessionsByUser.get(user.userId)
-    if (!session) return ack({ outcome: 'NO_SESSION' })
+    if (!session) return ack({ outcome: 'NO_SESSION', user })
     if (session.kind === 'lobby') {
       const lobby = context.lobbies.get(session.lobbyId)
       if (!lobby) throw new Error('Session references a missing lobby')
       return ack(lobby.members.get(user.userId)?.connectionId === socket.id
-        ? { outcome: 'IN_LOBBY', lobby: presentLobby(lobby) }
+        ? { outcome: 'IN_LOBBY', lobby: presentLobby(lobby), user }
         : { outcome: 'USER_ALREADY_IN_SESSION' })
     }
     const game = context.games.get(session.gameId)
     if (!game) throw new Error('Session references a missing game')
     handleReattachGame(game, socket, ack)
   })
+}
+
+export function validateRecoveredSession(context: SessionContext, socket: GameSocket, next: (error?: Error) => void): void {
+  if (socket.recovered) {
+    const ctx = currentGame(context, socket)
+    const membership = ctx?.memberships.get(socket.data.user.userId)
+    if (membership?.connectionId && membership.connectionId !== socket.id) {
+      return next(new Error('USER_ALREADY_IN_GAME'))
+    }
+    const expectedRooms = new Set(membership && ctx
+      ? [socket.id, ctx.publicRoom, ctx.playerRoom(membership.player.id)] : [socket.id])
+    if ([...socket.rooms].some((room) => !expectedRooms.has(room))) {
+      return next(new Error('SESSION_EXPIRED'))
+    }
+  }
+  next()
 }
 
 export function recoverSession(context: SessionContext, socket: GameSocket): void {
@@ -41,9 +57,9 @@ export function handleLeaveGame(
 ): void {
   if (typeof acknowledge !== 'function') return
   const game = currentGame(context, socket)
-  if (!game) return acknowledge({ outcome: socket.data.user ? 'GAME_NOT_FOUND' : 'LOGIN_REQUIRED' })
+  if (!game) return acknowledge({ outcome: 'GAME_NOT_FOUND' })
   handleLeave(game, socket, payload, (result) => {
-    if (result.outcome === 'LEFT') context.sessionsByUser.delete(socket.data.user!.userId)
+    if (result.outcome === 'LEFT') context.sessionsByUser.delete(socket.data.user.userId)
     acknowledge(result)
   })
   if (game.memberships.size === 0) {
