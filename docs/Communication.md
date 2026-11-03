@@ -213,7 +213,7 @@ A player wins when their robot completes the final checkpoint, so `lastCheckpoin
 
 The game ends at once: remaining registers are not resolved and no new hand is dealt. The service broadcasts to the [public room](#rooms):
 
-`game.won {gameId, playerId,username}`
+`game.won {gameId, playerId, username}`
 
 The event follows the final `player.checkpointProgress`. `PublicGameState.winner` holds the winner's `{playerId, username}`, or `null` while the game runs, so reconnecting players also see the result. The service records the username when the game is won, so it is still sent after the winner has left.
 

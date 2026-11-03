@@ -12,6 +12,7 @@ export type {
   Coordinate,
   GameAborted,
   GameWon,
+  Winner,
   GameId,
   GamePhase,
   LeaveGame,

@@ -64,7 +64,6 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout }: {
   const status = getGameStatus(state)
   const disconnectedNames = state.players.filter((player) => !player.connected).map((player) => player.username)
   const player = state.players.find((candidate) => candidate.playerId === state.assignment?.playerId)
-  const winnerName = state.winnerName ?? 'A player'
   const showWinner = isGameOver(state) && state.connected
   const robotColour = state.playback.robots.find((robot) => robot.robotId === state.assignment?.robotId)?.colour
   const registeredCardIds = new Set(
@@ -127,8 +126,8 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout }: {
       </div>
             {showWinner && (
         <WinnerPopup
-          winnerName={winnerName}
-          isWinner={state.winner === state.assignment?.playerId}
+          winnerName={state.winner?.username ?? ''}
+          isWinner={state.winner?.playerId === state.assignment?.playerId}
           leaving={leaving}
           onLeave={onLeave}
         />

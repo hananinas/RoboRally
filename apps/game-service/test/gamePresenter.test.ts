@@ -156,7 +156,9 @@ describe('game presenter', () => {
 
     game.executeNextAction()
 
-    expect(presentPublicGameState('game', game).winner).toBe(player.id)
+    expect(game.winner).toBe(player.id)
+    const winner = { playerId: player.id, username: 'Winner' }
+    expect(presentPublicGameState('game', game, [], winner).winner).toEqual(winner)
   })
 
   it('presents all dealt card instruction types without exposing domain objects', () => {
