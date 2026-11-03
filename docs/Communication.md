@@ -7,63 +7,32 @@ This document describes the v0.6 communication flow. [AsyncAPI](asyncapi.yaml) d
 
 ## Rooms
 
-The service broadcasts lobby and gameplay events through three kinds of Socket.IO rooms:
+Server side Socket.IO rooms scope event broadcasts to only the connections that should receive them. The service uses three kinds:
 
-- `lobby:{lobbyId}` — every connection currently waiting in that lobby.
-- `game:{gameId}:public` — every connection currently a member of that game.
-- `game:{gameId}:player:{playerId}` — only the connection currently attached to that player.
+- `lobby:{lobbyId}` — every connection currently waiting in that lobby. Carries lobby-wide updates such as `lobby.updated`, sent whenever membership or ownership changes.
+- `game:{gameId}:public` — every connection currently a member of that game. Carries events every player needs to see: resolved robot actions, checkpoint progress, connection and pause state, and the fact that another player has submitted their program for the round.
+- `game:{gameId}:player:{playerId}` — only the connection currently attached to that player. Carries anything that must stay private to that player (eg. their hand of cards).
 
 ## Authentication
-Authentication is handled using OpenID Connect (OIDC) with Rauthy. The Game Service acts as the Backend for Frontend (BFF) and maintains the authenticated browser session.
+Authentication is handled using OpenID Connect (OIDC) with Hydra. The Game Service acts as the Backend for Frontend (BFF) and maintains the authenticated browser session.
 
-When the user is not authenticated, the browser starts login through the Game Service. The Game Service redirects the browser to Rauthy and completes the OIDC Authorization Code flow. After successful authentication, the Game Service creates a server-side session and returns a Secure, HttpOnly session cookie to the browser.
+When the user is not authenticated, the browser starts login through the Game Service. The Game Service redirects the browser to Hydra, which redirects to Kratos for the user to authenticate, then completes the OIDC Authorization Code flow. After successful authentication, the Game Service creates a server-side session and returns a Secure, HttpOnly session cookie to the browser.
 
 When the client establishes a Socket.IO connection, the browser includes the session cookie in the connection handshake. The Game Service validates the session before accepting the connection and associates the authenticated user with the socket. Unauthenticated Socket.IO connections are rejected.
 
 The following diagram documents authentication:
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Server as Game Service
-    participant Rauthy
+![Authentication sequence](communication/auth-login.svg)
 
-    Client->>Server: GET /auth/login
-    Server-->>Client: Redirect to Rauthy
-    Client->>Rauthy: OIDC authorization request
-    Note over Client,Rauthy: User authenticates
-    Rauthy-->>Client: Redirect /auth/callback?code=...
-    Client->>Server: GET /auth/callback?code=...
-    Server->>Rauthy: Exchange authorization code
-    Rauthy-->>Server: OIDC tokens
-    Note over Server: Validate identity and create server-side session
-    Server-->>Client: Set HttpOnly session cookie and redirect
-
-    Client->>Server: Establish Socket.IO connection with session cookie
-    alt Session valid
-        Note over Server: Associate authenticated user with socket
-    else Session invalid or missing
-        Server-->>Client: Reject Socket.IO connection
-    end
-```
+Source: [communication/auth-login.mmd](communication/auth-login.mmd)
 
 ### Logout
 
-To log out, the client sends `GET /auth/logout` to the Game Service. The Game Service destroys the server-side session and clears the session cookie, then redirects the browser to Rauthy's end-session endpoint to terminate the identity provider session as well. Rauthy redirects back to the login screen once its session has been cleared.
+To log out, the client sends `GET /auth/logout` to the Game Service. The Game Service destroys the server-side session and clears the session cookie, then redirects the browser to Hydra's end-session endpoint to terminate the identity provider session as well. Hydra redirects back to the login screen once its session has been cleared.
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Server as Game Service
-    participant Rauthy
+![Logout sequence](communication/auth-logout.svg)
 
-    Client->>Server: GET /auth/logout
-    Note over Server: Destroy server-side session
-    Server-->>Client: Clear session cookie and redirect to Rauthy
-    Client->>Rauthy: End-session request
-    Note over Rauthy: Clear identity provider session
-    Rauthy-->>Client: Redirect to login screen
-```
+Source: [communication/auth-logout.mmd](communication/auth-logout.mmd)
 
 ## Lobby
 After successful authentication, the client sends a `session.get` request to determine if the user has an existent session. 
@@ -100,32 +69,9 @@ While waiting, `lobby.leave {lobbyId}` or disconnecting removes membership. Leav
 
 The following diagram documents the lobby lifecycle:
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Server as Game Service
-    participant Others as Lobby members
+![Lobby lifecycle sequence](communication/lobby-lifecycle.svg)
 
-    Client->>Server: session.get {}
-    Server-->>Client: Acknowledgement: NO_SESSION
-    Client->>Server: lobby.list {}
-    Server-->>Client: Acknowledgement: LOBBIES_FOUND {lobbies}
-    Note over Client: Creates a lobby or picks a lobbyId
-    Client->>Server: lobby.create {} or lobby.join {lobbyId}
-    alt Join accepted
-        Server-->>Client: Acknowledgement: LOBBY_JOINED {lobby}
-        Note over Client,Others: Wait for the owner to start
-        Client->>Server: lobby.start {lobbyId} (owner only)
-        Note over Server: Move members to game rooms and remove lobby
-        Note over Server: Send through each game:{gameId}:player:{playerId} room
-        Server-->>Client: game.started {lobbyId, initialization}
-        Server-->>Others: game.started with each player's own initialization
-        Server-->>Client: Acknowledgement: STARTED {gameId}
-        Note over Client,Server: Initialize before later game events
-    else Join rejected
-        Server-->>Client: Acknowledgement: rejection outcome
-    end
-```
+Source: [communication/lobby-lifecycle.mmd](communication/lobby-lifecycle.mmd)
 
 ## Game has started
 ### Initialization
@@ -227,44 +173,9 @@ The new hand also opens the next programming round, so the client resets every p
 The following sequence shows one complete round while the game remains connected and unpaused.
 
 Both players have received their initial hands through game.started or session.get.
-```mermaid
-sequenceDiagram
-    participant A as Client A
-    participant B as Client B
-    participant Server as Game Service
-    participant PrivateA as game:{gameId}:player:{A}
-    participant PrivateB as game:{gameId}:player:{B}
-    participant Public as game:{gameId}:public
+![Game round sequence](communication/game-round.svg)
 
-    loop Each round
-        A->>Server: game.updateRegisters {gameId, playerId: A, occupied}
-        Server-->>A: Acknowledgement: ACCEPTED
-        Server->>Public: game.registersChanged {gameId, playerId: A, registers}
-        Public-->>B: game.registersChanged {gameId, playerId: A, registers}
-        A->>Server: program.submit {gameId, cardIds}
-        Server-->>A: Acknowledgement: ACCEPTED
-        Server->>Public: program.submitted {playerId: A}
-        Public-->>B: program.submitted
-
-        B->>Server: program.submit {gameId, cardIds}
-        Server-->>B: Acknowledgement: ACCEPTED
-        Server->>Public: program.submitted {playerId: B}
-        Public-->>A: program.submitted
-        loop Registers 1 through 5
-            loop Eligible robots in antenna order
-                Note over Server: Execute next instruction
-                Server->>Public: robot.actionResolved
-                Public-->>A: robot.actionResolved
-                Public-->>B: robot.actionResolved
-            end
-        end
-
-        Server->>PrivateA: cards.dealt {cards}
-        PrivateA-->>A: cards.dealt {cards}
-        Server->>PrivateB: cards.dealt {cards}
-        PrivateB-->>B: cards.dealt {cards}
-    end
-```
+Source: [communication/game-round.mmd](communication/game-round.mmd)
 
 
 ### Game Membership
@@ -307,35 +218,9 @@ If recovery succeeds and the client still retains its local game state, Socket.I
 
 The client applies the recovered events in order and continues using its existing player and robot assignments.
 
-```mermaid
-sequenceDiagram
-    participant A as Player A
-    participant S as Game Service
-    participant Public as game:{gameId}:public
-    participant PrivateA as game:{gameId}:player:{A}
-    participant B as Player B
+![Successful connection state recovery sequence](communication/reconnect-recovery-success.svg)
 
-    Note over A: Connection lost
-    Note over A: Show disconnected status and disable gameplay
-    Note over S: Detect disconnect and pause after current action
-
-    S->>Public: game.playerConnectionChanged {gameId, playerId: A, connected: false, paused: true}
-    Public-->>B: game.playerConnectionChanged
-    Note over B: Show waiting for Player A and disable gameplay
-
-    A->>S: Socket.IO reconnection with session cookie
-    Note over S: Validate existing authenticated session
-    Note over A,Public: Restore public room membership
-    Note over A,PrivateA: Restore private room membership
-    S-->>A: Replay missed public and private events
-
-    S->>Public: game.playerConnectionChanged {gameId, playerId: A, connected: true, paused: false}
-    Public-->>A: game.playerConnectionChanged
-    Public-->>B: game.playerConnectionChanged
-
-    Note over S: Continue gameplay from preserved state
-    Note over A,B: Unpause clients
-```
+Source: [communication/reconnect-recovery-success.mmd](communication/reconnect-recovery-success.mmd)
 
 ##### Failed connection state recovery
 Once Socket.IO has reconnected, if state recovery was unsuccessful the client must reinitialize.
@@ -350,41 +235,9 @@ The returned `IN_GAME {initialization}` acknowledgement contains the current aut
 
 The client replaces its local game state with the returned initialization before processing further game events.
 
-```mermaid
-sequenceDiagram
-    participant A as Player A
-    participant S as Game Service
-    participant Public as game:{gameId}:public
-    participant PrivateA as game:{gameId}:player:{A}
-    participant B as Player B
+![Failed connection state recovery sequence](communication/reconnect-recovery-failure.svg)
 
-    Note over A: Connection lost
-    Note over A: Show disconnected status and disable gameplay
-    Note over S: Detect disconnect and pause after current action
-
-    S->>Public: game.playerConnectionChanged {gameId, playerId: A, connected: false, paused: true}
-    Public-->>B: game.playerConnectionChanged
-    Note over B: Show waiting for Player A and disable gameplay
-
-    A->>S: Establish Socket.IO connection with session cookie
-    Note over S: Validate session and associate authenticated user
-    Note over A: socket.recovered is false
-    Note over S: Game remains paused until membership is reattached
-
-    A->>S: session.get {}
-    Note over A,Public: Restore public room membership
-    Note over A,PrivateA: Restore private room membership
-
-    S-->>A: Acknowledgement: IN_GAME {initialization}
-    Note over A: Clear outdated state and apply initialization
-
-    S->>Public: game.playerConnectionChanged {gameId, playerId: A, connected: true, paused: false}
-    Public-->>A: game.playerConnectionChanged
-    Public-->>B: game.playerConnectionChanged
-
-    Note over S: Continue gameplay from preserved state
-    Note over A,B: Unpause game
-```
+Source: [communication/reconnect-recovery-failure.mmd](communication/reconnect-recovery-failure.mmd)
 
 The game remains paused while any remaining player is disconnected. Once all remaining players are connected, the same `game.playerConnectionChanged` event (now with `paused: false`) announces that the game has resumed, and gameplay continues from the preserved game state.
 

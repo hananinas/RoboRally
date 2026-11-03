@@ -1,0 +1,26 @@
+@startuml system
+!include C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+
+Person(player, "Player", "Plays RoboRally in a web browser")
+
+System_Boundary(system, "RoboRally") {
+    Container(client, "client", "React, TypeScript", "Renders the game board and UI")
+    Container(authUi, "kratos-hydra-ui", "Node.js, Express", "Hosts login and registration screens")
+    Container(gameService, "game-service", "Node.js, Express", "Handles game sessions and game logic; acts as BFF")
+    ContainerDb(gameDb, "robo-rally-db", "SQLite", "Persists game and player state")
+}
+
+System_Ext(hydra, "Hydra", "OAuth2 / OIDC provider (Ory Hydra)")
+System_Ext(kratos, "Kratos", "Identity provider (Ory Kratos)")
+
+Rel(player, client, "Accesses through browser")
+Rel(client, authUi, "Logs in / registers via browser redirect", "HTTPS")
+Rel(client, gameService, "Sends game actions, receives state updates", "Socket.IO")
+Rel(gameService, hydra, "Exchanges / validates tokens", "OIDC / HTTPS")
+Rel(authUi, kratos, "Manages identities", "HTTPS")
+Rel(gameService, gameDb, "Reads and writes", "SQL")
+
+SHOW_LEGEND()
+@enduml

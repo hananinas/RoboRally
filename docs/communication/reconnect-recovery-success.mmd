@@ -1,0 +1,27 @@
+sequenceDiagram
+    participant A as Player A
+    participant S as Game Service
+    participant Public as game:{gameId}:public
+    participant PrivateA as game:{gameId}:player:{A}
+    participant B as Player B
+
+    Note over A: Connection lost
+    Note over A: Show disconnected status and disable gameplay
+    Note over S: Detect disconnect and pause after current action
+
+    S->>Public: game.playerConnectionChanged {gameId, playerId: A, connected: false, paused: true}
+    Public-->>B: game.playerConnectionChanged
+    Note over B: Show waiting for Player A and disable gameplay
+
+    A->>S: Socket.IO reconnection with session cookie
+    Note over S: Validate existing authenticated session
+    Note over A,Public: Restore public room membership
+    Note over A,PrivateA: Restore private room membership
+    S-->>A: Replay missed public and private events
+
+    S->>Public: game.playerConnectionChanged {gameId, playerId: A, connected: true, paused: false}
+    Public-->>A: game.playerConnectionChanged
+    Public-->>B: game.playerConnectionChanged
+
+    Note over S: Continue gameplay from preserved state
+    Note over A,B: Unpause clients

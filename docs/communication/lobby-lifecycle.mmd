@@ -1,0 +1,24 @@
+sequenceDiagram
+    participant Client
+    participant Server as Game Service
+    participant Others as Lobby members
+
+    Client->>Server: session.get {}
+    Server-->>Client: Acknowledgement: NO_SESSION
+    Client->>Server: lobby.list {}
+    Server-->>Client: Acknowledgement: LOBBIES_FOUND {lobbies}
+    Note over Client: Creates a lobby or picks a lobbyId
+    Client->>Server: lobby.create {} or lobby.join {lobbyId}
+    alt Join accepted
+        Server-->>Client: Acknowledgement: LOBBY_JOINED {lobby}
+        Note over Client,Others: Wait for the owner to start
+        Client->>Server: lobby.start {lobbyId} (owner only)
+        Note over Server: Move members to game rooms and remove lobby
+        Note over Server: Send through each game:{gameId}:player:{playerId} room
+        Server-->>Client: game.started {lobbyId, initialization}
+        Server-->>Others: game.started with each player's own initialization
+        Server-->>Client: Acknowledgement: STARTED {gameId}
+        Note over Client,Server: Initialize before later game events
+    else Join rejected
+        Server-->>Client: Acknowledgement: rejection outcome
+    end
