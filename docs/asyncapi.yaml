@@ -832,6 +832,7 @@ components:
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
             playerId: 00000000-0000-4000-8000-000000000002
+            username: dane
 
   schemas:
     EmptyRequest:
@@ -1254,7 +1255,7 @@ components:
         winner:
           description: The winning player, or null while the game runs.
           oneOf:
-            - $ref: '#/components/schemas/PlayerId'
+            - $ref: '#/components/schemas/Winner'
             - type: 'null'
 
     LastCheckpoint:
@@ -1441,12 +1442,27 @@ components:
         gameId:
           $ref: '#/components/schemas/GameId'
 
+    Winner:
+      type: object
+      additionalProperties: false
+      required: [ playerId, username ]
+      description: >-
+        The winning player. The username is recorded when the game is won,
+        so it stays available after the winner has left.
+      properties:
+        playerId:
+          $ref: '#/components/schemas/PlayerId'
+        username:
+          $ref: '#/components/schemas/Username'
+
     GameWon:
       type: object
       additionalProperties: false
-      required: [ gameId, playerId ]
+      required: [ gameId, playerId, username ]
       properties:
         gameId:
           $ref: '#/components/schemas/GameId'
         playerId:
           $ref: '#/components/schemas/PlayerId'
+        username:
+          $ref: '#/components/schemas/Username'
