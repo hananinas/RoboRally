@@ -16,7 +16,7 @@ test('announces the winner to every player and lets them leave', async ({ browse
   const context = await browser.newContext({ baseURL, reducedMotion: 'reduce' })
   const other = await context.newPage()
   try {
-    await startTogether(page, other, 'Winner', 'Other')
+    await startTogether(page, other, 'bence', 'dane')
     // The owner's robot starts at (8, 7) and reaches checkpoint 1 at (10, 6) in round 1
     // and the final checkpoint at (8, 9) in register 4 of round 2.
     // The other robot only turns and backs away, so it never blocks that route.
@@ -35,7 +35,7 @@ test('announces the winner to every player and lets them leave', async ({ browse
 
     await program(page, rounds[1])
     await program(other, otherProgram)
-    for (const [client, heading] of [[page, 'You win!'], [other, 'Winner wins!']] as const) {
+    for (const [client, heading] of [[page, 'You win!'], [other, 'bence wins!']] as const) {
       const dialog = client.getByRole('dialog', { name: 'Game over' })
       await expect(dialog.getByRole('heading')).toHaveText(heading, { timeout: 15000 })
       await expect(gameStatus(client)).toHaveText('Game over')
@@ -50,7 +50,7 @@ test('announces the winner to every player and lets them leave', async ({ browse
     await page.getByRole('dialog', { name: 'Game over' }).getByRole('button', { name: 'Leave game', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeVisible()
     await expect.poll(() => robotIds(other)).toHaveLength(1)
-    await expect(other.getByRole('dialog', { name: 'Game over' }).getByRole('heading')).toHaveText('Winner wins!')
+    await expect(other.getByRole('dialog', { name: 'Game over' }).getByRole('heading')).toHaveText('bence wins!')
     await other.getByRole('dialog', { name: 'Game over' }).getByRole('button', { name: 'Leave game', exact: true }).click()
     await expect(other.getByRole('button', { name: 'Create lobby', exact: true })).toBeVisible()
   } finally {

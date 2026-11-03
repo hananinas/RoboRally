@@ -1,0 +1,178 @@
+[
+  {
+    "schema_id": "default",
+    "traits": {
+      "username": "malte",
+      "email": "malte@dev.local"
+    },
+    "credentials": {
+      "password": {
+        "config": {
+          "password": "malte"
+        }
+      }
+    },
+    "verifiable_addresses": [
+      {
+        "value": "malte@dev.local",
+        "verified": true,
+        "via": "email",
+        "status": "completed"
+      }
+    ]
+  },
+  {
+    "schema_id": "default",
+    "traits": {
+      "username": "bence",
+      "email": "bence@dev.local"
+    },
+    "credentials": {
+      "password": {
+        "config": {
+          "password": "bence"
+        }
+      }
+    },
+    "verifiable_addresses": [
+      {
+        "value": "bence@dev.local",
+        "verified": true,
+        "via": "email",
+        "status": "completed"
+      }
+    ]
+  },
+  {
+    "schema_id": "default",
+    "traits": {
+      "username": "dane",
+      "email": "dane@dev.local"
+    },
+    "credentials": {
+      "password": {
+        "config": {
+          "password": "dane"
+        }
+      }
+    },
+    "verifiable_addresses": [
+      {
+        "value": "dane@dev.local",
+        "verified": true,
+        "via": "email",
+        "status": "completed"
+      }
+    ]
+  },
+  {
+    "schema_id": "default",
+    "traits": {
+      "username": "abid",
+      "email": "abid@dev.local"
+    },
+    "credentials": {
+      "password": {
+        "config": {
+          "password": "abid"
+        }
+      }
+    },
+    "verifiable_addresses": [
+      {
+        "value": "abid@dev.local",
+        "verified": true,
+        "via": "email",
+        "status": "completed"
+      }
+    ]
+  },
+  {
+    "schema_id": "default",
+    "traits": {
+      "username": "charlie",
+      "email": "charlie@dev.local"
+    },
+    "credentials": {
+      "password": {
+        "config": {
+          "password": "charlie"
+        }
+      }
+    },
+    "verifiable_addresses": [
+      {
+        "value": "charlie@dev.local",
+        "verified": true,
+        "via": "email",
+        "status": "completed"
+      }
+    ]
+  },
+  {
+    "schema_id": "default",
+    "traits": {
+      "username": "hanan",
+      "email": "hanan@dev.local"
+    },
+    "credentials": {
+      "password": {
+        "config": {
+          "password": "hanan"
+        }
+      }
+    },
+    "verifiable_addresses": [
+      {
+        "value": "hanan@dev.local",
+        "verified": true,
+        "via": "email",
+        "status": "completed"
+      }
+    ]
+  },
+  {
+    "schema_id": "default",
+    "traits": {
+      "username": "pratha",
+      "email": "pratha@dev.local"
+    },
+    "credentials": {
+      "password": {
+        "config": {
+          "password": "pratha"
+        }
+      }
+    },
+    "verifiable_addresses": [
+      {
+        "value": "pratha@dev.local",
+        "verified": true,
+        "via": "email",
+        "status": "completed"
+      }
+    ]
+  },
+  {
+    "schema_id": "default",
+    "traits": {
+      "username": "eirik",
+      "email": "eirik@dev.local"
+    },
+    "credentials": {
+      "password": {
+        "config": {
+          "password": "eirik"
+        }
+      }
+    },
+    "verifiable_addresses": [
+      {
+        "value": "eirik@dev.local",
+        "verified": true,
+        "via": "email",
+        "status": "completed"
+      }
+    ]
+  }
+]

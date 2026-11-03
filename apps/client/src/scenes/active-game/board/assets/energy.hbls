@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="energy1" viewBox="0 0 84 84">
+    <g transform="translate(42 42)">
+      <rect x="-36" y="-36" width="72" height="72" rx="10" fill="#252a31" />
+    </g>
+  </symbol>
+  <symbol id="energy2" viewBox="0 0 84 84">
+    <g transform="translate(42 42)">
+      <rect x="-36" y="-36" width="72" height="72" rx="10" fill="#313131" />
+    </g>
+  </symbol>
+  <symbol id="energy3" viewBox="0 0 84 84">
+    <g transform="translate(42 42)">
+      <rect x="-36" y="-36" width="72" height="72" rx="10" fill="#606a76" />
+    </g>
+  </symbol>
+  <symbol id="energy4" viewBox="0 0 84 84">
+    <g transform="translate(42 42)">
+      <circle cx="-26" cy="-26" r="1.8" fill="#b0b4b8" />
+      <circle cx="26" cy="-26" r="1.8" fill="#b0b4b8" />
+      <circle cx="-26" cy="26" r="1.8" fill="#b0b4b8" />
+      <circle cx="26" cy="26" r="1.8" fill="#b0b4b8" />
+      <rect x="-23" y="-23" width="46" height="46" rx="6" fill="#313131" />
+    </g>
+  </symbol>
+  <symbol id="energy5" viewBox="0 0 84 84">
+    <g transform="translate(42 42)">
+      <rect x="-21" y="-21" width="42" height="42" rx="5" fill="#7e8a98" />
+    </g>
+  </symbol>
+  <symbol id="energy6" viewBox="0 0 84 84">
+    <g transform="translate(42 42)">
+      <rect x="-17" y="-17" width="34" height="34" rx="4" fill="#313131" />
+      <path d="M2.185 -10.418 Q2.440 -12.200 1.360 -10.760 L-7.460 1.000 Q-8.540 2.440 -6.740 2.440 L-3.020 2.440 Q-1.220 2.440 -1.657 4.186 L-3.223 10.454 Q-3.660 12.200 -2.563 10.773 L7.443 -2.233 Q8.540 -3.660 6.740 -3.660 L3.020 -3.660 Q1.220 -3.660 1.475 -5.442 Z" fill="#6e7986" />
+    </g>
+  </symbol>
+  <symbol id="energy7" viewBox="0 0 84 84">
+    <g transform="translate(42 42)">
+      <rect x="-15" y="-21" width="8" height="3" rx="1" fill="#e5c04d" />
+      <rect x="7" y="-21" width="8" height="3" rx="1" fill="#e5c04d" />
+      <rect x="-15" y="18" width="8" height="3" rx="1" fill="#e5c04d" />
+      <rect x="7" y="18" width="8" height="3" rx="1" fill="#e5c04d" />
+    </g>
+  </symbol>
+  <symbol id="energyCube1" viewBox="0 0 84 84">
+    <g transform="translate(42 42)">
+      <rect x="-13" y="-13" width="26" height="26" rx="3" fill="#827127" />
+    </g>
+  </symbol>
+  <symbol id="energyCube2" viewBox="0 0 84 84">
+    <g transform="translate(42 42)">
+      <rect x="-13" y="-13" width="26" height="26" rx="3" fill="#b4a301" />
+    </g>
+  </symbol>
+  <symbol id="energyCube3" viewBox="0 0 84 84">
+    <g transform="translate(42 42)">
+      <rect x="-13" y="-13" width="26" height="26" rx="3" fill="#e5c04d" />
+    </g>
+  </symbol>
+  <symbol id="energyCube4" viewBox="0 0 84 84">
+    <g transform="translate(42 42)">
+      <rect x="-11" y="-11" width="22" height="22" rx="2" fill="#e5c04d" />
+      <path d="M-8 -9 L8 -9" fill="none" stroke="#f0d77d" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+    </g>
+  </symbol>
+</svg>
