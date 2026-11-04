@@ -66,14 +66,14 @@ describe('GET /auth/login', () => {
     }
   })
 
-  it('requests an openid profile scope with a PKCE S256 code challenge', async () => {
+  it('requests an openid profile offline_access scope with a PKCE S256 code challenge', async () => {
     vi.mocked(oidcClient.buildAuthorizationUrl).mockResolvedValue(new URL('https://hydra.test/oauth2/auth'))
 
     await fetch(`${baseUrl}/auth/login`, { redirect: 'manual' })
 
     expect(oidcClient.buildAuthorizationUrl).toHaveBeenCalledWith(
       expect.objectContaining({
-        scope: 'openid profile',
+        scope: 'openid profile offline_access',
         code_challenge_method: 'S256',
         code_challenge: expect.any(String),
         state: expect.any(String),
@@ -124,9 +124,12 @@ describe('GET /auth/callback', () => {
 
   it('exchanges the code, creates a session, and clears the transaction cookies on success', async () => {
     vi.mocked(oidcClient.exchangeAuthorizationCode).mockResolvedValue(
-      { claims: () => ({ sub: 'user-123', preferred_username: 'Bence' }), expires_in: 900, id_token: 'id-token-abc' } as unknown as Awaited<
-        ReturnType<OidcClient['exchangeAuthorizationCode']>
-      >,
+      {
+        claims: () => ({ sub: 'user-123', preferred_username: 'Bence' }),
+        expires_in: 900,
+        id_token: 'id-token-abc',
+        refresh_token: 'refresh-token-abc',
+      } as unknown as Awaited<ReturnType<OidcClient['exchangeAuthorizationCode']>>,
     )
 
     const response = await fetch(`${baseUrl}/auth/callback?code=abc&state=xyz`, {
@@ -159,6 +162,23 @@ describe('GET /auth/callback', () => {
   it('responds 400 and clears cookies without creating a session when the ID token has no subject', async () => {
     vi.mocked(oidcClient.exchangeAuthorizationCode).mockResolvedValue(
       { claims: () => ({}) } as unknown as Awaited<ReturnType<OidcClient['exchangeAuthorizationCode']>>,
+    )
+
+    const response = await fetch(`${baseUrl}/auth/callback?code=abc&state=xyz`, {
+      headers: { cookie: 'oauth_state=xyz; oauth_verifier=verifier-abc' },
+    })
+
+    expect(response.status).toBe(400)
+    expect(response.headers.getSetCookie().some((cookie) => cookie.startsWith('game_session='))).toBe(false)
+  })
+
+  it('responds 400 and clears cookies without creating a session when the refresh token is missing', async () => {
+    vi.mocked(oidcClient.exchangeAuthorizationCode).mockResolvedValue(
+      {
+        claims: () => ({ sub: 'user-123', preferred_username: 'Bence' }),
+        expires_in: 900,
+        id_token: 'id-token-abc',
+      } as unknown as Awaited<ReturnType<OidcClient['exchangeAuthorizationCode']>>,
     )
 
     const response = await fetch(`${baseUrl}/auth/callback?code=abc&state=xyz`, {
