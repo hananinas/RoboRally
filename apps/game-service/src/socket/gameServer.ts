@@ -49,6 +49,15 @@ function authenticateSocket(sessionStore: SessionStore, socket: GameSocket, next
   next()
 }
 
+function rejectExpiredSession(sessionStore: SessionStore, socket: GameSocket, next: (error?: Error) => void): void {
+  if (sessionStore.get(socket.data.sessionId)) {
+    next()
+    return
+  }
+  socket.disconnect(true)
+  next(new Error('UNAUTHENTICATED'))
+}
+
 export function createGameSocketServer(
   httpServer: HttpServer,
   sessionStore: SessionStore,
@@ -75,6 +84,8 @@ export function createGameSocketServer(
   io.use((socket, next) => validateRecoveredSession(context, socket, next))
 
   io.on('connection', (socket) => {
+    socket.use((_event, next) => rejectExpiredSession(sessionStore, socket, next))
+
     recoverSession(context, socket)
 
     socket.on('lobby.list', (payload, ack) => handleListLobbies(context, socket, payload, ack))
