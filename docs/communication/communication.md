@@ -13,6 +13,8 @@ Server side Socket.IO rooms scope event broadcasts to only the connections that 
 - `game:{gameId}:public` — every connection currently a member of that game. Carries events every player needs to see: resolved robot actions, checkpoint progress, connection and pause state, and the fact that another player has submitted their program for the round.
 - `game:{gameId}:player:{playerId}` — only the connection currently attached to that player. Carries anything that must stay private to that player (eg. their hand of cards).
 
+Rooms are constructed server side. Clients never request to join a room directly — the server only calls `socket.join()` after validating a request, such as confirming a connection's game membership. This is what keeps the private player room private: there is no client-facing operation that could attach a socket to another player's room and expose private details such as their hand.
+
 ## Authentication
 Authentication is handled using OpenID Connect (OIDC) with Hydra. The Game Service acts as the Backend for Frontend (BFF): instead of giving the browser an access token directly, it maintains the authenticated session itself. Passwords, Access and ID tokens never reach client-side JavaScript. The browser only ever holds a Secure, HttpOnly session cookie, which scripts cannot read even if an attacker manages to inject code into the page (XSS).
 
