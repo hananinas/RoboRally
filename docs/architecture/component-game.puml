@@ -7,8 +7,8 @@ Container_Ext(client, "client", "React, TypeScript", "Renders the game board and
 ContainerDb_Ext(gameDb, "robo-rally-db", "SQLite", "Persists sessions, games, and player state")
 
 Container_Boundary(gameService, "game-service (game)") {
-    Component(sessionStore, "Session Store", "TypeScript", "Issues and validates session IDs (shared with auth)")
-    Component(gameSocketServer, "Game Socket Server", "Socket.IO", "Authenticates connections; routes events to handlers")
+    Component(sessionStore, "Session Store", "TypeScript", "Issues, validates, and silently renews session IDs (shared with auth)")
+    Component(gameSocketServer, "Game Socket Server", "Socket.IO", "Authenticates connections; routes events to handlers; disconnects sockets with an expired session")
     Component(lobbyHandlers, "Lobby Handlers", "TypeScript", "list / create / join / leave / start lobby")
     Component(gameHandlers, "Game Handlers", "TypeScript", "Session, membership and gameplay actions for an active game")
     Component(lobbyRegistry, "Lobby Registry", "TypeScript", "Tracks active lobbies and their membership")

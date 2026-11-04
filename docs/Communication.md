@@ -14,11 +14,21 @@ Server side Socket.IO rooms scope event broadcasts to only the connections that 
 - `game:{gameId}:player:{playerId}` — only the connection currently attached to that player. Carries anything that must stay private to that player (eg. their hand of cards).
 
 ## Authentication
-Authentication is handled using OpenID Connect (OIDC) with Hydra. The Game Service acts as the Backend for Frontend (BFF) and maintains the authenticated browser session.
+Authentication is handled using OpenID Connect (OIDC) with Hydra. The Game Service acts as the Backend for Frontend (BFF): instead of giving the browser an access token directly, it maintains the authenticated session itself. Passwords, Access and ID tokens never reach client-side JavaScript. The browser only ever holds a Secure, HttpOnly session cookie, which scripts cannot read even if an attacker manages to inject code into the page (XSS).
 
 When the user is not authenticated, the browser starts login through the Game Service. The Game Service redirects the browser to Hydra, which redirects to Kratos for the user to authenticate, then completes the OIDC Authorization Code flow. After successful authentication, the Game Service creates a server-side session and returns a Secure, HttpOnly session cookie to the browser.
 
 When the client establishes a Socket.IO connection, the browser includes the session cookie in the connection handshake. The Game Service validates the session before accepting the connection and associates the authenticated user with the socket. Unauthenticated Socket.IO connections are rejected.
+
+An authenticated Socket.IO connection is not only checked at connect time. The Game Service re-validates the session on every command the client sends, and again before every broadcast to that socket, disconnecting it immediately if the session has since expired.
+
+To avoid triggering that disconnect during normal play, the Game Service silently renews sessions using a refresh token obtained at login, refreshing the access token shortly before it expires. Renewal only happens when activity triggers a session check; an idle session is not refreshed and simply expires. Because a long-lived Socket.IO connection cannot receive a fresh `Set-Cookie`, the session cookie's lifetime tracks the refresh token's TTL rather than the access token's — by default 24 hours — which caps how long continued activity can keep a session alive before the user must log in again.
+
+The following diagram documents session renewal:
+
+![Session renewal sequence](communication/session-renewal.svg)
+
+Source: [communication/session-renewal.mmd](communication/session-renewal.mmd)
 
 The following diagram documents authentication:
 
@@ -28,7 +38,7 @@ Source: [communication/auth-login.mmd](communication/auth-login.mmd)
 
 ### Logout
 
-To log out, the client sends `GET /auth/logout` to the Game Service. The Game Service destroys the server-side session and clears the session cookie, then redirects the browser to Hydra's end-session endpoint to terminate the identity provider session as well. Hydra redirects back to the login screen once its session has been cleared.
+To log out, the client sends `GET /auth/logout` to the Game Service. The Game Service destroys the server-side session — discarding its refresh token, so the session cannot be silently renewed afterward — and clears the session cookie, then redirects the browser to Hydra's end-session endpoint to terminate the identity provider session as well. Hydra redirects back to the login screen once its session has been cleared.
 
 ![Logout sequence](communication/auth-logout.svg)
 

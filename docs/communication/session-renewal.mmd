@@ -1,0 +1,15 @@
+sequenceDiagram
+    participant Client
+    participant Server as Game Service
+    participant Hydra
+
+    Client->>Server: Any command (e.g. lobby.list)
+    Note over Server: Re-validate session
+    alt Session near expiry
+        Server->>Hydra: Refresh token grant
+        Hydra-->>Server: New access + refresh token
+        Note over Server: Session renewed
+    else Session expired, not renewed
+        Server-->>Client: Disconnect (UNAUTHENTICATED)
+    end
+    Server-->>Client: Proceed / Acknowledgement

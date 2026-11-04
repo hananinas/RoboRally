@@ -9,11 +9,11 @@ ContainerDb_Ext(gameDb, "robo-rally-db", "SQLite", "Persists sessions, games, an
 
 Container_Boundary(gameService, "game-service") {
     Component(authRoutes, "Auth HTTP Routes", "Express", "Handles /auth/login, /auth/callback, /auth/logout")
-    Component(oidcClient, "OIDC Client", "openid-client", "Builds authorization/end-session URLs; exchanges auth code for tokens")
-    Component(sessionStore, "Session Store", "TypeScript", "Issues and validates session IDs")
+    Component(oidcClient, "OIDC Client", "openid-client", "Builds authorization/end-session URLs; exchanges auth code for tokens; refreshes access tokens")
+    Component(sessionStore, "Session Store", "TypeScript", "Issues, validates, and silently renews session IDs")
     Component(sessionRepo, "Session Repository", "SQLite", "Persists session records")
 
-    Component(gameSocketServer, "Game Socket Server", "Socket.IO", "Authenticates connections; routes events to handlers")
+    Component(gameSocketServer, "Game Socket Server", "Socket.IO", "Authenticates connections; routes events to handlers; disconnects sockets with an expired session")
     Component(lobbyHandlers, "Lobby Handlers", "TypeScript", "list / create / join / leave / start lobby")
     Component(gameHandlers, "Game Handlers", "TypeScript", "Session, membership and gameplay actions for an active game")
     Component(lobbyRegistry, "Lobby Registry", "TypeScript", "Tracks active lobbies and their membership")
@@ -31,6 +31,7 @@ Rel(authRoutes, oidcClient, "Builds auth URLs, exchanges code")
 Rel(authRoutes, sessionStore, "Creates / destroys sessions")
 Rel(oidcClient, hydra, "Discovery, token exchange", "OIDC / HTTPS")
 Rel(sessionStore, sessionRepo, "Reads / writes session records")
+Rel(sessionStore, oidcClient, "Refreshes near-expiry sessions")
 Rel(sessionRepo, gameDb, "Reads and writes", "SQL")
 
 Rel(gameSocketServer, sessionStore, "Authenticates connections")
