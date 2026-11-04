@@ -17,6 +17,7 @@ export const DEFAULT_AUTH_CALLBACK_URL = 'https://127.0.0.1:3001/auth/callback'
 export const DEFAULT_POST_LOGOUT_REDIRECT_URL = 'https://127.0.0.1:3001/'
 export const DEFAULT_KRATOS_SETTINGS_URL = 'https://127.0.0.1:3001/ory/ui/settings'
 export const DEFAULT_REFRESH_BUFFER_SECONDS = 60
+export const DEFAULT_REFRESH_TOKEN_TTL_SECONDS = 24 * 60 * 60
 
 export function parseUrlEnv(value: string | undefined, fallback: string): URL {
   return new URL(value ?? fallback)
@@ -24,6 +25,10 @@ export function parseUrlEnv(value: string | undefined, fallback: string): URL {
 
 export function parseRefreshBufferSeconds(value: string | undefined): number {
   return PositiveInteger(value === undefined ? DEFAULT_REFRESH_BUFFER_SECONDS : Number(value))
+}
+
+export function parseRefreshTokenTtlSeconds(value: string | undefined): number {
+  return PositiveInteger(value === undefined ? DEFAULT_REFRESH_TOKEN_TTL_SECONDS : Number(value))
 }
 
 export type OidcConfig = Readonly<{
@@ -62,6 +67,7 @@ export type AppConfig = Readonly<{
   port: number
   kratosSettingsUrl: URL
   oidc: OidcConfig
+  refreshTokenTtlSeconds: number
 }>
 
 export function parseAppConfig(env: NodeJS.ProcessEnv): AppConfig {
@@ -69,5 +75,6 @@ export function parseAppConfig(env: NodeJS.ProcessEnv): AppConfig {
     port: parseGameServicePort(env.PORT),
     kratosSettingsUrl: parseKratosSettingsUrl(env.KRATOS_SETTINGS_URL),
     oidc: parseOidcConfig(env),
+    refreshTokenTtlSeconds: parseRefreshTokenTtlSeconds(env.REFRESH_TOKEN_TTL_SECONDS),
   }
 }

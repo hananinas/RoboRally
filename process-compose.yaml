@@ -50,7 +50,7 @@ processes:
       mkcert -cert-file infra/dev-tls/cert.pem -key-file infra/dev-tls/key.pem 127.0.0.1 localhost
 
   hydra:
-    command: "hydra serve -c infra/hydra/hydra.yml all --dev"
+    command: "TTL_REFRESH_TOKEN=${REFRESH_TOKEN_TTL_SECONDS}s hydra serve -c infra/hydra/hydra.yml all --dev"
     depends_on:
       migrate-hydra-db:
         condition: process_completed_successfully
