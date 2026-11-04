@@ -6,9 +6,9 @@ This section describes RoboRally's software architecture: first the overall syst
 
 The following diagram shows the four containers we are building, together with the two external identity systems the system depends on.
 
-![Container diagram of the RoboRally system](system.svg)
+![Container diagram of the RoboRally system](figures/system.svg)
 
-Source: [system.puml](system.puml)
+Source: [system.puml](figures/system.puml)
 
 The `client` is a React single-page application that runs in the player's browser. It renders the game board and user interface, and communicates with the backend over Socket.IO for real-time game actions and state updates.
 
@@ -28,9 +28,9 @@ At a high level, the player authenticates through `kratos-hydra-ui`, which is dr
 
 The following diagram shows `game-service` split into its authentication components and its game-management components. These two parts share one component, the Session Store. Auth HTTP Routes create a session on login and destroy it on logout, while the Game Socket Server reads from the Session Store to authenticate every incoming Socket.IO connection.
 
-![Component diagram of game-service](component-combined.svg)
+![Component diagram of game-service](figures/component-combined.svg)
 
-Source: [component-combined.puml](component-combined.puml)
+Source: [component-combined.puml](figures/component-combined.puml)
 
 ### Authentication
 

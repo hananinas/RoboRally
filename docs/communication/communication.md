@@ -28,23 +28,23 @@ To avoid triggering that disconnect during normal play, the Game Service silentl
 
 The following diagram documents session renewal:
 
-![Session renewal sequence](communication/session-renewal.svg)
+![Session renewal sequence](figures/session-renewal.svg)
 
-Source: [communication/session-renewal.mmd](communication/session-renewal.mmd)
+Source: [figures/session-renewal.mmd](figures/session-renewal.mmd)
 
 The following diagram documents authentication:
 
-![Authentication sequence](communication/auth-login.svg)
+![Authentication sequence](figures/auth-login.svg)
 
-Source: [communication/auth-login.mmd](communication/auth-login.mmd)
+Source: [figures/auth-login.mmd](figures/auth-login.mmd)
 
 ### Logout
 
 To log out, the client sends `GET /auth/logout` to the Game Service. The Game Service destroys the server-side session — discarding its refresh token, so the session cannot be silently renewed afterward — and clears the session cookie, then redirects the browser to Hydra's end-session endpoint to terminate the identity provider session as well. Hydra redirects back to the login screen once its session has been cleared.
 
-![Logout sequence](communication/auth-logout.svg)
+![Logout sequence](figures/auth-logout.svg)
 
-Source: [communication/auth-logout.mmd](communication/auth-logout.mmd)
+Source: [figures/auth-logout.mmd](figures/auth-logout.mmd)
 
 ## Lobby
 After successful authentication, the client sends a `session.get` request to determine if the user has an existent session. 
@@ -81,9 +81,9 @@ While waiting, `lobby.leave {lobbyId}` or disconnecting removes membership. Leav
 
 The following diagram documents the lobby lifecycle:
 
-![Lobby lifecycle sequence](communication/lobby-lifecycle.svg)
+![Lobby lifecycle sequence](figures/lobby-lifecycle.svg)
 
-Source: [communication/lobby-lifecycle.mmd](communication/lobby-lifecycle.mmd)
+Source: [figures/lobby-lifecycle.mmd](figures/lobby-lifecycle.mmd)
 
 ## Game has started
 ### Initialization
@@ -185,9 +185,9 @@ The new hand also opens the next programming round, so the client resets every p
 The following sequence shows one complete round while the game remains connected and unpaused.
 
 Both players have received their initial hands through game.started or session.get.
-![Game round sequence](communication/game-round.svg)
+![Game round sequence](figures/game-round.svg)
 
-Source: [communication/game-round.mmd](communication/game-round.mmd)
+Source: [figures/game-round.mmd](figures/game-round.mmd)
 
 
 ### Game Membership
@@ -227,9 +227,9 @@ If recovery succeeds and the client still retains its local game state, Socket.I
 
 The client applies the recovered events in order and continues using its existing player and robot assignments.
 
-![Successful connection state recovery sequence](communication/reconnect-recovery-success.svg)
+![Successful connection state recovery sequence](figures/reconnect-recovery-success.svg)
 
-Source: [communication/reconnect-recovery-success.mmd](communication/reconnect-recovery-success.mmd)
+Source: [figures/reconnect-recovery-success.mmd](figures/reconnect-recovery-success.mmd)
 
 ##### Failed connection state recovery
 Once Socket.IO has reconnected, if state recovery was unsuccessful the client must reinitialize.
@@ -244,9 +244,9 @@ The returned `IN_GAME {initialization}` acknowledgement contains the current aut
 
 The client replaces its local game state with the returned initialization before processing further game events.
 
-![Failed connection state recovery sequence](communication/reconnect-recovery-failure.svg)
+![Failed connection state recovery sequence](figures/reconnect-recovery-failure.svg)
 
-Source: [communication/reconnect-recovery-failure.mmd](communication/reconnect-recovery-failure.mmd)
+Source: [figures/reconnect-recovery-failure.mmd](figures/reconnect-recovery-failure.mmd)
 
 The game remains paused while any remaining player is disconnected. Once all remaining players are connected, the same `game.playerConnectionChanged` event (now with `paused: false`) announces that the game has resumed, and gameplay continues from the preserved game state.
 
