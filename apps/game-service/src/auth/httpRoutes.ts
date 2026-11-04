@@ -62,8 +62,8 @@ export function createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl }: A
       return
     }
 
-    const { sub, username, idToken, expiresIn } = result.value
-    const sessionId = sessionStore.create(sub, username, idToken, expiresIn)
+    const { sub, username, idToken, refreshToken, expiresIn } = result.value
+    const sessionId = sessionStore.create(sub, username, idToken, refreshToken, expiresIn)
     logInfo('OIDC callback succeeded', { sub })
 
     res.setHeader('Set-Cookie', [
