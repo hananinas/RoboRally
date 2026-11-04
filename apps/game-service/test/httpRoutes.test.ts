@@ -25,6 +25,7 @@ describe('GET /auth/login', () => {
         oidcClient,
         sessionStore: createSessionStore({ oidcClient, refreshBufferSeconds: 60 }),
         kratosSettingsUrl,
+        refreshTokenTtlSeconds: 86_400,
       }),
     )
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
@@ -110,7 +111,9 @@ describe('GET /auth/callback', () => {
   const sessionStore = createSessionStore({ oidcClient, refreshBufferSeconds: 60 })
 
   beforeAll(async () => {
-    server = createServer(createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl }))
+    server = createServer(
+      createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl, refreshTokenTtlSeconds: 86_400 }),
+    )
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   })
@@ -161,7 +164,7 @@ describe('GET /auth/callback', () => {
     expect(sessionCookie).toMatch(/HttpOnly/i)
     expect(sessionCookie).toMatch(/SameSite=Lax/i)
     expect(sessionCookie).toMatch(/Path=\//i)
-    expect(sessionCookie).toMatch(/Max-Age=900/i)
+    expect(sessionCookie).toMatch(/Max-Age=86400/i)
 
     const sessionId = parseCookie(sessionCookie!).game_session!
     expect(sessionStore.get(sessionId)).toStrictEqual({ sub: 'user-123', username: 'Bence', idToken: 'id-token-abc' })
@@ -226,7 +229,9 @@ describe('GET /auth/logout', () => {
   const sessionStore = createSessionStore({ oidcClient, refreshBufferSeconds: 60 })
 
   beforeAll(async () => {
-    server = createServer(createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl }))
+    server = createServer(
+      createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl, refreshTokenTtlSeconds: 86_400 }),
+    )
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   })
