@@ -218,12 +218,27 @@ describe('started game membership over Socket.IO', () => {
     sessionStore.destroy(sessionId)
     const firstReceivedStart = vi.fn()
     first.once('game.started', firstReceivedStart)
-    const disconnected = new Promise<void>((resolve) => first.once('disconnect', resolve))
+    const disconnected = new Promise<void>((resolve) => first.once('disconnect', () => resolve()))
     const started = new Promise((resolve) => second.once('game.started', resolve))
     expect((await second.emitWithAck('lobby.start', {})).outcome).toBe('STARTED')
     await started
     await disconnected
     expect(firstReceivedStart).not.toHaveBeenCalled()
+  })
+  it('rejects a command from a still-connected socket once its session is destroyed and disconnects it', async () => {
+    const { client: first, sessionId } = await connectWithSessionId('First')
+    sessionStore.destroy(sessionId)
+    const disconnected = new Promise<void>((resolve) => first.once('disconnect', () => resolve()))
+    await expect(first.timeout(500).emitWithAck('lobby.create', {})).rejects.toThrow()
+    await disconnected
+  })
+  it('rejects a command from a still-connected socket once its session naturally expires and disconnects it', async () => {
+    const { client: first, sessionId } = await connectWithSessionId('First', 0.05)
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    expect(sessionStore.get(sessionId)).toBeUndefined()
+    const disconnected = new Promise<void>((resolve) => first.once('disconnect', () => resolve()))
+    await expect(first.timeout(500).emitWithAck('lobby.create', {})).rejects.toThrow()
+    await disconnected
   })
   it('drops a still-connected member and withholds further broadcasts once their session naturally expires', async () => {
     const { client: first, sessionId } = await connectWithSessionId('First', 0.05)
@@ -235,7 +250,7 @@ describe('started game membership over Socket.IO', () => {
     expect(sessionStore.get(sessionId)).toBeUndefined()
     const firstReceivedStart = vi.fn()
     first.once('game.started', firstReceivedStart)
-    const disconnected = new Promise<void>((resolve) => first.once('disconnect', resolve))
+    const disconnected = new Promise<void>((resolve) => first.once('disconnect', () => resolve()))
     const started = new Promise((resolve) => second.once('game.started', resolve))
     expect((await second.emitWithAck('lobby.start', {})).outcome).toBe('STARTED')
     await started
