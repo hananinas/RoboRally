@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_GAME_SERVICE_PORT,
+  DEFAULT_REFRESH_BUFFER_SECONDS,
   parseGameServicePort,
+  parseRefreshBufferSeconds,
 } from '@/config.ts'
 
 describe('game service configuration', () => {
@@ -14,6 +16,18 @@ describe('game service configuration', () => {
     'rejects invalid PORT %j',
     (value) => {
       expect(() => parseGameServicePort(value)).toThrow(RangeError)
+    },
+  )
+
+  it('uses the default or a configured refresh buffer', () => {
+    expect(parseRefreshBufferSeconds(undefined)).toBe(DEFAULT_REFRESH_BUFFER_SECONDS)
+    expect(parseRefreshBufferSeconds('30')).toBe(30)
+  })
+
+  it.each(['', '0', '1.5', 'not-a-number'])(
+    'rejects invalid REFRESH_BUFFER_SECONDS %j',
+    (value) => {
+      expect(() => parseRefreshBufferSeconds(value)).toThrow(RangeError)
     },
   )
 })

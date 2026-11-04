@@ -25,7 +25,7 @@ describe('started game membership over Socket.IO', () => {
   })
   async function start() {
     const http = createServer()
-    sessionStore = createSessionStore()
+    sessionStore = createSessionStore({ oidcClient: { refreshToken: vi.fn() }, refreshBufferSeconds: 0 })
     server = createGameSocketServer(http, sessionStore, () => shared)
     await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve))
     url = `http://127.0.0.1:${(http.address() as AddressInfo).port}`
@@ -61,7 +61,7 @@ describe('started game membership over Socket.IO', () => {
     return { members, initializations: await Promise.all(ready) }
   }
   async function connectWithSessionId(username: string, expiresInSeconds = 3600): Promise<{ client: Client; sessionId: string }> {
-    const sessionId = sessionStore.create(username, username, 'test-id-token', expiresInSeconds)
+    const sessionId = sessionStore.create(username, username, 'test-id-token', 'test-refresh-token', expiresInSeconds)
     const client: Client = io(url, {
       autoConnect: false, transports: ['websocket'], reconnection: false, ackTimeout: 1000,
       extraHeaders: { Cookie: `game_session=${sessionId}` },

@@ -18,7 +18,10 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
     new Card(`00000000-0000-4000-8000-00000000010${index}`, 'TURN_LEFT'))
   const game = new Game(board, players, deck, { x: Integer(0), y: Integer(0) })
   const httpServer = createServer()
-  const sessionStore = createSessionStore()
+  const sessionStore = createSessionStore({
+    oidcClient: { refreshToken: () => Promise.reject(new Error('not used in this test')) },
+    refreshBufferSeconds: 0,
+  })
   const server = createGameSocketServer(httpServer, sessionStore, () => ({ gameId, game }))
   const clients: Socket<ServerToClientEvents, ClientToServerEvents>[] = []
   const events: { name: string; payload: unknown }[][] = [[], []]

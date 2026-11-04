@@ -15,11 +15,18 @@ describe('GET /auth/login', () => {
     buildAuthorizationUrl: vi.fn<OidcClient['buildAuthorizationUrl']>(),
     exchangeAuthorizationCode: vi.fn<OidcClient['exchangeAuthorizationCode']>(),
     buildEndSessionUrl: vi.fn<OidcClient['buildEndSessionUrl']>(),
+    refreshToken: vi.fn<OidcClient['refreshToken']>(),
     postLogoutRedirectUrl: new URL('https://127.0.0.1:3001/'),
   }
 
   beforeAll(async () => {
-    server = createServer(createAuthApp({ oidcClient, sessionStore: createSessionStore(), kratosSettingsUrl }))
+    server = createServer(
+      createAuthApp({
+        oidcClient,
+        sessionStore: createSessionStore({ oidcClient, refreshBufferSeconds: 60 }),
+        kratosSettingsUrl,
+      }),
+    )
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   })
@@ -97,9 +104,10 @@ describe('GET /auth/callback', () => {
     buildAuthorizationUrl: vi.fn<OidcClient['buildAuthorizationUrl']>(),
     exchangeAuthorizationCode: vi.fn<OidcClient['exchangeAuthorizationCode']>(),
     buildEndSessionUrl: vi.fn<OidcClient['buildEndSessionUrl']>(),
+    refreshToken: vi.fn<OidcClient['refreshToken']>(),
     postLogoutRedirectUrl: new URL('https://127.0.0.1:3001/'),
   }
-  const sessionStore = createSessionStore()
+  const sessionStore = createSessionStore({ oidcClient, refreshBufferSeconds: 60 })
 
   beforeAll(async () => {
     server = createServer(createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl }))
@@ -212,9 +220,10 @@ describe('GET /auth/logout', () => {
     buildAuthorizationUrl: vi.fn<OidcClient['buildAuthorizationUrl']>(),
     exchangeAuthorizationCode: vi.fn<OidcClient['exchangeAuthorizationCode']>(),
     buildEndSessionUrl: vi.fn<OidcClient['buildEndSessionUrl']>(),
+    refreshToken: vi.fn<OidcClient['refreshToken']>(),
     postLogoutRedirectUrl: new URL('https://127.0.0.1:3001/'),
   }
-  const sessionStore = createSessionStore()
+  const sessionStore = createSessionStore({ oidcClient, refreshBufferSeconds: 60 })
 
   beforeAll(async () => {
     server = createServer(createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl }))
@@ -233,7 +242,7 @@ describe('GET /auth/logout', () => {
   it('destroys the session, clears the cookie, and redirects to the end-session URL with the id token hint', async () => {
     const endSessionUrl = new URL('https://hydra.test/oauth2/sessions/logout')
     vi.mocked(oidcClient.buildEndSessionUrl).mockResolvedValue(endSessionUrl)
-    const sessionId = sessionStore.create('user-123', 'Bence', 'id-token-abc', 900)
+    const sessionId = sessionStore.create('user-123', 'Bence', 'id-token-abc', 'refresh-token-abc', 900)
 
     const response = await fetch(`${baseUrl}/auth/logout`, {
       redirect: 'manual',
@@ -260,7 +269,7 @@ describe('GET /auth/logout', () => {
 
   it('responds 500 without crashing when buildEndSessionUrl rejects', async () => {
     vi.mocked(oidcClient.buildEndSessionUrl).mockRejectedValue(new Error('discovery unreachable'))
-    const sessionId = sessionStore.create('user-123', 'Bence', 'id-token-abc', 900)
+    const sessionId = sessionStore.create('user-123', 'Bence', 'id-token-abc', 'refresh-token-abc', 900)
 
     const response = await fetch(`${baseUrl}/auth/logout`, {
       redirect: 'manual',
