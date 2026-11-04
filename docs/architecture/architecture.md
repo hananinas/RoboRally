@@ -14,6 +14,8 @@ The `client` is a React single-page application that runs in the player's browse
 
 The `game-service` is the system's backend. It owns two responsibilities: it runs the actual game logic (lobbies, turns, robot movement), and it acts as the OIDC relying party for the client, following the Backend-for-Frontend (BFF) pattern. Authentication is handled server-side so that access tokens never reach the browser. The client only ever holds a session cookie.
 
+Authentication and game logic are independent domains and could be split into separate services. We chose to keep them combined, following KISS and YAGNI: the added operational complexity of a second service isn't justified until an actual need for it — independent scaling, independent deployment — actually arises.
+
 `kratos-hydra-ui` hosts the login and registration screens the player is redirected to during authentication. It is currently vendored from Ory's reference implementation and is expected to be replaced with a customized application over time to fit the project's visual design.
 
 `robo-rally-db` is a SQLite database that persists session, game, and player state, so that progress survives a service restart.
