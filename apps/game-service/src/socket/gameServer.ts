@@ -12,8 +12,9 @@ import { parseCookie } from 'cookie'
 import type { Game } from '@/game/index'
 import { createDefaultGame } from '@/game/GameFactory'
 import { SESSION_COOKIE_NAME, type Session, type SessionStore } from '@/auth/sessionStore'
+import { createAuthGatedAdapter } from '@/socket/authGatedAdapter'
 
-export type GameSocketData = { user: User; authSession: Session }
+export type GameSocketData = { user: User; authSession: Session; sessionId: string }
 
 export type GameSocketServer = Server<
   ClientToServerEvents,
@@ -29,7 +30,11 @@ export type GameSession = Readonly<{ gameId: string; game: Game }>
 function authenticateSocket(sessionStore: SessionStore, socket: GameSocket, next: (error?: Error) => void): void {
   const cookies = parseCookie(socket.handshake.headers.cookie ?? '')
   const sessionId = cookies[SESSION_COOKIE_NAME]
-  const authSession = sessionId ? sessionStore.get(sessionId) : undefined
+  if (!sessionId) {
+    next(new Error('UNAUTHENTICATED'))
+    return
+  }
+  const authSession = sessionStore.get(sessionId)
   if (!authSession) {
     next(new Error('UNAUTHENTICATED'))
     return
@@ -38,6 +43,7 @@ function authenticateSocket(sessionStore: SessionStore, socket: GameSocket, next
     next(new Error('SESSION_MISMATCH'))
     return
   }
+  socket.data.sessionId = sessionId
   socket.data.authSession = authSession
   socket.data.user = { userId: authSession.sub, username: authSession.username }
   next()
@@ -57,6 +63,7 @@ export function createGameSocketServer(
     connectionStateRecovery: { skipMiddlewares: false },
     pingInterval: 1000,
     pingTimeout: 1000,
+    adapter: createAuthGatedAdapter(sessionStore),
   })
   const context: SessionContext = {
     io, createGame, games: new Map(), lobbies: new Map(), sessionsByUser: new Map(),
