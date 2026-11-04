@@ -28,7 +28,7 @@ export function createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl }: A
     const state = randomState()
 
     const authorizationUrl = await oidcClient.buildAuthorizationUrl({
-      scope: 'openid profile',
+      scope: 'openid profile offline_access',
       code_challenge: codeChallenge,
       code_challenge_method: 'S256',
       state,
@@ -114,8 +114,15 @@ type CallbackError =
   | 'MISSING_SUBJECT_CLAIM'
   | 'MISSING_USERNAME_CLAIM'
   | 'MISSING_ID_TOKEN'
+  | 'MISSING_REFRESH_TOKEN'
 
-type CallbackSession = Readonly<{ sub: string; username: string; idToken: string; expiresIn: number }>
+type CallbackSession = Readonly<{
+  sub: string
+  username: string
+  idToken: string
+  refreshToken: string
+  expiresIn: number
+}>
 
 async function exchangeCallback(
   oidcClient: OidcClient,
@@ -144,11 +151,13 @@ async function exchangeCallback(
   if (typeof username !== 'string' || username.length === 0) return err('MISSING_USERNAME_CLAIM')
 
   if (!tokens.id_token) return err('MISSING_ID_TOKEN')
+  if (!tokens.refresh_token) return err('MISSING_REFRESH_TOKEN')
 
   return ok({
     sub,
     username,
     idToken: tokens.id_token,
+    refreshToken: tokens.refresh_token,
     expiresIn: tokens.expires_in ?? DEFAULT_SESSION_EXPIRES_IN_SECONDS,
   })
 }
