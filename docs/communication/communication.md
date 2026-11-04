@@ -192,30 +192,20 @@ Source: [figures/game-round.mmd](figures/game-round.mmd)
 
 ### Game Membership
 
-A player's game membership and their authenticated session are both independent of their Socket.IO connection to the server. Losing the connection does not mean losing the player's spot in the game. When the connection is lost, the client must indicate that it is disconnected and prevent gameplay submissions until the connection and game state have been restored.
+A player's game membership and their authenticated session are both independent of their Socket.IO connection to the server. Losing the connection does not mean losing the player's spot in the game. When the connection is lost, the game is paused and the server rejects further gameplay submissions it receives. The client reflects this by indicating that it is disconnected and disables gameplay until the connection and game state have been restored.
 
-#### Reclaiming a disconnected membership
-
-Existing members may reconnect at any time. If the tab is left open, Socket.IO will automatically try to reestablish the connection. In case of a closed tab, the player can reopen the webpage in another tab to reconnect.
-
-When an existing game member sends `session.get {}`, the server attaches the new connection to the existing player and returns their current assignment and state through `IN_GAME {initialization}`.
-
-If multiple tabs are used, the first connection to reclaim a disconnected membership becomes its owner. A later connection cannot replace that owner, even if its own Socket.IO session was successfully recovered — `session.get` instead returns `USER_ALREADY_IN_SESSION`, leaving the authenticated session unaffected. The client may call `session.get` again later.
+A membership can only be owned by one live connection at a time: the first connection to reclaim it — whether through automatic Socket.IO recovery or an explicit `session.get {}` — becomes its owner, and a later connection attempting the same claim receives `USER_ALREADY_IN_SESSION` instead, leaving the authenticated session unaffected.
 
 #### Pausing on disconnection
-When the server detects that a player has disconnected, it pauses the game. An action already in progress completes, but no subsequent action is executed. The current game state is preserved.
-
-The server announces this to the [public room](#rooms):
+When the server detects that a player has disconnected, it pauses the game. An action already in progress completes, but no subsequent action is executed. The current game state is preserved. The server announces this to the [public room](#rooms):
 
 `game.playerConnectionChanged {gameId, playerId, connected: false, paused: true}`
 
-All clients must disable gameplay while the game is paused.
-
-The server must reject gameplay submissions received while the game is paused.
+Currently, the game pauses whenever any client disconnects, regardless of the circumstances. This is being evaluated for changes in a future version: pausing unconditionally on every disconnect could be exploited to stall, and a more restrictive policy for when a disconnect actually triggers a pause may be introduced to prevent this kind of abuse (see issue #221).
 
 #### Restoring the connections
 
-After an unexpected connection loss, the client attempts to reconnect automatically through Socket.IO. If the session is still valid, the Game Service associates the authenticated user with the connection. If Socket.IO can reestablish the connection, it will try to replay missed events through its [connection state recovery mechanism](https://socket.io/docs/v4/connection-state-recovery).
+After an unexpected connection loss, the client attempts to reconnect automatically through Socket.IO. If Socket.IO can reestablish the connection, it will try to replay missed events through its [connection state recovery mechanism](https://socket.io/docs/v4/connection-state-recovery).
 
 There are two possible outcomes:
 
@@ -223,26 +213,14 @@ There are two possible outcomes:
 2. Connection state recovery fails, so the client establishes a new authenticated Socket.IO connection and calls `session.get` to obtain a fresh authoritative snapshot.
 
 ##### Successful connection state recovery 
-If recovery succeeds and the client still retains its local game state, Socket.IO replays missed events.
-
-The client applies the recovered events in order and continues using its existing player and robot assignments.
+If recovery succeeds, Socket.IO replays the missed events. The client applies them in order on top of its retained local game state.
 
 ![Successful connection state recovery sequence](figures/reconnect-recovery-success.svg)
 
 Source: [figures/reconnect-recovery-success.mmd](figures/reconnect-recovery-success.mmd)
 
 ##### Failed connection state recovery
-Once Socket.IO has reconnected, if state recovery was unsuccessful the client must reinitialize.
-
-The client performs the normal game initialization flow by sending:
-
-`session.get {}`
-
-Because the user is already a game member, session.get restores the connection to the existing player and robot.
-
-The returned `IN_GAME {initialization}` acknowledgement contains the current authoritative state.
-
-The client replaces its local game state with the returned initialization before processing further game events.
+If state recovery is unsuccessful, the client reinitializes by sending `session.get {}`, the same command used for normal game initialization. Because the user is already a game member, the server reattaches the connection to their existing player membership and returns the current authoritative state through `IN_GAME {initialization}`. The client replaces its local game state with this initialization before processing further game events.
 
 ![Failed connection state recovery sequence](figures/reconnect-recovery-failure.svg)
 
