@@ -1,4 +1,4 @@
-{ pkgs, client, game-service }:
+{ pkgs, client, game-service, kratos-hydra-ui }:
 
 let
   kratosConfig = import ./kratos-config.nix { inherit pkgs; };
@@ -96,6 +96,84 @@ let
             period_seconds = 2;
             timeout_seconds = 2;
             failure_threshold = 30;
+          };
+
+          shutdown = {
+            signal = 15;
+            timeout_seconds = 10;
+          };
+        };
+
+        register-game-service-client = {
+          command = ''
+            : "''${OAUTH_CLIENT_SECRET:?Missing OAUTH_CLIENT_SECRET in /etc/robo-rally.env}"
+
+            payload=$(${pkgs.jq}/bin/jq -n \
+              --arg secret "$OAUTH_CLIENT_SECRET" \
+              --arg redirect "$PUBLIC_ORIGIN/auth/callback" \
+              --arg postLogout "$PUBLIC_ORIGIN/" \
+              '{
+                client_id: "game-service",
+                client_secret: $secret,
+                grant_types: ["authorization_code"],
+                response_types: ["code"],
+                token_endpoint_auth_method: "client_secret_post",
+                scope: "openid profile",
+                redirect_uris: [$redirect],
+                post_logout_redirect_uris: [$postLogout],
+                skip_consent: true,
+                skip_logout_consent: true
+              }')
+
+            if ${pkgs.curl}/bin/curl --fail --silent http://127.0.0.1:4445/admin/clients/game-service > /dev/null; then
+              echo "$payload" | ${pkgs.curl}/bin/curl --fail --silent --show-error \
+                -X PUT http://127.0.0.1:4445/admin/clients/game-service \
+                -H "Content-Type: application/json" -d @-
+            else
+              echo "$payload" | ${pkgs.curl}/bin/curl --fail --silent --show-error \
+                -X POST http://127.0.0.1:4445/admin/clients \
+                -H "Content-Type: application/json" -d @-
+            fi
+          '';
+
+          depends_on.hydra.condition = "process_healthy";
+        };
+
+        kratos-hydra-ui = {
+          command = ''
+            export PORT="''${ORY_UI_PORT:-14455}"
+            export BASE_PATH="/ory/ui"
+            export TRUSTED_CLIENT_IDS="game-service"
+            export ORY_SDK_URL="$PUBLIC_ORIGIN/ory/kratos"
+            export KRATOS_PUBLIC_URL="$PUBLIC_ORIGIN/ory/kratos"
+            export KRATOS_ADMIN_URL="http://127.0.0.1:4434"
+            export HYDRA_ADMIN_URL="http://127.0.0.1:4445"
+            export CSRF_COOKIE_NAME="''${CSRF_COOKIE_NAME:-__Host-ax-csrf-token}"
+            : "''${COOKIE_SECRET:?Missing COOKIE_SECRET in /etc/robo-rally.env}"
+            : "''${CSRF_COOKIE_SECRET:?Missing CSRF_COOKIE_SECRET in /etc/robo-rally.env}"
+            exec ${kratos-hydra-ui}/bin/kratos-hydra-ui
+          '';
+
+          depends_on = {
+            kratos.condition = "process_healthy";
+            hydra.condition = "process_healthy";
+          };
+
+          availability = {
+            restart = "on_failure";
+            backoff_seconds = 2;
+          };
+
+          readiness_probe = {
+            exec.command = ''
+              ${pkgs.curl}/bin/curl --fail --silent --max-time 2 \
+              "http://127.0.0.1:''${ORY_UI_PORT:-14455}/ory/ui/health/ready" > /dev/null
+            '';
+
+            initial_delay_seconds = 1;
+            period_seconds = 10;
+            timeout_seconds = 2;
+            failure_threshold = 3;
           };
 
           shutdown = {

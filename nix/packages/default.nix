@@ -16,7 +16,7 @@ in {
   inherit client game-service kratos-hydra-ui;
 
   production = import ./production.nix {
-    inherit pkgs client game-service;
+    inherit pkgs client game-service kratos-hydra-ui;
   };
 
   build-production = import ./build-production.nix {
