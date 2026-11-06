@@ -25,17 +25,17 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
   try {
     await new Promise<void>((resolve) => httpServer.listen(0, '127.0.0.1', resolve))
     const url = `http://127.0.0.1:${(httpServer.address() as AddressInfo).port}`
+    const usernames = ['Bence', 'Dane']
     for (let index = 0; index < 2; index++) {
       const socket: Socket<ServerToClientEvents, ClientToServerEvents> = connectSocket(url, {
         transports: ['websocket'], autoConnect: false, reconnection: false,
-        extraHeaders: authCookieHeader(sessionStore),
+        extraHeaders: authCookieHeader(sessionStore, usernames[index], usernames[index]),
       })
       clients.push(socket)
       socket.onAny((name, payload: unknown) => events[index].push({ name, payload }))
       const connected = new Promise<void>((resolve) => socket.once('connect', resolve))
       socket.connect()
       await connected
-      await socket.timeout(1000).emitWithAck('user.login', { username: `Player ${index}` })
     }
     const created = await clients[0].emitWithAck('lobby.create', {})
     if (created.outcome !== 'LOBBY_JOINED') throw new Error(created.outcome)

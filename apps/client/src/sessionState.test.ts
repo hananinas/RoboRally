@@ -24,6 +24,7 @@ const joined: GameInitialization = {
     paused: false,
     aborted: false,
     checkpointCount: 0,
+    winner: null,
   },
   hand: [],
   programSubmitted: false,
@@ -34,11 +35,10 @@ const browsing: SessionState = { status: 'browsing', user, error: null }
 const waiting: SessionState = { status: 'waiting', user, lobby, error: null }
 
 describe('lobby session transitions', () => {
-  it('discovers a session after login before offering lobby actions', () => {
-    const loggingIn = sessionReducer({ status: 'editing', username: user.username, error: null }, { type: 'login-submitted' })
-    const syncing = sessionReducer(loggingIn, { type: 'login-result', result: { outcome: 'LOGGED_IN', user } })
+  it('discovers a session on first connect before offering lobby actions', () => {
+    const syncing = sessionReducer({ status: 'resyncing', user: null }, { type: 'sync-requested' })
     expect(syncing.status).toBe('resyncing')
-    expect(sessionReducer(syncing, { type: 'session-result', result: { outcome: 'NO_SESSION' } })).toEqual(browsing)
+    expect(sessionReducer(syncing, { type: 'session-result', result: { outcome: 'NO_SESSION', user } })).toEqual(browsing)
   })
   it('waits after creating or joining without entering gameplay', () => {
     const joining = sessionReducer(browsing, { type: 'lobby-requested', lobbyId: lobby.lobbyId })
@@ -63,11 +63,11 @@ describe('lobby session transitions', () => {
   })
   it('reconciles ambiguous commands to either lobby, game, or browsing', () => {
     const syncing = sessionReducer(waiting, { type: 'sync-requested' })
-    expect(sessionReducer(syncing, { type: 'session-result', result: { outcome: 'IN_LOBBY', lobby } })).toEqual(waiting)
-    expect(sessionReducer(syncing, { type: 'session-result', result: { outcome: 'IN_GAME', initialization: joined } })).toMatchObject({ status: 'joined', gameId: joined.assignment.gameId })
-    expect(sessionReducer(syncing, { type: 'session-result', result: { outcome: 'NO_SESSION' } })).toEqual(browsing)
+    expect(sessionReducer(syncing, { type: 'session-result', result: { outcome: 'IN_LOBBY', lobby, user } })).toEqual(waiting)
+    expect(sessionReducer(syncing, { type: 'session-result', result: { outcome: 'IN_GAME', initialization: joined, user } })).toMatchObject({ status: 'joined', gameId: joined.assignment.gameId })
+    expect(sessionReducer(syncing, { type: 'session-result', result: { outcome: 'NO_SESSION', user } })).toEqual(browsing)
   })
-  it('retains login when leaving and stops automatic reconciliation on error', () => {
+  it('retains identity when leaving and stops automatic reconciliation on error', () => {
     expect(sessionReducer(waiting, { type: 'left' })).toEqual(browsing)
     const syncing = sessionReducer(waiting, { type: 'disconnected' })
     expect(sessionReducer(syncing, { type: 'error', error: 'TIMEOUT' })).toMatchObject({ status: 'sync-failed', user })
@@ -76,20 +76,15 @@ describe('lobby session transitions', () => {
     const joining = sessionReducer(browsing, { type: 'lobby-requested', lobbyId: lobby.lobbyId })
     expect(sessionReducer(joining, { type: 'lobby-result', result: { outcome: 'LOBBY_FULL' } })).toMatchObject({ status: 'browsing', error: 'LOBBY_FULL' })
   })
-  it('only authenticates during reconnect, not after login or ambiguous commands', () => {
-    const loggingIn = sessionReducer({ status: 'editing', username: user.username, error: null }, { type: 'login-submitted' })
-    expect(sessionReducer(loggingIn, { type: 'login-result', result: { outcome: 'LOGGED_IN', user } }))
-      .toMatchObject({ status: 'resyncing', requiresLogin: false })
-    expect(sessionReducer(waiting, { type: 'sync-requested' }))
-      .toMatchObject({ status: 'resyncing', requiresLogin: false })
-    const disconnected = sessionReducer(waiting, { type: 'disconnected' })
-    expect(sessionReducer(disconnected, { type: 'sync-requested' }))
-      .toMatchObject({ status: 'resyncing', requiresLogin: true })
-    const failed = sessionReducer(disconnected, { type: 'error', error: 'TIMEOUT' })
-    expect(sessionReducer(failed, { type: 'sync-requested' }))
-      .toMatchObject({ status: 'resyncing', requiresLogin: true })
-    expect(sessionReducer({ status: 'joined', user, gameId: joined.assignment.gameId }, { type: 'sync-requested', requiresLogin: true }))
-      .toMatchObject({ status: 'resyncing', requiresLogin: true })
+  it('resyncs from scratch on first connect, with no identity known yet', () => {
+    const syncing = sessionReducer({ status: 'resyncing', user: null }, { type: 'sync-requested' })
+    expect(syncing).toEqual({ status: 'resyncing', user: null })
+    expect(sessionReducer(syncing, { type: 'error', error: 'TIMEOUT' })).toEqual({ status: 'sync-failed', user: null, error: 'TIMEOUT' })
+  })
+  it('keeps joined state across a recovered reconnect but resyncs after a real disconnect', () => {
+    const joinedState: SessionState = { status: 'joined', user, gameId: joined.assignment.gameId }
+    expect(sessionReducer(joinedState, { type: 'disconnected' })).toBe(joinedState)
+    expect(sessionReducer(joinedState, { type: 'sync-requested' })).toEqual({ status: 'resyncing', user })
   })
 
 })

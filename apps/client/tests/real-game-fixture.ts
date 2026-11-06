@@ -1,14 +1,16 @@
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { test as base } from '@playwright/test'
 
-export const GAME_SERVICE_URL = 'http://127.0.0.1:4176'
+export const GAME_SERVICE_URL = 'http://127.0.0.1:3002'
+
+const mkcertCaRoot = execFileSync('mkcert', ['-CAROOT']).toString().trim()
 
 export const test = base.extend<{ realGameService: void; gameServiceArgs: readonly string[] }>({
-  gameServiceArgs: [[fileURLToPath(new URL('./real-game-server.mjs', import.meta.url))], { option: true }],
+  gameServiceArgs: [[fileURLToPath(new URL('../../game-service/dist/main.js', import.meta.url))], { option: true }],
   realGameService: [async ({ request, gameServiceArgs }, runTest) => {
     const service = spawn(process.execPath, gameServiceArgs, {
-      env: { ...process.env, PORT: '4176' },
+      env: { ...process.env, PORT: '3002', NODE_EXTRA_CA_CERTS: `${mkcertCaRoot}/rootCA.pem` },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     const closed = new Promise<void>((resolve) => service.once('close', () => resolve()))

@@ -20,12 +20,19 @@ processes:
         condition: process_completed_successfully
       mailpit:
         condition: process_started
+    readiness_probe:
+      exec:
+        command: "curl --fail --silent --max-time 2 http://127.0.0.1:4434/health/ready"
+      initial_delay_seconds: 1
+      period_seconds: 1
+      timeout_seconds: 2
+      failure_threshold: 15
 
   seed-kratos-identities:
     command: "kratos import identities infra/kratos/fixtures/dev-users.json -e http://127.0.0.1:4434"
     depends_on:
       kratos:
-        condition: process_started
+        condition: process_healthy
 
   reset-hydra-db:
     command: "rm -rf hydra/data && mkdir -p hydra/data"
@@ -58,12 +65,18 @@ processes:
       failure_threshold: 15
 
   kratos-hydra-ui:
-    command: "pnpm --filter @robo-rally/kratos-hydra-ui run start"
+    command: >
+      export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem" &&
+      pnpm --filter @robo-rally/kratos-hydra-ui run start
+    environment:
+      - TRUSTED_CLIENT_IDS=game-service
     depends_on:
       kratos:
-        condition: process_started
+        condition: process_healthy
       hydra:
-        condition: process_started
+        condition: process_healthy
+      dev-tls-proxy:
+        condition: process_healthy
 
   register-game-service-client:
     command: >
@@ -92,7 +105,13 @@ processes:
       failure_threshold: 30
 
   open-client:
-    command: "firefox https://127.0.0.1:3001"
+    namespace: dev-ui
+    command: >
+      if [ -n "$WSL_DISTRO_NAME" ]; then
+        firefox https://127.0.0.1:3001
+      else
+        xdg-open https://127.0.0.1:3001
+      fi
     depends_on:
       dev-tls-proxy:
         condition: process_healthy
@@ -104,8 +123,13 @@ processes:
     depends_on:
       build-game-events:
         condition: process_completed_successfully
+      kratos:
+        condition: process_healthy
+      hydra:
+        condition: process_healthy
 
   game-service:
+    namespace: game
     command: >
       export PORT=3002 &&
       export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem" &&

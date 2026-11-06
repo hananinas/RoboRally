@@ -56,7 +56,6 @@ function notifyReconnected(ctx: MembershipContext, playerId: string): void {
 }
 
 type ValidateMembershipRequestError =
-  | 'LOGIN_REQUIRED'
   | 'GAME_NOT_FOUND'
   | Rejection<'INVALID_REQUEST', ZodError>
 
@@ -64,9 +63,8 @@ function validateMembershipRequest(
   ctx: MembershipContext,
   schema: typeof leaveGameSchema,
   payload: unknown,
-  user: User | undefined,
+  user: User,
 ): Result<User, ValidateMembershipRequestError> {
-  if (!user) return err('LOGIN_REQUIRED')
   const parsed = schema.safeParse(payload)
   if (!parsed.success) return err({ outcome: 'INVALID_REQUEST', detail: parsed.error })
   if (parsed.data.gameId !== ctx.gameId) return err('GAME_NOT_FOUND')
@@ -74,12 +72,12 @@ function validateMembershipRequest(
 }
 
 export function ownedMembership(ctx: MembershipContext, socket: GameSocket): GameMembership | undefined {
-  const membership = ctx.memberships.get(socket.data.user?.userId ?? '')
+  const membership = ctx.memberships.get(socket.data.user.userId)
   return membership?.connectionId === socket.id ? membership : undefined
 }
 
 export function reconnectIfRecovered(ctx: MembershipContext, socket: GameSocket): void {
-  if (!socket.recovered || !socket.data.user) return
+  if (!socket.recovered) return
   const membership = ctx.memberships.get(socket.data.user.userId)
   if (membership && reattachMembership(membership, socket.id)) {
     resumeUnlessStillDisconnected(ctx)
@@ -94,7 +92,6 @@ export function handleReattachGame(
   acknowledge: (result: SessionResult) => void,
 ): void {
   const user = socket.data.user
-  if (!user) return acknowledge({ outcome: 'LOGIN_REQUIRED' })
   const membership = ctx.memberships.get(user.userId)
   if (!membership) return acknowledge({ outcome: 'INTERNAL_ERROR' })
   if (membership.connectionId && membership.connectionId !== socket.id) {
@@ -118,7 +115,7 @@ export function handleReattachGame(
     if (wasPaused) ctx.game.pause()
     return acknowledge({ outcome: 'INTERNAL_ERROR' })
   }
-  acknowledge({ outcome: 'IN_GAME', initialization })
+  acknowledge({ outcome: 'IN_GAME', initialization, user })
   if (reconnected) notifyReconnected(ctx, membership.player.id)
 }
 
@@ -157,6 +154,7 @@ export function handleLeave(
       gameId, playerId: player.id, robotId: player.robot.id,
     })
     actionScheduler.broadcastCheckpointProgress()
+    actionScheduler.announceWinner()
     if (phaseBeforeLeave === 'activation' && game.phase === 'programming') actionScheduler.dealHands()
     actionScheduler.scheduleNextAction()
   }, (error) => {

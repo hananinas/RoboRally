@@ -4,6 +4,7 @@ import type {
   GamePhase as GamePhasePayload,
   Orientation,
   PublicGameState,
+  Winner,
   RobotActionResolved,
   PlayerState,
   Tile as TilePayload,
@@ -75,6 +76,7 @@ export function presentPublicGameState(
   gameId: GameId,
   game: Game,
   players: readonly PlayerState[] = [],
+  winner: Winner | null = null,
 ): PublicGameState {
   const tiles = Array.from({ length: game.board.height }, (_, y) =>
     Array.from({ length: game.board.width }, (_, x) => presentTile(game, x, y)),
@@ -102,6 +104,7 @@ export function presentPublicGameState(
     phase: phases[game.phase],
     paused: game.paused,
     aborted: game.aborted,
+    winner,
   }
 }
 

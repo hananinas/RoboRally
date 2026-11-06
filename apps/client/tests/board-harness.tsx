@@ -108,7 +108,7 @@ export default function BoardHarness() {
       <div ref={overlayRef} className={overlayClassName}>
         <aside className="game-hud" aria-label="Game controls">
           <div ref={hudContentRef} className="game-hud__content">
-            <PlayerPanel player={{ name: 'Board fixture player', lastCheckpoint: 0 }} checkpointCount={0} />
+            <PlayerPanel player={{ name: 'Board fixture player', lastCheckpoint: 0 }} checkpointCount={0} onLogout={() => {}} onSettings={() => {}} />
             <RegisterPanel
               registers={registers}
               activeRegister={null}

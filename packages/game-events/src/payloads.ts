@@ -11,16 +11,6 @@ export type User = Readonly<{
   username: string
 }>
 
-export type LoginResult =
-  | Readonly<{ outcome: 'LOGGED_IN'; user: User }>
-  | Readonly<{
-      outcome:
-        | 'INVALID_USERNAME'
-        | 'INVALID_REQUEST'
-        | 'ALREADY_LOGGED_IN'
-        | 'INTERNAL_ERROR'
-    }>
-
 export type LeaveGame = Readonly<{ gameId: GameId }>
 
 export type PlayerAssignment = Readonly<{
@@ -88,6 +78,7 @@ export type PublicGameState = Readonly<{
   players: readonly PlayerState[]
   paused: boolean
   aborted: boolean
+  winner : Winner | null
 }>
 
 export type PlayerState = Readonly<{
@@ -101,6 +92,9 @@ export type PlayerState = Readonly<{
 export type PlayerLeft = Readonly<{ gameId: GameId; playerId: PlayerId; robotId: RobotId }>
 
 export type GameAborted = Readonly<{ gameId: GameId }>
+export type Winner = Readonly<{ playerId: PlayerId; username: string }>
+export type GameWon = Readonly<{ gameId: GameId; playerId: PlayerId; username: string }>
+
 export type PlayerCheckpointProgress = Readonly<{
   gameId: GameId
   playerId: PlayerId
@@ -116,7 +110,7 @@ export type PlayerConnectionChanged = Readonly<{
 }>
 
 export type LeaveResult = Readonly<{
-  outcome: 'LEFT' | 'LOGIN_REQUIRED' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND' | 'INTERNAL_ERROR'
+  outcome: 'LEFT' | 'INVALID_REQUEST' | 'GAME_NOT_FOUND' | 'INTERNAL_ERROR'
 }>
 
 export type CardsDealt = Readonly<{
@@ -130,6 +124,7 @@ export type ProgramResultOutcome =
   | 'INVALID_PROGRAM'
   | 'GAME_PAUSED'
   | 'GAME_ABORTED'
+  | 'GAME_FINISHED'
   | 'ALREADY_SUBMITTED'
   | 'WRONG_PHASE'
   | 'NOT_A_MEMBER'

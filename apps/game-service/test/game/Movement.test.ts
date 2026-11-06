@@ -8,6 +8,7 @@ function createGame(pitWalls: readonly Direction[] = [], startWalls: readonly Di
   tiles[1][1] = new PitTile(pitWalls)
   tiles[0][4] = new EmptyTile([], 1)
   tiles[2][3] = new EmptyTile([], 2)
+  tiles[2][0] = new EmptyTile([], 3)
   const board = new Board(tiles, { x: Integer(4), y: Integer(1), angle: Math.PI / 2 })
   const robot = new Robot('robot', Direction.NORTH)
   const start = { x: Integer(0), y: Integer(1) }

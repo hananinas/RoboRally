@@ -2,9 +2,9 @@ import type { EmptyRequest, LobbyRequest, LobbyState, LobbyListResult, LobbyJoin
 import type {
   CardsDealt,
   GameAborted,
+  GameWon,
   LeaveGame,
   GameInitialization,
-  LoginResult,
   ProgramResult,
   ProgramSubmitted,
   RobotActionResolved,
@@ -14,10 +14,8 @@ import type {
   LeaveResult,
 } from './payloads.js'
 import type { SubmitProgram } from './submitProgram.js'
-import type { Login } from './login.js'
 
 export type ProgramResultAcknowledgement = (result: ProgramResult) => void
-export type LoginAcknowledgement = (result: LoginResult) => void
 
 export interface ClientToServerEvents {
   'lobby.list': (payload: EmptyRequest, acknowledge: (result: LobbyListResult) => void) => void
@@ -27,7 +25,6 @@ export interface ClientToServerEvents {
   'lobby.start': (payload: LobbyRequest, acknowledge: (result: LobbyStartResult) => void) => void
   'session.get': (payload: EmptyRequest, acknowledge: (result: SessionResult) => void) => void
   'game.leave': (payload: LeaveGame, acknowledge: (result: LeaveResult) => void) => void
-  'user.login': (payload: Login, acknowledge: LoginAcknowledgement) => void
   'program.submit': (
     payload: SubmitProgram,
     acknowledge: ProgramResultAcknowledgement,
@@ -44,4 +41,5 @@ export interface ServerToClientEvents {
   'program.submitted': (payload: ProgramSubmitted) => void
   'robot.actionResolved': (payload: RobotActionResolved) => void
   'game.aborted': (payload: GameAborted) => void
+  'game.won': (payload: GameWon) => void
 }

@@ -11,6 +11,7 @@ function createGame(
   const tiles = Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => new EmptyTile()))
   tiles[start.y][start.x] = new EmptyTile(walls)
   tiles[2][1] = new EmptyTile([], 1)
+  tiles[4][0] = new EmptyTile([], 2)
   const board = new Board(tiles, { x: Integer(0), y: Integer(0), angle: 0 })
   const robot = new Robot('robot', instruction === 'BACK_UP' ? Direction.WEST : Direction.EAST)
   board.placeRobot(robot.id, start)

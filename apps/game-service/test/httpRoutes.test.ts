@@ -6,6 +6,8 @@ import { createAuthApp } from '@/auth/httpRoutes.ts'
 import { createSessionStore } from '@/auth/sessionStore.ts'
 import type { OidcClient } from '@/infra/oidcClient.ts'
 
+const kratosSettingsUrl = new URL('http://127.0.0.1:4455/settings')
+
 describe('GET /auth/login', () => {
   let baseUrl: string
   let server: Server
@@ -17,7 +19,7 @@ describe('GET /auth/login', () => {
   }
 
   beforeAll(async () => {
-    server = createServer(createAuthApp({ oidcClient, sessionStore: createSessionStore() }))
+    server = createServer(createAuthApp({ oidcClient, sessionStore: createSessionStore(), kratosSettingsUrl }))
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   })
@@ -64,14 +66,14 @@ describe('GET /auth/login', () => {
     }
   })
 
-  it('requests an openid scope with a PKCE S256 code challenge', async () => {
+  it('requests an openid profile scope with a PKCE S256 code challenge', async () => {
     vi.mocked(oidcClient.buildAuthorizationUrl).mockResolvedValue(new URL('https://hydra.test/oauth2/auth'))
 
     await fetch(`${baseUrl}/auth/login`, { redirect: 'manual' })
 
     expect(oidcClient.buildAuthorizationUrl).toHaveBeenCalledWith(
       expect.objectContaining({
-        scope: 'openid',
+        scope: 'openid profile',
         code_challenge_method: 'S256',
         code_challenge: expect.any(String),
         state: expect.any(String),
@@ -100,7 +102,7 @@ describe('GET /auth/callback', () => {
   const sessionStore = createSessionStore()
 
   beforeAll(async () => {
-    server = createServer(createAuthApp({ oidcClient, sessionStore }))
+    server = createServer(createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl }))
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   })
@@ -122,7 +124,7 @@ describe('GET /auth/callback', () => {
 
   it('exchanges the code, creates a session, and clears the transaction cookies on success', async () => {
     vi.mocked(oidcClient.exchangeAuthorizationCode).mockResolvedValue(
-      { claims: () => ({ sub: 'user-123' }), expires_in: 900, id_token: 'id-token-abc' } as unknown as Awaited<
+      { claims: () => ({ sub: 'user-123', preferred_username: 'Bence' }), expires_in: 900, id_token: 'id-token-abc' } as unknown as Awaited<
         ReturnType<OidcClient['exchangeAuthorizationCode']>
       >,
     )
@@ -151,7 +153,7 @@ describe('GET /auth/callback', () => {
     expect(sessionCookie).toMatch(/Max-Age=900/i)
 
     const sessionId = parseCookie(sessionCookie!).game_session!
-    expect(sessionStore.get(sessionId)).toStrictEqual({ sub: 'user-123', idToken: 'id-token-abc' })
+    expect(sessionStore.get(sessionId)).toStrictEqual({ sub: 'user-123', username: 'Bence', idToken: 'id-token-abc' })
   })
 
   it('responds 400 and clears cookies without creating a session when the ID token has no subject', async () => {
@@ -195,7 +197,7 @@ describe('GET /auth/logout', () => {
   const sessionStore = createSessionStore()
 
   beforeAll(async () => {
-    server = createServer(createAuthApp({ oidcClient, sessionStore }))
+    server = createServer(createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl }))
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   })
@@ -211,7 +213,7 @@ describe('GET /auth/logout', () => {
   it('destroys the session, clears the cookie, and redirects to the end-session URL with the id token hint', async () => {
     const endSessionUrl = new URL('https://hydra.test/oauth2/sessions/logout')
     vi.mocked(oidcClient.buildEndSessionUrl).mockResolvedValue(endSessionUrl)
-    const sessionId = sessionStore.create('user-123', 'id-token-abc', 900)
+    const sessionId = sessionStore.create('user-123', 'Bence', 'id-token-abc', 900)
 
     const response = await fetch(`${baseUrl}/auth/logout`, {
       redirect: 'manual',
@@ -238,7 +240,7 @@ describe('GET /auth/logout', () => {
 
   it('responds 500 without crashing when buildEndSessionUrl rejects', async () => {
     vi.mocked(oidcClient.buildEndSessionUrl).mockRejectedValue(new Error('discovery unreachable'))
-    const sessionId = sessionStore.create('user-123', 'id-token-abc', 900)
+    const sessionId = sessionStore.create('user-123', 'Bence', 'id-token-abc', 900)
 
     const response = await fetch(`${baseUrl}/auth/logout`, {
       redirect: 'manual',

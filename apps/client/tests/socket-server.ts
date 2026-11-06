@@ -4,7 +4,6 @@ import type {
   Card,
   ClientToServerEvents,
   LobbyState,
-  LoginResult,
   ProgramResultAcknowledgement,
   ProgramResultOutcome,
   PublicGameState,
@@ -33,13 +32,10 @@ type Fixture = {
   outcome: ProgramResultOutcome
   deferred: boolean
   entryRequests: FixtureSnapshot['entryRequests'][number][]
-  loginOutcome: LoginResult['outcome']
-  deferLogin: boolean
   deferStart: boolean
   startOutcome: 'STARTED' | 'LOBBY_MEMBER_DISCONNECTED'
   programSubmitted: boolean
   started: boolean
-  pendingLogins: { socket: GameSocket; respond: () => void }[]
   pendingStarts: { socket: GameSocket; respond: () => void }[]
   pending: { socket: GameSocket; acknowledge: ProgramResultAcknowledgement }[]
 }
@@ -60,7 +56,6 @@ function snapshot(fixture: Fixture): FixtureSnapshot {
     state: fixture.state,
     submissions: fixture.submissions,
     entryRequests: fixture.entryRequests,
-    pendingLogins: fixture.pendingLogins.length,
     pendingStarts: fixture.pendingStarts.length,
   }
 }
@@ -107,16 +102,9 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
     case 'disconnect':
       for (const socket of fixture.sockets) socket.disconnect(true)
       break
-    case 'login':
-      fixture.loginOutcome = control.outcome
-      fixture.deferLogin = control.deferred
-      break
     case 'start':
       fixture.startOutcome = control.outcome ?? 'STARTED'
       fixture.deferStart = control.deferred
-      break
-    case 'respond-login':
-      for (const pending of fixture.pendingLogins.splice(0)) pending.respond()
       break
     case 'respond-start':
       for (const pending of fixture.pendingStarts.splice(0)) pending.respond()
@@ -179,13 +167,10 @@ const httpServer = createServer(async (request, response) => {
       deferred: false,
       pending: [],
       entryRequests: [],
-      loginOutcome: 'LOGGED_IN',
-      deferLogin: false,
       deferStart: false,
       startOutcome: 'STARTED',
       programSubmitted: false,
       started: false,
-      pendingLogins: [],
       pendingStarts: [],
     }
     fixtures.set(fixture.id, fixture)
@@ -218,7 +203,7 @@ const httpServer = createServer(async (request, response) => {
 })
 
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
-  cors: { origin: 'http://127.0.0.1:4173', allowedHeaders: ['x-fixture-id'] },
+  cors: { origin: 'http://127.0.0.1:4173', allowedHeaders: ['x-fixture-id', 'x-fixture-user'] },
 })
 
 io.on('connection', (socket) => {
@@ -229,24 +214,9 @@ io.on('connection', (socket) => {
     return
   }
   fixture.sockets.add(socket)
-  let user: User | undefined
-
-  socket.on('user.login', (payload, acknowledge) => {
-    fixture.entryRequests.push({ event: 'user.login', socketId: socket.id, payload })
-    let result: LoginResult
-    if (fixture.loginOutcome !== 'LOGGED_IN') {
-      result = { outcome: fixture.loginOutcome }
-    } else if (user && user.username !== payload.username) {
-      result = { outcome: 'ALREADY_LOGGED_IN' }
-    } else {
-      user ??= { userId: randomUUID(), username: payload.username }
-      result = { outcome: 'LOGGED_IN', user }
-    }
-    // Delay only delivery: a timed-out request may already have bound the identity.
-    const respond = () => acknowledge(result)
-    if (fixture.deferLogin) fixture.pendingLogins.push({ socket, respond })
-    else respond()
-  })
+  const usernameHeader = socket.handshake.headers['x-fixture-user']
+  const username = typeof usernameHeader === 'string' ? usernameHeader : 'Player 1'
+  const user: User = { userId: username, username }
 
   let lobby: LobbyState | undefined
   const initialization = () => ({
@@ -254,12 +224,11 @@ io.on('connection', (socket) => {
     assignment: { gameId: GAME_ID, playerId: PLAYER_ID, robotId: ROBOT_ID },
     state: fixture.state, hand: fixture.cards, programSubmitted: fixture.programSubmitted,
   })
-  const lobbyState = (): LobbyState => ({ lobbyId: GAME_ID, name: 'Lobby 1', ownerUserId: user!.userId, playerCount: 1, maxPlayers: 6, players: [user!] })
+  const lobbyState = (): LobbyState => ({ lobbyId: GAME_ID, name: 'Lobby 1', ownerUserId: user.userId, playerCount: 1, maxPlayers: 6, players: [user] })
   socket.on('session.get', (_, acknowledge) => {
     fixture.entryRequests.push({ event: 'session.get', socketId: socket.id, payload: {} })
-    if (!user) return acknowledge({ outcome: 'LOGIN_REQUIRED' })
-    acknowledge(fixture.started ? { outcome: 'IN_GAME', initialization: initialization() }
-      : lobby ? { outcome: 'IN_LOBBY', lobby } : { outcome: 'NO_SESSION' })
+    acknowledge(fixture.started ? { outcome: 'IN_GAME', initialization: initialization(), user }
+      : lobby ? { outcome: 'IN_LOBBY', lobby, user } : { outcome: 'NO_SESSION', user })
   })
   socket.on('lobby.list', (_, acknowledge) => acknowledge({ outcome: 'LOBBIES_FOUND', lobbies: [lobbyState()] }))
   socket.on('lobby.create', (_, acknowledge) => {
@@ -312,7 +281,6 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     fixture.sockets.delete(socket)
     fixture.pending = fixture.pending.filter((pending) => pending.socket !== socket)
-    fixture.pendingLogins = fixture.pendingLogins.filter((pending) => pending.socket !== socket)
     fixture.pendingStarts = fixture.pendingStarts.filter((pending) => pending.socket !== socket)
   })
 })

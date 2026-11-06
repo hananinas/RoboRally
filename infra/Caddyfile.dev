@@ -8,10 +8,29 @@ https://127.0.0.1:3001 {
 
 	@backend path /auth/* /socket.io /socket.io/*
 	handle @backend {
-		reverse_proxy 127.0.0.1:3002
+		reverse_proxy 127.0.0.1:3002 {
+			transport http {
+				keepalive off
+			}
+		}
 	}
 
 	handle {
 		reverse_proxy 127.0.0.1:5173
 	}
+}
+
+https://127.0.0.1:4433 {
+	tls infra/dev-tls/cert.pem infra/dev-tls/key.pem
+	reverse_proxy 127.0.0.1:14433
+}
+
+https://127.0.0.1:4444 {
+	tls infra/dev-tls/cert.pem infra/dev-tls/key.pem
+	reverse_proxy 127.0.0.1:14444
+}
+
+https://127.0.0.1:4455 {
+	tls infra/dev-tls/cert.pem infra/dev-tls/key.pem
+	reverse_proxy 127.0.0.1:14455
 }
