@@ -154,6 +154,7 @@ export function handleLeave(
       gameId, playerId: player.id, robotId: player.robot.id,
     })
     actionScheduler.broadcastCheckpointProgress()
+    actionScheduler.announceWinner()
     if (phaseBeforeLeave === 'activation' && game.phase === 'programming') actionScheduler.dealHands()
     actionScheduler.scheduleNextAction()
   }, (error) => {

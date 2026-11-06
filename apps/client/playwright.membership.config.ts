@@ -4,8 +4,9 @@ const baseURL = 'https://127.0.0.1:3001'
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: ['**/membership.e2e.ts', '**/reconnection.e2e.ts', '**/rounds.e2e.ts', '**/pushing-multiplayer.e2e.ts'],
+  testMatch: ['**/membership.e2e.ts', '**/reconnection.e2e.ts', '**/rounds.e2e.ts', '**/pushing-multiplayer.e2e.ts','**/winning.e2e.ts'],
   globalTeardown: './tests/process-compose-teardown.ts',
+
   workers: 1,
   use: {
     baseURL,
