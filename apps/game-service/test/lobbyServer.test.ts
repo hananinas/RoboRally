@@ -316,7 +316,7 @@ describe('lobby lifecycle over Socket.IO', () => {
 
   it('restores membership and rooms when reattaching a game fails partway through', async () => {
     const owner = await connect('Owner')
-    const lobby = await create(owner)
+    await create(owner)
     const ready = started(owner)
     await owner.emitWithAck('lobby.start', {})
     const initialization = await ready
