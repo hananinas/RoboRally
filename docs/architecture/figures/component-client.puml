@@ -1,0 +1,24 @@
+@startuml component-client
+!include C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+Container_Ext(gameService, "game-service", "Node.js, Express", "Handles game sessions and game logic; acts as BFF")
+
+Container_Boundary(client, "client (React, TypeScript)") {
+    Component(ui, "User Interface", "React", "Renders screens and forwards player input")
+    Component(sessionController, "Session Controller", "TypeScript", "Manages lobby and session state; initializes a game on start")
+    Component(gameController, "Game Controller", "TypeScript", "Manages programming actions and live game state")
+    Component(boardPresentation, "Board Presentation", "React", "Renders the board from resolved game state")
+}
+
+Rel(ui, sessionController, "Lobby actions and session state")
+Rel(ui, gameController, "Programming actions and game state")
+Rel(sessionController, gameController, "Initializes game state")
+Rel(gameController, boardPresentation, "Board state and resolved actions")
+
+Rel(sessionController, gameService, "Lobby and session messages", "Socket.IO")
+Rel(gameController, gameService, "Gameplay messages", "Socket.IO")
+
+SHOW_LEGEND()
+@enduml
