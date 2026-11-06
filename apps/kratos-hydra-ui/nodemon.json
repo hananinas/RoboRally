@@ -4,11 +4,12 @@
   "exec": "tsx ./src/index.ts",
   "env": {
     "PORT": "14455",
+    "BASE_PATH": "/ory/ui",
     "CSRF_COOKIE_NAME": "ax-csrf-cookie",
     "COOKIE_SECRET": "I_AM_VERY_SECRET",
     "CSRF_COOKIE_SECRET": "I_AM_VERY_SECRET_TOO",
-    "ORY_SDK_URL": "https://127.0.0.1:4433",
-    "KRATOS_PUBLIC_URL": "https://127.0.0.1:4433",
+    "ORY_SDK_URL": "https://127.0.0.1:3001/ory/kratos",
+    "KRATOS_PUBLIC_URL": "https://127.0.0.1:3001/ory/kratos",
     "KRATOS_ADMIN_URL": "http://127.0.0.1:4434",
     "HYDRA_ADMIN_URL": "http://127.0.0.1:4445",
     "NODE_ENV": "development"
