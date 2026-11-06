@@ -4,6 +4,7 @@ import ActiveGame from './scenes/active-game/ActiveGame.tsx'
 import EntryScreen from './scenes/entry/EntryScreen.tsx'
 import LobbyScreen from './scenes/entry/LobbyScreen.tsx'
 import WaitingLobby from './scenes/entry/WaitingLobby.tsx'
+import RobotPicker from './scenes/entry/RobotPicker.tsx'
 import { USER_ALREADY_IN_GAME_MESSAGE } from './scenes/active-game/gameState.ts'
 import useSessionConnection from './useSessionConnection.ts'
 
@@ -29,10 +30,11 @@ function App() {
   }, [connection.status])
 
   const logout = () => { window.location.href = '/auth/logout' }
+  const openSettings = () => { window.location.href = '/auth/settings' }
 
   // Keep the existing game visible while session.get restores membership after reconnecting.
   if ((session.status === 'joined' || session.status === 'resyncing') && session.user && game.state.assignment) {
-    return <ActiveGame game={game} username={session.user.username} leaving={busy} onLeave={leaveSession} onLogout={logout} />
+    return <ActiveGame game={game} username={session.user.username} leaving={busy} onLeave={leaveSession} onLogout={logout} onSettings={openSettings} />
   }
 
   if (connection.status === 'unauthenticated') {
@@ -60,7 +62,7 @@ function App() {
       <button className="entry-secondary-button" type="button" disabled={busy || connection.status === 'connecting'} onClick={retrySession}>Retry</button>
     </>
   }
-  return <EntryScreen onLogout={connection.status === 'connected' || session.user ? logout : undefined}>
+  return <EntryScreen onLogout={connection.status === 'connected' || session.user ? logout : undefined} aside={session.status === 'waiting' ? <RobotPicker /> : undefined}>
     {error && (session.status === 'waiting' || session.status === 'resyncing' || session.status === 'sync-failed') &&
       <p role="alert" className="entry-validation entry-validation--error">{error}</p>}
     {content}

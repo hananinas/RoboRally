@@ -11,6 +11,7 @@ Will update with a more conceptual domain diagram which will be used for present
         +rebootTile: Position readonly
         -phase: GamePhase
         -currentRegister: int
+        -winner: PlayerId?
         -activatedRobotIds: RobotId[] set
         -deck: Card[] unordered
         -dealCards()
@@ -102,7 +103,7 @@ Game deals cards, accepts programs, and executes five registers. `submitProgram(
 
 `Game.moveRobot(robot, direction, steps)` calls `Board.pushRobot()` one step at a time. After each successful step, it resolves entry effects for every displaced robot, farthest first. Blocked steps stop movement without an effect and preserve earlier successful steps. Entering a pit or leaving the board immediately reboots that robot through the same resolver. A pushed robot rebooting does not stop the initiating robot's remaining movement; the initiating robot rebooting does. Facing and programmed registers are preserved. Pushing does not mark the displaced robot as activated. Each programmed action reports the acting robot's final position and orientation before pending priority is recalculated.
 
-Direct movement preserves orientation, programs, submissions, and register state. It neither starts a round nor marks an action complete, awards checkpoints, or emits events. Checkpoints are evaluated at final positions when all remaining robots finish a register, including when a departure completes it. Only the next numbered checkpoint counts; passing over one does not. After register five, Game returns to programming with progress preserved. Completing the course does not end the game.
+Direct movement preserves orientation, programs, submissions, and register state. It neither starts a round nor marks an action complete, awards checkpoints, or emits events. Checkpoints are evaluated at final positions when all remaining robots finish a register, including when a departure completes it. Only the next numbered checkpoint counts; passing over one does not. After register five, Game returns to programming with progress preserved. When a player completes the final checkpoint, Game records them as the winner and stops: remaining registers are skipped, no new hand is dealt, and `submitProgram()` rejects with `GAME_FINISHED`. Robots cannot share a space, so only one player can win.
 
 # Board
 
@@ -182,6 +183,7 @@ while game.phase == "activation":
     # Execute its card: Game.moveRobot resolves entries; Robot handles turning.
     # Mark this robot as activated and capture the final position after any reboot.
     # After the last robot: evaluate checkpoints and advance the register.
+    # If a player completed the final checkpoint: record the winner and stop the game.
     # After the fifth register: clear programs and return to programming.
     # The socket layer publishes the action before associated checkpoint updates.
 ```

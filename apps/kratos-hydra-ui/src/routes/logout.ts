@@ -69,7 +69,7 @@ export const createSubmitLogoutRoute: RouteCreator =
 
     if (submit === "No") {
       logger.debug("User rejected to log out.")
-      // The user rejected to log out, so we'll redirect to /ui/welcome
+      // The user rejected to log out, so we'll redirect back to login
       return oauth2
         .rejectOAuth2LogoutRequest({ logoutChallenge })
         .then(() => res.redirect("login"))
