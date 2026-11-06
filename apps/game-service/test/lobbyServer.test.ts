@@ -207,7 +207,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     const owners = [await connect('First'), await connect('Second')]
     const initializations: GameInitialization[] = []
     for (const owner of owners) {
-      const lobby = await create(owner)
+      await create(owner)
       const ready = started(owner)
       await owner.emitWithAck('lobby.start', {})
       initializations.push(await ready)
