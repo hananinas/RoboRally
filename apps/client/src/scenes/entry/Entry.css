@@ -130,15 +130,6 @@
   box-shadow: 0 0 0 2px #dcbd05;
 }
 
-.lobby__image {
-  flex: none;
-  width: 48px;
-  height: 48px;
-  border: 1px solid var(--entry-border);
-  border-radius: 6px;
-  background: var(--entry-background);
-  object-fit: cover;
-}
 
 .lobby__details {
   display: grid;
@@ -148,11 +139,6 @@
 
 .lobby__name {
   font-weight: 600;
-}
-
-.lobby__map {
-  color: var(--entry-muted);
-  font-size: 12px;
 }
 
 .lobby__status {

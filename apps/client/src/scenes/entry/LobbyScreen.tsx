@@ -1,6 +1,5 @@
 import type { LobbySummary } from '@robo-rally/game-events'
 import { useState } from 'react'
-import map1 from './maps/map-1.png'
 
 type LobbyScreenProps = {
   username: string
@@ -35,10 +34,10 @@ export default function LobbyScreen({ username, lobbies, pending, connected, err
               autoFocus={lobby === firstJoinable}
               onClick={() => setSelectedId(lobby.lobbyId)}
             >
-              <img className="lobby__image" src={map1} alt="Map 1 preview" />
+              
               <span className="lobby__details">
                 <span className="lobby__name">{lobby.name}</span>
-                <span className="lobby__map">Map 1</span>
+                
               </span>
               <span className="lobby__status">
                 <span>{lobby.playerCount}/{lobby.maxPlayers} players</span>

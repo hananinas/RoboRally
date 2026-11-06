@@ -18,8 +18,6 @@ test('joining requires selection and enters the waiting screen', async ({ page }
   const join = page.getByRole('button', { name: 'Join game', exact: true })
   await expect(join).toBeDisabled()
   const row = page.getByRole('button', { name: /Lobby 1/ })
-  await expect(row.getByRole('img', { name: 'Map 1 preview' })).toBeVisible()
-  await expect(row.getByText('Map 1', { exact: true })).toBeVisible()
   await expect(row.getByText('1/6 players', { exact: true })).toBeVisible()
   await expect(row.getByRole('img', { name: 'Unlocked' })).toBeVisible()
   await expect(page.getByRole('list', { name: 'Lobbies' }).getByRole('listitem')).toHaveCount(1)
