@@ -33,6 +33,7 @@ export type AddPlayerError = 'GAME_ALREADY_STARTED' | 'NO_SPAWN_AVAILABLE'
 
 export type SubmitProgramError =
   | 'GAME_ABORTED'
+  | 'GAME_FINISHED'
   | 'GAME_PAUSED'
   | 'WRONG_PHASE'
   | 'PLAYER_NOT_IN_GAME'
@@ -53,6 +54,7 @@ export class Game {
   private started = false
   private isPaused = false
   private isAborted = false
+  private winnerId: PlayerId | undefined
 
   constructor(
     board: Board,
@@ -114,6 +116,10 @@ export class Game {
 
   get aborted(): boolean {
     return this.isAborted
+  }
+
+  get winner(): PlayerId | undefined {
+    return this.winnerId
   }
 
   pause(): void {
@@ -184,8 +190,9 @@ export class Game {
 
   private checkCanSubmitProgram(
     playerId: PlayerId,
-  ): Result<Player, 'GAME_ABORTED' | 'GAME_PAUSED' | 'WRONG_PHASE' | 'PLAYER_NOT_IN_GAME' | 'ALREADY_SUBMITTED'> {
+  ): Result<Player, Exclude<SubmitProgramError, 'INVALID_PROGRAM'>> {
     if (this.isAborted) return err('GAME_ABORTED')
+    if (this.winnerId !== undefined) return err('GAME_FINISHED')
     if (this.isPaused) return err('GAME_PAUSED')
     if (this.currentPhase !== 'programming') return err('WRONG_PHASE')
 
@@ -356,14 +363,18 @@ export class Game {
     for (const player of this.players) {
       const position = this.board.positionOf(player.robot.id)
       const checkpoint = this.board.getTile(position)?.checkpointNumber
-      if (checkpoint !== undefined) player.completeCheckpoint(checkpoint)
+      if (checkpoint === undefined || !player.completeCheckpoint(checkpoint)) continue
+      if (checkpoint === this.board.checkpointCount) {
+        this.winnerId = player.id
+        break
+      }
     }
   }
 
   private finishRegister(): void {
     this.activatedRobotIds.clear()
     this.registerIndex++
-    if (this.registerIndex === 5) this.finishRound()
+    if (this.registerIndex === 5 || this.winnerId !== undefined) this.finishRound()
   }
 
   private finishRound(): void {

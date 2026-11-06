@@ -2,6 +2,7 @@ import type { EmptyRequest, LobbyRequest, LobbyState, LobbyListResult, LobbyJoin
 import type {
   CardsDealt,
   GameAborted,
+  GameWon,
   GameInitialization,
   ProgramResult,
   ProgramSubmitted,
@@ -39,4 +40,5 @@ export interface ServerToClientEvents {
   'program.submitted': (payload: ProgramSubmitted) => void
   'robot.actionResolved': (payload: RobotActionResolved) => void
   'game.aborted': (payload: GameAborted) => void
+  'game.won': (payload: GameWon) => void
 }

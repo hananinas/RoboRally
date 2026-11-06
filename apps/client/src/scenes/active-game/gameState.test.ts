@@ -49,6 +49,7 @@ const publicState: PublicGameState = {
   paused: false,
   aborted: false,
   checkpointCount: 0,
+  winner: null,
   players: [
     { playerId: '50000000-0000-4000-8000-000000000001', lastCheckpoint: 0, username: 'First', connected: true, programSubmitted: false },
     { playerId: '50000000-0000-4000-8000-000000000002', lastCheckpoint: 0, username: 'Second', connected: true, programSubmitted: false },
@@ -815,6 +816,52 @@ describe('checkpoint progress', () => {
     } })
     expect(gameStateReducer(departed, { type: 'checkpoint-progress', payload: progress })).toBe(departed)
     expect(gameStateReducer(state, { type: 'reset' }).checkpointCount).toBe(0)
+  })
+})
+describe('winning', () => {
+  const won = { gameId: publicState.gameId, playerId: result.assignment.playerId, username: 'First' }
+  const winner = { playerId: won.playerId, username: won.username }
+
+  it('records the winner from its own game and disables programming', () => {
+    const state = gameStateReducer(programmingState(), { type: 'won', payload: won })
+    expect(state.winner).toEqual(winner)
+    expect(canProgram(state)).toBe(false)
+    expect(gameStateReducer(state, { type: 'place', cardId: cards[0].id, registerIndex: 0 })).toBe(state)
+  })
+
+  it('ignores other games and a second announcement', () => {
+    const state = programmingState()
+    expect(gameStateReducer(state, { type: 'won', payload: { ...won, gameId: 'another-game' } })).toBe(state)
+    const first = gameStateReducer(state, { type: 'won', payload: won })
+    const other = { ...won, playerId: publicState.players[1].playerId, username: 'Second' }
+    expect(gameStateReducer(first, { type: 'won', payload: other })).toBe(first)
+  })
+
+  it('keeps queued playback running after the announcement', () => {
+    let state = selectProgram()
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, { type: 'won', payload: won })
+    expect(state.winner).toEqual(winner)
+    expect(state.playback.active).toEqual(actions[0])
+  })
+
+  it("keeps the winner's name after the winner leaves", () => {
+    const state = gameStateReducer(programmingState(), { type: 'won', payload: won })
+    const departed = gameStateReducer(state, { type: 'player-left', payload: {
+      gameId: won.gameId, playerId: won.playerId, robotId,
+    } })
+    expect(departed.players.some((player) => player.playerId === won.playerId)).toBe(false)
+    expect(departed.winner).toEqual(winner)
+  })
+
+  it('restores the winner from a join snapshot, even after the winner has left', () => {
+    const remaining = publicState.players.filter((player) => player.playerId !== won.playerId)
+    const state = gameStateReducer(createClientGameState(), {
+      type: 'joined', result: { ...result, state: { ...publicState, players: remaining, winner } },
+    })
+    expect(state.winner).toEqual(winner)
+    expect(canProgram(state)).toBe(false)
+    expect(gameStateReducer(state, { type: 'reset' }).winner).toBeNull()
   })
 })
 
