@@ -1,5 +1,5 @@
 import * as client from 'openid-client'
-import { parseOidcConfig, type OidcConfig } from '@/config'
+import type { OidcConfig } from '@/config'
 
 export type OidcClient = Readonly<{
   buildAuthorizationUrl(params: Record<string, string>): Promise<URL>
@@ -11,9 +11,7 @@ export type OidcClient = Readonly<{
   postLogoutRedirectUrl: URL
 }>
 
-export async function createOidcClient(
-  oidcConfig: OidcConfig = parseOidcConfig(process.env),
-): Promise<OidcClient> {
+export async function createOidcClient(oidcConfig: OidcConfig): Promise<OidcClient> {
   const config = await client.discovery(oidcConfig.issuerUrl, oidcConfig.clientId, oidcConfig.clientSecret)
 
   return {

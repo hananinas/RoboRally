@@ -65,13 +65,17 @@ processes:
       failure_threshold: 15
 
   kratos-hydra-ui:
-    command: "pnpm --filter @robo-rally/kratos-hydra-ui run start"
+    command: >
+      export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem" &&
+      pnpm --filter @robo-rally/kratos-hydra-ui run start
     environment:
       - TRUSTED_CLIENT_IDS=game-service
     depends_on:
       kratos:
         condition: process_healthy
       hydra:
+        condition: process_healthy
+      dev-tls-proxy:
         condition: process_healthy
 
   register-game-service-client:

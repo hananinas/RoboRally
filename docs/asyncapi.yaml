@@ -2,7 +2,7 @@ asyncapi: 3.1.0
 
 info:
   title: Game Service
-  version: 0.5.0-draft
+  version: 1.2.0
   description: |-
     This document describes RoboRally's client-server communication. No code change
     regarding communication should be made without updating this document.
@@ -320,8 +320,11 @@ components:
         $ref: '#/components/schemas/LobbyJoinResult'
     LobbyLeave:
       name: lobby.leave
+      description: >-
+        Leaves the lobby membership owned by this connection, identified via
+        the authenticated session.
       payload:
-        $ref: '#/components/schemas/LobbyRequest'
+        $ref: '#/components/schemas/EmptyRequest'
     LobbyLeaveReply:
       name: lobby.leaveResult
       description: Delivered only through the request acknowledgement.
@@ -329,8 +332,11 @@ components:
         $ref: '#/components/schemas/LobbyLeaveResult'
     LobbyStart:
       name: lobby.start
+      description: >-
+        Starts the lobby owned by this connection, identified via the
+        authenticated session. Only the owner may start.
       payload:
-        $ref: '#/components/schemas/LobbyRequest'
+        $ref: '#/components/schemas/EmptyRequest'
     LobbyStartReply:
       name: lobby.startResult
       description: Delivered only through the request acknowledgement.
@@ -428,18 +434,14 @@ components:
     LeaveGame:
       name: game.leave
       description: >-
-        Requests explicit departure for the membership owned by this connection.
+        Requests explicit departure for the membership owned by this connection,
+        identified via the authenticated session.
         On success, removes the player and robot, frees the occupied tile, and
         removes the connection from the public and private player rooms.
         Disconnecting retains membership and does not send game.playerLeft.
         Leaving does not reopen a game that has already started.
       payload:
-        $ref: '#/components/schemas/JoinGame'
-      examples:
-        - name: leave
-          summary: Explicitly leave the assigned game
-          payload:
-            gameId: 00000000-0000-4000-8000-000000000001
+        $ref: '#/components/schemas/EmptyRequest'
 
     LeaveResult:
       name: game.leaveResult
@@ -491,14 +493,8 @@ components:
         type: object
         additionalProperties: false
         required:
-          - gameId
-          - playerId
           - cardIds
         properties:
-          gameId:
-            $ref: "#/components/schemas/GameId"
-          playerId:
-            $ref: "#/components/schemas/PlayerId"
           cardIds:
             type: array
             description: Card instance IDs in register order.
@@ -508,12 +504,11 @@ components:
             items:
               $ref: "#/components/schemas/CardId"
       description: >-
-        Submits five cards in register order for the connection-owned player.
+        Submits five cards in register order for the connection's owned game
+        and player, both derived from the authenticated session.
       examples:
         - name: submit
           payload:
-            gameId: 00000000-0000-4000-8000-000000000001
-            playerId: 00000000-0000-4000-8000-000000000002
             cardIds:
               - 00000000-0000-4000-8000-000000000101
               - 00000000-0000-4000-8000-000000000102
@@ -539,8 +534,6 @@ components:
               - WRONG_PHASE
               - NOT_A_MEMBER
               - INVALID_REQUEST
-              - GAME_ID_MISMATCH
-              - PLAYER_ID_MISMATCH
               - PLAYER_NOT_IN_GAME
               - INTERNAL_ERROR
       description: |
@@ -553,8 +546,6 @@ components:
         WRONG_PHASE: the round had already moved into activation before this submission arrived.
         NOT_A_MEMBER: this connection does not own a membership for this game.
         INVALID_REQUEST: the request did not match the expected shape.
-        GAME_ID_MISMATCH: the request's gameId did not match the connection's game.
-        PLAYER_ID_MISMATCH: the request's playerId did not match the connection's own player.
         PLAYER_NOT_IN_GAME: the player is no longer part of the game (left or otherwise removed).
         INTERNAL_ERROR: unexpected service failure.
         No acknowledgement means the outcome is unknown.
@@ -990,29 +981,38 @@ components:
           additionalProperties: false
           required:
             - outcome
+            - user
           properties:
             outcome:
               const: NO_SESSION
+            user:
+              $ref: '#/components/schemas/User'
         - type: object
           additionalProperties: false
           required:
             - outcome
             - lobby
+            - user
           properties:
             outcome:
               const: IN_LOBBY
             lobby:
               $ref: '#/components/schemas/LobbyState'
+            user:
+              $ref: '#/components/schemas/User'
         - type: object
           additionalProperties: false
           required:
             - outcome
             - initialization
+            - user
           properties:
             outcome:
               const: IN_GAME
             initialization:
               $ref: '#/components/schemas/JoinAccepted'
+            user:
+              $ref: '#/components/schemas/User'
         - $ref: '#/components/schemas/LobbyFailure'
     LobbyUpdated:
       type: object
@@ -1055,14 +1055,6 @@ components:
           $ref: '#/components/schemas/Username'
 
     # Membership
-    JoinGame:
-      type: object
-      additionalProperties: false
-      required: [ gameId ]
-      properties:
-        gameId:
-          $ref: '#/components/schemas/GameId'
-
     PlayerAssignment:
       type: object
       additionalProperties: false
@@ -1115,7 +1107,7 @@ components:
       description: |
         LEFT: membership and robot removed, room access revoked.
         INVALID_REQUEST: the request did not match the expected shape.
-        GAME_NOT_FOUND: unavailable game or membership not owned by this connection;
+        GAME_NOT_FOUND: this connection has no game membership to leave;
         this also covers a repeated leave after a successful departure.
         INTERNAL_ERROR: unexpected service failure; do not expose internals.
 
