@@ -6,6 +6,8 @@ import { createAuthApp } from '@/auth/httpRoutes.ts'
 import { createSessionStore } from '@/auth/sessionStore.ts'
 import type { OidcClient } from '@/infra/oidcClient.ts'
 
+const kratosSettingsUrl = new URL('http://127.0.0.1:4455/settings')
+
 describe('GET /auth/login', () => {
   let baseUrl: string
   let server: Server
@@ -17,7 +19,7 @@ describe('GET /auth/login', () => {
   }
 
   beforeAll(async () => {
-    server = createServer(createAuthApp({ oidcClient, sessionStore: createSessionStore() }))
+    server = createServer(createAuthApp({ oidcClient, sessionStore: createSessionStore(), kratosSettingsUrl }))
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   })
@@ -100,7 +102,7 @@ describe('GET /auth/callback', () => {
   const sessionStore = createSessionStore()
 
   beforeAll(async () => {
-    server = createServer(createAuthApp({ oidcClient, sessionStore }))
+    server = createServer(createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl }))
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   })
@@ -195,7 +197,7 @@ describe('GET /auth/logout', () => {
   const sessionStore = createSessionStore()
 
   beforeAll(async () => {
-    server = createServer(createAuthApp({ oidcClient, sessionStore }))
+    server = createServer(createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl }))
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   })

@@ -28,6 +28,9 @@
           "ory.sh/kratos": {
             "verification": {
               "via": "email"
+            },
+            "recovery": {
+              "via": "email"
             }
           }
         }

@@ -126,7 +126,7 @@ export const requireNoAuth =
     frontend
       .toSession({ cookie: req.header("cookie") })
       .then(() => {
-        res.redirect("welcome")
+        res.redirect("login")
       })
       .catch(() => {
         next()
