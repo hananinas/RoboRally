@@ -81,7 +81,7 @@ After setup, follow the printed instructions to enter Ubuntu and run
 
 ### Trusting the local dev certificate
 
-Hydra's public OIDC endpoint (`https://127.0.0.1:4444`) serves HTTPS even in local development. `process-compose` generates a certificate and key for `127.0.0.1`/`localhost` at `infra/dev-tls/cert.pem` and `infra/dev-tls/key.pem` on every run, and automatically trusts the issuing CA in your browser via `mkcert -install`.
+The app and all of its auth endpoints (Kratos, Hydra, the login/consent UI) are served behind Caddy on a single origin, `https://127.0.0.1:3001`, with HTTPS even in local development. `process-compose` generates a certificate and key for `127.0.0.1`/`localhost` at `infra/dev-tls/cert.pem` and `infra/dev-tls/key.pem` on every run, and automatically trusts the issuing CA in your browser via `mkcert -install`.
 
 Without Nix, you must provide your own certificate and key for `127.0.0.1`/`localhost`, trusted by your browser and by Node, at those same paths.
 
