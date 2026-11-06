@@ -364,7 +364,10 @@ export class Game {
       const position = this.board.positionOf(player.robot.id)
       const checkpoint = this.board.getTile(position)?.checkpointNumber
       if (checkpoint === undefined || !player.completeCheckpoint(checkpoint)) continue
-      if (this.winnerId === undefined && checkpoint === this.board.checkpointCount) this.winnerId = player.id
+      if (checkpoint === this.board.checkpointCount) {
+        this.winnerId = player.id
+        break
+      }
     }
   }
 
