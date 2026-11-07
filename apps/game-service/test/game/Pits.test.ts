@@ -149,6 +149,7 @@ describe('pit entry and rebooting', () => {
     const board = new Board([
       [new EmptyTile(), new EmptyTile([], 2), new PitTile()],
       [new EmptyTile(), new EmptyTile([], 1), new EmptyTile()],
+      [new EmptyTile([], 3), new EmptyTile(), new EmptyTile()],
     ], { x: Integer(2), y: Integer(1), angle: Math.PI / 2 })
     const robot = new Robot('robot', Direction.EAST)
     board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })

@@ -83,6 +83,7 @@ describe('game presenter', () => {
       checkpointCount: 2,
       board: { width: 21, height: 15 },
       phase: 'PROGRAMMING',
+      winner: null,
       robots: [
         {
           robotId: player.robot.id,
@@ -140,6 +141,25 @@ describe('game presenter', () => {
       { position: { x: 1, y: 0 }, type: 'EMPTY' },
     ])
     expect(state.robots[0].position.orientation).toBe('EAST')
+  })
+
+  it('presents the winner once a player completes the final checkpoint', () => {
+    const board = new Board([
+      [new EmptyTile(), new EmptyTile([], 1), new EmptyTile()],
+    ], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
+    const robot = new Robot('robot', Direction.EAST)
+    board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })
+    const player = new Player('player', robot)
+    const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
+    const game = new Game(board, [player], cards, { x: Integer(0), y: Integer(0) })
+    game.submitProgram(player.id, cards.map((card) => card.id))
+    expect(presentPublicGameState('game', game).winner).toBeNull()
+
+    game.executeNextAction()
+
+    expect(game.winner).toBe(player.id)
+    const winner = { playerId: player.id, username: 'Winner' }
+    expect(presentPublicGameState('game', game, [], winner).winner).toEqual(winner)
   })
 
   it('presents all dealt card instruction types without exposing domain objects', () => {

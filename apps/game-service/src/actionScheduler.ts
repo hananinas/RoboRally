@@ -2,6 +2,7 @@ import type { Game } from '@/game/index'
 import { presentCardsDealt, presentRobotActionResolved } from '@/socket/gamePresenter'
 import type { GameSocketServer } from '@/socket/gameServer'
 import { logError } from '@/logger'
+import type { Winner } from '@robo-rally/game-events'
 
 export type ActionSchedulerDeps = {
   io: GameSocketServer
@@ -9,21 +10,26 @@ export type ActionSchedulerDeps = {
   gameId: string
   publicRoom: string
   playerRoom: (playerId: string) => string
+  usernameOf: (playerId: string) => string | undefined
 }
 
 export type ActionScheduler = {
   scheduleNextAction: () => void
   broadcastCheckpointProgress: () => void
+  announceWinner: () => void
+  winner: () => Winner | null
   dealHands: () => void
   stop: () => void
 }
 
 export function createActionScheduler(
-  { io, game, gameId, publicRoom, playerRoom }: ActionSchedulerDeps,
+  { io, game, gameId, publicRoom, playerRoom, usernameOf  }: ActionSchedulerDeps,
 ): ActionScheduler {
   let scheduledAction: NodeJS.Immediate | undefined
   let closed = false
   let checkpointProgress = new Map(game.players.map((player) => [player.id, player.lastCheckpoint]))
+  let winnerAnnounced = false
+  let recordedWinner: Winner | null = null
 
   function broadcastCheckpointProgress(): void {
     const nextProgress = new Map<string, number>()
@@ -40,7 +46,23 @@ export function createActionScheduler(
     checkpointProgress = nextProgress
   }
 
+    // Record the winner's name while they are still a member; they may leave later.
+  function winner(): Winner | null {
+    if (recordedWinner === null && game.winner !== undefined) {
+      recordedWinner = { playerId: game.winner, username: usernameOf(game.winner) ?? '' }
+    }
+    return recordedWinner
+  }
+
+  function announceWinner(): void {
+    const result = winner()
+    if (result === null || winnerAnnounced) return
+    winnerAnnounced = true
+    io.to(publicRoom).emit('game.won', { gameId, ...result })
+  }
+
   function dealHands(): void {
+    if (game.winner !== undefined) return
     for (const player of game.players) {
       io.to(playerRoom(player.id)).emit('cards.dealt', presentCardsDealt(gameId, player))
     }
@@ -58,6 +80,7 @@ export function createActionScheduler(
           presentRobotActionResolved(gameId, game, result),
         )
         broadcastCheckpointProgress()
+        announceWinner()
         if (game.phase === 'activation') {
           scheduleNextAction()
         } else {
@@ -82,5 +105,5 @@ export function createActionScheduler(
     clearImmediate(scheduledAction)
   }
 
-  return { scheduleNextAction, broadcastCheckpointProgress, dealHands, stop }
+  return { scheduleNextAction, broadcastCheckpointProgress, announceWinner,winner, dealHands, stop }
 }

@@ -219,6 +219,7 @@ describe('robot pushing', () => {
   it('awards a pushed robot its checkpoint only when the register finishes', () => {
     const tiles = grid()
     tiles[3][3] = new EmptyTile([], 1)
+    tiles[6][8] = new EmptyTile([], 2)
     const { board, players, cards, game } = createGame([position(1), position(2)], tiles)
     const turn = cards.find((card) => card.instruction === 'TURN_LEFT')!
     const turnsFirst = [turn, ...cards.filter((card) => card !== turn).slice(0, 4)]

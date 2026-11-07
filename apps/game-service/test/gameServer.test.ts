@@ -2,7 +2,7 @@ import { Integer } from '@/numbers'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { submitProgramSchema } from '@robo-rally/game-events'
-import type { ClientToServerEvents, CardsDealt, RobotActionResolved, GameInitialization, PlayerConnectionChanged, PlayerCheckpointProgress, ServerToClientEvents } from '@robo-rally/game-events'
+import type { ClientToServerEvents, CardsDealt, GameWon, RobotActionResolved, GameInitialization, PlayerConnectionChanged, PlayerCheckpointProgress, ServerToClientEvents } from '@robo-rally/game-events'
 import { io, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Board, Direction, EmptyTile, PitTile, Game, type Tile } from '@/game/index'
@@ -193,8 +193,8 @@ describe('started game membership over Socket.IO', () => {
     expect((await getSnapshot(replacement)).assignment).toEqual(initial.assignment)
     expect(shared.game.paused).toBe(false)
   })
-  it('broadcasts checkpoint progress before next hands when a departure completes the final register', async () => {
-    const { members: [first, second], initializations: [initial] } = await startGame(['First', 'Second'])
+    it('announces the winner instead of dealing hands when a departure completes the final checkpoint', async () => {
+    const { members: [first, second] } = await startGame(['First', 'Second'])
     for (const player of shared.game.players) shared.game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
     for (let action = 0; action < 9; action++) shared.game.executeNextAction()
     const player = shared.game.players[0]
@@ -202,14 +202,51 @@ describe('started game membership over Socket.IO', () => {
     shared.game.board.removeRobot(player.robot.id)
     shared.game.board.placeRobot(player.robot.id, { x: Integer(8), y: Integer(9) })
     const events: string[] = []
-    first.onAny((name) => { if (['game.playerLeft', 'player.checkpointProgress', 'cards.dealt'].includes(name)) events.push(name) })
+    first.onAny((name) => { if (['game.playerLeft', 'player.checkpointProgress', 'game.won', 'cards.dealt'].includes(name)) events.push(name) })
     const progress = new Promise<PlayerCheckpointProgress>((resolve) => first.once('player.checkpointProgress', resolve))
-    const hand = new Promise((resolve) => first.once('cards.dealt', resolve))
+    const won = new Promise<GameWon>((resolve) => first.once('game.won', resolve))
     await second.emitWithAck('game.leave', { gameId: shared.gameId })
-    expect(await hand).toEqual({ gameId: shared.gameId, playerId: initial.assignment.playerId, cards: initial.hand })
     expect(await progress).toEqual({ gameId: shared.gameId, playerId: player.id, lastCheckpoint: 2, checkpointCount: 2 })
-    expect(events).toEqual(['game.playerLeft', 'player.checkpointProgress', 'cards.dealt'])
+    expect(await won).toEqual({ gameId: shared.gameId, playerId: player.id, username: 'First' })
+    await getSnapshot(first)
+    expect(events).toEqual(['game.playerLeft', 'player.checkpointProgress', 'game.won'])
   })
+
+  it('announces the winner after the final checkpoint and ends the game', async () => {
+    const { members: [client], initializations: [initial] } = await startGame(['First'])
+    const player = shared.game.players[0]
+    player.completeCheckpoint(1)
+    shared.game.board.relocateRobot(player.robot.id, { x: Integer(8), y: Integer(10) })
+    const events: string[] = []
+    client.onAny((name) => events.push(name))
+    const won = new Promise<GameWon>((resolve) => client.once('game.won', resolve))
+
+    expect(await client.emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'ACCEPTED' })
+
+    expect(await won).toEqual({ gameId: shared.gameId, playerId: player.id, username: 'First' })
+    const snapshot = await getSnapshot(client)
+    expect(events).toEqual(['robot.actionResolved', 'player.checkpointProgress', 'game.won'])
+    expect(snapshot.state.winner).toEqual({ playerId: player.id, username: 'First' })
+    expect(snapshot.state.phase).toBe('PROGRAMMING')
+    expect(await client.emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'GAME_FINISHED' })
+  })
+
+  it("keeps the winner's username in snapshots after the winner has left", async () => {
+    const { members: [first, second], initializations } = await startGame(['First', 'Second'])
+    const player = shared.game.players[0]
+    player.completeCheckpoint(1)
+    shared.game.board.relocateRobot(player.robot.id, { x: Integer(8), y: Integer(10) })
+    const won = new Promise<GameWon>((resolve) => second.once('game.won', resolve))
+    for (const [index, client] of [first, second].entries()) {
+      expect(await client.emitWithAck('program.submit', submission(initializations[index]))).toEqual({ outcome: 'ACCEPTED' })
+    }
+    expect(await won).toEqual({ gameId: shared.gameId, playerId: player.id, username: 'First' })
+    await first.emitWithAck('game.leave', { gameId: shared.gameId })
+    const snapshot = await getSnapshot(second)
+    expect(snapshot.state.players.map(({ username }) => username)).toEqual(['Second'])
+    expect(snapshot.state.winner).toEqual({ playerId: player.id, username: 'First' })
+  })
+
   it('ignores commands without acknowledgements', async () => {
     const client = await connect('Abid')
     const emit = client.emit.bind(client) as (event: string, payload: unknown) => void

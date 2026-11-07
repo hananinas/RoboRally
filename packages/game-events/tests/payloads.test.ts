@@ -47,6 +47,7 @@ describe('game event payload types', () => {
       paused: false,
       aborted: false,
       checkpointCount: 0,
+      winner: null,
     } satisfies PublicGameState
 
     expect(state.gameId).toBe('game')

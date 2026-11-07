@@ -8,7 +8,9 @@ export function createGameContext(io: GameSocketServer, session: GameSession): M
   const publicRoom = `game:${gameId}:public`
   const playerRoom = (playerId: string) => `game:${gameId}:player:${playerId}`
   const memberships = new Map<string, GameMembership>()
-  const actionScheduler = createActionScheduler({ io, game, gameId, publicRoom, playerRoom })
+    const usernameOf = (playerId: string) =>
+    [...memberships.values()].find((membership) => membership.player.id === playerId)?.user.username
+  const actionScheduler = createActionScheduler({ io, game, gameId, publicRoom, playerRoom, usernameOf })
 
   const publicState = () => presentPublicGameState(gameId, game,
     [...memberships.values()].map(({ user, player, connectionId }) => ({
@@ -19,6 +21,7 @@ export function createGameContext(io: GameSocketServer, session: GameSession): M
       connected: connectionId !== null,
       registers: player.registers,
     })),
+    actionScheduler.winner(),
   )
 
   return {
