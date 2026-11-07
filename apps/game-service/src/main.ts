@@ -1,4 +1,5 @@
 import { createServer } from 'node:http'
+import { createDefaultGame } from '@/game/GameFactory'
 import { parseAppConfig } from '@/config'
 import { createGameSocketServer } from '@/socket/gameServer'
 import { createAuthApp } from '@/auth/httpRoutes'
@@ -21,7 +22,9 @@ httpServer.on('request', (req, res) => {
     authApp(req, res)
   }
 })
-const io = createGameSocketServer(httpServer, sessionStore)
+
+const random = config.startTileOrder === 'ordered' ? () => 0 : Math.random
+const io = createGameSocketServer(httpServer, sessionStore, () => createDefaultGame(random))
 
 httpServer.listen(config.port, host, () => {
   console.log(`Game Service listening at http://${host}:${config.port}`)
