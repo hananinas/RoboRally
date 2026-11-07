@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_GAME_SERVICE_PORT,
   parseGameServicePort,
+  parseStartTileOrder,
 } from '@/config.ts'
 
 describe('game service configuration', () => {
@@ -16,4 +17,10 @@ describe('game service configuration', () => {
       expect(() => parseGameServicePort(value)).toThrow(RangeError)
     },
   )
+
+  it('picks starting tiles at random unless ordered placement is configured', () => {
+    expect(parseStartTileOrder(undefined)).toBe('random')
+    expect(parseStartTileOrder('ordered')).toBe('ordered')
+    expect(() => parseStartTileOrder('first')).toThrow(RangeError)
+  })
 })

@@ -133,6 +133,7 @@ The service creates a fresh game, moves every member into its public and private
 
 `game.started {lobbyId, initialization: {outcome: JOINED, assignment, state, hand, programSubmitted}}`
 
+Each map has six starting tiles. When the game starts, the service places every robot on a random free starting tile. `Robot.startPosition` records that tile for the whole game, so clients can mark where each robot started.
 
 ### Programming
 During the programming phase, each player submits five distinct card IDs in register order for the current round.
