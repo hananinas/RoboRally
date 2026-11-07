@@ -16,6 +16,16 @@ test('marks each robot\'s starting tile in the robot\'s colour', async ({ page }
     await expect(startTile(page, robotId)).toHaveCSS('opacity', '1')
   }
 })
+test('drops robots onto their starting tiles, unless reduced motion is preferred', async ({ page }) => {
+  await openGame(page)
+  const robot = page.locator(`[data-robot-id="${ROBOT_ID}"]`).first()
+  await expect(robot).toHaveCSS('animation-name', 'robot-drop')
+  await expect(startTile(page, ROBOT_ID)).toHaveCSS('animation-name', 'start-tile-light-up')
+
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await expect(robot).toHaveCSS('animation-name', 'none')
+  await expect(startTile(page, ROBOT_ID)).toHaveCSS('animation-name', 'none')
+})
 
 test('keeps the starting tile marked after the robot drives away', async ({ page, game }) => {
   await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
