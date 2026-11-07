@@ -88,15 +88,11 @@ export function handleUpdateRegisters(
       return
     }
     const membership = ownedMembership(ctx, socket)
-    if (!membership || parsed.data.gameId !== ctx.gameId) {
+    if (!membership) {
       ack({ outcome: 'NOT_A_MEMBER' })
       return
     }
     const { player } = membership
-    if (parsed.data.playerId !== player.id) {
-      ack({ outcome: 'PLAYER_ID_MISMATCH' })
-      return
-    }
     const result = ctx.game.updateRegisters(player.id, parsed.data.occupied)
     ack(result)
     if (result.outcome === 'ACCEPTED') {

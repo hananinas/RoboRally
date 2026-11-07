@@ -6,8 +6,6 @@ const registerOccupancySchema = z
 
 export const updateRegistersSchema = z
   .strictObject({
-    gameId: z.uuid(),
-    playerId: z.uuid(),
     occupied: registerOccupancySchema,
   })
   .readonly()

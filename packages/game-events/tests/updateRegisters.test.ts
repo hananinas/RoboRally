@@ -4,7 +4,7 @@ import { updateRegistersSchema } from '../src/index.js'
 const gameId = '00000000-0000-4000-8000-000000000001'
 const playerId = '00000000-0000-4000-8000-000000000002'
 const occupied = [true, false, true, false, false]
-const payload = { gameId, playerId, occupied }
+const payload = { occupied }
 
 describe('updateRegistersSchema', () => {
   it('preserves five occupancy flags in register order without card identities', () => {
@@ -20,10 +20,8 @@ describe('updateRegistersSchema', () => {
     [],
     'registers',
     {},
-    { ...payload, gameId: undefined },
-    { ...payload, playerId: undefined },
-    { ...payload, gameId: 'game' },
-    { ...payload, playerId: 'player' },
+    { ...payload, gameId },
+    { ...payload, playerId },
     { ...payload, occupied: undefined },
     { ...payload, occupied: 'true,false,true,false,false' },
     { ...payload, occupied: occupied.slice(0, 4) },

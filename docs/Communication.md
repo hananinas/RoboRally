@@ -163,7 +163,7 @@ A player can also publish register occupancy before submitting, described in [Pu
 
 `PlayerState.registers` holds five slots in register order. `{status: EMPTY}` means no card is placed, `{status: HIDDEN}` means a card is placed without exposing its identity, and `{status: REVEALED, instruction}` shows an already-executed register. EMPTY and HIDDEN carry only their status. Each player's hand stays private.
 
-Before submitting, the client can share which slots are occupied. `game.updateRegisters {gameId, playerId, occupied}` sends five booleans in register order, `true` for an occupied slot and `false` for an empty one. Its acknowledgement returns `ACCEPTED`, `INVALID_REQUEST`, `NOT_A_MEMBER`, `PLAYER_ID_MISMATCH`, `WRONG_PHASE`, `ALREADY_SUBMITTED` or `INTERNAL_ERROR`. An accepted update broadcasts `game.registersChanged {gameId, playerId, registers}` to the [public room](#rooms) with only HIDDEN and EMPTY slots.
+Before submitting, the client can share which slots are occupied. `game.updateRegisters {occupied}` sends five booleans in register order, `true` for an occupied slot and `false` for an empty one. The server resolves the game and player from the connection. Its acknowledgement returns `ACCEPTED`, `INVALID_REQUEST`, `NOT_A_MEMBER`, `WRONG_PHASE`, `ALREADY_SUBMITTED` or `INTERNAL_ERROR`. An accepted update broadcasts `game.registersChanged {gameId, playerId, registers}` to the [public room](#rooms) with only HIDDEN and EMPTY slots.
 
 The client reveals a slot from `robot.actionResolved`, which carries `playerId`, `registerIndex` and `instruction`. `game.started` and `session.get` include every player's registers, revealed slots included, until the next hand resets them to five EMPTY slots.
 
@@ -250,7 +250,7 @@ sequenceDiagram
     participant Public as game:{gameId}:public
 
     loop Each round
-        A->>Server: game.updateRegisters {gameId, playerId: A, occupied}
+        A->>Server: game.updateRegisters {occupied}
         Server-->>A: Acknowledgement: ACCEPTED
         Server->>Public: game.registersChanged {gameId, playerId: A, registers}
         Public-->>B: game.registersChanged {gameId, playerId: A, registers}

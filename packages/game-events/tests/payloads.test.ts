@@ -87,7 +87,6 @@ describe('game event payload types', () => {
       | 'ACCEPTED'
       | 'INVALID_REQUEST'
       | 'NOT_A_MEMBER'
-      | 'PLAYER_ID_MISMATCH'
       | 'WRONG_PHASE'
       | 'ALREADY_SUBMITTED'
       | 'INTERNAL_ERROR'

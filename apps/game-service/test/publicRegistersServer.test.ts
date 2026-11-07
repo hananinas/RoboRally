@@ -10,6 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as actionScheduler from '@/actionScheduler'
 import { createGame } from '@/game/GameFactory'
 import { createGameSocketServer, type GameSession, type GameSocketServer } from '@/socket/gameServer'
+import * as gameContext from '@/socket/gameContext'
+import { handleUpdateRegisters } from '@/socket/handlers/gameplayHandlers'
 import { createSessionStore, type SessionStore } from '@/auth/sessionStore'
 import { authCookieHeader } from './authTestHelper.ts'
 
@@ -85,8 +87,8 @@ describe('public registers over Socket.IO', () => {
     return emit('game.updateRegisters', payload)
   }
 
-  function update(joined: GameInitialization, occupied: readonly boolean[] = partial) {
-    return { gameId: joined.assignment.gameId, playerId: joined.assignment.playerId, occupied }
+  function update(occupied: readonly boolean[] = partial) {
+    return { occupied }
   }
 
   function program(joined: GameInitialization) {
@@ -113,7 +115,7 @@ describe('public registers over Socket.IO', () => {
     expect(a.hand.every((card) => !b.hand.some((otherCard) => otherCard.id === card.id))).toBe(true)
     const seen = clients.map(() => [] as RegistersChanged[])
     clients.forEach((client, index) => client.on('game.registersChanged', (event) => seen[index].push(event)))
-    expect(await raw(first, update(a))).toEqual({ outcome: 'ACCEPTED' })
+    expect(await raw(first, update())).toEqual({ outcome: 'ACCEPTED' })
     const state = await snapshot(second)
     await snapshot(first)
     await snapshot(outsider)
@@ -137,7 +139,7 @@ describe('public registers over Socket.IO', () => {
     }
     const publicPayloads = JSON.stringify([seen, a.state, b.state, state.state])
     for (const card of [...a.hand, ...b.hand]) expect(publicPayloads).not.toContain(card.id)
-    expect(await raw(first, update(a, [false, false, false, false, false]))).toEqual({ outcome: 'ACCEPTED' })
+    expect(await raw(first, update([false, false, false, false, false]))).toEqual({ outcome: 'ACCEPTED' })
     expect((await snapshot(first)).state.players[0].registers).toEqual(empty)
     await snapshot(second)
     await snapshot(outsider)
@@ -150,6 +152,7 @@ describe('public registers over Socket.IO', () => {
   })
 
   it('rejects invalid occupancy, extra identities, foreign memberships and player spoofing without mutation', async () => {
+    const createContext = vi.spyOn(gameContext, 'createGameContext')
     const first = await connect('Owner')
     const second = await connect('Peer')
     const outsider = await connect('Other lobby')
@@ -158,17 +161,24 @@ describe('public registers over Socket.IO', () => {
     await start([outsider])
     const events: RegistersChanged[] = []
     first.on('game.registersChanged', (event) => events.push(event))
-    for (const payload of [null, {}, update(a, []), update(a, full.slice(0, 4)),
-      update(a, [...full, true]), { ...update(a), occupied: [1, false, false, false, false] },
-      { ...update(a), occupied: [null, false, false, false, false] },
-      { ...update(a), cardIds: a.hand.slice(0, 5).map((card) => card.id) },
-      { ...update(a), gameId: 'not-a-uuid' }, { ...update(a), playerId: 'not-a-uuid' }]) {
+    for (const payload of [null, {}, update([]), update(full.slice(0, 4)),
+      update([...full, true]), { ...update(), occupied: [1, false, false, false, false] },
+      { ...update(), occupied: [null, false, false, false, false] },
+      { ...update(), cardIds: a.hand.slice(0, 5).map((card) => card.id) },
+      { ...update(), gameId: a.assignment.gameId }, { ...update(), playerId: b.assignment.playerId }]) {
       expect(await raw(first, payload)).toEqual({ outcome: 'INVALID_REQUEST' })
     }
-    expect(await raw(first, { ...update(a), playerId: b.assignment.playerId })).toEqual({ outcome: 'PLAYER_ID_MISMATCH' })
-    expect(await raw(first, { ...update(a), gameId: randomUUID() })).toEqual({ outcome: 'NOT_A_MEMBER' })
-    expect(await raw(outsider, update(a))).toEqual({ outcome: 'NOT_A_MEMBER' })
-    expect(await raw(duplicate, update(a))).toEqual({ outcome: 'NOT_A_MEMBER' })
+    // Session routing selects the caller's own game; exercise the foreign-context guard directly.
+    const acknowledge = vi.fn()
+    handleUpdateRegisters(createContext.mock.results[0].value,
+      server.sockets.sockets.get(outsider.id!)!, { occupied: partial }, acknowledge)
+    expect(acknowledge.mock.calls).toEqual([[{ outcome: 'NOT_A_MEMBER' }]])
+    expect(await raw(outsider, update())).toEqual({ outcome: 'ACCEPTED' })
+    expect((await snapshot(outsider)).state.players[0].registers).toEqual([
+      { status: 'HIDDEN' }, { status: 'EMPTY' }, { status: 'HIDDEN' },
+      { status: 'EMPTY' }, { status: 'EMPTY' },
+    ])
+    expect(await raw(duplicate, update())).toEqual({ outcome: 'NOT_A_MEMBER' })
     expect(await duplicate.timeout(1000).emitWithAck('session.get', {})).toEqual({ outcome: 'USER_ALREADY_IN_SESSION' })
     expect((await snapshot(first)).state.players.map((player) => player.registers)).toEqual([empty, empty])
     expect(events).toEqual([])
@@ -177,7 +187,7 @@ describe('public registers over Socket.IO', () => {
     })).toEqual({ outcome: 'INVALID_PROGRAM' })
     expect(await first.timeout(1000).emitWithAck('program.submit', program(b))).toEqual({ outcome: 'PLAYER_ID_MISMATCH' })
     expect(await first.timeout(1000).emitWithAck('program.submit', program(a))).toEqual({ outcome: 'ACCEPTED' })
-    expect(await raw(first, update(a))).toEqual({ outcome: 'ALREADY_SUBMITTED' })
+    expect(await raw(first, update())).toEqual({ outcome: 'ALREADY_SUBMITTED' })
     expect((await snapshot(first)).programSubmitted).toBe(true)
     expect(events).toEqual([])
   })
@@ -186,7 +196,7 @@ describe('public registers over Socket.IO', () => {
     const first = await connect('Returning')
     const second = await connect('Remaining')
     const [a] = await start([first, second])
-    expect(await raw(first, update(a))).toEqual({ outcome: 'ACCEPTED' })
+    expect(await raw(first, update())).toEqual({ outcome: 'ACCEPTED' })
     await disconnect(first)
     const disconnected = await snapshot(second)
     expect(disconnected.state.paused).toBe(true)
@@ -204,8 +214,8 @@ describe('public registers over Socket.IO', () => {
     expect(await returning.timeout(1000).emitWithAck('game.leave', { gameId: a.assignment.gameId })).toEqual({ outcome: 'LEFT' })
     const remaining = await snapshot(second)
     expect(remaining.state.players.map((player) => player.playerId)).not.toContain(a.assignment.playerId)
-    expect(await raw(returning, update(a))).toEqual({ outcome: 'NOT_A_MEMBER' })
-    expect(await raw(second, update(remaining))).toEqual({ outcome: 'ACCEPTED' })
+    expect(await raw(returning, update())).toEqual({ outcome: 'NOT_A_MEMBER' })
+    expect(await raw(second, update())).toEqual({ outcome: 'ACCEPTED' })
     await snapshot(second)
     expect(await returning.timeout(1000).emitWithAck('session.get', {})).toEqual({
       outcome: 'NO_SESSION', user: { userId: 'Returning', username: 'Returning' },
@@ -223,8 +233,8 @@ describe('public registers over Socket.IO', () => {
       return scheduler
     })
     const [a, b] = await start([first, second])
-    for (const [index, client] of [first, second].entries()) {
-      expect(await raw(client, update([a, b][index], full))).toEqual({ outcome: 'ACCEPTED' })
+    for (const client of [first, second]) {
+      expect(await raw(client, update(full))).toEqual({ outcome: 'ACCEPTED' })
     }
     await snapshot(first)
     await snapshot(second)
@@ -320,17 +330,17 @@ describe('public registers over Socket.IO', () => {
     }
     const publicPayloads = JSON.stringify([activation.state, actions, executionStates, next.state, otherNext.state])
     for (const card of [...a.hand, ...b.hand, ...next.hand, ...otherNext.hand]) expect(publicPayloads).not.toContain(card.id)
-    expect(await raw(first, update(a))).toEqual({ outcome: 'ACCEPTED' })
+    expect(await raw(first, update())).toEqual({ outcome: 'ACCEPTED' })
   })
 
   it('rejects occupancy during paused programming and execution while retaining revealed snapshots on reconnect', async () => {
     const first = await connect('A')
     const second = await connect('B')
     const [a, b] = await start([first, second])
-    await raw(first, update(a, full))
-    await raw(second, update(b, full))
+    await raw(first, update(full))
+    await raw(second, update(full))
     await disconnect(second)
-    expect(await raw(first, update(a))).toEqual({ outcome: 'WRONG_PHASE' })
+    expect(await raw(first, update())).toEqual({ outcome: 'WRONG_PHASE' })
     const returning = await connect('B')
     await snapshot(returning)
     const game = sessions[0].game
@@ -355,7 +365,7 @@ describe('public registers over Socket.IO', () => {
       { status: 'REVEALED', instruction: action.instruction },
       { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' },
     ])
-    expect(await raw(first, update(a))).toEqual({ outcome: 'WRONG_PHASE' })
+    expect(await raw(first, update())).toEqual({ outcome: 'WRONG_PHASE' })
     await disconnect(returning)
     const reconnected = await connect('B')
     const restored = await snapshot(reconnected)
@@ -368,8 +378,8 @@ describe('public registers over Socket.IO', () => {
     const first = await connect('A')
     const second = await connect('B')
     const joined = await start([first, second])
-    await raw(first, update(joined[0], full))
-    await raw(second, update(joined[1], full))
+    await raw(first, update(full))
+    await raw(second, update(full))
     const game = sessions[0].game
     const execute = game.executeNextAction.bind(game)
     let count = 0
@@ -407,7 +417,7 @@ describe('public registers over Socket.IO', () => {
     const original = await connect('Recovering')
     const peer = await connect('Peer')
     const [initial, other] = await start([original, peer])
-    expect(await raw(original, update(initial))).toEqual({ outcome: 'ACCEPTED' })
+    expect(await raw(original, update())).toEqual({ outcome: 'ACCEPTED' })
     const before = await snapshot(original)
     const disconnected = Promise.withResolvers<void>()
     server.sockets.sockets.get(original.id!)!.once('disconnect', () => disconnected.resolve())
@@ -430,7 +440,7 @@ describe('public registers over Socket.IO', () => {
     }
     const changed = Promise.withResolvers<RegistersChanged>()
     recovered.once('game.registersChanged', changed.resolve)
-    expect(await raw(recovered, update(initial, [false, false, false, false, false]))).toEqual({ outcome: 'ACCEPTED' })
+    expect(await raw(recovered, update([false, false, false, false, false]))).toEqual({ outcome: 'ACCEPTED' })
     expect(await changed.promise).toEqual({
       gameId: initial.assignment.gameId, playerId: initial.assignment.playerId, registers: empty,
     })

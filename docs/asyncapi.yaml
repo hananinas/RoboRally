@@ -573,16 +573,14 @@ components:
 
     UpdateRegisters:
       name: game.updateRegisters
-      description: Updates a player's register occupancy and returns an acknowledgement outcome.
+      description: >-
+        Updates register occupancy for the connection's owned game and player,
+        both derived from the authenticated session, and returns an acknowledgement outcome.
       payload:
         type: object
         additionalProperties: false
-        required: [ gameId, playerId, occupied ]
+        required: [ occupied ]
         properties:
-          gameId:
-            $ref: '#/components/schemas/GameId'
-          playerId:
-            $ref: '#/components/schemas/PlayerId'
           occupied:
             type: array
             minItems: 5
@@ -593,8 +591,6 @@ components:
       examples:
         - name: partiallyOccupied
           payload:
-            gameId: 00000000-0000-4000-8000-000000000001
-            playerId: 00000000-0000-4000-8000-000000000002
             occupied: [ true, false, true, false, false ]
 
     UpdateRegistersResult:
@@ -607,7 +603,7 @@ components:
         properties:
           outcome:
             type: string
-            enum: [ ACCEPTED, INVALID_REQUEST, NOT_A_MEMBER, PLAYER_ID_MISMATCH, WRONG_PHASE, ALREADY_SUBMITTED, INTERNAL_ERROR ]
+            enum: [ ACCEPTED, INVALID_REQUEST, NOT_A_MEMBER, WRONG_PHASE, ALREADY_SUBMITTED, INTERNAL_ERROR ]
       examples:
         - name: accepted
           payload:
