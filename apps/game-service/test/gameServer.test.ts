@@ -19,7 +19,7 @@ describe('started game membership over Socket.IO', () => {
   let url: string
   let clients: Client[]
   beforeEach(async () => {
-    shared = createGame('empty-map')
+    shared = createGame('empty-map', undefined, () => 0)
     clients = []
     await start()
   })

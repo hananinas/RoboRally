@@ -25,7 +25,7 @@ import {
 import { Integer } from '@/numbers'
 
 function createGameWithPlayer() {
-  const { gameId, game } = createGame('empty-map')
+    const { gameId, game } = createGame('empty-map', undefined, () => 0)
   const player = game.addPlayer()._unsafeUnwrap()
   return { gameId, game, player }
 }
