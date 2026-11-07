@@ -129,6 +129,11 @@ describe('public registers over Socket.IO', () => {
       })
       expect(events[0]).not.toHaveProperty('board')
       expect(events[0]).not.toHaveProperty('state')
+      for (const slot of events[0].registers) {
+        expect(slot).not.toHaveProperty('instruction')
+        expect(slot).not.toHaveProperty('cardId')
+        expect(slot).not.toHaveProperty('id')
+      }
     }
     expect(state.state.players.find((player) => player.playerId === a.assignment.playerId)?.registers).toEqual(registers)
     expect(state.hand).toEqual(b.hand)
@@ -333,6 +338,37 @@ describe('public registers over Socket.IO', () => {
     expect(await raw(first, update())).toEqual({ outcome: 'ACCEPTED' })
   })
 
+  it.each([
+    ['pause', 'GAME_PAUSED'],
+    ['abort', 'GAME_ABORTED'],
+  ] as const)('acknowledges %s rejection exactly once without broadcasting or mutation', async (transition, outcome) => {
+    const first = await connect('Owner')
+    const second = await connect('Peer')
+    await start([first, second])
+    expect(await raw(first, update(full))).toEqual({ outcome: 'ACCEPTED' })
+    await snapshot(first)
+    await snapshot(second)
+    const game = sessions[0].game
+    const before = game.players.map((player) => player.registers)
+    const events: RegistersChanged[] = []
+    for (const client of [first, second]) client.on('game.registersChanged', (event) => events.push(event))
+    const acknowledgementIds: (number | undefined)[] = []
+    // Observe decoded ACK packets, including duplicates ignored by emitWithAck.
+    first.io.on('packet', (packet: { type: number; id?: number }) => {
+      if (packet.type === 3) acknowledgementIds.push(packet.id)
+    })
+    game[transition]()
+    const result = await raw(first, update())
+    await snapshot(first)
+    await snapshot(second)
+    expect(result).toEqual({ outcome })
+    expect(acknowledgementIds).toHaveLength(2) // Command ACK, then the session.get barrier ACK.
+    expect(new Set(acknowledgementIds).size).toBe(2)
+    expect(events).toEqual([])
+    expect(game.players.map((player) => player.registers)).toEqual(before)
+    game.players.forEach((player, index) => expect(player.registers).toBe(before[index]))
+  })
+
   it('rejects occupancy during paused programming and execution while retaining revealed snapshots on reconnect', async () => {
     const first = await connect('A')
     const second = await connect('B')
@@ -340,7 +376,7 @@ describe('public registers over Socket.IO', () => {
     await raw(first, update(full))
     await raw(second, update(full))
     await disconnect(second)
-    expect(await raw(first, update())).toEqual({ outcome: 'WRONG_PHASE' })
+    expect(await raw(first, update())).toEqual({ outcome: 'GAME_PAUSED' })
     const returning = await connect('B')
     await snapshot(returning)
     const game = sessions[0].game
@@ -365,6 +401,8 @@ describe('public registers over Socket.IO', () => {
       { status: 'REVEALED', instruction: action.instruction },
       { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' },
     ])
+    // session.get resumes a game with no disconnected members; activation still rejects edits.
+    expect(executed.state.paused).toBe(false)
     expect(await raw(first, update())).toEqual({ outcome: 'WRONG_PHASE' })
     await disconnect(returning)
     const reconnected = await connect('B')

@@ -595,7 +595,12 @@ components:
 
     UpdateRegistersResult:
       name: game.updateRegistersResult
-      description: Acknowledges a register occupancy update with ACCEPTED or a rejection.
+      description: >-
+        Acknowledges a register occupancy update with ACCEPTED or a rejection.
+        NOT_A_MEMBER means the connection has no valid transport ownership of the game and player.
+        PLAYER_NOT_IN_GAME means the resolved player is absent from the domain game's roster.
+        GAME_ABORTED, GAME_FINISHED and GAME_PAUSED report lifecycle rejections;
+        rejected lifecycle updates neither mutate registers nor broadcast game.registersChanged.
       payload:
         type: object
         additionalProperties: false
@@ -603,7 +608,7 @@ components:
         properties:
           outcome:
             type: string
-            enum: [ ACCEPTED, INVALID_REQUEST, NOT_A_MEMBER, WRONG_PHASE, ALREADY_SUBMITTED, INTERNAL_ERROR ]
+            enum: [ ACCEPTED, INVALID_REQUEST, NOT_A_MEMBER, GAME_PAUSED, GAME_ABORTED, PLAYER_NOT_IN_GAME, GAME_FINISHED, WRONG_PHASE, ALREADY_SUBMITTED, INTERNAL_ERROR ]
       examples:
         - name: accepted
           payload:

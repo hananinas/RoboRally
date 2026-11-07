@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { err, ok, type Result } from 'neverthrow'
 import type { Board } from '@/game/Board'
-import { instructions, type PublicRegisters, type RegisterOccupancy, type UpdateRegistersResult } from '@robo-rally/game-events'
+import { instructions, type PublicRegisters, type RegisterOccupancy } from '@robo-rally/game-events'
 import { Card } from '@/game/Card'
 import type { CardId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
@@ -40,6 +40,9 @@ export type SubmitProgramError =
   | 'PLAYER_NOT_IN_GAME'
   | 'ALREADY_SUBMITTED'
   | 'INVALID_PROGRAM'
+
+export type UpdateRegistersError = Exclude<SubmitProgramError, 'INVALID_PROGRAM'>
+
 export const DEFAULT_GAME_NAME = 'Game'
 
 export class Game {
@@ -227,16 +230,10 @@ export class Game {
     )
   }
 
-  updateRegisters(playerId: PlayerId, occupied: RegisterOccupancy): UpdateRegistersResult {
-    const player = this.roster.find((candidate) => candidate.id === playerId)
-    if (!player) return { outcome: 'NOT_A_MEMBER' }
-    // The occupancy contract has no paused/aborted outcomes.
-    if (this.isPaused || this.isAborted || this.currentPhase !== 'programming') {
-      return { outcome: 'WRONG_PHASE' }
-    }
-    if (this.submittedPlayerIds.has(playerId)) return { outcome: 'ALREADY_SUBMITTED' }
-    player.updateRegisters(occupied)
-    return { outcome: 'ACCEPTED' }
+  updateRegisters(playerId: PlayerId, occupied: RegisterOccupancy): Result<void, UpdateRegistersError> {
+    return this.checkCanSubmitProgram(playerId).map((player) => {
+      player.updateRegisters(occupied)
+    })
   }
 
   recheckProgrammingPhase(): void {

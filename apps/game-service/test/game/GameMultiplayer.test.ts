@@ -124,7 +124,7 @@ describe('Game multiplayer activation', () => {
       players.forEach((player, index) => {
         expect(player.hand).toEqual(deck)
         expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
-        expect(game.updateRegisters(player.id, [true, true, true, true, true])).toEqual({ outcome: 'ACCEPTED' })
+        expect(game.updateRegisters(player.id, [true, true, true, true, true])._unsafeUnwrap()).toBeUndefined()
         game.submitProgram(player.id, programs[index].map((card) => card.id))
         expect(game.phase).toBe(index === players.length - 1 ? 'activation' : 'programming')
         player.setHand([])
