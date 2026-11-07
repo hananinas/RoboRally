@@ -41,8 +41,6 @@ export default function useGameConnection(socket: GameSocket) {
     const requestGeneration = generation.current
     const handVersion = next.handVersion
     socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit('game.updateRegisters', {
-      gameId: next.assignment.gameId,
-      playerId: next.assignment.playerId,
       occupied: [
         !!next.registers[0], !!next.registers[1], !!next.registers[2],
         !!next.registers[3], !!next.registers[4],

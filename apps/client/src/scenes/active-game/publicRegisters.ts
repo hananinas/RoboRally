@@ -32,14 +32,13 @@ export type PublicRegisterEvents = {
 }
 
 export type PublicRegisterCommands = {
+  // Game and player identity come from the authenticated session, not the payload.
   'game.updateRegisters': (
     payload: Readonly<{
-      gameId: GameId
-      playerId: PlayerId
       occupied: readonly [boolean, boolean, boolean, boolean, boolean]
     }>,
     acknowledge: (result: Readonly<{
-      outcome: 'ACCEPTED' | 'INVALID_REQUEST' | 'NOT_A_MEMBER' | 'PLAYER_ID_MISMATCH'
+      outcome: 'ACCEPTED' | 'INVALID_REQUEST' | 'NOT_A_MEMBER'
         | 'WRONG_PHASE' | 'ALREADY_SUBMITTED' | 'INTERNAL_ERROR'
     }>) => void,
   ) => void

@@ -273,8 +273,6 @@ io.on('connection', (socket) => {
   })
 
   socket.on('game.updateRegisters', (payload, acknowledge) => {
-    if (payload.gameId !== GAME_ID) return acknowledge({ outcome: 'NOT_A_MEMBER' })
-    if (payload.playerId !== PLAYER_ID) return acknowledge({ outcome: 'PLAYER_ID_MISMATCH' })
     const registers: PublicRegisters = [
       { status: payload.occupied[0] ? 'HIDDEN' : 'EMPTY' },
       { status: payload.occupied[1] ? 'HIDDEN' : 'EMPTY' },
