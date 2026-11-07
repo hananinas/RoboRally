@@ -9,6 +9,8 @@ import {
 } from '../board/boardConfig.ts'
 import { tileCentre } from '../board/boardMath.ts'
 import {
+  PIT_FALL_DURATION_MS,
+  PIT_RESPAWN_DURATION_MS,
   ROBOT_MOVE_DURATION_MS,
   ROBOT_TURN_DURATION_MS,
   type DisplayRobot,
@@ -37,6 +39,8 @@ type PieceStyle = CSSProperties &
     '--tank-colour'?: string
     '--tank-move-duration'?: string
     '--tank-turn-duration'?: string
+    '--pit-fall-duration'?: string
+    '--pit-respawn-duration'?: string
   }>
 
 function holeColour(blend: number): string {
@@ -178,6 +182,7 @@ function RobotPiece({
       )}
       data-board-tile={`${robot.position.coordinate.x},${robot.position.coordinate.y}`}
       data-robot-id={robot.robotId}
+      data-pit-phase={robot.pitPhase}
       preserveAspectRatio="xMidYMid meet"
       style={style}
       viewBox={component.asset.viewBox}
@@ -202,6 +207,8 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
   )
   useBoardInteraction({ canvasRef, robots, scene, viewportRef })
   const checkpointTiles = scene.tiles.filter((tile) => tile.cell.checkpointNumber !== undefined)
+  const fallingInto = new Set(robots.flatMap((robot) => robot.pitPhase === 'fall'
+    ? [`${robot.position.coordinate.x},${robot.position.coordinate.y}`] : []))
 
   return (
     <main
@@ -211,6 +218,8 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
       style={{
         '--tank-move-duration': `${ROBOT_MOVE_DURATION_MS}ms`,
         '--tank-turn-duration': `${ROBOT_TURN_DURATION_MS}ms`,
+        '--pit-fall-duration': `${PIT_FALL_DURATION_MS}ms`,
+        '--pit-respawn-duration': `${PIT_RESPAWN_DURATION_MS}ms`,
       } as PieceStyle}
     >
       <div
@@ -254,6 +263,7 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
                     data-board-height="0"
                     data-board-tile-type="hole"
                     data-board-tile={`${hole.cell.x},${hole.cell.y}`}
+                    data-pit-active={fallingInto.has(`${hole.cell.x},${hole.cell.y}`) || undefined}
                     key={hole.key}
                     style={{
                       background: holeColour(BOARD_CONFIG.hole.colourOffset),

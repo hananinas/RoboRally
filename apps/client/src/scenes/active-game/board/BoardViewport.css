@@ -22,6 +22,8 @@
   --board-wall-yellow-end: #b4a301;
   --tank-move-duration: 600ms;
   --tank-turn-duration: 300ms;
+  --pit-fall-duration: 450ms;
+  --pit-respawn-duration: 300ms;
   --tank-motion-easing: cubic-bezier(0.4, 0, 0.2, 1);
 
   overflow: hidden;
@@ -71,6 +73,21 @@
     left var(--tank-move-duration) var(--tank-motion-easing),
     top var(--tank-move-duration) var(--tank-motion-easing),
     --board-piece-angle var(--tank-turn-duration) var(--tank-motion-easing);
+}
+
+/* The tank sinks into the hole, then appears at its reboot position. */
+.board-piece--test-tank[data-pit-phase='fall'] {
+  scale: 0.35;
+  opacity: 0;
+  transition:
+    scale var(--pit-fall-duration) ease-in,
+    opacity var(--pit-fall-duration) ease-in;
+}
+
+.board-piece--test-tank[data-pit-phase='respawn'] {
+  transition:
+    scale var(--pit-respawn-duration) var(--tank-motion-easing),
+    opacity var(--pit-respawn-duration) var(--tank-motion-easing);
 }
 
 .board-piece--checkpoint {
@@ -159,6 +176,11 @@
 .board-piece--hole {
   overflow: hidden;
   box-shadow: var(--board-hole-shadow);
+  transition: box-shadow var(--pit-fall-duration) ease-in;
+}
+
+.board-piece--hole[data-pit-active] {
+  box-shadow: var(--board-hole-shadow), inset 0 0 0 3px var(--board-hole-bottom);
 }
 
 .board-hole-depth {
