@@ -1,4 +1,4 @@
-import { emptyRequestSchema, type EmptyRequest, type SessionResult, type LeaveGame, type LeaveResult, type SubmitProgram, type ProgramResult } from '@robo-rally/game-events'
+import { emptyRequestSchema, type EmptyRequest, type SessionResult, type LeaveResult, type SubmitProgram, type ProgramResult } from '@robo-rally/game-events'
 import type { GameSocket } from '@/socket/gameServer'
 import { currentGame, type SessionContext } from '@/socket/sessionContext'
 import { presentLobby, leaveLobby } from '@/socket/handlers/lobbyHandlers'
@@ -52,7 +52,7 @@ export function recoverSession(context: SessionContext, socket: GameSocket): voi
 export function handleLeaveGame(
   context: SessionContext,
   socket: GameSocket,
-  payload: LeaveGame,
+  payload: EmptyRequest,
   acknowledge: (result: LeaveResult) => void,
 ): void {
   if (typeof acknowledge !== 'function') return

@@ -69,10 +69,8 @@ describe('game factory', () => {
       'TURN_RIGHT', 'U_TURN', 'MOVE_1', 'TURN_LEFT',
     ])
     expect(submitProgramSchema.parse({
-      gameId: '00000000-0000-4000-8000-000000000001',
-      playerId: first.id,
       cardIds: cardIds.slice(0, 5),
-    })).toMatchObject({ playerId: first.id, cardIds: cardIds.slice(0, 5) })
+    })).toMatchObject({ cardIds: cardIds.slice(0, 5) })
   })
 
   it('places an added player at the centre of the board', () => {
