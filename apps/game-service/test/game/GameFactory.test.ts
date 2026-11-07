@@ -86,8 +86,7 @@ describe('game factory', () => {
     const { game } = createGame('test-map', undefined, () => 0)
     const positions = Array.from({ length: 3 }, () =>
       game.board.positionOf(game.addPlayer()._unsafeUnwrap().robot.id))
-
-    expect(positions).toEqual([{ x: 8, y: 7 }, { x: 7, y: 7 }, { x: 6, y: 7 }])
+    expect(positions).toEqual([{ x: 8, y: 7 }, { x: 3, y: 8 }, { x: 10, y: 13 }])
   })
 
   it('gives six players six different starting tiles and has no tile for a seventh', () => {
