@@ -84,6 +84,14 @@
   font-size: 11.5px;
   font-weight: 700;
 }
+/* The starting tile takes the robot's colour and keeps it all game. */
+.board-piece--start-tile {
+  box-sizing: border-box;
+  border: 4px solid var(--start-tile-colour);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--start-tile-colour) 35%, transparent);
+  pointer-events: none;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .board-piece--test-tank {
