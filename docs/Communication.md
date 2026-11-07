@@ -187,19 +187,19 @@ The service broadcasts timer changes to the public room:
 | Running | `{status: RUNNING, deadline}` | Programming closes at the server deadline. |
 | Closed | `{status: CLOSED}` | Programming is closed; edits and submissions are disabled. |
 
-`PublicGameState.programmingTimer` uses the same representation. Timer changes are sent when the countdown starts, closes, or resets. There are no per-second broadcasts. Clients use the server time and deadline to display the remaining seconds, clamped at zero. The server decides when programming ends; reaching zero locally does not submit cards or start activation.
+`PublicGameState.programmingTimer` uses the same representation. The service broadcasts starts, closures, and resets, not per-second updates. Clients display the remaining seconds from the server time and deadline, clamped at zero. Only the server closes programming; local zero does not submit cards or start activation.
 
 The service accepts edits and submissions only if they are validated and applied before the deadline. At or after the deadline, it closes programming before handling another edit or submission, even if its timeout callback has not run yet. `WRONG_PHASE` rejects requests for the current round once it has closed; `STALE_ROUND` rejects requests carrying a different round number. Client timestamps do not extend the deadline. Repeating an accepted submission does not restart the timer.
 
 #### Completing unfinished programs
 
-When time expires, the service locks the last accepted draft for each unfinished player. Assigned registers keep their cards and positions, including assignments after an empty slot. The service discards the player's remaining hand, excluding assigned cards, then draws from the top of that player's programming deck to fill empty registers in register order. If the deck runs out, it shuffles the discard pile to replenish it before continuing. Discarded hand cards can therefore be drawn again after a reshuffle. Cards already assigned to registers cannot enter the discard pile during this operation.
+When time expires, the service locks each unfinished player's last accepted draft, preserving every assigned card and its position. It discards only unassigned hand cards, then fills empty registers in order from the top of that player's deck. If the deck runs out, it shuffles the discard pile to replenish it. Discarded hand cards may be drawn again; assigned cards never enter the discard pile during completion.
 
 A player with five assigned draft cards keeps all five, even if they did not submit. A player with no assigned cards receives five drawn cards. Programs submitted before the deadline remain unchanged. This requires the private programming deck and discard pile from #194 and #196; choosing arbitrary instructions or replacing the whole draft does not satisfy this contract.
 
 For each completed program, the service sends `program.completed {gameId, playerId, roundNumber, reason: TIMEOUT, cards}` through the player's private room. The client replaces its draft with these five cards, clears its discarded hand, and disables programming. The public room receives `game.registersChanged` with five HIDDEN slots and `program.submitted`, without the cards. `programSubmitted` is true for both manually submitted and automatically completed programs.
 
-All unfinished programs are completed before any robot action executes. The service publishes completion events, then `program.timerChanged` with `CLOSED`, then the activation events. If everyone submits early, it follows the same closing order without drawing replacement cards. A departure that leaves all remaining players submitted also closes programming immediately. Once started, the countdown is not cancelled or restarted because its first submitter leaves.
+The service completes all programs and publishes their completion events before `program.timerChanged` with `CLOSED`, followed by activation events. If everyone submits early, the same order applies without drawing cards. A departure closes programming if all remaining players have submitted; otherwise the countdown continues, even if its first submitter leaves.
 
 #### Restoring the timer
 
