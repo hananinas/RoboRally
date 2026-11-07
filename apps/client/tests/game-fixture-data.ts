@@ -86,8 +86,8 @@ export type FixtureSnapshot = {
   state: PublicGameState
   submissions: readonly SubmitProgram[]
   entryRequests: readonly (
-    | { event: 'session.get' | 'lobby.create'; socketId: string; payload: Record<string, never> }
-    | { event: 'lobby.join' | 'lobby.start'; socketId: string; payload: { lobbyId: string } }
+    | { event: 'session.get' | 'lobby.create' | 'lobby.start'; socketId: string; payload: Record<string, never> }
+    | { event: 'lobby.join'; socketId: string; payload: { lobbyId: string } }
   )[]
   pendingStarts: number
 }

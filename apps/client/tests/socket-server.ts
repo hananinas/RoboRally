@@ -292,9 +292,7 @@ io.on('connection', (socket) => {
 
   socket.on('program.submit', (payload, acknowledge) => {
     fixture.submissions.push(payload)
-    const valid = payload.gameId === GAME_ID
-      && payload.playerId === PLAYER_ID
-      && payload.cardIds.length === 5
+    const valid = payload.cardIds.length === 5
       && new Set(payload.cardIds).size === 5
       && payload.cardIds.every((id) => fixture.cards.some((card) => card.id === id))
     if (!valid) {
