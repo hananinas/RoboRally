@@ -57,7 +57,7 @@ export const boardMaps = {
     rebootTile: { x: Integer(10), y: Integer(7) },
     antenna: { x: Integer(10), y: Integer(0), angle: Math.PI / 2 },
     checkpoints: [[10, 6], [8, 9]],
-    startTiles: [[8, 7], [7, 7], [6, 7], [5, 7], [4, 7], [3, 7]],
+    startTiles: [[8, 7], [3, 8], [10, 13], [1, 4], [10, 3], [5, 12]],
     walls: [
       // TEST written top left corner of map
       { at: [1, 1], directions: [N, E] },

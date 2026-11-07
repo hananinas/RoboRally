@@ -78,8 +78,8 @@ describe('game factory', () => {
     const player = game.addPlayer('#4d8deb')._unsafeUnwrap()
 
     expect(player.robot.colour).toBe('#4d8deb')
-    expect(game.board.positionOf(player.robot.id)).toEqual({ x: 3, y: 7 })
-    expect(game.startPositionOf(player.robot.id)).toEqual({ x: 3, y: 7 })
+    expect(game.board.positionOf(player.robot.id)).toEqual({ x: 5, y: 12 })
+    expect(game.startPositionOf(player.robot.id)).toEqual({ x: 5, y: 12 })
   })
 
   it('only picks starting tiles that are still free', () => {
