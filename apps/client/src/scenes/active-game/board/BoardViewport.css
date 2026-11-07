@@ -84,8 +84,12 @@
     opacity var(--pit-fall-duration) ease-in;
 }
 
+/* Respawn places the tank at once; only its appearance animates. */
 .board-piece--test-tank[data-pit-phase='respawn'] {
   transition:
+    left 0s,
+    top 0s,
+    --board-piece-angle 0s,
     scale var(--pit-respawn-duration) var(--tank-motion-easing),
     opacity var(--pit-respawn-duration) var(--tank-motion-easing);
 }
