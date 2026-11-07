@@ -16,6 +16,7 @@ export type Robot = Readonly<{
   colour: string
   position: RobotPosition
   playerId?: PlayerId
+  startPosition: Coordinate
 }>
 export type ResolvedRobotAction = RobotActionResolved
 // Moving onto the pit, sinking into it, then appearing at the reboot position.

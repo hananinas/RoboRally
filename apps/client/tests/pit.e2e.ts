@@ -34,7 +34,10 @@ function motion(tank: Locator) {
   return tank.evaluate((element) => {
     const style = getComputedStyle(element)
     return {
-      transitioning: element.getAnimations().map((animation) => (animation as CSSTransition).transitionProperty).sort(),
+      transitioning: element.getAnimations()
+        .filter((animation) => animation instanceof CSSTransition)
+        .map((animation) => animation.transitionProperty)
+        .sort(),
       placed: style.left === (element as SVGElement).style.left && style.top === (element as SVGElement).style.top,
     }
   })

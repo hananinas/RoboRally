@@ -19,7 +19,7 @@ describe('started game membership over Socket.IO', () => {
   let url: string
   let clients: Client[]
   beforeEach(async () => {
-    shared = createGame('empty-map')
+    shared = createGame('empty-map', undefined, () => 0)
     clients = []
     await start()
   })
@@ -59,6 +59,18 @@ describe('started game membership over Socket.IO', () => {
     const ready = members.map((member) => new Promise<GameInitialization>((resolve) => member.once('game.started', ({ initialization }) => resolve(initialization))))
     expect((await members[0].emitWithAck('lobby.start', {})).outcome).toBe('STARTED')
     return { members, initializations: await Promise.all(ready) }
+  }
+  async function connectWithSessionId(username: string, expiresInSeconds = 3600): Promise<{ client: Client; sessionId: string }> {
+    const sessionId = sessionStore.create(username, username, 'test-id-token', expiresInSeconds)
+    const client: Client = io(url, {
+      autoConnect: false, transports: ['websocket'], reconnection: false, ackTimeout: 1000,
+      extraHeaders: { Cookie: `game_session=${sessionId}` },
+    })
+    clients.push(client)
+    const connected = new Promise<void>((resolve) => client.once('connect', resolve))
+    client.connect()
+    await connected
+    return { client, sessionId }
   }
   async function disconnect(client: Client, recoverable = false) {
     const closed = new Promise((resolve) => server.sockets.sockets.get(client.id!)!.once('disconnect', resolve))
@@ -179,6 +191,71 @@ describe('started game membership over Socket.IO', () => {
     first.connect()
     expect((await rejected).message).toBe('SESSION_MISMATCH')
     expect(shared.game.paused).toBe(true)
+  })
+  it('rejects a recovery attempt and withholds buffered updates once the backing session was destroyed while disconnected', async () => {
+    const { client: first, sessionId } = await connectWithSessionId('First')
+    const second = await connect('Second')
+    const created = await first.emitWithAck('lobby.create', {})
+    if (created.outcome !== 'LOBBY_JOINED') throw new Error(created.outcome)
+    await second.emitWithAck('lobby.join', { lobbyId: created.lobby.lobbyId })
+    await disconnect(first, true)
+    sessionStore.destroy(sessionId)
+    const third = await connect('Third')
+    await third.emitWithAck('lobby.join', { lobbyId: created.lobby.lobbyId })
+    const rejected = new Promise<Error>((resolve) => first.once('connect_error', resolve))
+    const receivedUpdate = vi.fn()
+    first.once('lobby.updated', receivedUpdate)
+    first.connect()
+    expect((await rejected).message).toBe('UNAUTHENTICATED')
+    expect(receivedUpdate).not.toHaveBeenCalled()
+  })
+  it('drops a still-connected member and withholds further broadcasts once their session is destroyed', async () => {
+    const { client: first, sessionId } = await connectWithSessionId('First')
+    const second = await connect('Second')
+    const created = await second.emitWithAck('lobby.create', {})
+    if (created.outcome !== 'LOBBY_JOINED') throw new Error(created.outcome)
+    await first.emitWithAck('lobby.join', { lobbyId: created.lobby.lobbyId })
+    sessionStore.destroy(sessionId)
+    const firstReceivedStart = vi.fn()
+    first.once('game.started', firstReceivedStart)
+    const disconnected = new Promise<void>((resolve) => first.once('disconnect', () => resolve()))
+    const started = new Promise((resolve) => second.once('game.started', resolve))
+    expect((await second.emitWithAck('lobby.start', {})).outcome).toBe('STARTED')
+    await started
+    await disconnected
+    expect(firstReceivedStart).not.toHaveBeenCalled()
+  })
+  it('rejects a command from a still-connected socket once its session is destroyed and disconnects it', async () => {
+    const { client: first, sessionId } = await connectWithSessionId('First')
+    sessionStore.destroy(sessionId)
+    const disconnected = new Promise<void>((resolve) => first.once('disconnect', () => resolve()))
+    await expect(first.timeout(500).emitWithAck('lobby.create', {})).rejects.toThrow()
+    await disconnected
+  })
+  it('rejects a command from a still-connected socket once its session naturally expires and disconnects it', async () => {
+    const { client: first, sessionId } = await connectWithSessionId('First', 0.05)
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    expect(sessionStore.get(sessionId)).toBeUndefined()
+    const disconnected = new Promise<void>((resolve) => first.once('disconnect', () => resolve()))
+    await expect(first.timeout(500).emitWithAck('lobby.create', {})).rejects.toThrow()
+    await disconnected
+  })
+  it('drops a still-connected member and withholds further broadcasts once their session naturally expires', async () => {
+    const { client: first, sessionId } = await connectWithSessionId('First', 0.05)
+    const second = await connect('Second')
+    const created = await second.emitWithAck('lobby.create', {})
+    if (created.outcome !== 'LOBBY_JOINED') throw new Error(created.outcome)
+    await first.emitWithAck('lobby.join', { lobbyId: created.lobby.lobbyId })
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    expect(sessionStore.get(sessionId)).toBeUndefined()
+    const firstReceivedStart = vi.fn()
+    first.once('game.started', firstReceivedStart)
+    const disconnected = new Promise<void>((resolve) => first.once('disconnect', () => resolve()))
+    const started = new Promise((resolve) => second.once('game.started', resolve))
+    expect((await second.emitWithAck('lobby.start', {})).outcome).toBe('STARTED')
+    await started
+    await disconnected
+    expect(firstReceivedStart).not.toHaveBeenCalled()
   })
   it('keeps the game paused when a reconnect snapshot fails and permits retry', async () => {
     const { members: [first], initializations: [initial] } = await startGame(['First'])
@@ -367,6 +444,7 @@ describe('started game membership over Socket.IO', () => {
         robotId: initial.assignment.robotId, playerId: initial.assignment.playerId,
         colour: initial.state.robots[0].colour,
         position: actions[4].position,
+        startPosition: initial.state.robots[0].startPosition,
       }])
       expect(snapshot.state.players[0].lastCheckpoint).toBe(1)
       expect(shared.game.board.occupantAt({ x: Integer(2), y: Integer(1) })).toBeUndefined()
@@ -421,6 +499,7 @@ describe('started game membership over Socket.IO', () => {
           robotId: joined.assignment.robotId, playerId: joined.assignment.playerId,
           colour: initializations[0].state.robots.find((robot) => robot.robotId === joined.assignment.robotId)!.colour,
           position: actions[0].findLast((action) => action.robotId === joined.assignment.robotId)!.position,
+          startPosition: initializations[0].state.robots.find((robot) => robot.robotId === joined.assignment.robotId)!.startPosition,
         })))
         expect(new Set(snapshot.state.robots.map(({ position }) =>
           `${position.coordinate.x},${position.coordinate.y}`)).size).toBe(3)

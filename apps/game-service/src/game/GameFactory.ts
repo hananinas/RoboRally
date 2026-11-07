@@ -44,12 +44,13 @@ export function createSharedGame(): Readonly<{ gameId: GameId; game: Game }> {
 export function createGame(
   mapName: BoardMapName = 'test-map',
   name?: string,
+  random?: () => number,
 ): Readonly<{ gameId: GameId; game: Game }> {
   const map: MapSpec = boardMaps[mapName]
-  const game = new Game(createBoard(mapName), [], createHand(), map.rebootTile, name)
+  const game = new Game(createBoard(mapName), [], createHand(), map.rebootTile, name, random)
   return { gameId: GAME_ID, game }
 }
 
-export function createDefaultGame(): Readonly<{ gameId: string; game: Game }> {
-  return { ...createGame(), gameId: randomUUID() }
+export function createDefaultGame(random?: () => number): Readonly<{ gameId: string; game: Game }> {
+  return { ...createGame('test-map', undefined, random), gameId: randomUUID() }
 }
