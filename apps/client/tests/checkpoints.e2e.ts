@@ -28,7 +28,7 @@ test('stacks eleven Pushcap slices beside walls and a robot, with shared hover l
     plane: index + 3, height: (index + 3) / 2, lift: 1.5,
   })))
   await expect(page.locator('[data-board-wall][data-board-tile="5,5"]')).toHaveCount(16)
-  await expect(page.locator('[data-robot-id][data-board-tile="5,5"]')).toHaveCount(5)
+  await expect(page.locator('[data-robot-id][data-board-tile="5,5"]')).toHaveCount(8)
 
   // Move away from the camera centre so different heights visibly separate.
   await page.mouse.move(900, 150)

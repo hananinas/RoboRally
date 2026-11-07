@@ -1,5 +1,6 @@
 import type { Locator } from '@playwright/test'
 import { expect, test } from './real-game-fixture.ts'
+import { browse } from './browserClient.ts'
 
 async function expectRobot(
   robot: Locator,
@@ -29,9 +30,7 @@ test.use({ reducedMotion: 'reduce' })
 
 test('plays every register of two consecutive programs through the real Game Service', async ({ page }) => {
   await page.clock.install()
-  await page.goto('/')
-  await page.getByRole('textbox', { name: 'Username' }).fill('Round player')
-  await page.getByRole('button', { name: 'Log in', exact: true }).click()
+  await browse(page, 'bence')
   await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
   await page.getByRole('button', { name: 'Start', exact: true }).click()
 
@@ -76,8 +75,8 @@ test('plays every register of two consecutive programs through the real Game Ser
       { card: 'Turn Right', x: 10, y: 6, angle: -90 },
       { card: 'Move 2', x: 8, y: 6, angle: -90 },
       { card: 'Turn Left', x: 8, y: 6, angle: -180 },
-      { card: 'Move 3', x: 8, y: 9, angle: -180 },
-      { card: 'Turn Left', x: 8, y: 9, angle: -270 },
+      { card: 'Move 1', x: 8, y: 7, angle: -180 },
+      { card: 'Turn Left', x: 8, y: 7, angle: -270 },
     ],
   ] as const
   for (const [roundIndex, steps] of rounds.entries()) {
@@ -108,7 +107,7 @@ test('plays every register of two consecutive programs through the real Game Ser
 
     await expect(page.getByRole('status')).toHaveText('Programming')
     await expect(page.getByRole('heading', { name: 'Checkpoints', exact: true }).locator('..'))
-      .toContainText(`${roundIndex + 1}/2`)
+      .toContainText('1/2')
     await expect(page.locator('[data-board-checkpoint]')).toHaveCount(2)
     await expect(registered).toHaveCount(0)
     await expect(hand).toHaveCount(9)

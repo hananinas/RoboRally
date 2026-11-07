@@ -16,11 +16,9 @@ import {
   registerLoginRoute,
   registerRecoveryRoute,
   registerRegistrationRoute,
-  registerSessionsRoute,
   registerSettingsRoute,
   registerStaticRoutes,
   registerVerificationRoute,
-  registerWelcomeRoute,
   registerLogoutRoute,
 } from "./routes"
 import { csrfErrorHandler } from "./routes/csrfError"
@@ -94,13 +92,9 @@ registerRecoveryRoute(router)
 registerRegistrationRoute(router)
 registerSettingsRoute(router)
 registerVerificationRoute(router)
-registerSessionsRoute(router)
-registerWelcomeRoute(router)
 registerErrorRoute(router)
 
-// all routes registered under the /consent path are protected by CSRF
-router.use("/consent", doubleCsrfProtection)
-router.use("/consent", csrfErrorHandler(invalidCsrfTokenError))
+// /consent has no interactive form to submit, so it doesn't need CSRF protection
 registerConsentRoute(router)
 
 // all routes registered under the /logout path are protected by CSRF
@@ -109,7 +103,7 @@ router.use("/logout", csrfErrorHandler(invalidCsrfTokenError))
 registerLogoutRoute(router)
 
 router.get("/", (req: Request, res: Response) => {
-  res.redirect(303, "welcome")
+  res.redirect(303, "login")
 })
 
 register404Route(router)

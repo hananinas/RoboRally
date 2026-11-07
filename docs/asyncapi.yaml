@@ -2,7 +2,7 @@ asyncapi: 3.1.0
 
 info:
   title: Game Service
-  version: 0.5.0-draft
+  version: 1.2.0
   description: |-
     This document describes RoboRally's client-server communication. No code change
     regarding communication should be made without updating this document.
@@ -28,12 +28,13 @@ channels:
         $ref: '#/components/messages/LobbyStart'
       getSession:
         $ref: '#/components/messages/SessionGet'
-      login:
-        $ref: '#/components/messages/Login'
       leaveGame:
         $ref: '#/components/messages/LeaveGame'
       submitProgram:
         $ref: '#/components/messages/SubmitProgram'
+      updateRegisters:
+        $ref: '#/components/messages/UpdateRegisters'
+
   lobbyListReplies:
     address: null
     description: Socket.IO acknowledgement of lobby.list.
@@ -85,15 +86,6 @@ channels:
       updated:
         $ref: '#/components/messages/LobbyUpdated'
 
-  loginReplies:
-    address: null
-    description: |
-      Logical reply channel
-      Delivered through the acknowledgement of user.login
-    messages:
-      result:
-        $ref: '#/components/messages/LoginResult'
-
   leaveReplies:
     address: null
     description: |
@@ -111,6 +103,13 @@ channels:
     messages:
       programResult:
         $ref: '#/components/messages/ProgramResult'
+
+  updateRegistersReplies:
+    address: null
+    description: Delivered through the acknowledgement of game.updateRegisters.
+    messages:
+      result:
+        $ref: '#/components/messages/UpdateRegistersResult'
 
   player:
     address: 'game:{gameId}:player:{playerId}'
@@ -135,6 +134,8 @@ channels:
         $ref: '#/components/messages/ProgramSubmitted'
       robotActionResolved:
         $ref: '#/components/messages/RobotActionResolved'
+      registersChanged:
+        $ref: '#/components/messages/RegistersChanged'
       playerCheckpointProgress:
         $ref: '#/components/messages/PlayerCheckpointProgress'
       playerLeft:
@@ -143,22 +144,10 @@ channels:
         $ref: '#/components/messages/PlayerConnectionChanged'
       gameAborted:
         $ref: '#/components/messages/GameAborted'
+      gameWon:
+        $ref: '#/components/messages/GameWon'
 
 operations:
-  handleLogin:
-    action: receive
-    channel:
-      $ref: '#/channels/commands'
-    messages:
-      - $ref: '#/channels/commands/messages/login'
-    reply:
-      channel:
-        $ref: '#/channels/loginReplies'
-      messages:
-        - $ref: '#/channels/loginReplies/messages/result'
-      x-socketio:
-        acknowledgement: true
-
   handleLeaveGame:
     action: receive
     channel:
@@ -184,6 +173,20 @@ operations:
         $ref: '#/channels/programReplies'
       messages:
         - $ref: '#/channels/programReplies/messages/programResult'
+      x-socketio:
+        acknowledgement: true
+
+  handleUpdateRegisters:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/updateRegisters'
+    reply:
+      channel:
+        $ref: '#/channels/updateRegistersReplies'
+      messages:
+        - $ref: '#/channels/updateRegistersReplies/messages/result'
       x-socketio:
         acknowledgement: true
 
@@ -317,8 +320,11 @@ components:
         $ref: '#/components/schemas/LobbyJoinResult'
     LobbyLeave:
       name: lobby.leave
+      description: >-
+        Leaves the lobby membership owned by this connection, identified via
+        the authenticated session.
       payload:
-        $ref: '#/components/schemas/LobbyRequest'
+        $ref: '#/components/schemas/EmptyRequest'
     LobbyLeaveReply:
       name: lobby.leaveResult
       description: Delivered only through the request acknowledgement.
@@ -326,8 +332,11 @@ components:
         $ref: '#/components/schemas/LobbyLeaveResult'
     LobbyStart:
       name: lobby.start
+      description: >-
+        Starts the lobby owned by this connection, identified via the
+        authenticated session. Only the owner may start.
       payload:
-        $ref: '#/components/schemas/LobbyRequest'
+        $ref: '#/components/schemas/EmptyRequest'
     LobbyStartReply:
       name: lobby.startResult
       description: Delivered only through the request acknowledgement.
@@ -350,53 +359,89 @@ components:
       name: game.started
       payload:
         $ref: '#/components/schemas/GameStarted'
-
-    Login:
-      name: user.login
-      description: Requests a user identity for a username.
-      payload:
-        $ref: '#/components/schemas/Login'
-
+      description: Initializes the player with their assignment, public state including every player's registers, private hand, and submission status.
       examples:
-        - name: "username"
-          summary: "Exact username, no normalization"
+        - name: started
+          summary: One-tile illustrative board; normal initial hand
           payload:
-            username: "Dane"
-
-    LoginResult:
-      name: user.loginResult
-      description: Returns an approved user identity or a rejection.
-      payload:
-        $ref: '#/components/schemas/LoginResult'
-
-      examples:
-        - name: "loggedIn"
-          summary: "Same shape for new and existing users"
-          payload:
-            outcome: "LOGGED_IN"
-            user:
-              userId: "00000000-0000-4000-8000-000000000004"
-              username: "Dane"
-        - name: "invalidUsername"
-          summary: "Empty or overlong username"
-          payload:
-            outcome: "INVALID_USERNAME"
+            lobbyId: 00000000-0000-4000-8000-000000000005
+            initialization:
+              outcome: JOINED
+              assignment:
+                gameId: 00000000-0000-4000-8000-000000000001
+                playerId: 00000000-0000-4000-8000-000000000002
+                robotId: 00000000-0000-4000-8000-000000000003
+              state:
+                gameId: 00000000-0000-4000-8000-000000000001
+                checkpointCount: 0
+                board:
+                  width: 1
+                  height: 1
+                  tiles:
+                    - position:
+                        x: 0
+                        y: 0
+                      type: EMPTY
+                robots:
+                  - robotId: 00000000-0000-4000-8000-000000000003
+                    playerId: 00000000-0000-4000-8000-000000000002
+                    colour: red
+                    position:
+                      coordinate:
+                        x: 0
+                        y: 0
+                      orientation: NORTH
+                phase: PROGRAMMING
+                antenna:
+                  x: 0
+                  y: 0
+                  angle: 1.5707963267948966
+                players:
+                  - playerId: 00000000-0000-4000-8000-000000000002
+                    username: Dane
+                    lastCheckpoint: 0
+                    programSubmitted: false
+                    connected: true
+                    registers:
+                      - status: EMPTY
+                      - status: EMPTY
+                      - status: EMPTY
+                      - status: EMPTY
+                      - status: EMPTY
+                paused: false
+                aborted: false
+              hand:
+                - id: 00000000-0000-4000-8000-000000000101
+                  instruction: MOVE_1
+                - id: 00000000-0000-4000-8000-000000000102
+                  instruction: MOVE_2
+                - id: 00000000-0000-4000-8000-000000000103
+                  instruction: MOVE_3
+                - id: 00000000-0000-4000-8000-000000000104
+                  instruction: BACK_UP
+                - id: 00000000-0000-4000-8000-000000000105
+                  instruction: TURN_LEFT
+                - id: 00000000-0000-4000-8000-000000000106
+                  instruction: TURN_RIGHT
+                - id: 00000000-0000-4000-8000-000000000107
+                  instruction: U_TURN
+                - id: 00000000-0000-4000-8000-000000000108
+                  instruction: MOVE_1
+                - id: 00000000-0000-4000-8000-000000000109
+                  instruction: TURN_LEFT
+              programSubmitted: false
 
     LeaveGame:
       name: game.leave
       description: >-
-        Requests explicit departure for the membership owned by this connection.
+        Requests explicit departure for the membership owned by this connection,
+        identified via the authenticated session.
         On success, removes the player and robot, frees the occupied tile, and
-        removes the connection from the public and private player rooms while
-        retaining login. Disconnecting retains membership and does not send
-        game.playerLeft. Leaving does not reopen a game that has already started.
+        removes the connection from the public and private player rooms.
+        Disconnecting retains membership and does not send game.playerLeft.
+        Leaving does not reopen a game that has already started.
       payload:
-        $ref: '#/components/schemas/JoinGame'
-      examples:
-        - name: leave
-          summary: Explicitly leave the assigned game
-          payload:
-            gameId: 00000000-0000-4000-8000-000000000001
+        $ref: '#/components/schemas/EmptyRequest'
 
     LeaveResult:
       name: game.leaveResult
@@ -407,13 +452,9 @@ components:
         $ref: '#/components/schemas/LeaveResult'
       examples:
         - name: left
-          summary: Membership removed; the connection remains logged in
+          summary: Membership removed
           payload:
             outcome: LEFT
-        - name: loginRequired
-          summary: The connection has not logged in
-          payload:
-            outcome: LOGIN_REQUIRED
         - name: invalidRequest
           summary: The request is malformed
           payload:
@@ -452,14 +493,8 @@ components:
         type: object
         additionalProperties: false
         required:
-          - gameId
-          - playerId
           - cardIds
         properties:
-          gameId:
-            $ref: "#/components/schemas/GameId"
-          playerId:
-            $ref: "#/components/schemas/PlayerId"
           cardIds:
             type: array
             description: Card instance IDs in register order.
@@ -469,12 +504,11 @@ components:
             items:
               $ref: "#/components/schemas/CardId"
       description: >-
-        Submits five cards in register order for the connection-owned player.
+        Submits five cards in register order for the connection's owned game
+        and player, both derived from the authenticated session.
       examples:
         - name: submit
           payload:
-            gameId: 00000000-0000-4000-8000-000000000001
-            playerId: 00000000-0000-4000-8000-000000000002
             cardIds:
               - 00000000-0000-4000-8000-000000000101
               - 00000000-0000-4000-8000-000000000102
@@ -495,12 +529,11 @@ components:
               - INVALID_PROGRAM
               - GAME_PAUSED
               - GAME_ABORTED
+              - GAME_FINISHED
               - ALREADY_SUBMITTED
               - WRONG_PHASE
               - NOT_A_MEMBER
               - INVALID_REQUEST
-              - GAME_ID_MISMATCH
-              - PLAYER_ID_MISMATCH
               - PLAYER_NOT_IN_GAME
               - INTERNAL_ERROR
       description: |
@@ -508,15 +541,15 @@ components:
         INVALID_PROGRAM: the cards did not match the player's hand, or did not cover all five registers.
         GAME_PAUSED: rejected because the game is paused.
         GAME_ABORTED: rejected because the game has stopped irrecoverably after an unexpected service failure.
+        GAME_FINISHED: rejected because a player has won and the game has ended.
         ALREADY_SUBMITTED: this player already has a stored program for the current round; it is unchanged.
         WRONG_PHASE: the round had already moved into activation before this submission arrived.
         NOT_A_MEMBER: this connection does not own a membership for this game.
         INVALID_REQUEST: the request did not match the expected shape.
-        GAME_ID_MISMATCH: the request's gameId did not match the connection's game.
-        PLAYER_ID_MISMATCH: the request's playerId did not match the connection's own player.
         PLAYER_NOT_IN_GAME: the player is no longer part of the game (left or otherwise removed).
         INTERNAL_ERROR: unexpected service failure.
         No acknowledgement means the outcome is unknown.
+
 
     ProgramSubmitted:
       name: program.submitted
@@ -538,12 +571,82 @@ components:
             gameId: 00000000-0000-4000-8000-000000000001
             playerId: 00000000-0000-4000-8000-000000000002
 
+    UpdateRegisters:
+      name: game.updateRegisters
+      description: Updates a player's register occupancy and returns an acknowledgement outcome.
+      payload:
+        type: object
+        additionalProperties: false
+        required: [ gameId, playerId, occupied ]
+        properties:
+          gameId:
+            $ref: '#/components/schemas/GameId'
+          playerId:
+            $ref: '#/components/schemas/PlayerId'
+          occupied:
+            type: array
+            minItems: 5
+            maxItems: 5
+            items:
+              type: boolean
+            description: 'Five occupancy flags in register order: true is HIDDEN; false is EMPTY.'
+      examples:
+        - name: partiallyOccupied
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            occupied: [ true, false, true, false, false ]
+
+    UpdateRegistersResult:
+      name: game.updateRegistersResult
+      description: Acknowledges a register occupancy update with ACCEPTED or a rejection.
+      payload:
+        type: object
+        additionalProperties: false
+        required: [ outcome ]
+        properties:
+          outcome:
+            type: string
+            enum: [ ACCEPTED, INVALID_REQUEST, NOT_A_MEMBER, PLAYER_ID_MISMATCH, WRONG_PHASE, ALREADY_SUBMITTED, INTERNAL_ERROR ]
+      examples:
+        - name: accepted
+          payload:
+            outcome: ACCEPTED
+
+    RegistersChanged:
+      name: game.registersChanged
+      description: Broadcasts a player's register occupancy during programming.
+      payload:
+        $ref: '#/components/schemas/RegistersChanged'
+      examples:
+        - name: occupancyChanged
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            registers:
+              - status: HIDDEN
+              - status: EMPTY
+              - status: HIDDEN
+              - status: EMPTY
+              - status: EMPTY
+        - name: occupancyCleared
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            registers:
+              - status: EMPTY
+              - status: EMPTY
+              - status: EMPTY
+              - status: EMPTY
+              - status: EMPTY
+
     RobotActionResolved:
       name: robot.actionResolved
       payload:
         type: object
         required:
           - robotId
+          - playerId
           - instruction
           - position
           - gameId
@@ -552,6 +655,8 @@ components:
         properties:
           robotId:
             $ref: "#/components/schemas/RobotId"
+          playerId:
+            $ref: "#/components/schemas/PlayerId"
           instruction:
             $ref: "#/components/schemas/Instruction"
           position:
@@ -585,6 +690,7 @@ components:
             gameId: 00000000-0000-4000-8000-000000000001
             registerIndex: 0
             robotId: 00000000-0000-4000-8000-000000000003
+            playerId: 00000000-0000-4000-8000-000000000002
             instruction: MOVE_1
             pushedRobots: []
             position:
@@ -704,6 +810,21 @@ components:
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
 
+    GameWon:
+      name: game.won
+      description: >-
+        Announces the winner to game:{gameId}:public after the player.checkpointProgress
+        that completed the final checkpoint. The game ends: no further actions are resolved
+        and no new hands are dealt.
+      payload:
+        $ref: '#/components/schemas/GameWon'
+      examples:
+        - name: won
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            username: dane
+
   schemas:
     EmptyRequest:
       type: object
@@ -787,7 +908,6 @@ components:
       properties:
         outcome:
           enum:
-            - LOGIN_REQUIRED
             - INVALID_REQUEST
             - INTERNAL_ERROR
             - LOBBY_NOT_FOUND
@@ -861,29 +981,38 @@ components:
           additionalProperties: false
           required:
             - outcome
+            - user
           properties:
             outcome:
               const: NO_SESSION
+            user:
+              $ref: '#/components/schemas/User'
         - type: object
           additionalProperties: false
           required:
             - outcome
             - lobby
+            - user
           properties:
             outcome:
               const: IN_LOBBY
             lobby:
               $ref: '#/components/schemas/LobbyState'
+            user:
+              $ref: '#/components/schemas/User'
         - type: object
           additionalProperties: false
           required:
             - outcome
             - initialization
+            - user
           properties:
             outcome:
               const: IN_GAME
             initialization:
               $ref: '#/components/schemas/JoinAccepted'
+            user:
+              $ref: '#/components/schemas/User'
         - $ref: '#/components/schemas/LobbyFailure'
     LobbyUpdated:
       type: object
@@ -907,7 +1036,7 @@ components:
         initialization:
           $ref: '#/components/schemas/JoinAccepted'
 
-    # Login
+    # User identity
     Username:
       type: string
       minLength: 1
@@ -925,54 +1054,7 @@ components:
         username:
           $ref: '#/components/schemas/Username'
 
-    Login:
-      type: object
-      additionalProperties: false
-      required: [ username ]
-      properties:
-        username:
-          $ref: '#/components/schemas/Username'
-
-    LoginResult:
-      oneOf:
-        - $ref: '#/components/schemas/LoginAccepted'
-        - $ref: '#/components/schemas/LoginRejected'
-
-    LoginAccepted:
-      type: object
-      additionalProperties: false
-      required: [ outcome, user ]
-      properties:
-        outcome:
-          type: string
-          enum: [ LOGGED_IN ]
-        user:
-          $ref: '#/components/schemas/User'
-
-    LoginRejected:
-      type: object
-      additionalProperties: false
-      required: [ outcome ]
-      properties:
-        outcome:
-          type: string
-          enum: [ INVALID_USERNAME, INVALID_REQUEST, ALREADY_LOGGED_IN, INTERNAL_ERROR ]
-      description: |
-        INVALID_USERNAME covers a missing/non-string username or a length outside 1–30.
-        INVALID_REQUEST: the request did not match the expected shape.
-        ALREADY_LOGGED_IN means this connection is bound to a different username.
-        Repeating login with the same username returns LOGGED_IN with the same user.
-        INTERNAL_ERROR is an unexpected service failure; do not expose internals.
-
     # Membership
-    JoinGame:
-      type: object
-      additionalProperties: false
-      required: [ gameId ]
-      properties:
-        gameId:
-          $ref: '#/components/schemas/GameId'
-
     PlayerAssignment:
       type: object
       additionalProperties: false
@@ -1021,12 +1103,11 @@ components:
       properties:
         outcome:
           type: string
-          enum: [ LEFT, LOGIN_REQUIRED, INVALID_REQUEST, GAME_NOT_FOUND, INTERNAL_ERROR ]
+          enum: [ LEFT, INVALID_REQUEST, GAME_NOT_FOUND, INTERNAL_ERROR ]
       description: |
-        LEFT: membership and robot removed, room access revoked, login retained.
-        LOGIN_REQUIRED: this connection has no approved user.
+        LEFT: membership and robot removed, room access revoked.
         INVALID_REQUEST: the request did not match the expected shape.
-        GAME_NOT_FOUND: unavailable game or membership not owned by this connection;
+        GAME_NOT_FOUND: this connection has no game membership to leave;
         this also covers a repeated leave after a successful departure.
         INTERNAL_ERROR: unexpected service failure; do not expose internals.
 
@@ -1051,6 +1132,7 @@ components:
         - programSubmitted
         - connected
         - lastCheckpoint
+        - registers
       properties:
         playerId:
           $ref: "#/components/schemas/PlayerId"
@@ -1062,8 +1144,64 @@ components:
           type: boolean
         lastCheckpoint:
           $ref: '#/components/schemas/LastCheckpoint'
+        registers:
+          $ref: '#/components/schemas/PublicRegisters'
       description: >-
         Public participation and submission status; never contains cards.
+
+    RegistersChanged:
+      type: object
+      additionalProperties: false
+      required: [ gameId, playerId, registers ]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+        playerId:
+          $ref: '#/components/schemas/PlayerId'
+        registers:
+          type: array
+          minItems: 5
+          maxItems: 5
+          items:
+            type: object
+            additionalProperties: false
+            required: [ status ]
+            properties:
+              status:
+                type: string
+                enum: [ EMPTY, HIDDEN ]
+          description: Occupancy-only slots after an accepted update; revealed instructions arrive through robot.actionResolved.
+
+    PublicRegisters:
+      type: array
+      minItems: 5
+      maxItems: 5
+      items:
+        $ref: '#/components/schemas/PublicRegisterSlot'
+      description: Five public slots in register order, reset to EMPTY when a new hand is dealt.
+
+    PublicRegisterSlot:
+      type: object
+      additionalProperties: false
+      required: [ status ]
+      properties:
+        status:
+          type: string
+          enum: [ EMPTY, HIDDEN, REVEALED ]
+        instruction:
+          $ref: '#/components/schemas/Instruction'
+      if:
+        properties:
+          status:
+            const: REVEALED
+      then:
+        required: [ instruction ]
+      else:
+        not:
+          required: [ instruction ]
+      description: >-
+        One register slot in register order. EMPTY and HIDDEN carry only their status;
+        REVEALED carries the executed instruction.
 
     PublicGameState:
       description: >-
@@ -1080,6 +1218,7 @@ components:
         - paused
         - aborted
         - checkpointCount
+        - winner
       properties:
         gameId:
           $ref: "#/components/schemas/GameId"
@@ -1105,6 +1244,11 @@ components:
           description: Whether gameplay has stopped irrecoverably after an unexpected service failure.
         checkpointCount:
           $ref: '#/components/schemas/CheckpointCount'
+        winner:
+          description: The winning player, or null while the game runs.
+          oneOf:
+            - $ref: '#/components/schemas/Winner'
+            - type: 'null'
 
     LastCheckpoint:
       type: integer
@@ -1112,7 +1256,7 @@ components:
       description: >-
         Last checkpoint completed by the player in numerical order, initially 0.
         Must not exceed checkpointCount. Persists across rounds and reconnections.
-        Completing the final checkpoint does not end the game.
+        Completing the final checkpoint wins the game.
 
     CheckpointCount:
       type: integer
@@ -1289,3 +1433,28 @@ components:
       properties:
         gameId:
           $ref: '#/components/schemas/GameId'
+
+    Winner:
+      type: object
+      additionalProperties: false
+      required: [ playerId, username ]
+      description: >-
+        The winning player. The username is recorded when the game is won,
+        so it stays available after the winner has left.
+      properties:
+        playerId:
+          $ref: '#/components/schemas/PlayerId'
+        username:
+          $ref: '#/components/schemas/Username'
+
+    GameWon:
+      type: object
+      additionalProperties: false
+      required: [ gameId, playerId, username ]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+        playerId:
+          $ref: '#/components/schemas/PlayerId'
+        username:
+          $ref: '#/components/schemas/Username'

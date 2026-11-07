@@ -14,10 +14,17 @@ import {
 } from './gameState.ts'
 import type useGameConnection from './useGameConnection.ts'
 import useOverlayLayout from './useOverlayLayout.ts'
+import WinnerPopup from './components/WinnerPopup.tsx'
+
+
+function isGameOver(state: ClientGameState): boolean {
+  return state.winner !== null && !state.playback.active
+}
 
 function getGameStatus(state: ClientGameState): string {
   if (!state.connected) return 'Not connected'
   if (state.assignment === null) return 'Loading game…'
+  if (isGameOver(state)) return 'Game over'
   if (state.paused) {
     const names = state.players.filter((player) => !player.connected).map((player) => player.username)
     return names.length > 0 ? `Game paused · Waiting for ${names.join(', ')}` : 'Game paused'
@@ -31,11 +38,13 @@ function getGameStatus(state: ClientGameState): string {
   return 'Waiting'
 }
 
-function ActiveGame({ game, username, leaving, onLeave }: {
+function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: {
   game: ReturnType<typeof useGameConnection>
   username: string
   leaving: boolean
   onLeave: () => void
+  onLogout: () => void
+  onSettings: () => void
 }) {
   const { state, dispatch, submit } = game
   const {
@@ -58,6 +67,7 @@ function ActiveGame({ game, username, leaving, onLeave }: {
   const status = getGameStatus(state)
   const disconnectedNames = state.players.filter((player) => !player.connected).map((player) => player.username)
   const player = state.players.find((candidate) => candidate.playerId === state.assignment?.playerId)
+  const showWinner = isGameOver(state) && state.connected
   const robotColour = state.playback.robots.find((robot) => robot.robotId === state.assignment?.robotId)?.colour
   const registeredCardIds = new Set(
     state.registers.flatMap((card) => (card ? [card.id] : [])),
@@ -84,6 +94,8 @@ function ActiveGame({ game, username, leaving, onLeave }: {
               checkpointCount={state.checkpointCount}
               onLeave={onLeave}
               leaveDisabled={leaving || !state.connected}
+              onLogout={onLogout}
+              onSettings={onSettings}
             />
             <RegisterPanel
               registers={state.playbackProgram ?? state.registers}
@@ -126,7 +138,15 @@ function ActiveGame({ game, username, leaving, onLeave }: {
           />
         )}
       </div>
-      {(state.paused || !state.connected) && (
+            {showWinner && (
+        <WinnerPopup
+          winnerName={state.winner?.username ?? ''}
+          isWinner={state.winner?.playerId === state.assignment?.playerId}
+          leaving={leaving}
+          onLeave={onLeave}
+        />
+      )}
+      {!showWinner && (state.paused || !state.connected) && (
         <div className="disconnect-overlay">
           <div className="disconnect-popup">
             <h2>{!state.connected

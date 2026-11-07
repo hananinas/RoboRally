@@ -6,7 +6,7 @@ import type { PublicRegisterCommands, PublicRegisterEvents } from './scenes/acti
 export const ACKNOWLEDGEMENT_TIMEOUT_MS = 5000
 
 export type GameSocket = Socket<ServerToClientEvents & PublicRegisterEvents, ClientToServerEvents & PublicRegisterCommands>
-export type SocketStatus = 'connecting' | 'connected' | 'connection-error' | 'disconnected'
+export type SocketStatus = 'connecting' | 'connected' | 'connection-error' | 'unauthenticated' | 'disconnected'
 
 export default function useGameSocket() {
   const [socket, setSocket] = useState<GameSocket>(() => io({
@@ -29,6 +29,11 @@ export default function useGameSocket() {
     const handleConnectError = (error: Error) => {
       if (error.message === 'SESSION_EXPIRED') {
         setSocket(io({ autoConnect: false, forceNew: true }))
+        return
+      }
+      if (error.message === 'UNAUTHENTICATED') {
+        setStatus('unauthenticated')
+        setError(null)
         return
       }
       setStatus('connection-error')

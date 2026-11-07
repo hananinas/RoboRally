@@ -12,15 +12,13 @@ export function withSessionRequest<R>(
   run: (user: User, ack: (result: R | LobbyFailure) => void) => void,
 ): void {
   withAcknowledgeOnce<R | LobbyFailure>(acknowledge, (ack) => {
-    const user = socket.data.user
     const parsed = schema.safeParse(payload)
-    if (!user || !parsed.success) {
-      const outcome = user ? 'INVALID_REQUEST' : 'LOGIN_REQUIRED'
-      logWarn(`Rejected ${command} request`, { command, outcome, payload })
-      ack({ outcome })
+    if (!parsed.success) {
+      logWarn(`Rejected ${command} request`, { command, outcome: 'INVALID_REQUEST', payload })
+      ack({ outcome: 'INVALID_REQUEST' })
       return
     }
-    run(user, ack)
+    run(socket.data.user, ack)
   }, (error) => {
     logError(`Failed to process ${command}`, error, { command, payload })
     return { outcome: 'INTERNAL_ERROR' }

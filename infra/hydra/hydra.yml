@@ -3,13 +3,15 @@ dsn: "sqlite://hydra/data/hydra.db?_fk=true&mode=rwc&_journal_mode=WAL&_timeout=
 serve:
   cookies:
     same_site_mode: Lax
+  public:
+    port: 14444
 
 urls:
   self:
-    issuer: http://127.0.0.1:4444/
-  consent: http://127.0.0.1:4455/consent
-  login: http://127.0.0.1:4455/login
-  logout: http://127.0.0.1:4455/logout
+    issuer: https://127.0.0.1:3001/ory/hydra/
+  consent: https://127.0.0.1:3001/ory/ui/consent
+  login: https://127.0.0.1:3001/ory/ui/login
+  logout: https://127.0.0.1:3001/ory/ui/logout
 
 secrets:
   system:

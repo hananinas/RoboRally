@@ -2,7 +2,7 @@ import type { PublicRobotActionResolved } from '../src/scenes/active-game/public
 import { GAME_ID } from './game-fixture-data.ts'
 import { ADA_ID, NOOR_ID, REGISTER_ROBOT_IDS, createRegisterState, executionPlayers } from './player-registers-fixtures.ts'
 import { expect, openGame, test } from './game-fixture.ts'
-import { login } from './browserClient.ts'
+import { reconnect } from './browserClient.ts'
 
 test('opponents expose only public registers on hover and keyboard focus', async ({ page, game }) => {
   await game.control({ type: 'joined-state', state: createRegisterState(), hand: game.initial.cards, programSubmitted: false })
@@ -85,9 +85,7 @@ test('expanded registers fit a narrow active scene and reconnect replaces the pu
   expect(panel!.y).toBeGreaterThanOrEqual(hud!.y + hud!.height)
   expect(await page.locator('.other-players').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
   await game.control({ type: 'joined-state', state: createRegisterState(true), hand: game.initial.cards, programSubmitted: false })
-  await page.reload()
-  // Returning game members land back in the game automatically after login.
-  await login(page, 'Player 1')
+  await reconnect(page)
   await ada.focus()
   await expect(ada.locator('.other-player__slot-label')).toHaveText(['Move 1', 'Turn Right', 'Move 2', 'Filled', 'Filled'])
   await expect(ada.locator('.other-player__status')).toHaveText('Waiting')

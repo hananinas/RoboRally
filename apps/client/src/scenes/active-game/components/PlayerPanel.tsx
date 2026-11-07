@@ -8,10 +8,12 @@ type PlayerPanelProps = {
   checkpointCount: number
   onLeave?: () => void
   leaveDisabled?: boolean
+  onLogout: () => void
+  onSettings: () => void
 }
 
 // Shows collapsible player details.
-function PlayerPanel({ player, robotColour, checkpointCount, onLeave, leaveDisabled }: PlayerPanelProps) {
+function PlayerPanel({ player, robotColour, checkpointCount, onLeave, leaveDisabled, onLogout, onSettings }: PlayerPanelProps) {
   const [expanded, setExpanded] = useState(true)
 
   return (
@@ -28,7 +30,7 @@ function PlayerPanel({ player, robotColour, checkpointCount, onLeave, leaveDisab
           )}
           {player.name}
         </h1>
-        <GameMenu onLeave={onLeave} leaveDisabled={leaveDisabled} />
+        <GameMenu onLeave={onLeave} leaveDisabled={leaveDisabled} onLogout={onLogout} onSettings={onSettings} />
       </header>
       {expanded && (
         <div className="player-panel__details">
