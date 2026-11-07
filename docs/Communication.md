@@ -131,7 +131,9 @@ sequenceDiagram
 ### Initialization
 The service creates a fresh game, moves every member into its public and private player rooms, and removes the lobby room and record. The service sends each player the following through their own `game:{gameId}:player:{playerId}` room:
 
-`game.started {lobbyId, initialization: {outcome: JOINED, assignment, state, hand, programSubmitted}}`
+`game.started {lobbyId, initialization: {outcome: JOINED, assignment, state, hand, program, programSubmitted}}`
+
+`state` includes `roundNumber`, `serverTime`, and `programmingTimer`. `roundNumber` starts at 1 and increases when the next programming hand is dealt. `program` is the player's private five-slot program, containing a card or `null` in each slot. It starts empty and is restored on reconnect, including cards assigned when time ran out.
 
 
 ### Programming
@@ -139,9 +141,7 @@ During the programming phase, each player submits five distinct card IDs in regi
 
 The client sends:
 
-`program.submit {cardIds}`
-
-The service derives the player and the game from the connection's owned membership, via the authenticated session. The service verifies that the submitted cards belong to that player and that the submission is valid for the current game phase.
+`program.submit {roundNumber, cardIds}`
 
 A successful submission receives:
 
@@ -149,13 +149,13 @@ A successful submission receives:
 
 The server then emits:
 
-`program.submitted {playerId}`
+`program.submitted {gameId, playerId, roundNumber}`
 
 to the [public room](#rooms).
 
-This informs other players that the player has submitted their program without revealing the submitted cards. The server waits until all players have successfully submitted before beginning activation.
+This informs other players that the program is complete without revealing its cards. The first accepted submission starts a shared 30-second countdown if other players still need to submit. Activation begins as soon as every remaining player has a locked program, either submitted or completed by the service at expiry.
 
-A player can also publish register occupancy before submitting, described in [Public registers](#public-registers).
+A player saves their partial program before submitting, described in [Public registers](#public-registers). Filling all five draft slots does not submit the program or start the timer.
 
 
 
@@ -163,13 +163,55 @@ A player can also publish register occupancy before submitting, described in [Pu
 
 `PlayerState.registers` holds five slots in register order. `{status: EMPTY}` means no card is placed, `{status: HIDDEN}` means a card is placed without exposing its identity, and `{status: REVEALED, instruction}` shows an already-executed register. EMPTY and HIDDEN carry only their status. Each player's hand stays private.
 
-Before submitting, the client can share which slots are occupied. `game.updateRegisters {gameId, playerId, occupied}` sends five booleans in register order, `true` for an occupied slot and `false` for an empty one. Its acknowledgement returns `ACCEPTED`, `INVALID_REQUEST`, `NOT_A_MEMBER`, `PLAYER_ID_MISMATCH`, `WRONG_PHASE`, `ALREADY_SUBMITTED` or `INTERNAL_ERROR`. An accepted update broadcasts `game.registersChanged {gameId, playerId, registers}` to the [public room](#rooms) with only HIDDEN and EMPTY slots.
+Before submitting, the client sends `game.updateRegisters {roundNumber, cardIds}` after each placement, removal, or rearrangement. `cardIds` contains exactly five entries in register order: a card ID for an assigned slot, or `null` for an empty one. Repeated `null` entries are allowed; non-null IDs must be distinct and belong to the player's current dealt hand. The service derives the game and player from the connection's owned membership.
+
+This replaces the occupancy-only request so the service can preserve assigned cards at expiry. An accepted update replaces the whole saved draft atomically. It does not lock the program or start, restart, or extend the countdown. The acknowledgement returns `ACCEPTED` or a rejection defined in AsyncAPI. Rejected updates leave the draft unchanged.
+
+An accepted update broadcasts `game.registersChanged {gameId, playerId, roundNumber, registers}` to the [public room](#rooms) with only HIDDEN and EMPTY slots. Card IDs and instructions remain private. The client serializes draft updates and waits for pending acknowledgements before submitting; at expiry, only the last draft accepted by the service is preserved. A local edit without an acknowledgement is not confirmed and must not be automatically resent after reconnecting.
 
 The client reveals a slot from `robot.actionResolved`, which carries `playerId`, `registerIndex` and `instruction`. `game.started` and `session.get` include every player's registers, revealed slots included, until the next hand resets them to five EMPTY slots.
 
+### Programming timer
+
+Each programming round starts without a countdown. The first accepted `program.submit` starts one 30-second countdown for the whole game. Invalid submissions and draft updates do not start it. Later submissions do not restart or extend it. A single-player game proceeds directly to activation when its player submits.
+
+The service broadcasts timer changes to the public room:
+
+`program.timerChanged {gameId, roundNumber, serverTime, timer}`
+
+`serverTime` and `deadline` are Unix timestamps in milliseconds. `timer` has one of these forms:
+
+| State | Payload | Meaning |
+|---|---|---|
+| Idle | `{status: IDLE}` | No player has submitted in this round. |
+| Running | `{status: RUNNING, deadline}` | Programming closes at the server deadline. |
+| Closed | `{status: CLOSED}` | Programming is closed; edits and submissions are disabled. |
+
+`PublicGameState.programmingTimer` uses the same representation. Timer changes are sent when the countdown starts, closes, or resets. There are no per-second broadcasts. Clients use the server time and deadline to display the remaining seconds, clamped at zero. The server decides when programming ends; reaching zero locally does not submit cards or start activation.
+
+The service accepts edits and submissions only if they are validated and applied before the deadline. At or after the deadline, it closes programming before handling another edit or submission, even if its timeout callback has not run yet. `WRONG_PHASE` rejects requests for the current round once it has closed; `STALE_ROUND` rejects requests carrying a different round number. Client timestamps do not extend the deadline. Repeating an accepted submission does not restart the timer.
+
+#### Completing unfinished programs
+
+When time expires, the service locks the last accepted draft for each unfinished player. Assigned registers keep their cards and positions, including assignments after an empty slot. The service discards the player's remaining hand, excluding assigned cards, then draws from the top of that player's programming deck to fill empty registers in register order. If the deck runs out, it shuffles the discard pile to replenish it before continuing. Discarded hand cards can therefore be drawn again after a reshuffle. Cards already assigned to registers cannot enter the discard pile during this operation.
+
+A player with five assigned draft cards keeps all five, even if they did not submit. A player with no assigned cards receives five drawn cards. Programs submitted before the deadline remain unchanged. This requires the private programming deck and discard pile from #194 and #196; choosing arbitrary instructions or replacing the whole draft does not satisfy this contract.
+
+For each completed program, the service sends `program.completed {gameId, playerId, roundNumber, reason: TIMEOUT, cards}` through the player's private room. The client replaces its draft with these five cards, clears its discarded hand, and disables programming. The public room receives `game.registersChanged` with five HIDDEN slots and `program.submitted`, without the cards. `programSubmitted` is true for both manually submitted and automatically completed programs.
+
+All unfinished programs are completed before any robot action executes. The service publishes completion events, then `program.timerChanged` with `CLOSED`, then the activation events. If everyone submits early, it follows the same closing order without drawing replacement cards. A departure that leaves all remaining players submitted also closes programming immediately. Once started, the countdown is not cancelled or restarted because its first submitter leaves.
+
+#### Restoring the timer
+
+On successful Socket.IO recovery, clients apply missed events in order. The service then sends the current timer with a fresh `serverTime` to the reconnecting player, even if the timer did not change. Replayed timestamps must not restart the countdown or be used as fresh clock samples. If a draft update or submission was unacknowledged at disconnect, the client also calls `session.get` before enabling programming. On failed recovery, `session.get` restores the timer from public state and the draft or completed program from private initialization. The client replaces unconfirmed local selections with that program.
+
+Clients ignore programming events for another game or an older round. `cards.dealt` advances the round and resets the private program, public registers, and timer before later updates for that round are applied. A countdown can start while a client is still playing the previous round's animations; playback does not extend the server deadline.
+
+Winning or aborting closes the timer before the terminal event. Removing the last member or shutting down the service cancels the timer. An old expiry callback must never complete programs in another round or a removed game.
+
 ### Activation
 
-Once all players have submitted, the service resolves the five registers in order. Within each register, eligible robots act according to antenna priority. Priority is recalculated after each robot action before the next robot acts.
+Once all remaining players have locked programs, the service resolves the five registers in order. Within each register, eligible robots act according to antenna priority. Priority is recalculated after each robot action before the next robot acts.
 
 Each resolved action is emitted to the [public room](#rooms) as:
 
@@ -227,13 +269,15 @@ After all five registers have been resolved, the service deals each player a pri
 
 Each player receives:
 
-`cards.dealt {cards}`
+`cards.dealt {gameId, playerId, roundNumber, cards}`
 
 through the player's [private room](#rooms).
 
 A new hand may arrive while the client is still playing animations from the previous activation. The client should store the new hand immediately but must not enable programming until all queued resolved actions have finished playing.
 
 The new hand also opens the next programming round, so the client resets every player's registers to five EMPTY slots when its own hand arrives. A player who reconnects after that point gets the reset registers from `session.get`.
+
+The service sends each private hand before broadcasting `program.timerChanged` with `IDLE` for the new round. The previous round's timer cannot carry over.
 
 ### Game sequence
 
@@ -250,19 +294,32 @@ sequenceDiagram
     participant Public as game:{gameId}:public
 
     loop Each round
-        A->>Server: game.updateRegisters {gameId, playerId: A, occupied}
+        A->>Server: game.updateRegisters {roundNumber, cardIds}
         Server-->>A: Acknowledgement: ACCEPTED
-        Server->>Public: game.registersChanged {gameId, playerId: A, registers}
-        Public-->>B: game.registersChanged {gameId, playerId: A, registers}
-        A->>Server: program.submit {cardIds}
+        Server->>Public: game.registersChanged {gameId, playerId: A, roundNumber, registers}
+        Public-->>B: game.registersChanged
+        A->>Server: program.submit {roundNumber, cardIds}
         Server-->>A: Acknowledgement: ACCEPTED
-        Server->>Public: program.submitted {playerId: A}
+        Server->>PrivateA: program.completed {reason: SUBMITTED, cards, ...}
+        Server->>Public: game.registersChanged with five HIDDEN slots for A
+        Server->>Public: program.submitted {gameId, playerId: A, roundNumber}
         Public-->>B: program.submitted
+        Server->>Public: program.timerChanged {timer: {status: RUNNING, deadline}, ...}
 
-        B->>Server: program.submit {cardIds}
-        Server-->>B: Acknowledgement: ACCEPTED
-        Server->>Public: program.submitted {playerId: B}
+        alt B submits before the deadline
+            B->>Server: program.submit {roundNumber, cardIds}
+            Server-->>B: Acknowledgement: ACCEPTED
+            Server->>PrivateB: program.completed {reason: SUBMITTED, cards, ...}
+        else Deadline reached
+            Note over Server: Preserve B's draft, discard remaining hand, draw for empty slots
+            Server->>PrivateB: program.completed {reason: TIMEOUT, cards, ...}
+        end
+
+        Server->>Public: game.registersChanged with five HIDDEN slots for B
+        Server->>Public: program.submitted {gameId, playerId: B, roundNumber}
         Public-->>A: program.submitted
+        Server->>Public: program.timerChanged {timer: {status: CLOSED}, ...}
+
         loop Registers 1 through 5
             loop Eligible robots in antenna order
                 Note over Server: Execute next instruction
@@ -272,10 +329,11 @@ sequenceDiagram
             end
         end
 
-        Server->>PrivateA: cards.dealt {cards}
-        PrivateA-->>A: cards.dealt {cards}
-        Server->>PrivateB: cards.dealt {cards}
-        PrivateB-->>B: cards.dealt {cards}
+        Server->>PrivateA: cards.dealt {roundNumber, cards, ...}
+        PrivateA-->>A: cards.dealt
+        Server->>PrivateB: cards.dealt {roundNumber, cards, ...}
+        PrivateB-->>B: cards.dealt
+        Server->>Public: program.timerChanged {timer: {status: IDLE}, ...}
     end
 ```
 
