@@ -14,8 +14,6 @@ import { toRejection, type Rejection } from '@/socket/utilities/rejection'
 
 type ValidateGameplayRequestError =
   | 'NOT_A_MEMBER'
-  | 'GAME_ID_MISMATCH'
-  | 'PLAYER_ID_MISMATCH'
   | Rejection<'INVALID_REQUEST', ZodError>
 
 function validateGameplayRequest(
@@ -29,8 +27,6 @@ function validateGameplayRequest(
 
   const parsed = schema.safeParse(payload)
   if (!parsed.success) return err({ outcome: 'INVALID_REQUEST', detail: parsed.error })
-  if (parsed.data.gameId !== ctx.gameId) return err('GAME_ID_MISMATCH')
-  if (parsed.data.playerId !== player.id) return err('PLAYER_ID_MISMATCH')
 
   return ok({ player, data: parsed.data })
 }

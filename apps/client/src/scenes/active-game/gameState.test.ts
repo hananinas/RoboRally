@@ -298,18 +298,6 @@ describe('client game state', () => {
     expect(gameStateReducer(state, { type: 'dealt', hand })).toBe(state)
   })
 
-  it('uses the assignment game identity for submission', () => {
-    const assignment = { ...result.assignment, gameId: '40000000-0000-4000-8000-000000000002' }
-    const state = selectProgram(gameStateReducer(createClientGameState(), {
-      type: 'joined', result: { ...result, assignment },
-    }))
-    expect(createSubmission(state)).toEqual({
-      gameId: assignment.gameId,
-      playerId: assignment.playerId,
-      cardIds: selectedCardIds,
-    })
-  })
-
   it('requires a dealt hand and disables editing when execution starts', () => {
     let state = gameStateReducer(createClientGameState(), {
       type: 'joined', result: { ...result, hand: [] },
@@ -350,11 +338,7 @@ describe('client game state', () => {
       expect(createSubmission(state)).toBeNull()
       state = gameStateReducer(state, { type: 'place', cardId, registerIndex })
     }
-    expect(createSubmission(state)).toEqual({
-      gameId: publicState.gameId,
-      playerId: hand.playerId,
-      cardIds: selectedCardIds,
-    })
+    expect(createSubmission(state)).toEqual({ cardIds: selectedCardIds })
 
     state = gameStateReducer(state, { type: 'remove', registerIndex: 2 })
     expect(createSubmission(state)).toBeNull()
@@ -508,11 +492,7 @@ describe('client game state', () => {
 
     state = selectProgram(state)
     const submission = createSubmission(state)
-    expect(submission).toEqual({
-      gameId: publicState.gameId,
-      playerId: hand.playerId,
-      cardIds: selectedCardIds,
-    })
+    expect(submission).toEqual({ cardIds: selectedCardIds })
     state = gameStateReducer(state, { type: 'submit' })
     state = gameStateReducer(state, {
       type: 'result',
@@ -558,11 +538,7 @@ describe('client game state', () => {
 
     expect(canProgram(state)).toBe(true)
     state = selectProgram(state)
-    expect(createSubmission(state)).toEqual({
-      gameId: publicState.gameId,
-      playerId: hand.playerId,
-      cardIds: selectedCardIds,
-    })
+    expect(createSubmission(state)).toEqual({ cardIds: selectedCardIds })
     expect(state.playback.robots.find((robot) => robot.robotId === robotId)?.position)
       .toEqual(actions[4].position)
   })
