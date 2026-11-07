@@ -102,15 +102,14 @@ export function handleJoinLobby(
 export function handleLeaveLobby(
   context: SessionContext,
   socket: GameSocket,
-  payload: LobbyRequest,
+  payload: EmptyRequest,
   acknowledge: (result: LobbyLeaveResult) => void,
 ): void {
-  withSessionRequest(socket, 'lobby.leave', lobbyRequestSchema, payload, acknowledge, (user, ack) => {
+  withSessionRequest(socket, 'lobby.leave', emptyRequestSchema, payload, acknowledge, (user, ack) => {
     const session = context.sessionsByUser.get(user.userId)
     if (!session) return ack({ outcome: 'LEFT' })
-    const lobby = context.lobbies.get(payload.lobbyId)
-    if (session.kind !== 'lobby' || session.lobbyId !== payload.lobbyId
-      || lobby?.members.get(user.userId)?.connectionId !== socket.id) {
+    const lobby = session.kind === 'lobby' ? context.lobbies.get(session.lobbyId) : undefined
+    if (lobby?.members.get(user.userId)?.connectionId !== socket.id) {
       return ack({ outcome: 'NOT_LOBBY_MEMBER' })
     }
     leaveLobby(context, socket)
@@ -133,14 +132,14 @@ function getConnectedMembers(context: SessionContext, lobby: Lobby): Result<Conn
 export function handleStartLobby(
   context: SessionContext,
   socket: GameSocket,
-  payload: LobbyRequest,
+  payload: EmptyRequest,
   acknowledge: (result: LobbyStartResult) => void,
 ): void {
   const { io } = context
-  withSessionRequest(socket, 'lobby.start', lobbyRequestSchema, payload, acknowledge, (user, ack) => {
-    const lobby = context.lobbies.get(payload.lobbyId)
-    if (!lobby) return ack({ outcome: 'LOBBY_NOT_FOUND' })
-    if (lobby.members.get(user.userId)?.connectionId !== socket.id) return ack({ outcome: 'NOT_LOBBY_MEMBER' })
+  withSessionRequest(socket, 'lobby.start', emptyRequestSchema, payload, acknowledge, (user, ack) => {
+    const session = context.sessionsByUser.get(user.userId)
+    const lobby = session?.kind === 'lobby' ? context.lobbies.get(session.lobbyId) : undefined
+    if (!lobby || lobby.members.get(user.userId)?.connectionId !== socket.id) return ack({ outcome: 'NOT_LOBBY_MEMBER' })
     if (lobby.members.keys().next().value !== user.userId) return ack({ outcome: 'NOT_LOBBY_OWNER' })
 
     const connected = getConnectedMembers(context, lobby)
