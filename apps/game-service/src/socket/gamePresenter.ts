@@ -79,6 +79,7 @@ export function presentPublicGameState(
         coordinate: game.board.positionOf(player.robot.id),
         orientation: orientations[player.robot.direction],
       },
+      startPosition: game.startPositionOf(player.robot.id),
     })),
     phase: phases[game.phase],
     paused: game.paused,

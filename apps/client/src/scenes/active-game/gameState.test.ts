@@ -69,12 +69,14 @@ const publicState: PublicGameState = {
       colour: '#A66BE0',
       playerId: '50000000-0000-4000-8000-000000000001',
       position: { coordinate: { x: 2, y: 3 }, orientation: 'NORTH' },
+      startPosition: { x: 2, y: 3 },
     },
     {
       robotId: stationaryRobotId,
       colour: '#4DC9C0',
       playerId: '50000000-0000-4000-8000-000000000002',
       position: { coordinate: { x: 4, y: 4 }, orientation: 'EAST' },
+      startPosition: { x: 4, y: 4 },
     },
   ],
 }

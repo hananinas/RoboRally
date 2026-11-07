@@ -444,6 +444,7 @@ describe('started game membership over Socket.IO', () => {
         robotId: initial.assignment.robotId, playerId: initial.assignment.playerId,
         colour: initial.state.robots[0].colour,
         position: actions[4].position,
+        startPosition: initial.state.robots[0].startPosition,
       }])
       expect(snapshot.state.players[0].lastCheckpoint).toBe(1)
       expect(shared.game.board.occupantAt({ x: Integer(2), y: Integer(1) })).toBeUndefined()
@@ -498,6 +499,7 @@ describe('started game membership over Socket.IO', () => {
           robotId: joined.assignment.robotId, playerId: joined.assignment.playerId,
           colour: initializations[0].state.robots.find((robot) => robot.robotId === joined.assignment.robotId)!.colour,
           position: actions[0].findLast((action) => action.robotId === joined.assignment.robotId)!.position,
+          startPosition: initializations[0].state.robots.find((robot) => robot.robotId === joined.assignment.robotId)!.startPosition,
         })))
         expect(new Set(snapshot.state.robots.map(({ position }) =>
           `${position.coordinate.x},${position.coordinate.y}`)).size).toBe(3)
