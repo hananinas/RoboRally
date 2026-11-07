@@ -67,9 +67,6 @@ export function createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl, ref
     const sessionId = sessionStore.create(sub, username, idToken, refreshToken, expiresIn)
     logInfo('OIDC callback succeeded', { sub })
 
-    // The cookie's lifetime tracks the refresh token's TTL, not the access token's `expiresIn`:
-    // a long-open socket can't receive a fresh Set-Cookie, so the cookie must outlive the
-    // access token's lifetime for as long as the session can still be renewed.
     res.setHeader('Set-Cookie', [
       ...clearTransactionCookies,
       sessionCookie(sessionId, refreshTokenTtlSeconds),
