@@ -12,7 +12,7 @@ test('marks each robot\'s starting tile in the robot\'s colour', async ({ page }
     [OTHER_ROBOT_ID, '7,5', 'rgb(77, 141, 235)'],
   ] as const) {
     await expect(startTile(page, robotId)).toHaveAttribute('data-board-tile', tile)
-    await expect(startTile(page, robotId)).toHaveCSS('border-top-color', colour)
+    await expect(startTile(page, robotId)).toHaveCSS('background-color', colour)
     await expect(startTile(page, robotId)).toHaveCSS('opacity', '1')
   }
 })

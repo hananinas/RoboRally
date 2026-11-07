@@ -26,8 +26,8 @@ export default function StartTilePiece({ board, robot }: Readonly<{
       style={{
         left: centre.worldX,
         top: centre.worldY,
-        width: BOARD_CONFIG.tile * 0.86,
-        height: BOARD_CONFIG.tile * 0.86,
+        width: BOARD_CONFIG.tile,
+        height: BOARD_CONFIG.tile,
         '--start-tile-colour': robot.colour,
       } as CSSProperties}
     />

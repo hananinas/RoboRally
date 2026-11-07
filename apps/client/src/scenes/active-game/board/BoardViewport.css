@@ -103,10 +103,8 @@
 }
 /* The starting tile takes the robot's colour as the robot lands, and keeps it all game. */
 .board-piece--start-tile {
-  box-sizing: border-box;
-  border: 4px solid var(--start-tile-colour);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--start-tile-colour) 35%, transparent);
+  border-radius: var(--board-radius);
+  background: var(--start-tile-colour);
   pointer-events: none;
   animation: start-tile-light-up 0.35s ease-out 0.7s both;
 }
