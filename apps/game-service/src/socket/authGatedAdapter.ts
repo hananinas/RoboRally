@@ -7,12 +7,14 @@ export function createAuthGatedAdapter(sessionStore: SessionStore) {
     override broadcast(packet: unknown, opts: BroadcastOptions): void {
       const sockets = this.nsp.sockets as Map<string, GameSocket>
       const except = new Set(opts.except)
+      const expiredSockets: GameSocket[] = []
       for (const [id, socket] of sockets) {
         if (except.has(id) || sessionStore.get(socket.data.sessionId)) continue
         except.add(id)
-        socket.disconnect(true)
+        expiredSockets.push(socket)
       }
       super.broadcast(packet, { ...opts, except })
+      for (const socket of expiredSockets) socket.disconnect(true)
     }
   }
 }
