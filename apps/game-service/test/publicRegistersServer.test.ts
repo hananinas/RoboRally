@@ -71,7 +71,7 @@ describe('public registers over Socket.IO', () => {
       expect((await member.timeout(1000).emitWithAck('lobby.join', { lobbyId })).outcome).toBe('LOBBY_JOINED')
     }
     const started = members.map((member) => new Promise<GameStarted>((resolve) => member.once('game.started', resolve)))
-    expect((await members[0].timeout(1000).emitWithAck('lobby.start', { lobbyId })).outcome).toBe('STARTED')
+    expect((await members[0].timeout(1000).emitWithAck('lobby.start', {})).outcome).toBe('STARTED')
     return (await Promise.all(started)).map((payload) => payload.initialization)
   }
 
@@ -93,7 +93,6 @@ describe('public registers over Socket.IO', () => {
 
   function program(joined: GameInitialization) {
     return {
-      gameId: joined.assignment.gameId, playerId: joined.assignment.playerId,
       cardIds: joined.hand.slice(0, 5).map((card) => card.id) as [string, string, string, string, string],
     }
   }
@@ -185,7 +184,8 @@ describe('public registers over Socket.IO', () => {
     expect(await first.timeout(1000).emitWithAck('program.submit', {
       ...program(a), cardIds: program(b).cardIds,
     })).toEqual({ outcome: 'INVALID_PROGRAM' })
-    expect(await first.timeout(1000).emitWithAck('program.submit', program(b))).toEqual({ outcome: 'PLAYER_ID_MISMATCH' })
+    // Identity is session-derived, so another player's cards are invalid for the caller.
+    expect(await first.timeout(1000).emitWithAck('program.submit', program(b))).toEqual({ outcome: 'INVALID_PROGRAM' })
     expect(await first.timeout(1000).emitWithAck('program.submit', program(a))).toEqual({ outcome: 'ACCEPTED' })
     expect(await raw(first, update())).toEqual({ outcome: 'ALREADY_SUBMITTED' })
     expect((await snapshot(first)).programSubmitted).toBe(true)
@@ -211,7 +211,7 @@ describe('public registers over Socket.IO', () => {
     expect(restored.state.paused).toBe(false)
     const departedEvents: unknown[] = []
     returning.onAny((name, payload: unknown) => departedEvents.push({ name, payload }))
-    expect(await returning.timeout(1000).emitWithAck('game.leave', { gameId: a.assignment.gameId })).toEqual({ outcome: 'LEFT' })
+    expect(await returning.timeout(1000).emitWithAck('game.leave', {})).toEqual({ outcome: 'LEFT' })
     const remaining = await snapshot(second)
     expect(remaining.state.players.map((player) => player.playerId)).not.toContain(a.assignment.playerId)
     expect(await raw(returning, update())).toEqual({ outcome: 'NOT_A_MEMBER' })
@@ -403,7 +403,7 @@ describe('public registers over Socket.IO', () => {
     const events: string[] = []
     remaining.onAny((name) => events.push(name))
     const dealt = new Promise<void>((resolve) => remaining.once('cards.dealt', () => resolve()))
-    expect(await departing.timeout(1000).emitWithAck('game.leave', { gameId: joined[0].assignment.gameId })).toEqual({ outcome: 'LEFT' })
+    expect(await departing.timeout(1000).emitWithAck('game.leave', {})).toEqual({ outcome: 'LEFT' })
     await dealt
     const restored = await snapshot(remaining)
     expect(restored.state.players.map((player) => player.registers)).toEqual([empty])
