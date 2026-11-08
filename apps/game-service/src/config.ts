@@ -16,7 +16,7 @@ export const DEFAULT_OAUTH_CLIENT_SECRET = 'game-service-dev-secret'
 export const DEFAULT_AUTH_CALLBACK_URL = 'https://127.0.0.1:3001/auth/callback'
 export const DEFAULT_POST_LOGOUT_REDIRECT_URL = 'https://127.0.0.1:3001/'
 export const DEFAULT_KRATOS_SETTINGS_URL = 'https://127.0.0.1:3001/ory/ui/settings'
-export const DEFAULT_REFRESH_BUFFER_SECONDS = 60
+export const DEFAULT_REFRESH_BUFFER_SECONDS = 5 * 60
 export const DEFAULT_REFRESH_TOKEN_TTL_SECONDS = 24 * 60 * 60
 
 export function parseUrlEnv(value: string | undefined, fallback: string): URL {
