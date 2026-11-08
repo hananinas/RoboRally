@@ -1,5 +1,5 @@
 import { handleListLobbies, handleCreateLobby, handleJoinLobby, handleLeaveLobby, handleStartLobby } from '@/socket/handlers/lobbyHandlers'
-import { handleGetSession, handleLeaveGame, handleDisconnectSession, handleSessionProgram, recoverSession, validateRecoveredSession } from '@/socket/handlers/sessionHandlers'
+import { handleGetSession, handleLeaveGame, handleDisconnectSession, handleSessionProgram, handleSessionRegisters, recoverSession, validateRecoveredSession } from '@/socket/handlers/sessionHandlers'
 import type { SessionContext } from '@/socket/sessionContext'
 import type { Server as HttpServer } from 'node:http'
 import type {
@@ -98,6 +98,7 @@ export function createGameSocketServer(
     socket.on('game.leave', (payload, ack) => handleLeaveGame(context, socket, payload, ack))
     socket.on('disconnect', () => handleDisconnectSession(context, socket))
     socket.on('program.submit', (payload, ack) => handleSessionProgram(context, socket, payload, ack))
+    socket.on('game.updateRegisters', (payload, ack) => handleSessionRegisters(context, socket, payload, ack))
   })
 
   return io

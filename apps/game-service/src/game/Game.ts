@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { err, ok, type Result } from 'neverthrow'
 import type { Board } from '@/game/Board'
-import { instructions } from '@robo-rally/game-events'
+import { instructions, type PublicRegisters, type RegisterOccupancy } from '@robo-rally/game-events'
 import { Card } from '@/game/Card'
 import type { CardId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
@@ -22,6 +22,7 @@ export type RobotActionResult = Readonly<{
 export type NextActionResult = Readonly<{
   registerIndex: number
   action: RobotActionResult
+  registers: PublicRegisters
   pushedRobots: readonly Readonly<{
     robotId: RobotId
     position: Position
@@ -39,6 +40,9 @@ export type SubmitProgramError =
   | 'PLAYER_NOT_IN_GAME'
   | 'ALREADY_SUBMITTED'
   | 'INVALID_PROGRAM'
+
+export type UpdateRegistersError = Exclude<SubmitProgramError, 'INVALID_PROGRAM'>
+
 export const DEFAULT_GAME_NAME = 'Game'
 
 export class Game {
@@ -248,6 +252,12 @@ export class Game {
     )
   }
 
+  updateRegisters(playerId: PlayerId, occupied: RegisterOccupancy): Result<void, UpdateRegistersError> {
+    return this.checkCanSubmitProgram(playerId).map((player) => {
+      player.updateRegisters(occupied)
+    })
+  }
+
   recheckProgrammingPhase(): void {
     if (
       this.currentPhase === 'programming' &&
@@ -286,6 +296,8 @@ export class Game {
     const previousPositions = this.roster.map((player) => this.board.positionOf(player.robot.id))
     this.executeCard(robot, card)
     this.activatedRobotIds.add(robot.id)
+    const player = this.roster.find((candidate) => candidate.robot === robot)!
+    const registers = player.revealRegister(registerIndex, card.instruction)
     const action: RobotActionResult = {
       robotId: robot.id,
       card,
@@ -304,13 +316,14 @@ export class Game {
       this.activateBoardElements()
       this.finishRegister()
     }
-    return { registerIndex, action, pushedRobots }
+    return { registerIndex, action, registers, pushedRobots }
   }
 
   private dealCards(): void {
     // V0 uses the supplied deck as a fixed hand, without drawing or shuffling.
     for (const player of this.players) {
       if (player.hand.length === 0) player.setHand(this.deck)
+      player.resetRegisters()
     }
   }
 

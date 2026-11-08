@@ -327,6 +327,7 @@ describe('started game membership over Socket.IO', () => {
     const emit = client.emit.bind(client) as (event: string, payload: unknown) => void
     emit('lobby.create', {})
     emit('program.submit', {})
+    emit('game.updateRegisters', {})
     expect(await client.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION', user: { userId: 'Abid', username: 'Abid' } })
     expect(shared.game.players).toHaveLength(0)
   })
@@ -388,6 +389,7 @@ describe('started game membership over Socket.IO', () => {
 
       expect(actions[0][0]).toEqual({
         gameId: shared.gameId, registerIndex: 0, robotId: robotIds[0], instruction: 'MOVE_1',
+        playerId: initializations[0].assignment.playerId,
         position: { coordinate: { x: 3, y: 2 }, orientation: 'EAST' },
         pushedRobots: [
           { robotId: robotIds[1], position: { coordinate: { x: 4, y: 2 }, orientation: 'SOUTH' } },
@@ -427,6 +429,7 @@ describe('started game membership over Socket.IO', () => {
         { coordinate: { x: 4, y: 4 }, orientation: 'NORTH' },
       ].map((position, registerIndex) => ({
         gameId: shared.gameId, registerIndex, robotId: initial.assignment.robotId,
+        playerId: initial.assignment.playerId,
         pushedRobots: [],
         instruction: initial.hand[[2, 0, 4, 5, 3][registerIndex]].instruction, position,
       })))
@@ -487,6 +490,7 @@ describe('started game membership over Socket.IO', () => {
       expect(actions[2]).toEqual(actions[0])
       expect(actions[0][0]).toEqual({
         gameId: shared.gameId, registerIndex: 0, robotId: robotIds[0], instruction: 'MOVE_3',
+        playerId: initializations[0].assignment.playerId,
         pushedRobots: [],
         position: { coordinate: { x: 4, y: 3 }, orientation: 'NORTH' },
       })
