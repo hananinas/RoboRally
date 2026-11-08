@@ -6,6 +6,7 @@ import {
   parseGameServicePort,
   parseRefreshBufferSeconds,
   parseRefreshTokenTtlSeconds,
+  parseStartTileOrder,
 } from '@/config.ts'
 
 describe('game service configuration', () => {
@@ -44,4 +45,9 @@ describe('game service configuration', () => {
       expect(() => parseRefreshTokenTtlSeconds(value)).toThrow(RangeError)
     },
   )
+  it('picks starting tiles at random unless ordered placement is configured', () => {
+    expect(parseStartTileOrder(undefined)).toBe('random')
+    expect(parseStartTileOrder('ordered')).toBe('ordered')
+    expect(() => parseStartTileOrder('first')).toThrow(RangeError)
+  })
 })

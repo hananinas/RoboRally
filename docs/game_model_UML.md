@@ -14,6 +14,8 @@ Will update with a more conceptual domain diagram which will be used for present
         -winner: PlayerId?
         -activatedRobotIds: RobotId[] set
         -deck: Card[] unordered
+        -startPositions: Map
+        +startPositionOf(RobotId robotId) Position
         -dealCards()
         +submitProgram(PlayerId playerId, CardId[5] cardIds)
         +moveRobot(Robot robot, Direction direction, PositiveInteger steps)
@@ -26,6 +28,7 @@ Will update with a more conceptual domain diagram which will be used for present
         class Board {
         -tiles: Tile[][]
         -robotPositions: Map
+        +startTiles: Position[] readonly
         +positionOf(RobotId robotId) Position
         +occupantAt(Position position) RobotId?
         +allowsPlacement(Position position) bool

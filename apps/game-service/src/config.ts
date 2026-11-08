@@ -63,11 +63,19 @@ export function parseKratosSettingsUrl(value: string | undefined): URL {
   return parseUrlEnv(value, DEFAULT_KRATOS_SETTINGS_URL)
 }
 
+export type StartTileOrder = 'random' | 'ordered'
+
+export function parseStartTileOrder(value: string | undefined): StartTileOrder {
+  if (value === undefined || value === 'random' || value === 'ordered') return value ?? 'random'
+  throw new RangeError('START_TILE_ORDER must be "random" or "ordered"')
+}
+
 export type AppConfig = Readonly<{
   port: number
   kratosSettingsUrl: URL
   oidc: OidcConfig
   refreshTokenTtlSeconds: number
+  startTileOrder: StartTileOrder
 }>
 
 export function parseAppConfig(env: NodeJS.ProcessEnv): AppConfig {
@@ -76,5 +84,6 @@ export function parseAppConfig(env: NodeJS.ProcessEnv): AppConfig {
     kratosSettingsUrl: parseKratosSettingsUrl(env.KRATOS_SETTINGS_URL),
     oidc: parseOidcConfig(env),
     refreshTokenTtlSeconds: parseRefreshTokenTtlSeconds(env.REFRESH_TOKEN_TTL_SECONDS),
+    startTileOrder: parseStartTileOrder(env.START_TILE_ORDER),
   }
 }
