@@ -21,9 +21,14 @@ const board = new Board(tiles, { x: Integer(0), y: Integer(0), angle: 0 }, {
 const game = new Game(board, [], createHand(), { x: Integer(5), y: Integer(5) }, 'Shared game')
 const config = parseAppConfig(process.env)
 const oidcClient = await createOidcClient(config.oidc)
-const sessionStore = createSessionStore()
+const sessionStore = createSessionStore({ oidcClient, refreshBufferSeconds: config.oidc.refreshBufferSeconds })
 const server = createServer()
-const authApp = createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl: config.kratosSettingsUrl })
+const authApp = createAuthApp({
+  oidcClient,
+  sessionStore,
+  kratosSettingsUrl: config.kratosSettingsUrl,
+  refreshTokenTtlSeconds: config.refreshTokenTtlSeconds,
+})
 server.on('request', (req, res) => {
   if (req.url?.startsWith('/auth/')) {
     authApp(req, res)

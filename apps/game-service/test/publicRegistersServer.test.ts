@@ -33,7 +33,7 @@ describe('public registers over Socket.IO', () => {
     clients = []
     sessions = []
     const http = createServer()
-    sessionStore = createSessionStore()
+    sessionStore = createSessionStore({ oidcClient: { refreshToken: vi.fn() }, refreshBufferSeconds: 0 })
     server = createGameSocketServer(http, sessionStore, () => {
       const session = { ...createGame('empty-map'), gameId: randomUUID() }
       sessions.push(session)
