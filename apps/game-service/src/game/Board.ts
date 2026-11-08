@@ -19,8 +19,14 @@ export class Board {
   readonly height: number
   readonly antenna: Antenna
   readonly map?: BoardMap
+  readonly startTiles: readonly Position[]
 
-  constructor(tiles: readonly (readonly Tile[])[], antenna: Antenna, map?: BoardMap) {
+  constructor(
+    tiles: readonly (readonly Tile[])[],
+    antenna: Antenna,
+    map?: BoardMap,
+    startTiles: readonly Position[] = [],
+  ) {
     const width = tiles[0]?.length ?? 0
     if (width === 0 || tiles.some((row) => row.length !== width)) {
       throw new RangeError('A board must be a non-empty rectangular tile grid')
@@ -43,6 +49,15 @@ export class Board {
     }
     this.antenna = Object.freeze({ ...antenna })
     this.map = map === undefined ? undefined : Object.freeze({ ...map })
+
+    const startKeys = new Set(startTiles.map(({ x, y }) => `${x},${y}`))
+    if (startKeys.size !== startTiles.length) {
+      throw new RangeError('Starting tiles must be distinct')
+    }
+    if (!startTiles.every((position) => this.allowsPlacement(position))) {
+      throw new RangeError('Starting tiles must be non-pit tiles on the board outside the priority antenna')
+    }
+    this.startTiles = Object.freeze(startTiles.map((position) => Object.freeze({ ...position })))
   }
 
   get checkpointCount(): number {

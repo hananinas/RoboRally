@@ -113,20 +113,19 @@ export default function useSessionConnection() {
   }
   function startLobby() {
     if (session.status !== 'waiting') return
-    const lobbyId = session.lobby.lobbyId
     void run(async () => {
-      const result = await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.start', { lobbyId })
+      const result = await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.start', {})
       if (result.outcome === 'STARTED' && current.current.status === 'joined') return
-      return result.outcome === 'STARTED' || result.outcome === 'LOBBY_NOT_FOUND'
+      return result.outcome === 'STARTED' || result.outcome === 'NOT_LOBBY_MEMBER'
         ? { type: 'sync-requested' } : { type: 'error', error: result.outcome }
     }, 'start')
   }
   function leaveSession() {
     void run(async () => {
       const result = session.status === 'waiting'
-        ? await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.leave', { lobbyId: session.lobby.lobbyId })
+        ? await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.leave', {})
         : game.state.assignment
-          ? await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('game.leave', { gameId: game.state.assignment.gameId }) : undefined
+          ? await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('game.leave', {}) : undefined
       return result?.outcome === 'LEFT' || result?.outcome === 'GAME_NOT_FOUND'
         ? { type: 'left' } : { type: 'sync-requested' }
     })

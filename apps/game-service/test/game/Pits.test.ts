@@ -44,7 +44,7 @@ describe('pit entry and rebooting', () => {
     const program = [first, ...Object.values(cards).filter((card) => card !== first).slice(0, 4)]
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
-    expect(game.executeNextAction()).toEqual({
+    expect(game.executeNextAction()).toMatchObject({
       registerIndex: 0,
       pushedRobots: [],
       action: { robotId: robot.id, card: first, position: { x: Integer(0), y: Integer(2) }, direction },

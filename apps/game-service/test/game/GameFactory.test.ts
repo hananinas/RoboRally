@@ -69,18 +69,47 @@ describe('game factory', () => {
       'TURN_RIGHT', 'U_TURN', 'MOVE_1', 'TURN_LEFT',
     ])
     expect(submitProgramSchema.parse({
-      gameId: '00000000-0000-4000-8000-000000000001',
-      playerId: first.id,
       cardIds: cardIds.slice(0, 5),
-    })).toMatchObject({ playerId: first.id, cardIds: cardIds.slice(0, 5) })
+    })).toMatchObject({ cardIds: cardIds.slice(0, 5) })
   })
 
-  it('places an added player at the centre of the board', () => {
-    const { game } = createGame('empty-map')
+    it('places an added player on the starting tile picked by the random source', () => {
+    const { game } = createGame('test-map', undefined, () => 0.99)
     const player = game.addPlayer('#4d8deb')._unsafeUnwrap()
 
     expect(player.robot.colour).toBe('#4d8deb')
-    expect(game.board.positionOf(player.robot.id)).toEqual({ x: 10, y: 7 })
+    expect(game.board.positionOf(player.robot.id)).toEqual({ x: 5, y: 12 })
+    expect(game.startPositionOf(player.robot.id)).toEqual({ x: 5, y: 12 })
+  })
+
+  it('only picks starting tiles that are still free', () => {
+    const { game } = createGame('test-map', undefined, () => 0)
+    const positions = Array.from({ length: 3 }, () =>
+      game.board.positionOf(game.addPlayer()._unsafeUnwrap().robot.id))
+    expect(positions).toEqual([{ x: 8, y: 7 }, { x: 3, y: 8 }, { x: 10, y: 13 }])
+  })
+
+  it('gives six players six different starting tiles and has no tile for a seventh', () => {
+    const { game } = createGame('test-map')
+    const starts = Array.from({ length: 6 }, () =>
+      game.startPositionOf(game.addPlayer()._unsafeUnwrap().robot.id))
+
+    expect(new Set(starts.map(({ x, y }) => `${x},${y}`))).toEqual(
+      new Set(boardMaps['test-map'].startTiles.map(([x, y]) => `${x},${y}`)),
+    )
+    expect(game.addPlayer()._unsafeUnwrapErr()).toBe('NO_SPAWN_AVAILABLE')
+  })
+
+  it('remembers the starting tile after the robot moves and frees it when the player leaves', () => {
+    const { game } = createGame('test-map', undefined, () => 0)
+    const player = game.addPlayer()._unsafeUnwrap()
+    game.board.relocateRobot(player.robot.id, { x: Integer(1), y: Integer(5) })
+
+    expect(game.startPositionOf(player.robot.id)).toEqual({ x: 8, y: 7 })
+
+    game.removePlayer(player.id)
+    expect(() => game.startPositionOf(player.robot.id)).toThrow()
+    expect(game.board.positionOf(game.addPlayer()._unsafeUnwrap().robot.id)).toEqual({ x: 8, y: 7 })
   })
 
   it('creates isolated state for each game', () => {

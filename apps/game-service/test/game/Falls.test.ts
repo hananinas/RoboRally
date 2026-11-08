@@ -76,7 +76,7 @@ describe('board-edge falls', () => {
 
     const result = game.executeNextAction()
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       registerIndex: 0,
       pushedRobots: [],
       action: { robotId: robot.id, card: program[0], position: reboot, direction },
