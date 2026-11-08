@@ -9,8 +9,16 @@ import { ROBOT_COLOURS, Robot } from '@/game/Robot'
 import { tileDefinitions } from '@/game/Tile'
 import { Direction, opposite, type Position } from '@/game/spatial'
 import { Integer, PositiveInteger, UnsignedInteger } from '@/numbers'
+import {
+  GameLifecycle,
+  type AbortError,
+  type GamePhase,
+  type PauseError,
+  type PhaseError,
+  type ResumeError,
+} from '@/game/GameLifecycle'
 
-export type GamePhase = 'programming' | 'activation'
+export type { GamePhase, PauseError, ResumeError, AbortError, PhaseError }
 
 export type RobotActionResult = Readonly<{
   robotId: RobotId
@@ -33,10 +41,7 @@ export type NextActionResult = Readonly<{
 export type AddPlayerError = 'GAME_ALREADY_STARTED' | 'NO_SPAWN_AVAILABLE'
 
 export type SubmitProgramError =
-  | 'GAME_ABORTED'
-  | 'GAME_FINISHED'
-  | 'GAME_PAUSED'
-  | 'WRONG_PHASE'
+  | PhaseError
   | 'PLAYER_NOT_IN_GAME'
   | 'ALREADY_SUBMITTED'
   | 'INVALID_PROGRAM'
@@ -51,14 +56,11 @@ export class Game {
   private readonly roster: Player[]
   readonly rebootTile: Position
   private readonly deck: readonly Card[]
-  private currentPhase: GamePhase = 'programming'
+  private readonly lifecycle = new GameLifecycle('programming')
   private registerIndex = 0
   private readonly submittedPlayerIds = new Set<PlayerId>()
   private readonly activatedRobotIds = new Set<RobotId>()
   private started = false
-  private isPaused = false
-  private isAborted = false
-  private winnerId: PlayerId | undefined
   private readonly startPositions = new Map<RobotId, Position>()
   private readonly random: () => number
 
@@ -104,7 +106,7 @@ export class Game {
   }
 
   get phase(): GamePhase {
-    return this.currentPhase
+    return this.lifecycle.lastPhase
   }
 
   get currentRegister(): number {
@@ -120,27 +122,28 @@ export class Game {
   }
 
   get paused(): boolean {
-    return this.isPaused
+    return this.lifecycle.current.kind === 'paused'
   }
 
   get aborted(): boolean {
-    return this.isAborted
+    return this.lifecycle.current.kind === 'aborted'
   }
 
   get winner(): PlayerId | undefined {
-    return this.winnerId
+    const state = this.lifecycle.current
+    return state.kind === 'finished' ? state.winnerId : undefined
   }
 
-  pause(): void {
-    this.isPaused = true
+  pause(): Result<void, PauseError> {
+    return this.lifecycle.pause()
   }
 
-  resume(): void {
-    this.isPaused = false
+  resume(): Result<void, ResumeError> {
+    return this.lifecycle.resume()
   }
 
-  abort(): void {
-    this.isAborted = true
+  abort(): Result<void, AbortError> {
+    return this.lifecycle.abort()
   }
 
   hasSubmittedProgram(playerId: PlayerId): boolean {
@@ -203,7 +206,8 @@ export class Game {
     player.robot.clearProgram()
     this.submittedPlayerIds.delete(playerId)
     this.activatedRobotIds.delete(player.robot.id)
-    if (this.currentPhase === 'activation') {
+    const lifecycleState = this.lifecycle.current
+    if (lifecycleState.kind === 'active' && lifecycleState.phase === 'activation') {
       if (this.roster.length === 0) {
         this.finishRound()
       } else if (this.activatedRobotIds.size === this.roster.length) {
@@ -217,16 +221,13 @@ export class Game {
   private checkCanSubmitProgram(
     playerId: PlayerId,
   ): Result<Player, Exclude<SubmitProgramError, 'INVALID_PROGRAM'>> {
-    if (this.isAborted) return err('GAME_ABORTED')
-    if (this.winnerId !== undefined) return err('GAME_FINISHED')
-    if (this.isPaused) return err('GAME_PAUSED')
-    if (this.currentPhase !== 'programming') return err('WRONG_PHASE')
+    return this.lifecycle.requirePhase('programming').andThen(() => {
+      const player = this.players.find((candidate) => candidate.id === playerId)
+      if (!player) return err('PLAYER_NOT_IN_GAME')
+      if (this.submittedPlayerIds.has(playerId)) return err('ALREADY_SUBMITTED')
 
-    const player = this.players.find((candidate) => candidate.id === playerId)
-    if (!player) return err('PLAYER_NOT_IN_GAME')
-    if (this.submittedPlayerIds.has(playerId)) return err('ALREADY_SUBMITTED')
-
-    return ok(player)
+      return ok(player)
+    })
   }
 
   private checkProgram(player: Player, cardIds: readonly CardId[]): Result<readonly Card[], 'INVALID_PROGRAM'> {
@@ -260,7 +261,7 @@ export class Game {
 
   recheckProgrammingPhase(): void {
     if (
-      this.currentPhase === 'programming' &&
+      this.lifecycle.requirePhase('programming').isOk() &&
       this.players.length > 0 &&
       this.players.every((player) => this.submittedPlayerIds.has(player.id))
     ) {
@@ -284,7 +285,7 @@ export class Game {
   }
 
   executeNextAction(): NextActionResult {
-    if (this.currentPhase !== 'activation') {
+    if (this.lifecycle.requirePhase('activation').isErr()) {
       throw new Error('Robot actions can only execute during activation')
     }
 
@@ -328,7 +329,7 @@ export class Game {
   }
 
   private startActivationPhase(): void {
-    this.currentPhase = 'activation'
+    this.lifecycle.enterActivation()
     this.registerIndex = 0
     this.activatedRobotIds.clear()
   }
@@ -400,7 +401,7 @@ export class Game {
       const checkpoint = this.board.getTile(position)?.checkpointNumber
       if (checkpoint === undefined || !player.completeCheckpoint(checkpoint)) continue
       if (checkpoint === this.board.checkpointCount) {
-        this.winnerId = player.id
+        this.lifecycle.finish(player.id)
         break
       }
     }
@@ -409,14 +410,16 @@ export class Game {
   private finishRegister(): void {
     this.activatedRobotIds.clear()
     this.registerIndex++
-    if (this.registerIndex === 5 || this.winnerId !== undefined) this.finishRound()
+    if (this.registerIndex === 5 || this.lifecycle.current.kind === 'finished') this.finishRound()
   }
 
   private finishRound(): void {
     for (const player of this.players) player.robot.clearProgram()
     this.submittedPlayerIds.clear()
     this.registerIndex = 0
-    this.dealCards()
-    this.currentPhase = 'programming'
+    if (this.lifecycle.current.kind === 'active') {
+      this.dealCards()
+      this.lifecycle.enterProgramming()
+    }
   }
 }
