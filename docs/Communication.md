@@ -128,6 +128,22 @@ sequenceDiagram
 ```
 
 ## Game has started
+### Game lifecycle
+A game is always in one lifecycle state: `active`, `paused`, `aborted`, or `finished`. While the game is `active` it can be in one of these phases: `programming` or `activation`. A phase only exists while the game is active. Pausing does not clear the current phase, it is remembered and restored once the game resumes.
+
+The diagram below shows every state and every transition between them:
+
+![Game lifecycle](game-lifecycle-statemachine.svg)
+
+- **`programming` → `activation`**, once every player has submitted their program. See [Programming](#programming).
+- **`activation` → `programming`**, once all five registers have resolved and no robot has won. See [Dealing the next hand](#dealing-the-next-hand).
+- **`active` → `finished`**, when a robot completes the final checkpoint. See [Winning](#winning).
+- **`active` → `paused`**, when a player disconnects. See [Pausing on disconnection](#pausing-on-disconnection).
+- **`paused` → `active`**, once every disconnected player has reconnected. The game resumes in the same phase it paused in. See [Restoring the connections](#restoring-the-connections).
+- **`active` or `paused` → `aborted`**, on an unrecoverable service failure. See [Aborting](#aborting).
+
+`aborted` and `finished` are final: once a game reaches either one, it does not change state again.
+
 ### Initialization
 The service creates a fresh game, moves every member into its public and private player rooms, and removes the lobby room and record. The service sends each player the following through their own `game:{gameId}:player:{playerId}` room:
 
@@ -214,7 +230,7 @@ The event follows the related `robot.actionResolved`.
 ### Winning
 A player wins when their robot completes the final checkpoint, so `lastCheckpoint` reaches `checkpointCount`. Like every checkpoint, this is checked at the end of a register. Robots cannot share a space, so only one robot can win. A board without checkpoints has no winner.
 
-The game ends at once: remaining registers are not resolved and no new hand is dealt. The service broadcasts to the [public room](#rooms):
+This is the `active` → `finished` transition, and it is final. The game ends at once: remaining registers are not resolved and no new hand is dealt. The service broadcasts to the [public room](#rooms):
 
 `game.won {gameId, playerId, username}`
 
@@ -224,9 +240,14 @@ After a win, `program.submit` is rejected with `GAME_FINISHED`. Players leave wi
 
 The client shows the winner once the remaining actions have played, with a button to leave the game.
 
+### Aborting
+If the service hits a failure it cannot recover from, the game moves straight to `aborted`, from either `active` or `paused`. This is a sefety mechanism and not an expected part of play like winning or pausing. Like winning it is game ending and permanent.
+
+The server broadcasts this to the [public room](#rooms) with `game.aborted {gameId}`. See [Errors and rejections](#errors-and-rejections) for the full payload.
+
 ### Dealing the next hand
 
-After all five registers have been resolved, the service deals each player a private hand for the next programming round.
+After all five registers have been resolved, the service deals each player a private hand for the next programming round. This is the `activation` → `programming` transition.
 
 Each player receives:
 
@@ -304,7 +325,7 @@ There are two possible reconnection paths:
 2. Connection state recovery fails, so the client establishes a new authenticated Socket.IO connection and calls `session.get` to obtain a fresh authoritative snapshot.
 
 #### Pausing on disconnection
-When the server detects that a player has disconnected, it pauses the game. An action already in progress completes, but no subsequent action is executed. The current game state is preserved.
+When the server detects that a player has disconnected, it pauses the game. This is the `active` → `paused` transition: an action already in progress completes, but no subsequent action is executed. The current game state is preserved, including the current phase (`programming` or `activation`).
 
 The server announces this to the [public room](#rooms):
 
@@ -402,7 +423,7 @@ sequenceDiagram
     Note over A,B: Unpause game
 ```
 
-The game remains paused while any remaining player is disconnected. Once all remaining players are connected, the same `game.playerConnectionChanged` event (now with `paused: false`) announces that the game has resumed, and gameplay continues from the preserved game state.
+The game remains paused while any remaining player is disconnected. Once all remaining players are connected, the same `game.playerConnectionChanged` event (now with `paused: false`) announces that the game has resumed. This is the `paused` → `active` transition: the game resumes in the phase it was in before pausing, and gameplay continues from the preserved game state.
 
 ## Errors and rejections
 
