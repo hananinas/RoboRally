@@ -114,4 +114,21 @@ describe('createSessionStore', () => {
     vi.advanceTimersByTime(60_000) // now past the original 120s hard expiry
     expect(store.get(sessionId)).toBeUndefined()
   })
+
+  it('does not resurrect a session destroyed while its background refresh was in flight', async () => {
+    let resolveRefresh: (tokens: { id_token: string; refresh_token: string; expires_in: number }) => void
+    const refreshToken = vi.fn().mockReturnValue(new Promise((resolve) => { resolveRefresh = resolve }))
+    const store = createSessionStore({ oidcClient: { refreshToken }, refreshBufferSeconds: 60 })
+    const sessionId = store.create('user-123', 'Bence', 'id-token-123', 'refresh-token-123', 120)
+
+    vi.advanceTimersByTime(61_000) // inside the 60s buffer: starts the background refresh
+    store.get(sessionId)
+
+    store.destroy(sessionId)
+
+    resolveRefresh!({ id_token: 'id-token-new', refresh_token: 'refresh-token-new', expires_in: 900 })
+    await vi.advanceTimersByTimeAsync(0) // flush the background refresh promise
+
+    expect(store.get(sessionId)).toBeUndefined()
+  })
 })

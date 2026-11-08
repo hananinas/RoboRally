@@ -38,6 +38,7 @@ export function createSessionStore(deps: SessionStoreDeps): SessionStore {
       .refreshToken(session.refreshToken)
       .then((tokens) => {
         if (!tokens.id_token || !tokens.refresh_token) return
+        if (sessions.get(sessionId) !== session) return
         sessions.set(sessionId, {
           sub: session.sub,
           username: session.username,
