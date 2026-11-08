@@ -1,7 +1,8 @@
 import { createServer } from 'node:http'
-import { Board, Direction, EmptyTile, Game, PitTile, createHand } from '../../game-service/dist/game/index.js'
+import { Board, Direction, EmptyTile, Game, PitTile, createDeckCards } from '../../game-service/dist/game/index.js'
 import { Integer } from '../../game-service/dist/numbers.js'
 import { parseAppConfig } from '../../game-service/dist/config.js'
+import { seededRandom } from '../../game-service/dist/random.js'
 import { createGameSocketServer } from '../../game-service/dist/socket/gameServer.js'
 import { createAuthApp } from '../../game-service/dist/auth/httpRoutes.js'
 import { createSessionStore } from '../../game-service/dist/auth/sessionStore.js'
@@ -18,7 +19,9 @@ const icon = 'data:image/svg+xml;base64,' + Buffer.from(
 const board = new Board(tiles, { x: Integer(0), y: Integer(0), angle: 0 }, {
   name: 'Pushing test board', icon, maxPlayers: 6,
 })
-const game = new Game(board, [], createHand(), { x: Integer(5), y: Integer(5) }, 'Shared game')
+// Fixed draw seed: every player's first hand holds the cards the pushing programs use.
+const CARD_SEED = 3674
+const game = new Game(board, [], createDeckCards(), { x: Integer(5), y: Integer(5) }, 'Shared game', Math.random, seededRandom(CARD_SEED))
 const config = parseAppConfig(process.env)
 const oidcClient = await createOidcClient(config.oidc)
 const sessionStore = createSessionStore()

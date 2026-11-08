@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { err, ok, type Result } from 'neverthrow'
 import type { Board } from '@/game/Board'
-import { instructions, type PublicRegisters, type RegisterOccupancy } from '@robo-rally/game-events'
+import { instructions, type Instruction, type PublicRegisters, type RegisterOccupancy } from '@robo-rally/game-events'
 import { Card } from '@/game/Card'
+import { Deck } from '@/game/Deck'
 import type { CardId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
 import { ROBOT_COLOURS, Robot } from '@/game/Robot'
@@ -50,6 +51,7 @@ export class Game {
   readonly board: Board
   private readonly roster: Player[]
   readonly rebootTile: Position
+  // Template for each player's private deck.
   private readonly deck: readonly Card[]
   private currentPhase: GamePhase = 'programming'
   private registerIndex = 0
@@ -61,6 +63,7 @@ export class Game {
   private winnerId: PlayerId | undefined
   private readonly startPositions = new Map<RobotId, Position>()
   private readonly random: () => number
+  private readonly drawRandom: () => number
 
   constructor(
     board: Board,
@@ -69,6 +72,7 @@ export class Game {
     rebootTile: Position,
     name: string = DEFAULT_GAME_NAME,
     random: () => number = Math.random,
+    drawRandom: () => number = random,
   ) {
     if (deck.length < 5 || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')
@@ -100,7 +104,8 @@ export class Game {
     this.rebootTile = Object.freeze({ ...rebootTile })
     this.deck = [...deck]
     this.random = random
-    this.dealCards()
+    this.drawRandom = drawRandom
+    this.dealInitialHands()
   }
 
   get phase(): GamePhase {
@@ -184,8 +189,9 @@ export class Game {
     return this.checkCanAddPlayer().andThen(() =>
       this.findSpawn().map((position) => {
         const robot = new Robot(randomUUID(), Direction.NORTH, colour)
-        const hand = this.deck.map((card) => new Card(randomUUID(), card.instruction))
-        const player = new Player(randomUUID(), robot, hand)
+        const cards = this.deck.map((card) => new Card(randomUUID(), card.instruction))
+        const player = new Player(randomUUID(), robot, [], new Deck(cards))
+        player.drawHand(this.drawRandom)
         this.board.placeRobot(robot.id, position)
         this.startPositions.set(robot.id, position)
         this.roster.push(player)
@@ -294,7 +300,7 @@ export class Game {
     const registerIndex = this.registerIndex
     const card = robot.getProgramCard(UnsignedInteger(registerIndex))
     const previousPositions = this.roster.map((player) => this.board.positionOf(player.robot.id))
-    this.executeCard(robot, card)
+    this.executeCard(robot, card, registerIndex)
     this.activatedRobotIds.add(robot.id)
     const player = this.roster.find((candidate) => candidate.robot === robot)!
     const registers = player.revealRegister(registerIndex, card.instruction)
@@ -319,10 +325,19 @@ export class Game {
     return { registerIndex, action, registers, pushedRobots }
   }
 
-  private dealCards(): void {
-    // V0 uses the supplied deck as a fixed hand, without drawing or shuffling.
+  private dealInitialHands(): void {
     for (const player of this.players) {
-      if (player.hand.length === 0) player.setHand(this.deck)
+      if (!player.hasCards) player.addToDeck(this.deck)
+      if (player.hand.length === 0) player.drawHand(this.drawRandom)
+      player.resetRegisters()
+    }
+  }
+
+  private dealNewHands(): void {
+    for (const player of this.players) {
+      // Hand and programmed cards both go to the discard pile before drawing.
+      player.discardHand()
+      player.drawHand(this.drawRandom)
       player.resetRegisters()
     }
   }
@@ -361,14 +376,25 @@ export class Game {
     return nextRobot
   }
 
-  private executeCard(robot: Robot, card: Card): void {
-    const effect = instructions[card.instruction]
+  private executeCard(robot: Robot, card: Card, registerIndex: number): void {
+    const instruction = this.resolveInstruction(robot, card.instruction, registerIndex)
+    if (instruction === undefined) return
+    const effect = instructions[instruction]
     if (effect.kind === 'move') {
       const direction = effect.steps < 0 ? opposite(robot.direction) : robot.direction
       this.moveRobot(robot, direction, PositiveInteger(Math.abs(effect.steps)))
-    } else {
+    } else if (effect.kind === 'turn') {
       robot.turn(effect.quarterTurns)
     }
+  }
+
+  // Again repeats the previous register's action; with nothing to repeat it does nothing.
+  private resolveInstruction(robot: Robot, instruction: Instruction, registerIndex: number): Instruction | undefined {
+    for (let index = registerIndex; index >= 0 && instruction === 'AGAIN'; index--) {
+      if (index === 0) return undefined
+      instruction = robot.getProgramCard(UnsignedInteger(index - 1)).instruction
+    }
+    return instruction
   }
 
   private resolveMovementEntry(robot: Robot, position: Position): 'continue' | 'stop' {
@@ -416,7 +442,7 @@ export class Game {
     for (const player of this.players) player.robot.clearProgram()
     this.submittedPlayerIds.clear()
     this.registerIndex = 0
-    this.dealCards()
+    this.dealNewHands()
     this.currentPhase = 'programming'
   }
 }

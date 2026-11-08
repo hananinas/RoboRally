@@ -5,8 +5,9 @@ import { submitProgramSchema } from '@robo-rally/game-events'
 import type { ClientToServerEvents, CardsDealt, GameWon, RobotActionResolved, GameInitialization, PlayerConnectionChanged, PlayerCheckpointProgress, ServerToClientEvents } from '@robo-rally/game-events'
 import { io, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Board, Direction, EmptyTile, PitTile, Game, type Tile } from '@/game/index'
-import { createGame, createHand } from '@/game/GameFactory'
+import { Board, Card, Direction, EmptyTile, PitTile, Game, type Tile } from '@/game/index'
+import { createGame } from '@/game/GameFactory'
+import { HAND_SIZE } from '@/game/Deck'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
 import { createSessionStore, type SessionStore } from '@/auth/sessionStore'
 import { authCookieHeader } from './authTestHelper.ts'
@@ -120,9 +121,11 @@ describe('started game membership over Socket.IO', () => {
   it('completes the programming barrier when an unsubmitted member leaves', async () => {
     const { members: [first, second], initializations: [initial] } = await startGame(['First', 'Second'])
     await first.emitWithAck('program.submit', submission(initial))
-    const hand = new Promise((resolve) => first.once('cards.dealt', resolve))
+    const hand = new Promise<CardsDealt>((resolve) => first.once('cards.dealt', resolve))
     await second.emitWithAck('game.leave', {})
-    expect(await hand).toEqual({ gameId: shared.gameId, playerId: initial.assignment.playerId, cards: initial.hand })
+    const dealt = await hand
+    expect(dealt).toMatchObject({ gameId: shared.gameId, playerId: initial.assignment.playerId })
+    expect(dealt.cards).toHaveLength(HAND_SIZE)
     expect(shared.game.phase).toBe('programming')
   })
   it('preserves assignments, hands and checkpoint progress while pausing for disconnected members', async () => {
@@ -355,9 +358,16 @@ describe('started game membership over Socket.IO', () => {
       tiles[1][2] = new PitTile()
       tiles[4][4] = new EmptyTile([Direction.WEST], 1)
       tiles[4][0] = new EmptyTile([], 2)
+      // A nine-card deck is redrawn in full (in order) each round, so hands repeat exactly.
+      const deck = [
+        'MOVE_1', 'MOVE_2', 'MOVE_3', 'BACK_UP', 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'MOVE_1', 'TURN_LEFT',
+      ].map((instruction, index) => new Card(`card-${index}`, instruction as Card['instruction']))
       shared = {
         gameId: shared.gameId,
-        game: new Game(new Board(tiles, { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }), [], createHand(), { x: Integer(4), y: Integer(4) }),
+        game: new Game(
+          new Board(tiles, { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }),
+          [], deck, { x: Integer(4), y: Integer(4) }, undefined, () => 0,
+        ),
       }
       await start()
     })

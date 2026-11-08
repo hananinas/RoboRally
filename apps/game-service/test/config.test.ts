@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_GAME_SERVICE_PORT,
   parseGameServicePort,
+  parseCardSeed,
   parseStartTileOrder,
 } from '@/config.ts'
 
@@ -22,5 +23,14 @@ describe('game service configuration', () => {
     expect(parseStartTileOrder(undefined)).toBe('random')
     expect(parseStartTileOrder('ordered')).toBe('ordered')
     expect(() => parseStartTileOrder('first')).toThrow(RangeError)
+  })
+
+  it('draws cards at random unless a card seed is configured', () => {
+    expect(parseCardSeed(undefined)).toBeUndefined()
+    expect(parseCardSeed('0')).toBe(0)
+    expect(parseCardSeed('42')).toBe(42)
+    for (const value of ['', '-1', '1.5', 'abc']) {
+      expect(() => parseCardSeed(value)).toThrow(RangeError)
+    }
   })
 })

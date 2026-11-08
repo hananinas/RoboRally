@@ -117,7 +117,7 @@ describe('robot playback', () => {
 describe('robot action timing', () => {
   it.each([
     ['MOVE_1', 600], ['MOVE_2', 600], ['MOVE_3', 600], ['BACK_UP', 600],
-    ['TURN_LEFT', 300], ['TURN_RIGHT', 300], ['U_TURN', 300],
+    ['TURN_LEFT', 300], ['TURN_RIGHT', 300], ['U_TURN', 300], ['AGAIN', 600],
   ] as const)('times %s and respects reduced motion', (instruction, duration) => {
     const action = { ...steps[0], instruction }
     expect(robotActionDuration(action, false)).toBe(duration)

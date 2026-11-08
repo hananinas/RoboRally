@@ -7,6 +7,7 @@ export const instructions = {
   TURN_LEFT: { kind: 'turn', quarterTurns: 1 },
   TURN_RIGHT: { kind: 'turn', quarterTurns: 3 },
   U_TURN: { kind: 'turn', quarterTurns: 2 },
+  AGAIN: { kind: 'repeat' },
 } as const
 
 export type Instruction = keyof typeof instructions

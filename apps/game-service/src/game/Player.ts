@@ -1,5 +1,6 @@
 import type { Instruction, PublicRegisters, RegisterOccupancy } from '@robo-rally/game-events'
 import type { Card } from '@/game/Card'
+import { Deck, createHand } from '@/game/Deck'
 import type { PlayerId } from '@/game/ids'
 import type { Robot } from '@/game/Robot'
 
@@ -12,12 +13,30 @@ export class Player {
     readonly id: PlayerId,
     readonly robot: Robot,
     hand: readonly Card[] = [],
+    private readonly cardDeck: Deck = new Deck(),
   ) {
     this.currentHand = [...hand]
   }
 
   get hand(): readonly Card[] {
     return [...this.currentHand]
+  }
+
+  get hasCards(): boolean {
+    return this.currentHand.length > 0 || !this.cardDeck.isEmpty
+  }
+
+  addToDeck(cards: readonly Card[]): void {
+    this.cardDeck.add(cards)
+  }
+
+  drawHand(random?: () => number): void {
+    this.currentHand = createHand(this.cardDeck, random)
+  }
+
+  discardHand(): void {
+    this.cardDeck.discard(this.currentHand)
+    this.currentHand = []
   }
 
   get lastCheckpoint(): number {

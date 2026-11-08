@@ -10,7 +10,7 @@ export const test = base.extend<{ realGameService: void; gameServiceArgs: readon
   gameServiceArgs: [[fileURLToPath(new URL('../../game-service/dist/main.js', import.meta.url))], { option: true }],
   realGameService: [async ({ request, gameServiceArgs }, runTest) => {
     const service = spawn(process.execPath, gameServiceArgs, {
-      env: { ...process.env, PORT: '3002', START_TILE_ORDER: 'ordered', NODE_EXTRA_CA_CERTS: `${mkcertCaRoot}/rootCA.pem` },
+      env: { ...process.env, PORT: '3002', START_TILE_ORDER: 'ordered', CARD_SEED: '371', NODE_EXTRA_CA_CERTS: `${mkcertCaRoot}/rootCA.pem` },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     const closed = new Promise<void>((resolve) => service.once('close', () => resolve()))

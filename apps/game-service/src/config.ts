@@ -53,11 +53,18 @@ export function parseStartTileOrder(value: string | undefined): StartTileOrder {
   throw new RangeError('START_TILE_ORDER must be "random" or "ordered"')
 }
 
+export function parseCardSeed(value: string | undefined): number | undefined {
+  if (value === undefined) return undefined
+  if (!/^\d+$/.test(value)) throw new RangeError('CARD_SEED must be a non-negative integer')
+  return Number(value)
+}
+
 export type AppConfig = Readonly<{
   port: number
   kratosSettingsUrl: URL
   oidc: OidcConfig
   startTileOrder: StartTileOrder
+  cardSeed: number | undefined
 }>
 
 export function parseAppConfig(env: NodeJS.ProcessEnv): AppConfig {
@@ -66,5 +73,6 @@ export function parseAppConfig(env: NodeJS.ProcessEnv): AppConfig {
     kratosSettingsUrl: parseKratosSettingsUrl(env.KRATOS_SETTINGS_URL),
     oidc: parseOidcConfig(env),
     startTileOrder: parseStartTileOrder(env.START_TILE_ORDER),
+    cardSeed: parseCardSeed(env.CARD_SEED),
   }
 }

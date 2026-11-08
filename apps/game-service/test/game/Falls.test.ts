@@ -19,7 +19,7 @@ function createGame(
   const instructions: Instruction[] = [instruction, 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'MOVE_1']
   const program = instructions.map((instruction, index) => new Card(`card-${index}`, instruction))
   const reboot = { x: Integer(1), y: Integer(2) }
-  const game = new Game(board, [player], program, reboot)
+  const game = new Game(board, [player], program, reboot, undefined, () => 0)
   return { board, robot, player, program, reboot, game }
 }
 

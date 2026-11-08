@@ -61,7 +61,7 @@ describe('game presenter', () => {
       new EmptyTile([Direction.SOUTH], 1),
     ]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
-    const game = new Game(board, [], cards, { x: Integer(0), y: Integer(0) })
+    const game = new Game(board, [], cards, { x: Integer(0), y: Integer(0) }, undefined, () => 0)
     const state = presentPublicGameState('game', game)
 
     expect(state.checkpointCount).toBe(1)
@@ -170,15 +170,7 @@ describe('game presenter', () => {
     expectTypeOf(dealt).toEqualTypeOf<CardsDealt>()
     expect(dealt.cards).toHaveLength(9)
     expect(dealt.cards.map((card) => card.instruction)).toEqual([
-      'MOVE_1',
-      'MOVE_2',
-      'MOVE_3',
-      'BACK_UP',
-      'TURN_LEFT',
-      'TURN_RIGHT',
-      'U_TURN',
-      'MOVE_1',
-      'TURN_LEFT',
+      'MOVE_1', 'MOVE_1', 'MOVE_1', 'MOVE_1', 'MOVE_2', 'MOVE_2', 'MOVE_2', 'MOVE_3', 'BACK_UP',
     ])
     expect(dealt.cards[0]).toEqual({
       id: player.hand[0].id,
@@ -188,15 +180,14 @@ describe('game presenter', () => {
   })
 
   it.each([
-    { cardIndex: 0, instruction: 'MOVE_1' },
-    { cardIndex: 1, instruction: 'MOVE_2' }, { cardIndex: 2, instruction: 'MOVE_3' },
-    { cardIndex: 3, instruction: 'BACK_UP' }, { cardIndex: 4, instruction: 'TURN_LEFT' },
-    { cardIndex: 5, instruction: 'TURN_RIGHT' }, { cardIndex: 6, instruction: 'U_TURN' },
-  ] as const)('presents a resolved $instruction action', ({ cardIndex, instruction }) => {
+    { instruction: 'MOVE_1' }, { instruction: 'MOVE_2' }, { instruction: 'MOVE_3' },
+    { instruction: 'BACK_UP' }, { instruction: 'TURN_LEFT' }, { instruction: 'TURN_RIGHT' },
+    { instruction: 'U_TURN' }, { instruction: 'AGAIN' },
+  ] as const)('presents a resolved $instruction action', ({ instruction }) => {
     const { game, player } = createGameWithPlayer()
     const action = {
       robotId: player.robot.id,
-      card: player.hand[cardIndex],
+      card: new Card('card', instruction),
       position: { x: Integer(4), y: Integer(5) },
       direction: Direction.SOUTH,
     }

@@ -16,7 +16,7 @@ function createMultiplayerGame(
     board.placeRobot(robot.id, position)
     return new Player(`player-${index}`, robot)
   })
-  const game = new Game(board, players, deck, { x: Integer(0), y: Integer(0) })
+  const game = new Game(board, players, deck, { x: Integer(0), y: Integer(0) }, undefined, () => 0)
   return { board, players, deck, game }
 }
 
@@ -127,7 +127,6 @@ describe('Game multiplayer activation', () => {
         expect(game.updateRegisters(player.id, [true, true, true, true, true])._unsafeUnwrap()).toBeUndefined()
         game.submitProgram(player.id, programs[index].map((card) => card.id))
         expect(game.phase).toBe(index === players.length - 1 ? 'activation' : 'programming')
-        player.setHand([])
       })
 
       for (let registerIndex = 0; registerIndex < 5; registerIndex++) {

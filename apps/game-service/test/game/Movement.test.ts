@@ -23,7 +23,7 @@ function createGame(pitWalls: readonly Direction[] = [], startWalls: readonly Di
     new Card('move', 'MOVE_1'),
     new Card('back', 'BACK_UP'),
   ]
-  const game = new Game(board, [player], program, reboot)
+  const game = new Game(board, [player], program, reboot, undefined, () => 0)
   return { board, robot, player, program, game, start, pit, reboot }
 }
 
