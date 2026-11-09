@@ -65,13 +65,13 @@ describe('checkpoint activation', () => {
     game.executeNextAction()
 
     expect(game.winner).toBe(player.id)
-    expect(game.phase).toBe('programming')
+    expect(game.phase).toBe('activation')
     expect(game.currentRegister).toBe(0)
     expect(player.robot.program).toEqual([])
     expect(game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrapErr()).toBe('GAME_FINISHED')
   })
 
-  it('rejects register updates after a checkpoint win returns the game to programming', () => {
+  it('rejects register updates after a checkpoint win', () => {
     const { board, players: [player], cards: c, game } = createGame()
     const program = [c.move2, c.back, c.step, c.stepAgain, c.left]
     game.updateRegisters(player.id, [true, true, true, true, true])._unsafeUnwrap()
@@ -80,7 +80,7 @@ describe('checkpoint activation', () => {
 
     expect(player.lastCheckpoint).toBe(2)
     expect(game.winner).toBe(player.id)
-    expect(game.phase).toBe('programming')
+    expect(game.phase).toBe('activation')
     expect(game.currentRegister).toBe(0)
     expect(game.hasSubmittedProgram(player.id)).toBe(false)
     expect(player.robot.program).toEqual([])
@@ -185,6 +185,6 @@ describe('checkpoint activation', () => {
     game.removePlayer(players[1].id)
 
     expect(game.winner).toBe(players[0].id)
-    expect(game.phase).toBe('programming')
+    expect(game.phase).toBe('activation')
   })
 })

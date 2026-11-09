@@ -115,7 +115,7 @@ describe('public register lifecycle', () => {
     expectRejectedWithoutMutation(game, first.id, 'GAME_PAUSED')
     expectRejectedWithoutMutation(game, 'missing-player', 'GAME_PAUSED')
     game.abort()
-    expect(game.paused).toBe(true)
+    expect(game.paused).toBe(false)
     expect(game.aborted).toBe(true)
     expectRejectedWithoutMutation(game, first.id, 'GAME_ABORTED')
     expectRejectedWithoutMutation(game, 'missing-player', 'GAME_ABORTED')
