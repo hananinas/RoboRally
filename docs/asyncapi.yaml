@@ -397,6 +397,9 @@ components:
                   - robotId: 00000000-0000-4000-8000-000000000003
                     playerId: 00000000-0000-4000-8000-000000000002
                     colour: red
+                    startPosition:
+                      x: 0
+                      y: 0
                     position:
                       coordinate:
                         x: 0
@@ -614,6 +617,7 @@ components:
         INVALID_REQUEST: the request does not match the expected shape.
         INVALID_PROGRAM: non-null IDs repeat or do not belong to the player's current dealt hand.
         NOT_A_MEMBER: this connection does not own a game membership.
+        PLAYER_NOT_IN_GAME: the resolved player is absent from the game roster.
         WRONG_PHASE: programming has closed, including at the deadline before activation starts.
         ALREADY_SUBMITTED: the player's program is finalized while programming is still open.
         GAME_PAUSED: gameplay is paused.
@@ -628,7 +632,7 @@ components:
         properties:
           outcome:
             type: string
-            enum: [ ACCEPTED, INVALID_REQUEST, INVALID_PROGRAM, NOT_A_MEMBER, WRONG_PHASE, ALREADY_SUBMITTED, GAME_PAUSED, GAME_ABORTED, GAME_FINISHED, INTERNAL_ERROR ]
+            enum: [ ACCEPTED, INVALID_REQUEST, INVALID_PROGRAM, NOT_A_MEMBER, PLAYER_NOT_IN_GAME, WRONG_PHASE, ALREADY_SUBMITTED, GAME_PAUSED, GAME_ABORTED, GAME_FINISHED, INTERNAL_ERROR ]
       examples:
         - name: accepted
           payload:
@@ -1504,7 +1508,7 @@ components:
 
     Robot:
       type: object
-      required: [ robotId, playerId, colour, position ]
+      required: [ robotId, playerId, colour, position, startPosition ]
       properties:
         robotId:
           $ref: '#/components/schemas/RobotId'
@@ -1515,6 +1519,11 @@ components:
           description: Server-assigned colour, fixed for the lifetime of this robot.
         position:
           $ref: '#/components/schemas/Position'
+        startPosition:
+          $ref: '#/components/schemas/Coordinate'
+          description: >-
+            Starting tile the robot was placed on when the game started. It does not
+            change when the robot moves or reboots.
 
     Board:
       type: object

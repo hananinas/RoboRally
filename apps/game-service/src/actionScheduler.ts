@@ -77,7 +77,7 @@ export function createActionScheduler(
         const result = game.executeNextAction()
         io.to(publicRoom).emit(
           'robot.actionResolved',
-          presentRobotActionResolved(gameId, result),
+          presentRobotActionResolved(gameId, game, result),
         )
         broadcastCheckpointProgress()
         announceWinner()

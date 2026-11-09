@@ -96,6 +96,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
             gameId, registerIndex,
             pushedRobots: [],
             robotId: players[playerIndex].robot.id,
+            playerId: players[playerIndex].id,
             instruction: 'TURN_LEFT',
             position: {
               coordinate: playerIndex === 0 ? { x: 0, y: 2 } : { x: 1, y: 1 },

@@ -19,7 +19,7 @@ describe('started game membership over Socket.IO', () => {
   let url: string
   let clients: Client[]
   beforeEach(async () => {
-    shared = createGame('empty-map')
+    shared = createGame('empty-map', undefined, () => 0)
     clients = []
     await start()
   })
@@ -327,6 +327,7 @@ describe('started game membership over Socket.IO', () => {
     const emit = client.emit.bind(client) as (event: string, payload: unknown) => void
     emit('lobby.create', {})
     emit('program.submit', {})
+    emit('game.updateRegisters', {})
     expect(await client.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION', user: { userId: 'Abid', username: 'Abid' } })
     expect(shared.game.players).toHaveLength(0)
   })
@@ -388,6 +389,7 @@ describe('started game membership over Socket.IO', () => {
 
       expect(actions[0][0]).toEqual({
         gameId: shared.gameId, registerIndex: 0, robotId: robotIds[0], instruction: 'MOVE_1',
+        playerId: initializations[0].assignment.playerId,
         position: { coordinate: { x: 3, y: 2 }, orientation: 'EAST' },
         pushedRobots: [
           { robotId: robotIds[1], position: { coordinate: { x: 4, y: 2 }, orientation: 'SOUTH' } },
@@ -427,6 +429,7 @@ describe('started game membership over Socket.IO', () => {
         { coordinate: { x: 4, y: 4 }, orientation: 'NORTH' },
       ].map((position, registerIndex) => ({
         gameId: shared.gameId, registerIndex, robotId: initial.assignment.robotId,
+        playerId: initial.assignment.playerId,
         pushedRobots: [],
         instruction: initial.hand[[2, 0, 4, 5, 3][registerIndex]].instruction, position,
       })))
@@ -444,6 +447,7 @@ describe('started game membership over Socket.IO', () => {
         robotId: initial.assignment.robotId, playerId: initial.assignment.playerId,
         colour: initial.state.robots[0].colour,
         position: actions[4].position,
+        startPosition: initial.state.robots[0].startPosition,
       }])
       expect(snapshot.state.players[0].lastCheckpoint).toBe(1)
       expect(shared.game.board.occupantAt({ x: Integer(2), y: Integer(1) })).toBeUndefined()
@@ -486,6 +490,7 @@ describe('started game membership over Socket.IO', () => {
       expect(actions[2]).toEqual(actions[0])
       expect(actions[0][0]).toEqual({
         gameId: shared.gameId, registerIndex: 0, robotId: robotIds[0], instruction: 'MOVE_3',
+        playerId: initializations[0].assignment.playerId,
         pushedRobots: [],
         position: { coordinate: { x: 4, y: 3 }, orientation: 'NORTH' },
       })
@@ -498,6 +503,7 @@ describe('started game membership over Socket.IO', () => {
           robotId: joined.assignment.robotId, playerId: joined.assignment.playerId,
           colour: initializations[0].state.robots.find((robot) => robot.robotId === joined.assignment.robotId)!.colour,
           position: actions[0].findLast((action) => action.robotId === joined.assignment.robotId)!.position,
+          startPosition: initializations[0].state.robots.find((robot) => robot.robotId === joined.assignment.robotId)!.startPosition,
         })))
         expect(new Set(snapshot.state.robots.map(({ position }) =>
           `${position.coordinate.x},${position.coordinate.y}`)).size).toBe(3)

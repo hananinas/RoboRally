@@ -19,6 +19,7 @@ export function createGameContext(io: GameSocketServer, session: GameSession): M
       username: user.username,
       programSubmitted: game.hasSubmittedProgram(player.id),
       connected: connectionId !== null,
+      registers: player.registers,
     })),
     actionScheduler.winner(),
   )

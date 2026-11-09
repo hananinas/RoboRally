@@ -135,6 +135,7 @@ The service creates a fresh game, moves every member into its public and private
 
 `state` includes `serverTime` and `programmingTimer`. The private `program` contains five register slots, each a card or `null`. Initialization restores the player's current selection or finalized program.
 
+Each map has six starting tiles. When the game starts, the service places every robot on a random free starting tile. `Robot.startPosition` records that tile for the whole game, so clients can mark where each robot started.
 
 ### Programming
 During the programming phase, each player submits five distinct card IDs in register order for the current round.
@@ -162,6 +163,8 @@ This announces that the player's program is finalized. The service also sends th
 While programming, the client sends `game.updateRegisters {cardIds}` with its current register selection. Each of the five entries is a card ID or `null` for an empty slot. Sending the selected IDs lets the service preserve assigned cards when time expires.
 
 The service acknowledges the update and broadcasts `game.registersChanged {gameId, playerId, registers}` with HIDDEN and EMPTY slots. The private selection is also included in `game.started` and `session.get`.
+
+`NOT_A_MEMBER` rejects a connection without valid transport ownership of the game and player; `PLAYER_NOT_IN_GAME` reports that the resolved player is absent from the domain game's roster. `GAME_PAUSED`, `GAME_ABORTED` and `GAME_FINISHED` report the corresponding lifecycle state rather than `WRONG_PHASE`. Rejected lifecycle updates do not mutate registers or broadcast `game.registersChanged`.
 
 The client reveals a slot from `robot.actionResolved`, which carries `playerId`, `registerIndex` and `instruction`. `game.started` and `session.get` include every player's registers, revealed slots included, until the next hand resets them to five EMPTY slots.
 

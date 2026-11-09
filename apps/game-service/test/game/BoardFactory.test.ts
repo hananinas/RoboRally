@@ -84,6 +84,15 @@ describe('board factory', () => {
   it('gives each board its own antenna object', () => {
     expect(createBoard('test-map').antenna).not.toBe(createBoard('test-map').antenna)
   })
+  
+  it('places a starting tile for every player of each map', () => {
+    for (const mapName of ['empty-map', 'test-map'] as const) {
+      const board = createBoard(mapName)
+
+      expect(board.startTiles).toEqual(boardMaps[mapName].startTiles.map(([x, y]) => ({ x, y })))
+      expect(board.startTiles).toHaveLength(boardMaps[mapName].maxPlayers)
+    }
+  })
 
   it('creates an independent board for each call', () => {
     expect(createBoard('test-map')).not.toBe(createBoard('test-map'))

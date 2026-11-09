@@ -25,16 +25,17 @@ import {
 import { Integer } from '@/numbers'
 
 function createGameWithPlayer() {
-  const { gameId, game } = createGame('empty-map')
+    const { gameId, game } = createGame('empty-map', undefined, () => 0)
   const player = game.addPlayer()._unsafeUnwrap()
   return { gameId, game, player }
 }
 
 describe('game presenter', () => {
   it('serializes pushed robot positions and orientations alongside the acting robot', () => {
-    const { player } = createGameWithPlayer()
-    const resolved = presentRobotActionResolved('game', {
+    const { game, player } = createGameWithPlayer()
+    const resolved = presentRobotActionResolved('game', game, {
       registerIndex: 0,
+      registers: player.registers,
       action: { robotId: player.robot.id, card: player.hand[0], position: { x: Integer(2), y: Integer(3) }, direction: Direction.EAST },
       pushedRobots: [
         { robotId: 'pushed', position: { x: Integer(3), y: Integer(3) }, direction: Direction.NORTH },
@@ -92,6 +93,7 @@ describe('game presenter', () => {
             coordinate: { x: 10, y: 7 },
             orientation: 'NORTH',
           },
+          startPosition: { x: 10, y: 7 },
         },
       ],
     })
@@ -191,7 +193,7 @@ describe('game presenter', () => {
     { cardIndex: 3, instruction: 'BACK_UP' }, { cardIndex: 4, instruction: 'TURN_LEFT' },
     { cardIndex: 5, instruction: 'TURN_RIGHT' }, { cardIndex: 6, instruction: 'U_TURN' },
   ] as const)('presents a resolved $instruction action', ({ cardIndex, instruction }) => {
-    const { player } = createGameWithPlayer()
+    const { game, player } = createGameWithPlayer()
     const action = {
       robotId: player.robot.id,
       card: player.hand[cardIndex],
@@ -199,13 +201,14 @@ describe('game presenter', () => {
       direction: Direction.SOUTH,
     }
 
-    const resolved = presentRobotActionResolved('game', { registerIndex: 4, action, pushedRobots: [] })
+    const resolved = presentRobotActionResolved('game', game, { registerIndex: 4, action, pushedRobots: [], registers: player.registers })
 
     expectTypeOf(resolved).toEqualTypeOf<RobotActionResolved>()
     expect(resolved).toEqual({
       gameId: 'game',
       registerIndex: 4,
       robotId: player.robot.id,
+      playerId: player.id,
       instruction,
       pushedRobots: [],
       position: {
