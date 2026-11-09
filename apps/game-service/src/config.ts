@@ -10,12 +10,12 @@ export function parseGameServicePort(value: string | undefined): number {
   return port
 }
 
-export const DEFAULT_HYDRA_ISSUER_URL = 'https://127.0.0.1:4444/'
+export const DEFAULT_HYDRA_ISSUER_URL = 'https://127.0.0.1:3001/ory/hydra/'
 export const DEFAULT_OAUTH_CLIENT_ID = 'game-service'
 export const DEFAULT_OAUTH_CLIENT_SECRET = 'game-service-dev-secret'
 export const DEFAULT_AUTH_CALLBACK_URL = 'https://127.0.0.1:3001/auth/callback'
 export const DEFAULT_POST_LOGOUT_REDIRECT_URL = 'https://127.0.0.1:3001/'
-export const DEFAULT_KRATOS_SETTINGS_URL = 'http://127.0.0.1:4455/settings'
+export const DEFAULT_KRATOS_SETTINGS_URL = 'https://127.0.0.1:3001/ory/ui/settings'
 
 export function parseUrlEnv(value: string | undefined, fallback: string): URL {
   return new URL(value ?? fallback)
@@ -46,10 +46,18 @@ export function parseKratosSettingsUrl(value: string | undefined): URL {
   return parseUrlEnv(value, DEFAULT_KRATOS_SETTINGS_URL)
 }
 
+export type StartTileOrder = 'random' | 'ordered'
+
+export function parseStartTileOrder(value: string | undefined): StartTileOrder {
+  if (value === undefined || value === 'random' || value === 'ordered') return value ?? 'random'
+  throw new RangeError('START_TILE_ORDER must be "random" or "ordered"')
+}
+
 export type AppConfig = Readonly<{
   port: number
   kratosSettingsUrl: URL
   oidc: OidcConfig
+  startTileOrder: StartTileOrder
 }>
 
 export function parseAppConfig(env: NodeJS.ProcessEnv): AppConfig {
@@ -57,5 +65,6 @@ export function parseAppConfig(env: NodeJS.ProcessEnv): AppConfig {
     port: parseGameServicePort(env.PORT),
     kratosSettingsUrl: parseKratosSettingsUrl(env.KRATOS_SETTINGS_URL),
     oidc: parseOidcConfig(env),
+    startTileOrder: parseStartTileOrder(env.START_TILE_ORDER),
   }
 }

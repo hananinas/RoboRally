@@ -1,5 +1,6 @@
 import { instructions } from '@robo-rally/game-events'
 import type {
+  Coordinate,
   Orientation,
   Position,
   RobotActionResolved,
@@ -12,6 +13,7 @@ export type Robot = Readonly<{
   robotId: string
   colour: string
   position: RobotPosition
+  startPosition: Coordinate
 }>
 export type ResolvedRobotAction = RobotActionResolved
 export type DisplayRobot = Robot & Readonly<{ angle: number }>

@@ -8,7 +8,7 @@
     "dev": "pnpm --parallel run dev",
     "build": "pnpm --recursive --if-present build",
     "lint": "pnpm --recursive --if-present lint",
-    "test": "pnpm --filter @robo-rally/game-events build && pnpm --recursive --if-present run test:unit && pnpm --filter @robo-rally/client run test:browser",
+    "test": "pnpm build && pnpm --recursive --if-present run test:unit && pnpm --filter @robo-rally/client run test:browser",
     "typecheck": "pnpm --recursive --if-present typecheck"
   },
   "engines": {

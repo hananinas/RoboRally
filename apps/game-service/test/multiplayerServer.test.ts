@@ -40,7 +40,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
     const created = await clients[0].emitWithAck('lobby.create', {})
     if (created.outcome !== 'LOBBY_JOINED') throw new Error(created.outcome)
     await clients[1].emitWithAck('lobby.join', { lobbyId: created.lobby.lobbyId })
-    await clients[0].emitWithAck('lobby.start', { lobbyId: created.lobby.lobbyId })
+    await clients[0].emitWithAck('lobby.start', {})
     for (let index = 0; index < clients.length; index++) {
       const player = game.players[index]
       players.push(player)
@@ -61,7 +61,6 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
 
     for (const round of [1, 2]) {
       const submissions = players.map((player): SubmitProgram => ({
-        gameId, playerId: player.id,
         cardIds: [player.hand[0].id, player.hand[1].id, player.hand[2].id, player.hand[3].id, player.hand[4].id],
       }))
       expect(await clients[0].timeout(1000).emitWithAck('program.submit', submissions[0]))
@@ -77,8 +76,6 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
       }])
       expect(await clients[0].timeout(1000).emitWithAck('program.submit', submissions[0]))
         .toEqual({ outcome: 'ALREADY_SUBMITTED' })
-      expect(await clients[0].timeout(1000).emitWithAck('program.submit', submissions[1]))
-        .toEqual({ outcome: 'PLAYER_ID_MISMATCH' })
 
       const nextHands = clients.map((socket) => new Promise<CardsDealt>((resolve) =>
         socket.once('cards.dealt', resolve)))
@@ -99,6 +96,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
             gameId, registerIndex,
             pushedRobots: [],
             robotId: players[playerIndex].robot.id,
+            playerId: players[playerIndex].id,
             instruction: 'TURN_LEFT',
             position: {
               coordinate: playerIndex === 0 ? { x: 0, y: 2 } : { x: 1, y: 1 },

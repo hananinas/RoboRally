@@ -30,14 +30,17 @@ export const DEMO_BOARD = createBoardRenderModel(21, 15, {
 export const DEMO_ROBOTS: readonly Robot[] = [
   {
     robotId: 'blue', colour: '#4D8DEB',
-    position: { coordinate: { x: 9, y: 7 }, orientation: 'WEST' },
+    position: { coordinate: { x: 9, y: 7 }, orientation: 'WEST' },      
+    startPosition: { x: 9, y: 7 },
   },
   {
     robotId: 'red', colour: '#E55F5F',
     position: { coordinate: { x: 10, y: 7 }, orientation: 'NORTH' },
+    startPosition: { x: 10, y: 7 },
   },
   {
     robotId: 'green', colour: '#4CAF70',
     position: { coordinate: { x: 11, y: 7 }, orientation: 'SOUTH' },
+    startPosition: { x: 11, y: 7 },
   },
 ]

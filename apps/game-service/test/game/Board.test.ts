@@ -19,6 +19,18 @@ const steps: { direction: Direction; target: Position; opposite: Direction }[] =
 ]
 
 describe('Tile and Board layout', () => {
+    it('stores distinct starting tiles and rejects ones a robot cannot stand on', () => {
+    const at = (x: number, y: number) => ({ x: Integer(x), y: Integer(y) })
+    const tiles = grid()
+    tiles[2][2] = new PitTile()
+
+    expect(new Board(tiles, antenna, undefined, [at(1, 1), at(2, 1)]).startTiles).toEqual([at(1, 1), at(2, 1)])
+    expect(new Board(tiles, antenna).startTiles).toEqual([])
+    expect(() => new Board(tiles, antenna, undefined, [at(1, 1), at(1, 1)])).toThrow(RangeError)
+    expect(() => new Board(tiles, antenna, undefined, [at(2, 2)])).toThrow(RangeError)
+    expect(() => new Board(tiles, antenna, undefined, [at(0, 0)])).toThrow(RangeError)
+    expect(() => new Board(tiles, antenna, undefined, [at(3, 0)])).toThrow(RangeError)
+  })
   it('stores pits with walls without counting them as checkpoints', () => {
     const pit = new PitTile([Direction.NORTH])
     const board = new Board([[pit, new EmptyTile([], 1), new PitTile()]], antenna)

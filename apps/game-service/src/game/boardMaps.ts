@@ -37,6 +37,7 @@ export type MapSpec = BoardMap & Readonly<{
   checkpoints: readonly (readonly [x: number, y: number])[]
   pits?: readonly (readonly [x: number, y: number])[]
   conveyors?: readonly ConveyorSpec[]
+  startTiles: readonly (readonly [x: number, y: number])[]
   rebootTile: Position
 }>
 
@@ -50,6 +51,7 @@ export const boardMaps = {
     antenna: { x: Integer(10), y: Integer(0), angle: Math.PI / 2 },
     rebootTile: { x: Integer(10), y: Integer(7) },
     walls: [],
+    startTiles: [[10, 7], [9, 7], [8, 7], [7, 7], [6, 7], [5, 7]],
     checkpoints: [[10, 6], [8, 9]],
   },
   'test-map': {
@@ -76,6 +78,7 @@ export const boardMaps = {
     rebootTile: { x: Integer(10), y: Integer(7) },
     antenna: { x: Integer(10), y: Integer(0), angle: Math.PI / 2 },
     checkpoints: [[10, 6], [8, 9]],
+    startTiles: [[8, 7], [3, 8], [10, 13], [1, 4], [10, 3], [5, 12]],
     walls: [
       // TEST written top left corner of map
       { at: [1, 1], directions: [N, E] },

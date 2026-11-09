@@ -1,5 +1,9 @@
 import {
   submitProgramSchema,
+  updateRegistersSchema,
+  type UpdateRegisters,
+  type UpdateRegistersResult,
+  type RegistersChanged,
   type ProgramResultAcknowledgement,
   type SubmitProgram,
 } from '@robo-rally/game-events'
@@ -14,8 +18,6 @@ import { toRejection, type Rejection } from '@/socket/utilities/rejection'
 
 type ValidateGameplayRequestError =
   | 'NOT_A_MEMBER'
-  | 'GAME_ID_MISMATCH'
-  | 'PLAYER_ID_MISMATCH'
   | Rejection<'INVALID_REQUEST', ZodError>
 
 function validateGameplayRequest(
@@ -29,8 +31,6 @@ function validateGameplayRequest(
 
   const parsed = schema.safeParse(payload)
   if (!parsed.success) return err({ outcome: 'INVALID_REQUEST', detail: parsed.error })
-  if (parsed.data.gameId !== ctx.gameId) return err('GAME_ID_MISMATCH')
-  if (parsed.data.playerId !== player.id) return err('PLAYER_ID_MISMATCH')
 
   return ok({ player, data: parsed.data })
 }
@@ -68,6 +68,44 @@ export function handleSubmitProgram(
     ctx.actionScheduler.scheduleNextAction()
   }, (error) => {
     logError('Failed to process program submission', error, { command: 'program.submit', gameId: ctx.gameId, playerId, payload })
+    return { outcome: 'INTERNAL_ERROR' } as const
+  })
+}
+
+export function handleUpdateRegisters(
+  ctx: MembershipContext,
+  socket: GameSocket,
+  payload: UpdateRegisters,
+  acknowledge: (result: UpdateRegistersResult) => void,
+): void {
+  withAcknowledgeOnce(acknowledge, (ack) => {
+    const parsed = updateRegistersSchema.safeParse(payload)
+    if (!parsed.success) {
+      ack({ outcome: 'INVALID_REQUEST' })
+      return
+    }
+    const membership = ownedMembership(ctx, socket)
+    if (!membership) {
+      ack({ outcome: 'NOT_A_MEMBER' })
+      return
+    }
+    const { player } = membership
+    const result = ctx.game.updateRegisters(player.id, parsed.data.occupied).mapErr(toRejection)
+    if (result.isErr()) {
+      ack({ outcome: result.error.outcome })
+      return
+    }
+
+    ack({ outcome: 'ACCEPTED' })
+    ctx.io.to(ctx.publicRoom).emit('game.registersChanged', {
+      gameId: ctx.gameId,
+      playerId: player.id,
+      // Successful updateRegisters synchronously replaces every slot with EMPTY/HIDDEN.
+      // No activation can interleave before this read; snapshots retain their wider type.
+      registers: player.registers as RegistersChanged['registers'],
+    })
+  }, (error) => {
+    logError('Failed to update registers', error, { command: 'game.updateRegisters', gameId: ctx.gameId })
     return { outcome: 'INTERNAL_ERROR' } as const
   })
 }

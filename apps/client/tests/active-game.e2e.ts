@@ -69,6 +69,7 @@ test('shows checkpoint counts from snapshots and broadcasts without disrupting q
     },
     players: [...game.initial.state.players, {
       playerId: OTHER_PLAYER_ID, username: 'Other player', connected: true, programSubmitted: false, lastCheckpoint: 0,
+      registers: game.initial.state.players[0].registers,
     }],
   }
   await game.control({ type: 'joined-state', state, hand: game.initial.cards, programSubmitted: false })
@@ -517,7 +518,7 @@ test('preserves the selected program after rejection and submits the same ordere
   await expect(hand.nth(4)).toBeDisabled()
   await expect(hand.nth(0)).toBeEnabled()
 
-  const submitted = { gameId: GAME_ID, playerId: PLAYER_ID, cardIds: indices.map((index) => game.initial.cards[index].id) }
+  const submitted = { cardIds: indices.map((index) => game.initial.cards[index].id) }
   await expect.poll(async () => (await game.snapshot()).submissions).toEqual([submitted])
   await game.control({ type: 'submission', outcome: 'ACCEPTED', deferred: false })
   await done.click()
@@ -535,7 +536,7 @@ test('prevents duplicate submissions while awaiting an acknowledgement and after
   await expect(page.getByRole('button', { name: 'Submitting…', exact: true })).toBeDisabled()
   await expect(page.getByRole('button', { name: /remove from register/ }).first()).toBeDisabled()
   await expect(page.getByRole('region', { name: 'Programming hand' }).getByRole('button').last()).toBeDisabled()
-  const submitted = { gameId: GAME_ID, playerId: PLAYER_ID, cardIds: game.initial.cards.slice(0, 5).map((card) => card.id) }
+  const submitted = { cardIds: game.initial.cards.slice(0, 5).map((card) => card.id) }
   await expect.poll(async () => (await game.snapshot()).submissions).toEqual([submitted])
 
   await game.control({ type: 'acknowledge', outcome: 'ACCEPTED' })
@@ -593,8 +594,8 @@ test('plays every burst result and starts the next program without refreshing st
   await page.getByRole('button', { name: 'Done', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()
   await expect.poll(async () => (await game.snapshot()).submissions).toEqual([
-    { gameId: GAME_ID, playerId: PLAYER_ID, cardIds: game.initial.cards.slice(0, 5).map((card) => card.id) },
-    { gameId: GAME_ID, playerId: PLAYER_ID, cardIds: nextRound.cards.slice(0, 5).map((card) => card.id) },
+    { cardIds: game.initial.cards.slice(0, 5).map((card) => card.id) },
+    { cardIds: nextRound.cards.slice(0, 5).map((card) => card.id) },
   ])
 })
 
@@ -693,8 +694,6 @@ test('does not resend a program after its acknowledgement times out', async ({ p
   await expect(registered).toHaveCount(5)
   await expect(registered.first()).toBeDisabled()
   expect((await game.snapshot()).submissions).toEqual([{
-    gameId: GAME_ID,
-    playerId: PLAYER_ID,
     cardIds: game.initial.cards.slice(0, 5).map((card) => card.id),
   }])
 
@@ -721,8 +720,8 @@ test('does not resend a program after its acknowledgement times out', async ({ p
   await fillProgram(page)
   await page.getByRole('button', { name: 'Done', exact: true }).click()
   await expect.poll(async () => (await game.snapshot()).submissions).toEqual([
-    { gameId: GAME_ID, playerId: PLAYER_ID, cardIds: game.initial.cards.slice(0, 5).map((card) => card.id) },
-    { gameId: GAME_ID, playerId: PLAYER_ID, cardIds: nextRound.cards.slice(0, 5).map((card) => card.id) },
+    { cardIds: game.initial.cards.slice(0, 5).map((card) => card.id) },
+    { cardIds: nextRound.cards.slice(0, 5).map((card) => card.id) },
   ])
 })
 
@@ -819,6 +818,7 @@ test('displays all basic cards and plays their results across two programs', asy
       gameId: GAME_ID,
       registerIndex,
       robotId: ROBOT_ID,
+      playerId: PLAYER_ID,
       instruction: step.instruction,
       position: { coordinate: { x: step.x, y: step.y }, orientation: step.orientation },
       pushedRobots: [],
