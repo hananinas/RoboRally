@@ -69,10 +69,10 @@ export function createActionScheduler(
   }
 
   function scheduleNextAction(): void {
-    if (closed || game.phase !== 'activation' || scheduledAction || game.paused) return
+    if (closed || scheduledAction || game.requirePhase('activation').isErr()) return
     scheduledAction = setImmediate(() => {
       scheduledAction = undefined
-      if (closed || game.phase !== 'activation' || game.paused) return
+      if (closed || game.requirePhase('activation').isErr()) return
       try {
         const result = game.executeNextAction()
         io.to(publicRoom).emit(
@@ -81,7 +81,8 @@ export function createActionScheduler(
         )
         broadcastCheckpointProgress()
         announceWinner()
-        if (game.phase === 'activation') {
+        const phaseCheck = game.requirePhase('activation')
+        if (phaseCheck.isOk() || phaseCheck.error === 'GAME_PAUSED') {
           scheduleNextAction()
         } else {
           dealHands()

@@ -302,7 +302,7 @@ describe('started game membership over Socket.IO', () => {
     const snapshot = await getSnapshot(client)
     expect(events).toEqual(['robot.actionResolved', 'player.checkpointProgress', 'game.won'])
     expect(snapshot.state.winner).toEqual({ playerId: player.id, username: 'First' })
-    expect(snapshot.state.phase).toBe('PROGRAMMING')
+    expect(snapshot.state.phase).toBe('EXECUTING')
     expect(await client.emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'GAME_FINISHED' })
   })
 

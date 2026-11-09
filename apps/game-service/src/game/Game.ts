@@ -121,6 +121,10 @@ export class Game {
     return this.started
   }
 
+  requirePhase(phase: GamePhase): Result<void, PhaseError> {
+    return this.lifecycle.requirePhase(phase)
+  }
+
   get paused(): boolean {
     return this.lifecycle.current.kind === 'paused'
   }
@@ -138,8 +142,8 @@ export class Game {
     return this.lifecycle.pause()
   }
 
-  resume(): Result<void, ResumeError> {
-    return this.lifecycle.resume()
+  resume(): Result<{ roundConcluded: boolean }, ResumeError> {
+    return this.lifecycle.resume().map(() => this.recheckActivationPhase())
   }
 
   abort(): Result<void, AbortError> {
@@ -197,31 +201,24 @@ export class Game {
     )
   }
 
-  removePlayer(playerId: PlayerId): void {
+  removePlayer(playerId: PlayerId): { roundConcluded: boolean } {
     const index = this.roster.findIndex((player) => player.id === playerId)
-    if (index < 0) return
+    if (index < 0) return { roundConcluded: false }
     const [player] = this.roster.splice(index, 1)
     this.board.removeRobot(player.robot.id)
     this.startPositions.delete(player.robot.id)
     player.robot.clearProgram()
     this.submittedPlayerIds.delete(playerId)
     this.activatedRobotIds.delete(player.robot.id)
-    const lifecycleState = this.lifecycle.current
-    if (lifecycleState.kind === 'active' && lifecycleState.phase === 'activation') {
-      if (this.roster.length === 0) {
-        this.finishRound()
-      } else if (this.activatedRobotIds.size === this.roster.length) {
-        this.activateBoardElements()
-        this.finishRegister()
-      }
-    }
+    const { roundConcluded } = this.recheckActivationPhase()
     this.recheckProgrammingPhase()
+    return { roundConcluded }
   }
 
   private checkCanSubmitProgram(
     playerId: PlayerId,
   ): Result<Player, Exclude<SubmitProgramError, 'INVALID_PROGRAM'>> {
-    return this.lifecycle.requirePhase('programming').andThen(() => {
+    return this.requirePhase('programming').andThen(() => {
       const player = this.players.find((candidate) => candidate.id === playerId)
       if (!player) return err('PLAYER_NOT_IN_GAME')
       if (this.submittedPlayerIds.has(playerId)) return err('ALREADY_SUBMITTED')
@@ -261,12 +258,24 @@ export class Game {
 
   recheckProgrammingPhase(): void {
     if (
-      this.lifecycle.requirePhase('programming').isOk() &&
+      this.requirePhase('programming').isOk() &&
       this.players.length > 0 &&
       this.players.every((player) => this.submittedPlayerIds.has(player.id))
     ) {
       this.startActivationPhase()
     }
+  }
+
+  private recheckActivationPhase(): { roundConcluded: boolean } {
+    if (this.requirePhase('activation').isErr()) return { roundConcluded: false }
+    const phaseBefore = this.phase
+    if (this.roster.length === 0) {
+      this.finishRound()
+    } else if (this.activatedRobotIds.size === this.roster.length) {
+      this.activateBoardElements()
+      this.finishRegister()
+    }
+    return { roundConcluded: phaseBefore === 'activation' && this.phase === 'programming' }
   }
 
   // Gameplay movement resolves entry effects; Board movement only changes positions.
@@ -285,7 +294,7 @@ export class Game {
   }
 
   executeNextAction(): NextActionResult {
-    if (this.lifecycle.requirePhase('activation').isErr()) {
+    if (this.requirePhase('activation').isErr()) {
       throw new Error('Robot actions can only execute during activation')
     }
 
@@ -313,10 +322,7 @@ export class Game {
       return [{ robotId: other.id, position, direction: other.direction }]
     })
 
-    if (this.activatedRobotIds.size === this.players.length) {
-      this.activateBoardElements()
-      this.finishRegister()
-    }
+    this.recheckActivationPhase()
     return { registerIndex, action, registers, pushedRobots }
   }
 
@@ -410,7 +416,7 @@ export class Game {
   private finishRegister(): void {
     this.activatedRobotIds.clear()
     this.registerIndex++
-    if (this.registerIndex === 5 || this.lifecycle.current.kind === 'finished') this.finishRound()
+    if (this.registerIndex === 5 || this.winner !== undefined) this.finishRound()
   }
 
   private finishRound(): void {

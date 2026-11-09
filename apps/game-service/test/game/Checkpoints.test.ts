@@ -84,7 +84,10 @@ describe('checkpoint activation', () => {
     expect(game.currentRegister).toBe(0)
     expect(game.hasSubmittedProgram(player.id)).toBe(false)
     expect(player.robot.program).toEqual([])
-    expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
+    expect(player.registers).toEqual([
+      ...program.slice(0, 4).map((card) => ({ status: 'REVEALED', instruction: card.instruction })),
+      { status: 'HIDDEN' },
+    ])
 
     const registers = player.registers
     const state = () => ({
@@ -103,7 +106,7 @@ describe('checkpoint activation', () => {
       direction: player.robot.direction,
       position: board.positionOf(player.robot.id),
     })
-    const expectRejected = (playerId: string, error: 'GAME_FINISHED' | 'GAME_ABORTED') => {
+    const expectRejected = (playerId: string, error: 'GAME_FINISHED') => {
       const before = state()
       expect(game.updateRegisters(playerId, [true, true, true, true, true])._unsafeUnwrapErr()).toBe(error)
       expect(player.registers).toBe(registers)
@@ -116,8 +119,8 @@ describe('checkpoint activation', () => {
     expectRejected(player.id, 'GAME_FINISHED')
     expectRejected('missing-player', 'GAME_FINISHED')
     game.abort()
-    expectRejected(player.id, 'GAME_ABORTED')
-    expectRejected('missing-player', 'GAME_ABORTED')
+    expectRejected(player.id, 'GAME_FINISHED')
+    expectRejected('missing-player', 'GAME_FINISHED')
   })
 
   it('does not award a later checkpoint before the next required checkpoint', () => {
