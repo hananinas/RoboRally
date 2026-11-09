@@ -63,7 +63,7 @@ function pieceStyle(piece: BoardScenePiece): PieceStyle {
     '--board-piece-angle':
       piece.componentName === 'conveyor' && piece.cell.tile === 'conveyor'
         ? `${orientationAngle[piece.cell.direction]}deg`
-        : '0deg',   
+        : `${piece.angle}deg`,   
   }
 
   if (!piece.slice.wall) return style
