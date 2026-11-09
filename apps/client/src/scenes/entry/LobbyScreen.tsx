@@ -34,10 +34,8 @@ export default function LobbyScreen({ username, lobbies, pending, connected, err
               autoFocus={lobby === firstJoinable}
               onClick={() => setSelectedId(lobby.lobbyId)}
             >
-              
               <span className="lobby__details">
                 <span className="lobby__name">{lobby.name}</span>
-                
               </span>
               <span className="lobby__status">
                 <span>{lobby.playerCount}/{lobby.maxPlayers} players</span>
