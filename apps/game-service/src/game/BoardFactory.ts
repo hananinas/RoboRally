@@ -65,6 +65,8 @@ export function createBoard(mapName: BoardMapName = DEFAULT_MAP): Board {
       tile.walls,
       tile.checkpointNumber,
     )
+  }
+  
   if (startTiles.length < maxPlayers) {
     throw new RangeError(`Map "${mapName}" needs a starting tile for each of its ${maxPlayers} players`)
   }
