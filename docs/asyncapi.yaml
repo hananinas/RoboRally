@@ -123,8 +123,8 @@ channels:
         $ref: '#/components/messages/GameStarted'
       cardsDealt:
         $ref: '#/components/messages/CardsDealt'
-      programCompleted:
-        $ref: '#/components/messages/ProgramCompleted'
+      programFinalized:
+        $ref: '#/components/messages/ProgramFinalized'
       programTimerChanged:
         $ref: '#/components/messages/ProgramTimerChanged'
 
@@ -365,7 +365,9 @@ components:
       name: game.started
       payload:
         $ref: '#/components/schemas/GameStarted'
-      description: Initializes the player with their assignment, public state including the round and timer, private hand and program, and submission status.
+      description: >-
+        Initializes the player with their assignment, public state including the
+        timer, private hand and program, and submission status.
       examples:
         - name: started
           summary: One-tile illustrative board; normal initial hand
@@ -379,7 +381,6 @@ components:
                 robotId: 00000000-0000-4000-8000-000000000003
               state:
                 gameId: 00000000-0000-4000-8000-000000000001
-                roundNumber: 1
                 serverTime: 1794052800000
                 programmingTimer:
                   status: IDLE
@@ -505,11 +506,8 @@ components:
         type: object
         additionalProperties: false
         required:
-          - roundNumber
           - cardIds
         properties:
-          roundNumber:
-            $ref: '#/components/schemas/RoundNumber'
           cardIds:
             type: array
             description: Card instance IDs in register order.
@@ -519,16 +517,11 @@ components:
             items:
               $ref: "#/components/schemas/CardId"
       description: >-
-        Submits five cards in register order for the connection's owned game
-        and player, both derived from the authenticated session. Replaces the
-        saved draft and locks the program. The first accepted submission starts
-        one shared 30-second countdown if other players still need to submit.
-        Must be applied before the server deadline. Later submissions do not
-        restart or extend the timer. When everyone is complete, activation starts.
+        Submits five cards in register order for the game and player identified
+        by the authenticated session.
       examples:
         - name: submit
           payload:
-            roundNumber: 1
             cardIds:
               - 00000000-0000-4000-8000-000000000101
               - 00000000-0000-4000-8000-000000000102
@@ -552,7 +545,6 @@ components:
               - GAME_FINISHED
               - ALREADY_SUBMITTED
               - WRONG_PHASE
-              - STALE_ROUND
               - NOT_A_MEMBER
               - INVALID_REQUEST
               - PLAYER_NOT_IN_GAME
@@ -565,7 +557,6 @@ components:
         GAME_FINISHED: rejected because a player has won and the game has ended.
         ALREADY_SUBMITTED: this player already has a stored program for the current round; it is unchanged.
         WRONG_PHASE: programming has closed, including when the deadline has passed but activation has not started yet.
-        STALE_ROUND: roundNumber does not match the current round; the request changes nothing.
         NOT_A_MEMBER: this connection does not own a membership for this game.
         INVALID_REQUEST: the request did not match the expected shape.
         PLAYER_NOT_IN_GAME: the player is no longer part of the game (left or otherwise removed).
@@ -576,18 +567,14 @@ components:
     ProgramSubmitted:
       name: program.submitted
       description: >-
-        Announces a locked program to all game members, including its owner.
-        Sent after either manual submission or automatic completion at expiry.
-        Does not expose cards or instructions.
+        Announces to all game members that a player's program has been finalized
+        by submission or timeout.
       payload:
         type: object
         required:
           - playerId
           - gameId
-          - roundNumber
         properties:
-          roundNumber:
-            $ref: '#/components/schemas/RoundNumber'
           playerId:
             $ref: "#/components/schemas/PlayerId"
           gameId:
@@ -595,33 +582,24 @@ components:
       examples:
         - name: ready
           payload:
-            roundNumber: 1
             gameId: 00000000-0000-4000-8000-000000000001
             playerId: 00000000-0000-4000-8000-000000000002
 
     UpdateRegisters:
       name: game.updateRegisters
       description: >-
-        Replaces the connection owner's private draft atomically. Game and player
-        are derived from the authenticated session. Non-null IDs must be distinct
-        and belong to the player's current dealt hand. Repeated nulls are allowed.
-        Accepted updates broadcast only HIDDEN/EMPTY occupancy. They do not submit
-        the program or start or extend the countdown. Only the last draft accepted
-        before the server deadline is preserved at expiry. This replaces the
-        previous gameId/playerId/occupied request; the two shapes are not combined.
+        Updates the player's current register selection and acknowledges the
+        result. The game and player are identified by the authenticated session.
       payload:
         type: object
         additionalProperties: false
-        required: [ roundNumber, cardIds ]
+        required: [ cardIds ]
         properties:
-          roundNumber:
-            $ref: '#/components/schemas/RoundNumber'
           cardIds:
-            $ref: '#/components/schemas/DraftCardIds'
+            $ref: '#/components/schemas/RegisterCardIds'
       examples:
         - name: partialProgram
           payload:
-            roundNumber: 1
             cardIds:
               - 00000000-0000-4000-8000-000000000101
               - null
@@ -632,18 +610,17 @@ components:
     UpdateRegistersResult:
       name: game.updateRegistersResult
       description: |
-        ACCEPTED: the private draft was stored and public occupancy updated.
-        INVALID_REQUEST: the request does not contain a round number and five card IDs or nulls.
+        ACCEPTED: the register selection was stored and public occupancy updated.
+        INVALID_REQUEST: the request does not match the expected shape.
         INVALID_PROGRAM: non-null IDs repeat or do not belong to the player's current dealt hand.
         NOT_A_MEMBER: this connection does not own a game membership.
         WRONG_PHASE: programming has closed, including at the deadline before activation starts.
-        STALE_ROUND: roundNumber does not match the current round.
-        ALREADY_SUBMITTED: the player's program is locked while programming is still open.
+        ALREADY_SUBMITTED: the player's program is finalized while programming is still open.
         GAME_PAUSED: gameplay is paused.
         GAME_ABORTED: the game has stopped after an unexpected failure.
         GAME_FINISHED: the game has a winner.
         INTERNAL_ERROR: unexpected service failure.
-        Rejections leave the saved draft unchanged. No acknowledgement means the outcome is unknown.
+        No acknowledgement means the outcome is unknown.
       payload:
         type: object
         additionalProperties: false
@@ -651,7 +628,7 @@ components:
         properties:
           outcome:
             type: string
-            enum: [ ACCEPTED, INVALID_REQUEST, INVALID_PROGRAM, NOT_A_MEMBER, WRONG_PHASE, STALE_ROUND, ALREADY_SUBMITTED, GAME_PAUSED, GAME_ABORTED, GAME_FINISHED, INTERNAL_ERROR ]
+            enum: [ ACCEPTED, INVALID_REQUEST, INVALID_PROGRAM, NOT_A_MEMBER, WRONG_PHASE, ALREADY_SUBMITTED, GAME_PAUSED, GAME_ABORTED, GAME_FINISHED, INTERNAL_ERROR ]
       examples:
         - name: accepted
           payload:
@@ -665,7 +642,6 @@ components:
       examples:
         - name: occupancyChanged
           payload:
-            roundNumber: 1
             gameId: 00000000-0000-4000-8000-000000000001
             playerId: 00000000-0000-4000-8000-000000000002
             registers:
@@ -676,7 +652,6 @@ components:
               - status: EMPTY
         - name: occupancyCleared
           payload:
-            roundNumber: 1
             gameId: 00000000-0000-4000-8000-000000000001
             playerId: 00000000-0000-4000-8000-000000000002
             registers:
@@ -686,27 +661,20 @@ components:
               - status: EMPTY
               - status: EMPTY
 
-    ProgramCompleted:
-      name: program.completed
+    ProgramFinalized:
+      name: program.finalized
       description: >-
-        Private locked program sent to its owner after manual submission or
-        automatic completion. TIMEOUT preserves assigned draft slots, discards
-        the unassigned hand, and fills empty slots in register order from the
-        player's own deck, shuffling the discard pile into the deck when needed.
-        The owner replaces their draft with these cards; on TIMEOUT they also
-        clear the discarded hand. All completion events precede the CLOSED timer
-        event and robot actions. Public events never contain these cards.
+        Sends the player's finalized five-register program privately after
+        submission or automatic completion at expiry.
       payload:
         type: object
         additionalProperties: false
-        required: [ gameId, playerId, roundNumber, reason, cards ]
+        required: [ gameId, playerId, reason, cards ]
         properties:
           gameId:
             $ref: '#/components/schemas/GameId'
           playerId:
             $ref: '#/components/schemas/PlayerId'
-          roundNumber:
-            $ref: '#/components/schemas/RoundNumber'
           reason:
             type: string
             enum: [ SUBMITTED, TIMEOUT ]
@@ -716,14 +684,13 @@ components:
             maxItems: 5
             items:
               $ref: '#/components/schemas/Card'
-            description: Five cards with distinct instance IDs, in register order, including cards drawn at expiry.
+            description: Five cards with distinct instance IDs, in register order.
       examples:
-        - name: completedAtDeadline
-          summary: Three assigned cards preserved; two drawn cards fill registers 4 and 5.
+        - name: finalizedAtDeadline
+          summary: Finalized program after the timer expires.
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
             playerId: 00000000-0000-4000-8000-000000000002
-            roundNumber: 1
             reason: TIMEOUT
             cards:
               - id: 00000000-0000-4000-8000-000000000101
@@ -740,25 +707,15 @@ components:
     ProgramTimerChanged:
       name: program.timerChanged
       description: >-
-        Broadcast when the shared programming timer starts, closes, or resets.
-        Sent privately with fresh serverTime after successful connection recovery,
-        even when the state did not change. No per-second events are sent.
-        The initial deadline is serverTime + 30000. Completion events precede
-        CLOSED, which precedes robot actions. New private hands precede IDLE.
-        Clients ignore another game's events and older rounds, apply recovery
-        events in order, and never restart the countdown from replayed timestamps
-        or use them as fresh clock samples. If an edit or submission was
-        unacknowledged at disconnect, session.get restores the private program
-        before programming is enabled, even after successful recovery.
+        Broadcasts the current programming timer state to game members. Also
+        sent privately when a player reconnects.
       payload:
         type: object
         additionalProperties: false
-        required: [ gameId, roundNumber, serverTime, timer ]
+        required: [ gameId, serverTime, timer ]
         properties:
           gameId:
             $ref: '#/components/schemas/GameId'
-          roundNumber:
-            $ref: '#/components/schemas/RoundNumber'
           serverTime:
             $ref: '#/components/schemas/ServerTime'
           timer:
@@ -767,7 +724,6 @@ components:
         - name: firstSubmission
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
-            roundNumber: 1
             serverTime: 1794052800000
             timer:
               status: RUNNING
@@ -775,7 +731,6 @@ components:
         - name: programmingClosed
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
-            roundNumber: 1
             serverTime: 1794052830000
             timer:
               status: CLOSED
@@ -876,10 +831,7 @@ components:
           - cards
           - gameId
           - playerId
-          - roundNumber
         properties:
-          roundNumber:
-            $ref: '#/components/schemas/RoundNumber'
           cards:
             type: array
             items:
@@ -889,14 +841,10 @@ components:
           playerId:
             $ref: "#/components/schemas/PlayerId"
       description: >-
-        Private hand for the next round. Advances roundNumber and resets the
-        private program, public registers, submission status, and timer to IDLE.
-        Sent before the new round's public IDLE timer event. Playback of previous
-        actions can delay local programming controls but never the server deadline.
+        Sends the next programming hand privately to the player.
       examples:
         - name: nextHand
           payload:
-            roundNumber: 2
             gameId: 00000000-0000-4000-8000-000000000001
             playerId: 00000000-0000-4000-8000-000000000002
             cards:
@@ -1237,18 +1185,23 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Card"
-          description: The player's current private hand. During draft editing this includes assigned cards; empty after timeout discards the unassigned cards and locks the program.
+          description: >-
+            The player's current private hand, including selected cards during
+            programming.
 
         program:
           $ref: '#/components/schemas/PrivateProgram'
 
         programSubmitted:
           type: boolean
-          description: Whether this player's program is locked for the current round, by submission or timeout.
+          description: >-
+            Whether this player's program is finalized for the current round, by
+            submission or timeout.
       description: >-
         Private initialization in game.started or session.get; reconnecting
-        preserves the assignment and restores the saved draft or locked program.
-        The public state includes fresh serverTime and the current timer.
+        preserves the assignment and restores the current register selection or
+        finalized program. The public state includes fresh serverTime and the
+        current timer.
 
     LeaveResult:
       type: object
@@ -1307,10 +1260,8 @@ components:
     RegistersChanged:
       type: object
       additionalProperties: false
-      required: [ gameId, playerId, roundNumber, registers ]
+      required: [ gameId, playerId, registers ]
       properties:
-        roundNumber:
-          $ref: '#/components/schemas/RoundNumber'
         gameId:
           $ref: '#/components/schemas/GameId'
         playerId:
@@ -1362,12 +1313,11 @@ components:
 
     PublicGameState:
       description: >-
-        Public board, robot, player, phase, antenna, round, and timer state for a game.
+        Public board, robot, player, phase, antenna, and timer state for a game.
         Robot positions include any completed pit reboot.
       type: object
       required:
         - gameId
-        - roundNumber
         - serverTime
         - programmingTimer
         - board
@@ -1380,8 +1330,6 @@ components:
         - checkpointCount
         - winner
       properties:
-        roundNumber:
-          $ref: '#/components/schemas/RoundNumber'
         serverTime:
           $ref: '#/components/schemas/ServerTime'
         programmingTimer:
@@ -1407,7 +1355,9 @@ components:
           description: Whether gameplay is paused because a game member is disconnected.
         aborted:
           type: boolean
-          description: Whether gameplay has stopped irrecoverably after an unexpected service failure.
+          description: >-
+            Whether gameplay has stopped irrecoverably after an unexpected
+            service failure.
         checkpointCount:
           $ref: '#/components/schemas/CheckpointCount'
         winner:
@@ -1416,23 +1366,15 @@ components:
             - $ref: '#/components/schemas/Winner'
             - type: 'null'
 
-    RoundNumber:
-      type: integer
-      minimum: 1
-      maximum: 9007199254740991
-      description: Starts at 1 and increases once for each new programming round. Preserved on reconnect; requests for a different round are rejected with STALE_ROUND.
-
     ServerTime:
       type: integer
       minimum: 0
       maximum: 9007199254740991
-      description: Server Unix time in milliseconds when the event or snapshot is produced. Clients use this with the deadline for display; only the server enforces expiry.
+      description: Server Unix time in milliseconds when the event or snapshot is produced.
 
     ProgrammingTimer:
       description: >-
-        One shared timer per programming round. IDLE before the first accepted
-        submission; RUNNING until everyone submits or the deadline expires;
-        CLOSED during activation or after a win or abort.
+        Current programming timer state. RUNNING includes the server deadline.
       oneOf:
         - type: object
           additionalProperties: false
@@ -1440,7 +1382,7 @@ components:
           properties:
             status:
               type: string
-              enum: [ IDLE ]
+              enum: [ IDLE, CLOSED ]
         - type: object
           additionalProperties: false
           required: [ status, deadline ]
@@ -1452,16 +1394,9 @@ components:
               type: integer
               minimum: 0
               maximum: 9007199254740991
-              description: Server Unix timestamp in milliseconds. Requests validated at or after this time cannot edit or submit a program.
-        - type: object
-          additionalProperties: false
-          required: [ status ]
-          properties:
-            status:
-              type: string
-              enum: [ CLOSED ]
+              description: Server Unix timestamp in milliseconds when programming closes.
 
-    DraftCardIds:
+    RegisterCardIds:
       type: array
       minItems: 5
       maxItems: 5
@@ -1469,7 +1404,10 @@ components:
         oneOf:
           - $ref: '#/components/schemas/CardId'
           - type: 'null'
-      description: Five private draft slots in register order. Null means empty. Non-null IDs must be distinct and belong to the current dealt hand; the service validates these constraints.
+      description: >-
+        Five register slots in order. Null means empty; repeated nulls are
+        allowed. Card IDs must be distinct and belong to the player's current
+        hand.
 
     PrivateProgram:
       type: array
@@ -1479,7 +1417,9 @@ components:
         oneOf:
           - $ref: '#/components/schemas/Card'
           - type: 'null'
-      description: The owner's saved draft or locked program in register order. Empty slots are null. A locked program contains five cards with distinct IDs, including any drawn at timeout. Reset to five nulls each new round; never broadcast publicly.
+      description: >-
+        The player's private register selection. Each slot contains a card or
+        null. A finalized program contains five cards with distinct IDs.
 
     LastCheckpoint:
       type: integer
