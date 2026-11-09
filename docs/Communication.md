@@ -325,7 +325,7 @@ There are two possible reconnection paths:
 2. Connection state recovery fails, so the client establishes a new authenticated Socket.IO connection and calls `session.get` to obtain a fresh authoritative snapshot.
 
 #### Pausing on disconnection
-When the server detects that a player has disconnected, it pauses the game. This is the `active` → `paused` transition: an action already in progress completes, but no subsequent action is executed. The current game state is preserved, including the current phase (`programming` or `activation`).
+When the server detects that a player has disconnected, it pauses the game. This is the `active` → `paused` transition: no further action executes until the game resumes, including one that was already scheduled when the disconnect was detected. The current game state is preserved, including the current phase (`programming` or `activation`).
 
 The server announces this to the [public room](#rooms):
 

@@ -159,13 +159,13 @@ describe('Game programming', () => {
     expect(game.phase).toBe('activation')
   })
 
-  it('still executes an already-committed action while paused', () => {
+  it('rejects an already-scheduled action once paused', () => {
     const { player, deck, game } = createGame()
     game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
 
     game.pause()
-    expect(() => game.executeNextAction()).not.toThrow()
-    expect(game.currentRegister).toBe(1)
+    expect(() => game.executeNextAction()).toThrow()
+    expect(game.currentRegister).toBe(0)
   })
 
   it('blocks program submission once aborted, even over a pause', () => {

@@ -72,7 +72,7 @@ export function createActionScheduler(
     if (closed || game.phase !== 'activation' || scheduledAction || game.paused) return
     scheduledAction = setImmediate(() => {
       scheduledAction = undefined
-      if (closed || game.phase !== 'activation') return
+      if (closed || game.phase !== 'activation' || game.paused) return
       try {
         const result = game.executeNextAction()
         io.to(publicRoom).emit(
