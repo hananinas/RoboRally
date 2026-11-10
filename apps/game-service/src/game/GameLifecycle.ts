@@ -21,10 +21,6 @@ export class GameLifecycle {
     this.#state = { kind: 'active', phase: initialPhase }
   }
 
-  get current(): LifecycleState {
-    return { ...this.#state }
-  }
-
   get isPaused(): boolean {
     return this.#state.kind === 'paused'
   }
