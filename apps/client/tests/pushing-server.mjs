@@ -21,7 +21,7 @@ const board = new Board(tiles, { x: Integer(0), y: Integer(0), angle: 0 }, {
 })
 // Fixed draw seed: every player's first hand holds the cards the pushing programs use.
 const CARD_SEED = 3674
-const game = new Game(board, [], createDeckCards(), { x: Integer(5), y: Integer(5) }, 'Shared game', Math.random, seededRandom(CARD_SEED))
+const game = new Game({ board, players: [], deck: createDeckCards(), rebootTile: { x: Integer(5), y: Integer(5) }, name: 'Shared game', random: Math.random, drawRandom: seededRandom(CARD_SEED) })
 const config = parseAppConfig(process.env)
 const oidcClient = await createOidcClient(config.oidc)
 const sessionStore = createSessionStore()

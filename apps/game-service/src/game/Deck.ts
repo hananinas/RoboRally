@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { Instruction } from '@robo-rally/game-events'
 import { Card } from '@/game/Card'
+import type { CardId } from '@/game/ids'
 
 export const HAND_SIZE = 9
 
@@ -51,10 +52,20 @@ export class Deck {
     this.discardPile.push(...cards)
   }
 
-  // Drawing at random is equivalent to shuffling and drawing from the top.
-  // When the draw pile runs out, the discard pile becomes the new draw pile.
+  // Removes a card from the game entirely (e.g. a trashed Spam).
+  remove(cardId: CardId): Card | undefined {
+    for (const pile of [this.drawPile, this.discardPile]) {
+      const index = pile.findIndex((card) => card.id === cardId)
+      if (index >= 0) return pile.splice(index, 1)[0]
+    }
+    return undefined
+  }
+
+  // Drawing at random is equivalent to shuffling and drawing from the top, so
+  // "draw the top card" is simply draw(1).
   draw(count: number, random: () => number = Math.random): Card[] {
     const drawn = this.drawFromPile(count, random)
+    // If draw pile was exhausted, replenish from discard pile and draw the rest.
     if (drawn.length < count && this.discardPile.length > 0) {
       this.drawPile.push(...this.discardPile)
       this.discardPile = []

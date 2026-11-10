@@ -16,7 +16,8 @@ function createMultiplayerGame(
     board.placeRobot(robot.id, position)
     return new Player(`player-${index}`, robot)
   })
-  const game = new Game(board, players, deck, { x: Integer(0), y: Integer(0) }, undefined, () => 0)
+  for (const player of players) player.deck.add(deck)
+  const game = new Game({ board, players, deck, rebootTile: { x: Integer(0), y: Integer(0) }, random: () => 0 })
   return { board, players, deck, game }
 }
 
@@ -62,7 +63,7 @@ describe('Game fixed-roster programming', () => {
     game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
     expect(game.phase).toBe('activation')
 
-    const empty = new Game(board, [], deck, game.rebootTile)
+    const empty = new Game({ board, players: [], deck, rebootTile: game.rebootTile })
     empty.recheckProgrammingPhase()
     expect(empty.phase).toBe('programming')
     expect(empty.currentRegister).toBe(0)
@@ -72,9 +73,9 @@ describe('Game fixed-roster programming', () => {
 
   it('rejects duplicate player IDs, duplicate robot IDs, and unplaced robots', () => {
     const { board, players, deck, game } = createMultiplayerGame([{ x: Integer(4), y: Integer(5) }, { x: Integer(5), y: Integer(4) }])
-    expect(() => new Game(board, [players[0], new Player(players[0].id, players[1].robot)], deck, game.rebootTile)).toThrow(RangeError)
-    expect(() => new Game(board, [players[0], new Player('other', new Robot(players[0].robot.id, Direction.NORTH))], deck, game.rebootTile)).toThrow(RangeError)
-    expect(() => new Game(board, [new Player('unplaced', new Robot('unplaced', Direction.NORTH))], deck, game.rebootTile)).toThrow()
+    expect(() => new Game({ board, players: [players[0], new Player(players[0].id, players[1].robot)], deck, rebootTile: game.rebootTile })).toThrow(RangeError)
+    expect(() => new Game({ board, players: [players[0], new Player('other', new Robot(players[0].robot.id, Direction.NORTH))], deck, rebootTile: game.rebootTile })).toThrow(RangeError)
+    expect(() => new Game({ board, players: [new Player('unplaced', new Robot('unplaced', Direction.NORTH))], deck, rebootTile: game.rebootTile })).toThrow()
   })
 
   it('exposes the antenna of its board', () => {
@@ -122,7 +123,8 @@ describe('Game multiplayer activation', () => {
     )
     for (let round = 1; round <= 2; round++) {
       players.forEach((player, index) => {
-        expect(player.hand).toEqual(deck)
+        expect(player.hand).toHaveLength(deck.length)
+        expect(player.hand).toEqual(expect.arrayContaining([...deck]))
         expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
         expect(game.updateRegisters(player.id, [true, true, true, true, true])._unsafeUnwrap()).toBeUndefined()
         game.submitProgram(player.id, programs[index].map((card) => card.id))
@@ -147,7 +149,8 @@ describe('Game multiplayer activation', () => {
 
       for (const player of players) {
         expect(player.robot.program).toEqual([])
-        expect(player.hand).toEqual(deck)
+        expect(player.hand).toHaveLength(deck.length)
+        expect(player.hand).toEqual(expect.arrayContaining([...deck]))
         expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
         expect(game.hasSubmittedProgram(player.id)).toBe(false)
       }

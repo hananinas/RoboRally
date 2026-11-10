@@ -247,7 +247,8 @@ export function gameStateReducer(
         assignment: result.assignment,
         hand: result.hand,
         handVersion: result.hand.length > 0 ? 1 : 0,
-        handReady: snapshot.phase === 'PROGRAMMING' && result.hand.length > 0,
+        // After submitting, the hand is empty until the next round is dealt.
+        handReady: snapshot.phase === 'PROGRAMMING' && (result.hand.length > 0 || result.programSubmitted),
         submission: result.programSubmitted ? 'accepted' : 'idle',
         phase: snapshot.phase,
         paused: snapshot.paused,

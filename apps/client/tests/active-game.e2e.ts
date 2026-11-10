@@ -820,6 +820,7 @@ test('displays all basic cards and plays their results across two programs', asy
       robotId: ROBOT_ID,
       playerId: PLAYER_ID,
       instruction: step.instruction,
+      resolvedInstruction: step.instruction,
       position: { coordinate: { x: step.x, y: step.y }, orientation: step.orientation },
       pushedRobots: [],
     })) })

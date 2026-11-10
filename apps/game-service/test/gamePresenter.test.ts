@@ -33,10 +33,17 @@ function createGameWithPlayer() {
 describe('game presenter', () => {
   it('serializes pushed robot positions and orientations alongside the acting robot', () => {
     const { game, player } = createGameWithPlayer()
+    const resolvedInstruction = player.hand[0].instruction === 'AGAIN' ? undefined : player.hand[0].instruction
     const resolved = presentRobotActionResolved('game', game, {
       registerIndex: 0,
       registers: player.registers,
-      action: { robotId: player.robot.id, card: player.hand[0], position: { x: Integer(2), y: Integer(3) }, direction: Direction.EAST },
+      action: {
+        robotId: player.robot.id,
+        card: player.hand[0],
+        resolvedInstruction,
+        position: { x: Integer(2), y: Integer(3) },
+        direction: Direction.EAST,
+      },
       pushedRobots: [
         { robotId: 'pushed', position: { x: Integer(3), y: Integer(3) }, direction: Direction.NORTH },
         { robotId: 'rebooted', position: { x: Integer(0), y: Integer(0) }, direction: Direction.WEST },
@@ -61,7 +68,7 @@ describe('game presenter', () => {
       new EmptyTile([Direction.SOUTH], 1),
     ]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
-    const game = new Game(board, [], cards, { x: Integer(0), y: Integer(0) }, undefined, () => 0)
+    const game = new Game({ board, players: [], deck: cards, rebootTile: { x: Integer(0), y: Integer(0) }, random: () => 0 })
     const state = presentPublicGameState('game', game)
 
     expect(state.checkpointCount).toBe(1)
@@ -126,7 +133,8 @@ describe('game presenter', () => {
       { length: 5 },
       (_, index) => new Card(`card-${index}`, 'MOVE_1'),
     )
-    const game = new Game(board, [player], cards, { x: Integer(0), y: Integer(0) })
+    player.deck.add(cards)
+    const game = new Game({ board, players: [player], deck: cards, rebootTile: { x: Integer(0), y: Integer(0) } })
     game.submitProgram(player.id, cards.map((card) => card.id))
 
     const state = presentPublicGameState('game', game)
@@ -152,7 +160,8 @@ describe('game presenter', () => {
     board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })
     const player = new Player('player', robot)
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
-    const game = new Game(board, [player], cards, { x: Integer(0), y: Integer(0) })
+    player.deck.add(cards)
+    const game = new Game({ board, players: [player], deck: cards, rebootTile: { x: Integer(0), y: Integer(0) } })
     game.submitProgram(player.id, cards.map((card) => card.id))
     expect(presentPublicGameState('game', game).winner).toBeNull()
 
@@ -185,9 +194,11 @@ describe('game presenter', () => {
     { instruction: 'U_TURN' }, { instruction: 'AGAIN' },
   ] as const)('presents a resolved $instruction action', ({ instruction }) => {
     const { game, player } = createGameWithPlayer()
+    const resolvedInstruction = instruction === 'AGAIN' ? undefined : instruction
     const action = {
       robotId: player.robot.id,
       card: new Card('card', instruction),
+      resolvedInstruction,
       position: { x: Integer(4), y: Integer(5) },
       direction: Direction.SOUTH,
     }
@@ -201,6 +212,7 @@ describe('game presenter', () => {
       robotId: player.robot.id,
       playerId: player.id,
       instruction,
+      resolvedInstruction: resolvedInstruction ?? null,
       pushedRobots: [],
       position: {
         coordinate: { x: 4, y: 5 },

@@ -27,10 +27,12 @@ test('plays a push as one action and updates a robot that already acted', async 
   await game.control({ type: 'round', actions: [
     {
       gameId: GAME_ID, playerId: OTHER_PLAYER_ID, registerIndex: 0, robotId: OTHER_ROBOT_ID, instruction: 'TURN_LEFT',
+      resolvedInstruction: 'TURN_LEFT',
       position: { coordinate: { x: 6, y: 5 }, orientation: 'SOUTH' }, pushedRobots: [],
     },
     {
       gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 0, robotId: ROBOT_ID, instruction: 'MOVE_2',
+      resolvedInstruction: 'MOVE_2',
       position: { coordinate: { x: 7, y: 5 }, orientation: 'EAST' },
       pushedRobots: [{ robotId: OTHER_ROBOT_ID, position: { coordinate: { x: 8, y: 5 }, orientation: 'SOUTH' } }],
     },

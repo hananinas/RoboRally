@@ -55,6 +55,19 @@ describe('Deck', () => {
   })
 })
 
+describe('Deck.remove', () => {
+  it('removes a card from either pile', () => {
+    const cards = ['a', 'b'].map((id) => new Card(id, 'MOVE_1'))
+    const deck = new Deck(cards)
+    deck.discard(deck.draw(1, () => 0))
+
+    expect(deck.remove('b')?.id).toBe('b')
+    expect(deck.remove('a')?.id).toBe('a')
+    expect(deck.remove('a')).toBeUndefined()
+    expect(deck.isEmpty).toBe(true)
+  })
+})
+
 describe('Game card cycle', () => {
   it('gives each player a private hand of nine and cycles cards through the discard pile', () => {
     const { game } = createGame('empty-map')
@@ -66,6 +79,11 @@ describe('Game card cycle', () => {
 
     const program = first.hand.slice(0, 5).map((card) => card.id)
     expect(game.submitProgram(first.id, program).isOk()).toBe(true)
+    // Unprogrammed cards are discarded; programmed ones sit in the registers, outside every pile.
+    expect(first.hand).toEqual([])
+    expect(first.robot.program.map((card) => card.id)).toEqual(program)
+    expect(first.deck.discarded).toBe(HAND_SIZE - 5)
+    expect(first.deck.size).toBe(19 - HAND_SIZE)
     expect(game.submitProgram(second.id, second.hand.slice(0, 5).map((card) => card.id)).isOk()).toBe(true)
     expect(game.phase).toBe('activation')
     for (let i = 0; i < 10; i++) game.executeNextAction()
@@ -74,6 +92,9 @@ describe('Game card cycle', () => {
     expect(first.hand).toHaveLength(HAND_SIZE)
     // 19-card deck: 9 drawn, 10 left, so the next hand has no overlap with the previous one.
     expect(first.hand.some((card) => firstIds.has(card.id))).toBe(false)
+    // The five programmed cards were discarded at round end.
+    expect(first.robot.program).toEqual([])
+    expect(first.deck.discarded).toBe(HAND_SIZE)
   })
 })
 
@@ -82,19 +103,31 @@ describe('Again card', () => {
     const board = new Board([Array.from({ length: 9 }, () => new EmptyTile())], { x: Integer(8), y: Integer(0), angle: 0 })
     const robot = new Robot('robot', Direction.EAST)
     board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })
-    const player = new Player('player', robot)
     const cards = instructions.map((instruction, index) => new Card(`card-${index}`, instruction))
-    const game = new Game(board, [player], cards, { x: Integer(0), y: Integer(0) }, undefined, () => 0)
+    const player = new Player('player', robot, new Deck(cards))
+    player.deck.add(cards)
+    const game = new Game({ board, players: [player], deck: cards, rebootTile: { x: Integer(0), y: Integer(0) }, random: () => 0 })
     game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
     const results = cards.map(() => game.executeNextAction())
-    return results.map(({ action }) => action.position.x)
+    return results.map(({ action }) => action)
   }
 
   it('repeats the previous register, including through consecutive Again cards', () => {
-    expect(run(['MOVE_1', 'AGAIN', 'AGAIN', 'MOVE_2', 'AGAIN'])).toEqual([1, 2, 3, 5, 7])
+    expect(run(['MOVE_1', 'AGAIN', 'AGAIN', 'MOVE_2', 'AGAIN']).map((a) => a.position.x)).toEqual([1, 2, 3, 5, 7])
+  })
+
+  it('repeats a turn as a turn and reports what it resolved to', () => {
+    const actions = run(['U_TURN', 'AGAIN', 'MOVE_1', 'AGAIN', 'AGAIN'])
+
+    expect(actions.map((a) => a.direction)).toEqual([
+      Direction.WEST, Direction.EAST, Direction.EAST, Direction.EAST, Direction.EAST,
+    ])
+    expect(actions.map((a) => a.resolvedInstruction)).toEqual([
+      'U_TURN', 'U_TURN', 'MOVE_1', 'MOVE_1', 'MOVE_1',
+    ])
   })
 
   it('does nothing in the first register', () => {
-    expect(run(['AGAIN', 'MOVE_1', 'AGAIN', 'AGAIN', 'AGAIN'])).toEqual([0, 1, 2, 3, 4])
+    expect(run(['AGAIN', 'MOVE_1', 'AGAIN', 'AGAIN', 'AGAIN']).map((a) => a.position.x)).toEqual([0, 1, 2, 3, 4])
   })
 })

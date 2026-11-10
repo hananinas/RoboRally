@@ -650,6 +650,7 @@ components:
           - gameId
           - registerIndex
           - pushedRobots
+          - resolvedInstruction
         properties:
           robotId:
             $ref: "#/components/schemas/RobotId"
@@ -657,6 +658,11 @@ components:
             $ref: "#/components/schemas/PlayerId"
           instruction:
             $ref: "#/components/schemas/Instruction"
+          resolvedInstruction:
+            description: What the register actually did. Differs from instruction for AGAIN, which repeats the previous register's resolved instruction. Null when AGAIN had nothing to repeat.
+            oneOf:
+              - $ref: "#/components/schemas/Instruction"
+              - type: 'null'
           position:
             $ref: "#/components/schemas/Position"
           pushedRobots:
@@ -690,6 +696,7 @@ components:
             robotId: 00000000-0000-4000-8000-000000000003
             playerId: 00000000-0000-4000-8000-000000000002
             instruction: MOVE_1
+            resolvedInstruction: MOVE_1
             pushedRobots: []
             position:
               coordinate:

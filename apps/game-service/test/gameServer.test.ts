@@ -358,16 +358,13 @@ describe('started game membership over Socket.IO', () => {
       tiles[1][2] = new PitTile()
       tiles[4][4] = new EmptyTile([Direction.WEST], 1)
       tiles[4][0] = new EmptyTile([], 2)
-      // A nine-card deck is redrawn in full (in order) each round, so hands repeat exactly.
+      // A nine-card deck is redrawn in full each round, so hands repeat as a set.
       const deck = [
         'MOVE_1', 'MOVE_2', 'MOVE_3', 'BACK_UP', 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'MOVE_1', 'TURN_LEFT',
       ].map((instruction, index) => new Card(`card-${index}`, instruction as Card['instruction']))
       shared = {
         gameId: shared.gameId,
-        game: new Game(
-          new Board(tiles, { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }),
-          [], deck, { x: Integer(4), y: Integer(4) }, undefined, () => 0,
-        ),
+        game: new Game({ board: new Board(tiles, { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }), players: [], deck, rebootTile: { x: Integer(4), y: Integer(4) }, random: () => 0 }),
       }
       await start()
     })
@@ -398,7 +395,7 @@ describe('started game membership over Socket.IO', () => {
       await Promise.all(hands)
 
       expect(actions[0][0]).toEqual({
-        gameId: shared.gameId, registerIndex: 0, robotId: robotIds[0], instruction: 'MOVE_1',
+        gameId: shared.gameId, registerIndex: 0, robotId: robotIds[0], instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1',
         playerId: initializations[0].assignment.playerId,
         position: { coordinate: { x: 3, y: 2 }, orientation: 'EAST' },
         pushedRobots: [
@@ -429,7 +426,7 @@ describe('started game membership over Socket.IO', () => {
       expect(await client.timeout(1000).emitWithAck('program.submit', program(initial, [2, 0, 4, 5, 3])))
         .toEqual({ outcome: 'ACCEPTED' })
       expect(await hand).toEqual({
-        gameId: shared.gameId, playerId: initial.assignment.playerId, cards: initial.hand,
+        gameId: shared.gameId, playerId: initial.assignment.playerId, cards: expect.arrayContaining([...initial.hand]),
       })
       expect(actions).toEqual([
         { coordinate: { x: 4, y: 4 }, orientation: 'NORTH' },
@@ -437,12 +434,15 @@ describe('started game membership over Socket.IO', () => {
         { coordinate: { x: 4, y: 3 }, orientation: 'WEST' },
         { coordinate: { x: 4, y: 3 }, orientation: 'NORTH' },
         { coordinate: { x: 4, y: 4 }, orientation: 'NORTH' },
-      ].map((position, registerIndex) => ({
-        gameId: shared.gameId, registerIndex, robotId: initial.assignment.robotId,
-        playerId: initial.assignment.playerId,
-        pushedRobots: [],
-        instruction: initial.hand[[2, 0, 4, 5, 3][registerIndex]].instruction, position,
-      })))
+      ].map((position, registerIndex) => {
+        const instruction = initial.hand[[2, 0, 4, 5, 3][registerIndex]].instruction
+        return {
+          gameId: shared.gameId, registerIndex, robotId: initial.assignment.robotId,
+          playerId: initial.assignment.playerId,
+          pushedRobots: [],
+          instruction, resolvedInstruction: instruction, position,
+        }
+      }))
       expect(progress).toEqual([{
         gameId: shared.gameId, playerId: initial.assignment.playerId, lastCheckpoint: 1, checkpointCount: 2,
       }])
@@ -467,7 +467,7 @@ describe('started game membership over Socket.IO', () => {
       await disconnect(client)
       const restored = await getSnapshot(await connect('First'))
       expect(restored.assignment).toEqual(initial.assignment)
-      expect(restored.hand).toEqual(initial.hand)
+      expect(restored.hand).toEqual(expect.arrayContaining([...initial.hand]))
       expect(restored.state.robots).toEqual(snapshot.state.robots)
       expect(restored.state.players[0].lastCheckpoint).toBe(1)
       expect(restored.state.paused).toBe(false)
@@ -493,13 +493,13 @@ describe('started game membership over Socket.IO', () => {
       }
 
       expect(await Promise.all(hands)).toEqual(members.map(({ joined }) => ({
-        gameId: shared.gameId, playerId: joined.assignment.playerId, cards: joined.hand,
+        gameId: shared.gameId, playerId: joined.assignment.playerId, cards: expect.arrayContaining([...joined.hand]),
       })))
       expect(actions[0]).toHaveLength(15)
       expect(actions[1]).toEqual(actions[0])
       expect(actions[2]).toEqual(actions[0])
       expect(actions[0][0]).toEqual({
-        gameId: shared.gameId, registerIndex: 0, robotId: robotIds[0], instruction: 'MOVE_3',
+        gameId: shared.gameId, registerIndex: 0, robotId: robotIds[0], instruction: 'MOVE_3', resolvedInstruction: 'MOVE_3',
         playerId: initializations[0].assignment.playerId,
         pushedRobots: [],
         position: { coordinate: { x: 4, y: 3 }, orientation: 'NORTH' },
@@ -518,7 +518,7 @@ describe('started game membership over Socket.IO', () => {
         expect(new Set(snapshot.state.robots.map(({ position }) =>
           `${position.coordinate.x},${position.coordinate.y}`)).size).toBe(3)
         expect(dealt[index]).toEqual([{
-          gameId: shared.gameId, playerId: joined.assignment.playerId, cards: joined.hand,
+          gameId: shared.gameId, playerId: joined.assignment.playerId, cards: expect.arrayContaining([...joined.hand]),
         }])
       }
       expect(shared.game.board.occupantAt({ x: Integer(2), y: Integer(1) })).toBeUndefined()
