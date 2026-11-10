@@ -148,6 +148,7 @@ let
             export KRATOS_PUBLIC_URL="$PUBLIC_ORIGIN/ory/kratos"
             export KRATOS_ADMIN_URL="http://127.0.0.1:4434"
             export HYDRA_ADMIN_URL="http://127.0.0.1:4445"
+            export NODE_EXTRA_CA_CERTS="$CADDY_DATA_DIR/pki/authorities/local/root.crt"
             export CSRF_COOKIE_NAME="''${CSRF_COOKIE_NAME:-__Host-ax-csrf-token}"
             : "''${COOKIE_SECRET:?Missing COOKIE_SECRET in /etc/robo-rally.env}"
             : "''${CSRF_COOKIE_SECRET:?Missing CSRF_COOKIE_SECRET in /etc/robo-rally.env}"
