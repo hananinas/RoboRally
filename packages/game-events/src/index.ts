@@ -47,7 +47,7 @@ export type { ProgramCardIds, SubmitProgram } from './submitProgram.js'
 export { updateRegistersSchema } from './updateRegisters.js'
 export type { RegisterOccupancy } from './updateRegisters.js'
 
-export { instructions } from './instructions.js'
-export type { Instruction } from './instructions.js'
+export { effects } from './instructions.js'
+export type { Instruction, ResolvedInstruction } from './instructions.js'
 
 export * from './lobby.js'

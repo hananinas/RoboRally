@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { err, ok, type Result } from 'neverthrow'
 import type { Board } from '@/game/Board'
-import { instructions, type PublicRegisters, type RegisterOccupancy } from '@robo-rally/game-events'
+import { effects, type PublicRegisters, type RegisterOccupancy, type ResolvedInstruction } from '@robo-rally/game-events'
 import { Card } from '@/game/Card'
+import { Deck } from '@/game/Deck'
 import type { CardId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
 import { ROBOT_COLOURS, Robot } from '@/game/Robot'
@@ -23,6 +24,7 @@ export type { GamePhase, PauseError, ResumeError, AbortError, PhaseError }
 export type RobotActionResult = Readonly<{
   robotId: RobotId
   card: Card
+  resolvedInstruction: ResolvedInstruction | undefined
   position: Position
   direction: Direction
 }>
@@ -36,6 +38,7 @@ export type NextActionResult = Readonly<{
     position: Position
     direction: Direction
   }>[]
+  roundConcluded: boolean
 }>
 
 export type AddPlayerError = 'GAME_ALREADY_STARTED' | 'NO_SPAWN_AVAILABLE'
@@ -50,6 +53,19 @@ export type UpdateRegistersError = Exclude<SubmitProgramError, 'INVALID_PROGRAM'
 
 export const DEFAULT_GAME_NAME = 'Game'
 
+export type GameOptions = Readonly<{
+  board: Board
+  players: readonly Player[]
+  // Template for each private deck created by addPlayer.
+  deck: readonly Card[]
+  rebootTile: Position
+  name?: string
+  // Picks start tiles.
+  random?: () => number
+  // Draws cards; defaults to `random`.
+  drawRandom?: () => number
+}>
+
 export class Game {
   readonly name: string
   readonly board: Board
@@ -63,15 +79,19 @@ export class Game {
   private started = false
   private readonly startPositions = new Map<RobotId, Position>()
   private readonly random: () => number
+  private readonly drawRandom: () => number
+  // What each robot's registers resolved to this round, so Again repeats the real action.
+  private readonly resolvedInstructions = new Map<RobotId, (ResolvedInstruction | undefined)[]>()
 
-  constructor(
-    board: Board,
-    players: readonly Player[],
-    deck: readonly Card[],
-    rebootTile: Position,
-    name: string = DEFAULT_GAME_NAME,
-    random: () => number = Math.random,
-  ) {
+  constructor({
+    board,
+    players,
+    deck,
+    rebootTile,
+    name = DEFAULT_GAME_NAME,
+    random = Math.random,
+    drawRandom = random,
+  }: GameOptions) {
     if (deck.length < 5 || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')
     }
@@ -102,7 +122,8 @@ export class Game {
     this.rebootTile = Object.freeze({ ...rebootTile })
     this.deck = [...deck]
     this.random = random
-    this.dealCards()
+    this.drawRandom = drawRandom
+    this.dealInitialHands()
   }
 
   get phase(): GamePhase {
@@ -191,8 +212,8 @@ export class Game {
     return this.checkCanAddPlayer().andThen(() =>
       this.findSpawn().map((position) => {
         const robot = new Robot(randomUUID(), Direction.NORTH, colour)
-        const hand = this.deck.map((card) => new Card(randomUUID(), card.instruction))
-        const player = new Player(randomUUID(), robot, hand)
+        const player = new Player(randomUUID(), robot, Deck.fromTemplate(this.deck))
+        player.drawHand(this.drawRandom)
         this.board.placeRobot(robot.id, position)
         this.startPositions.set(robot.id, position)
         this.roster.push(player)
@@ -243,6 +264,9 @@ export class Game {
     return this.checkCanSubmitProgram(playerId).andThen((player) =>
       this.checkProgram(player, cardIds).map((program) => {
         player.robot.setProgram(program)
+        // Programmed cards stay out of both piles until the round ends.
+        player.discard(player.hand.filter((card) => !program.includes(card)))
+        player.clearHand()
         this.started = true
         this.submittedPlayerIds.add(playerId)
         this.recheckProgrammingPhase()
@@ -268,14 +292,22 @@ export class Game {
 
   private recheckActivationPhase(): { roundConcluded: boolean } {
     if (this.requirePhase('activation').isErr()) return { roundConcluded: false }
-    const phaseBefore = this.phase
     if (this.roster.length === 0) {
       this.finishRound()
-    } else if (this.activatedRobotIds.size === this.roster.length) {
-      this.activateBoardElements()
-      this.finishRegister()
+      return { roundConcluded: true }
     }
-    return { roundConcluded: phaseBefore === 'activation' && this.phase === 'programming' }
+    if (this.activatedRobotIds.size !== this.roster.length) return { roundConcluded: false }
+    this.activateBoardElements()
+    this.finishRegister()
+    if (this.winner !== undefined) {
+      this.clearRound()
+      return { roundConcluded: false }
+    }
+    if (this.registerIndex === 5) {
+      this.finishRound()
+      return { roundConcluded: true }
+    }
+    return { roundConcluded: false }
   }
 
   // Gameplay movement resolves entry effects; Board movement only changes positions.
@@ -304,13 +336,14 @@ export class Game {
     const registerIndex = this.registerIndex
     const card = robot.getProgramCard(UnsignedInteger(registerIndex))
     const previousPositions = this.roster.map((player) => this.board.positionOf(player.robot.id))
-    this.executeCard(robot, card)
+    const resolvedInstruction = this.executeCard(robot, card, registerIndex)
     this.activatedRobotIds.add(robot.id)
     const player = this.roster.find((candidate) => candidate.robot === robot)!
     const registers = player.revealRegister(registerIndex, card.instruction)
     const action: RobotActionResult = {
       robotId: robot.id,
       card,
+      resolvedInstruction,
       position: this.board.positionOf(robot.id),
       direction: robot.direction,
     }
@@ -322,14 +355,20 @@ export class Game {
       return [{ robotId: other.id, position, direction: other.direction }]
     })
 
-    this.recheckActivationPhase()
-    return { registerIndex, action, registers, pushedRobots }
+    const { roundConcluded } = this.recheckActivationPhase()
+    return { registerIndex, action, registers, pushedRobots, roundConcluded }
   }
 
-  private dealCards(): void {
-    // V0 uses the supplied deck as a fixed hand, without drawing or shuffling.
+  private dealInitialHands(): void {
     for (const player of this.players) {
-      if (player.hand.length === 0) player.setHand(this.deck)
+      if (player.hand.length === 0) player.drawHand(this.drawRandom)
+      player.resetRegisters()
+    }
+  }
+
+  private dealNewHands(): void {
+    for (const player of this.players) {
+      player.drawHand(this.drawRandom)
       player.resetRegisters()
     }
   }
@@ -338,6 +377,7 @@ export class Game {
     this.lifecycle.enterActivation()
     this.registerIndex = 0
     this.activatedRobotIds.clear()
+    this.resolvedInstructions.clear()
   }
 
   private nextRobotByPriority(): Robot | undefined {
@@ -368,14 +408,24 @@ export class Game {
     return nextRobot
   }
 
-  private executeCard(robot: Robot, card: Card): void {
-    const effect = instructions[card.instruction]
+  private executeCard(robot: Robot, card: Card, registerIndex: number): ResolvedInstruction | undefined {
+    // Again repeats what the previous register resolved to (nothing in register 0).
+    // TODO: With damage cards, Again after a damage card instead draws the top
+    // card of the player's deck and resolves that.
+    const history = this.resolvedInstructions.get(robot.id) ?? []
+    const resolved = card.instruction === 'AGAIN' ? history[registerIndex - 1] : card.instruction
+    history[registerIndex] = resolved
+    this.resolvedInstructions.set(robot.id, history)
+    if (resolved === undefined) return undefined
+
+    const effect = effects[resolved]
     if (effect.kind === 'move') {
       const direction = effect.steps < 0 ? opposite(robot.direction) : robot.direction
       this.moveRobot(robot, direction, PositiveInteger(Math.abs(effect.steps)))
     } else {
       robot.turn(effect.quarterTurns)
     }
+    return resolved
   }
 
   private resolveMovementEntry(robot: Robot, position: Position): 'continue' | 'stop' {
@@ -416,16 +466,20 @@ export class Game {
   private finishRegister(): void {
     this.activatedRobotIds.clear()
     this.registerIndex++
-    if (this.registerIndex === 5 || this.winner !== undefined) this.finishRound()
+  }
+
+  private clearRound(): void {
+    for (const player of this.players) {
+      player.discard(player.robot.program)
+      player.robot.clearProgram()
+    }
+    this.submittedPlayerIds.clear()
+    this.registerIndex = 0
   }
 
   private finishRound(): void {
-    for (const player of this.players) player.robot.clearProgram()
-    this.submittedPlayerIds.clear()
-    this.registerIndex = 0
-    if (this.lifecycle.current.kind === 'active') {
-      this.dealCards()
-      this.lifecycle.enterProgramming()
-    }
+    this.clearRound()
+    this.dealNewHands()
+    this.lifecycle.enterProgramming()
   }
 }

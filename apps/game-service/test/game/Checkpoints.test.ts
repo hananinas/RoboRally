@@ -21,7 +21,8 @@ function createGame(starts = [{ x: 0, y: 1, direction: Direction.EAST }]) {
     right: new Card('right', 'TURN_RIGHT'),
     uturn: new Card('uturn', 'U_TURN'),
   }
-  const game = new Game(board, players, Object.values(cards), { x: Integer(0), y: Integer(2) })
+  for (const player of players) player.deck.add(Object.values(cards))
+  const game = new Game({ board, players, deck: Object.values(cards), rebootTile: { x: Integer(0), y: Integer(2) }, random: () => 0 })
   return { board, players, cards, game }
 }
 
@@ -69,6 +70,24 @@ describe('checkpoint activation', () => {
     expect(game.currentRegister).toBe(0)
     expect(player.robot.program).toEqual([])
     expect(game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrapErr()).toBe('GAME_FINISHED')
+  })
+
+  it('reports roundConcluded as false when a win lands exactly on the final register', () => {
+    const { players: [player], cards: c, game } = createGame([{ x: 2, y: 1, direction: Direction.EAST }])
+    player.completeCheckpoint(1)
+    const program = [c.left, c.right, c.back, c.step, c.stepAgain]
+    game.submitProgram(player.id, program.map((card) => card.id))
+
+    for (let register = 0; register < 4; register++) {
+      expect(game.executeNextAction().roundConcluded).toBe(false)
+    }
+    expect(game.winner).toBeUndefined()
+
+    const result = game.executeNextAction()
+
+    expect(game.winner).toBe(player.id)
+    expect(result.roundConcluded).toBe(false)
+    expect(game.phase).toBe('activation')
   })
 
   it('rejects register updates after a checkpoint win', () => {

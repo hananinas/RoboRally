@@ -81,10 +81,10 @@ export function createActionScheduler(
         )
         broadcastCheckpointProgress()
         announceWinner()
-        if (game.requirePhase('activation').isOk()) {
-          scheduleNextAction()
-        } else {
+        if (result.roundConcluded) {
           dealHands()
+        } else {
+          scheduleNextAction()
         }
       } catch (error) {
         logError('Failed to execute next robot action', error, {

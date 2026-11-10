@@ -23,7 +23,8 @@ function createGame(
     TURN_RIGHT: new Card('right', 'TURN_RIGHT'),
     U_TURN: new Card('uturn', 'U_TURN'),
   }
-  const game = new Game(board, [player], Object.values(cards), rebootTile)
+  player.deck.add(Object.values(cards))
+  const game = new Game({ board, players: [player], deck: Object.values(cards), rebootTile, random: () => 0 })
   return { board, robot, player, cards, game }
 }
 
@@ -105,7 +106,8 @@ describe('pit entry and rebooting', () => {
     expect(board.positionOf(robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
     expect(game.phase).toBe('programming')
     expect(robot.program).toEqual([])
-    expect(player.hand).toEqual(Object.values(c))
+    expect(player.hand).toHaveLength(Object.values(c).length)
+    expect(player.hand).toEqual(expect.arrayContaining(Object.values(c)))
   })
 
   it('supports repeated falls without canceling the program or resetting orientation', () => {
@@ -157,7 +159,8 @@ describe('pit entry and rebooting', () => {
     player.completeCheckpoint(1)
     const instructions: Instruction[] = ['MOVE_3', 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'BACK_UP']
     const program = instructions.map((instruction, index) => new Card(`card-${index}`, instruction))
-    const game = new Game(board, [player], program, rebootTile)
+    player.deck.add(program)
+    const game = new Game({ board, players: [player], deck: program, rebootTile, random: () => 0 })
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
     expect(game.executeNextAction().action.position).toEqual(rebootTile)

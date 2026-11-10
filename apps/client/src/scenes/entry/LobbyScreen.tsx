@@ -1,7 +1,5 @@
 import type { LobbySummary } from '@robo-rally/game-events'
 import { useState } from 'react'
-import map1 from './maps/map-1.png'
-import map2 from './maps/map-2.png'
 
 type LobbyScreenProps = {
   username: string
@@ -13,13 +11,6 @@ type LobbyScreenProps = {
   onCreate: () => void
   onRefresh: () => void
 }
-
-const MAX_PLAYERS = 6
-
-const sampleLobbies = [
-  { id: 'lobby-2', name: 'Lobby 2', map: 'Map 2', image: map2, players: 4, locked: true },
-  { id: 'lobby-3', name: 'Lobby 3', map: 'Map 1', image: map1, players: 6, locked: false },
-]
 
 export default function LobbyScreen({ username, lobbies, pending, connected, error, onJoin, onCreate, onRefresh }: LobbyScreenProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -43,31 +34,14 @@ export default function LobbyScreen({ username, lobbies, pending, connected, err
               autoFocus={lobby === firstJoinable}
               onClick={() => setSelectedId(lobby.lobbyId)}
             >
-              <img className="lobby__image" src={map1} alt="Map 1 preview" />
               <span className="lobby__details">
                 <span className="lobby__name">{lobby.name}</span>
-                <span className="lobby__map">Map 1</span>
               </span>
               <span className="lobby__status">
                 <span>{lobby.playerCount}/{lobby.maxPlayers} players</span>
                 <span role="img" aria-label="Unlocked">
                   🔓
                 </span>
-              </span>
-            </button>
-          </li>
-        ))}
-        {sampleLobbies.map((sample) => (
-          <li key={sample.id}>
-            <button type="button" className="lobby" aria-pressed={false} disabled>
-              <img className="lobby__image" src={sample.image} alt={`${sample.map} preview`} />
-              <span className="lobby__details">
-                <span className="lobby__name">{sample.name}</span>
-                <span className="lobby__map">{sample.map}</span>
-              </span>
-              <span className="lobby__status">
-                <span>{sample.players}/{MAX_PLAYERS} players</span>
-                <LockIcon locked={sample.locked} />
               </span>
             </button>
           </li>
@@ -85,13 +59,5 @@ export default function LobbyScreen({ username, lobbies, pending, connected, err
         {pending ? 'Joining game…' : 'Join game'}
       </button>
     </>
-  )
-}
-
-function LockIcon({ locked }: { locked: boolean }) {
-  return (
-    <span role="img" aria-label={locked ? 'Locked' : 'Unlocked'}>
-      {locked ? '🔒' : '🔓'}
-    </span>
   )
 }
