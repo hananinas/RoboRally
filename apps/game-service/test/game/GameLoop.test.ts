@@ -10,7 +10,8 @@ function createGame(deck: Card[]) {
   const robot = new Robot('robot-1', Direction.EAST)
   board.placeRobot(robot.id, { x: Integer(1), y: Integer(1) })
   const player = new Player('player-1', robot)
-  const game = new Game(board, [player], deck, { x: Integer(0), y: Integer(2) })
+  player.deck.add(deck)
+  const game = new Game({ board, players: [player], deck, rebootTile: { x: Integer(0), y: Integer(2) }, random: () => 0 })
   return { board, robot, player, game }
 }
 
@@ -39,6 +40,7 @@ describe('Game activation loop', () => {
         action: {
           robotId: robot.id,
           card: deck[registerIndex],
+          resolvedInstruction: 'TURN_LEFT',
           position: { x: 1, y: 1 },
           direction: directions[registerIndex],
         },
@@ -95,7 +97,8 @@ function resolveCard(instruction: Instruction, direction: Direction, tiles: Empt
   board.placeRobot(robot.id, { x: Integer(3), y: Integer(3) })
   const player = new Player('player', robot)
   const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, instruction))
-  const game = new Game(board, [player], cards, { x: Integer(0), y: Integer(0) })
+  player.deck.add(cards)
+  const game = new Game({ board, players: [player], deck: cards, rebootTile: { x: Integer(0), y: Integer(0) }, random: () => 0 })
   game.submitProgram(player.id, cards.map((card) => card.id))
   return game.executeNextAction().action
 }

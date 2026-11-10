@@ -124,13 +124,14 @@ describe('public register lifecycle', () => {
   it('reveals only the executed instruction and clears slots when the next hand is dealt', () => {
     const { game } = createGame('empty-map')
     const player = game.addPlayer()._unsafeUnwrap()
+    const hand = player.hand
     game.updateRegisters(player.id, [true, true, true, true, true])._unsafeUnwrap()
-    game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
+    game.submitProgram(player.id, hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
     for (let index = 0; index < 5; index++) {
       const result = game.executeNextAction()
       expect(result.action.robotId).toBe(player.robot.id)
       expect(result.registers).toEqual(Array.from({ length: 5 }, (_, slot) => slot <= index
-        ? { status: 'REVEALED', instruction: player.hand[slot].instruction }
+        ? { status: 'REVEALED', instruction: hand[slot].instruction }
         : { status: 'HIDDEN' }))
       expect(result.registers[index]).not.toHaveProperty('id')
       expect(player.registers).toEqual(index === 4 ? empty : result.registers)
