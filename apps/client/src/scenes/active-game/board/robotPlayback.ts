@@ -1,5 +1,6 @@
 import { effects } from '@robo-rally/game-events'
 import type {
+  Card,
   Coordinate,
   Orientation,
   Position,
@@ -15,7 +16,10 @@ export type Robot = Readonly<{
   position: RobotPosition
   startPosition: Coordinate
 }>
-export type ResolvedRobotAction = RobotActionResolved
+export type ResolvedRobotAction = RobotActionResolved & Readonly<{
+  // Program snapshot captured locally when this action is queued.
+  program?: readonly (Card | null)[]
+}>
 export type DisplayRobot = Robot & Readonly<{ angle: number }>
 
 export const ROBOT_MOVE_DURATION_MS = 600

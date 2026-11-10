@@ -2,11 +2,15 @@ import type {
   Card,
   CardsDealt,
   PlayerCheckpointProgress,
+  PrivateProgram,
   ProgramResultOutcome,
   ProgramSubmitted,
+  ProgramFinalized,
+  ProgrammingTimer,
   PublicGameState,
   RobotActionResolved,
   SubmitProgram,
+  UpdateRegisters,
 } from '@robo-rally/game-events'
 
 export const GAME_SERVICE_URL = 'http://127.0.0.1:4174'
@@ -19,6 +23,8 @@ export const OTHER_ROBOT_ID = '33333333-3333-4333-8333-333333333334'
 export function createPublicState(): PublicGameState {
   return {
     gameId: GAME_ID,
+    serverTime: 0,
+    programmingTimer: { status: 'IDLE' },
     players: [{ playerId: PLAYER_ID, lastCheckpoint: 0, username: 'Player 1', programSubmitted: false, connected: true, registers: [{ status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }] }],
     phase: 'PROGRAMMING',
     paused: false,
@@ -72,16 +78,19 @@ export type FixtureControl =
   | { type: 'deal' }
   | { type: 'hand'; hand: CardsDealt }
   | { type: 'submitted'; submission: ProgramSubmitted }
+  | { type: 'finalized'; program: ProgramFinalized }
+  | { type: 'timer'; timer: ProgrammingTimer; serverTime?: number }
   | { type: 'early-hand'; cards: readonly Card[] }
   | { type: 'start'; deferred: boolean; outcome?: 'STARTED' | 'LOBBY_MEMBER_DISCONNECTED' }
   | { type: 'respond-start' }
-  | { type: 'joined-state'; state: PublicGameState; hand: readonly Card[]; programSubmitted: boolean }
+  | { type: 'joined-state'; state: PublicGameState; hand: readonly Card[]; programSubmitted: boolean; program?: PrivateProgram }
 
 export type FixtureSnapshot = {
   id: string
   cards: readonly Card[]
   state: PublicGameState
   submissions: readonly SubmitProgram[]
+  registerUpdates: readonly UpdateRegisters[]
   entryRequests: readonly (
     | { event: 'session.get' | 'lobby.create' | 'lobby.start'; socketId: string; payload: Record<string, never> }
     | { event: 'lobby.join'; socketId: string; payload: { lobbyId: string } }

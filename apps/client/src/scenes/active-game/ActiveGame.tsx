@@ -101,6 +101,8 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
               disabled={disabled}
               submission={state.submission}
               status={status}
+              programmingTimer={state.programmingTimer}
+              serverTime={state.serverTime}
               error={state.error}
               pendingDelete={pendingDelete}
               awaitingSubmitConfirm={awaitingSubmitConfirm}

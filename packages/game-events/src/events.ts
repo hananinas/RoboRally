@@ -6,6 +6,8 @@ import type {
   GameInitialization,
   ProgramResult,
   ProgramSubmitted,
+  ProgramFinalized,
+  ProgramTimerChanged,
   RobotActionResolved,
   PlayerLeft,
   PlayerConnectionChanged,
@@ -43,6 +45,8 @@ export interface ServerToClientEvents {
   'game.playerConnectionChanged': (payload: PlayerConnectionChanged) => void
   'cards.dealt': (payload: CardsDealt) => void
   'program.submitted': (payload: ProgramSubmitted) => void
+  'program.finalized': (payload: ProgramFinalized) => void
+  'program.timerChanged': (payload: ProgramTimerChanged) => void
   'robot.actionResolved': (payload: RobotActionResolved) => void
   'game.aborted': (payload: GameAborted) => void
   'game.won': (payload: GameWon) => void

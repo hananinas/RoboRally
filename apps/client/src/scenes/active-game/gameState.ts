@@ -11,6 +11,9 @@ import type {
   PlayerId,
   PlayerLeft,
   ProgramResult,
+  ProgramFinalized,
+  ProgrammingTimer,
+  ProgramTimerChanged,
   RobotActionResolved,
   SubmitProgram,
 } from '@robo-rally/game-events'
@@ -36,6 +39,8 @@ export type ClientGameState = {
   connected: boolean
   assignment: PlayerAssignment | null
   phase: GamePhase | null
+  serverTime: number | null
+  programmingTimer: ProgrammingTimer
   paused: boolean
   players: readonly Player[]
   checkpointCount: number
@@ -49,7 +54,7 @@ export type ClientGameState = {
   playbackProgram: Registers | null
   handVersion: number
   handReady: boolean
-  pendingHand: CardsDealt | null
+  pendingHand: (CardsDealt & { program?: ProgramFinalized['cards'] }) | null
   submission: 'idle' | 'pending' | 'accepted' | 'uncertain'
   aborted: boolean
   winner: Winner | null
@@ -80,6 +85,8 @@ export type GameStateEvent =
   | { type: 'submit' }
   | { type: 'result'; result: ProgramResult; handVersion: number }
   | { type: 'submission-unknown'; handVersion: number }
+  | { type: 'program-finalized'; payload: ProgramFinalized }
+  | { type: 'timer-changed'; payload: ProgramTimerChanged }
 
 export const USER_ALREADY_IN_GAME_MESSAGE =
   'This username is already participating from another connection.'
@@ -99,6 +106,8 @@ export function createClientGameState(): ClientGameState {
     connected: false,
     assignment: null,
     phase: null,
+    serverTime: null,
+    programmingTimer: { status: 'IDLE' },
     paused: false,
     players: [],
     checkpointCount: 0,
@@ -126,6 +135,7 @@ export function canProgram(state: ClientGameState): boolean {
     state.winner === null &&
     state.assignment !== null &&
     state.phase === 'PROGRAMMING' &&
+    state.programmingTimer.status !== 'CLOSED' &&
     state.handReady &&
     state.hand.length > 0 &&
     !state.playback.active &&
@@ -146,6 +156,20 @@ function isHandEligible(state: ClientGameState, hand: CardsDealt): boolean {
     hand.playerId === state.assignment.playerId
 }
 
+function adoptPendingHand(state: ClientGameState): ClientGameState {
+  const hand = state.pendingHand
+  if (!hand) return state
+  return {
+    ...state,
+    hand: hand.cards,
+    handVersion: state.handVersion + 1,
+    pendingHand: null,
+    registers: hand.program ?? emptyRegisters(),
+    registersPast: [],
+    registersFuture: [],
+  }
+}
+
 // Keep the next hand pending until the previous round has finished playing.
 function activateHand(state: ClientGameState): ClientGameState {
   const hand = state.pendingHand
@@ -155,21 +179,30 @@ function activateHand(state: ClientGameState): ClientGameState {
     return state
   }
   return {
-    ...state,
-    hand: hand.cards,
+    ...adoptPendingHand(state),
     handReady: true,
-    handVersion: state.handVersion + 1,
-    pendingHand: null,
-    registers: emptyRegisters(),
-    registersPast: [],
-    registersFuture: [],
     playbackProgram: null,
-    submission: 'idle',
+    submission: hand.program ? 'accepted' : 'idle',
     error: state.connected ? null : state.error,
   }
 }
 
+function updatePlayback(state: ClientGameState, playback: RobotPlaybackState): ClientGameState {
+  return {
+    ...state,
+    playback,
+    playbackProgram: playback.active?.program ?? state.playbackProgram,
+  }
+}
 
+function finishPlayback(state: ClientGameState): ClientGameState {
+  if (state.playback.active || state.phase !== 'PROGRAMMING') return state
+  return activateHand({
+    ...state,
+    playbackProgram: null,
+    registers: state.playbackProgram ? emptyRegisters() : state.registers,
+  })
+}
 
 export function gameStateReducer(
   state: ClientGameState,
@@ -182,11 +215,10 @@ export function gameStateReducer(
       const { gameId, playerId, robotId } = event.payload
       if (gameId !== state.assignment?.gameId ||
         !state.players.some((player) => player.playerId === playerId)) return state
-      return {
+      return finishPlayback(updatePlayback({
         ...state,
         players: state.players.filter((player) => player.playerId !== playerId),
-        playback: robotPlaybackReducer(state.playback, { type: 'remove', robotId }),
-      }
+      }, robotPlaybackReducer(state.playback, { type: 'remove', robotId })))
     }
     case 'checkpoint-progress': {
       const { gameId, playerId, lastCheckpoint, checkpointCount } = event.payload
@@ -227,6 +259,7 @@ export function gameStateReducer(
       return {
         ...state,
         aborted: true,
+        programmingTimer: { status: 'CLOSED' },
         error: 'This game has encountered an error and cannot continue.',
       }
     case 'won':
@@ -234,6 +267,7 @@ export function gameStateReducer(
               return {
         ...state,
         winner: { playerId: event.payload.playerId, username: event.payload.username },
+        programmingTimer: { status: 'CLOSED' },
       }
 
     case 'reset':
@@ -246,11 +280,15 @@ export function gameStateReducer(
         connected: true,
         assignment: result.assignment,
         hand: result.hand,
+        registers: result.program,
+        playbackProgram: snapshot.phase === 'EXECUTING' ? result.program : null,
         handVersion: result.hand.length > 0 ? 1 : 0,
         // After submitting, the hand is empty until the next round is dealt.
         handReady: snapshot.phase === 'PROGRAMMING' && (result.hand.length > 0 || result.programSubmitted),
         submission: result.programSubmitted ? 'accepted' : 'idle',
         phase: snapshot.phase,
+        serverTime: snapshot.serverTime,
+        programmingTimer: snapshot.programmingTimer,
         paused: snapshot.paused,
         aborted: snapshot.aborted,
         winner: snapshot.winner,
@@ -275,7 +313,7 @@ export function gameStateReducer(
               sprite: tile.sprite,
               direction: tile.direction,
             }] : []),
-            
+
             checkpoints: snapshot.board.tiles.flatMap((tile) => tile.checkpointNumber === undefined
               ? [] : [{ ...tile.position, checkpointNumber: tile.checkpointNumber }]),
             walls: snapshot.board.tiles.map((tile) => ({
@@ -300,30 +338,20 @@ export function gameStateReducer(
         pendingHand: hand,
       })
     }
-    case 'action':
+    case 'action': {
       if (event.action.gameId !== state.assignment?.gameId ||
         !state.playback.robots.some((robot) => robot.robotId === event.action.robotId ||
           event.action.pushedRobots.some((pushed) => pushed.robotId === robot.robotId))) return state
-      return {
-        ...state,
+      const next = adoptPendingHand(state)
+      const action = { ...event.action, program: next.registers }
+      return updatePlayback({
+        ...next,
         phase: 'EXECUTING',
         handReady: false,
-        pendingHand: null,
-        playbackProgram: state.playbackProgram ??
-          (state.registers.some((card) => card !== null) ? state.registers : null),
-        playback: robotPlaybackReducer(state.playback, { type: 'enqueue', action: event.action }),
-      }
-    case 'complete': {
-      const playback = robotPlaybackReducer(state.playback, { type: 'complete' })
-      if (playback.active) return { ...state, playback }
-      if (state.phase !== 'PROGRAMMING') return { ...state, playback }
-      return activateHand({
-        ...state,
-        playback,
-        playbackProgram: null,
-        registers: state.playbackProgram ? emptyRegisters() : state.registers,
-      })
+      }, robotPlaybackReducer(next.playback, { type: 'enqueue', action }))
     }
+    case 'complete':
+      return finishPlayback(updatePlayback(state, robotPlaybackReducer(state.playback, { type: 'complete' })))
     case 'place': {
       if (!canProgram(state)) return state
       const card = state.hand.find((candidate) => candidate.id === event.cardId)
@@ -387,6 +415,21 @@ export function gameStateReducer(
     }
     case 'submit':
       return createSubmission(state) ? { ...state, submission: 'pending', error: null } : state
+    case 'program-finalized': {
+      const { gameId, playerId, cards } = event.payload
+      if (gameId !== state.assignment?.gameId || playerId !== state.assignment.playerId) return state
+      return {
+        ...state,
+        ...(state.pendingHand ? { pendingHand: { ...state.pendingHand, program: cards } } : { registers: cards }),
+        registersPast: [],
+        registersFuture: [],
+        submission: 'accepted',
+        error: null,
+      }
+    }
+    case 'timer-changed':
+      if (event.payload.gameId !== state.assignment?.gameId) return state
+      return { ...state, serverTime: event.payload.serverTime, programmingTimer: event.payload.timer }
     case 'result': {
       if (event.handVersion !== state.handVersion || state.submission !== 'pending') return state
       if (event.result.outcome === 'ACCEPTED' || event.result.outcome === 'ALREADY_SUBMITTED') {

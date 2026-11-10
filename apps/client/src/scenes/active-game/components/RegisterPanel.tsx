@@ -8,6 +8,7 @@ import DraggedCard from './DraggedCard.tsx'
 import Panel from './Panel.tsx'
 import { cardPresentation } from './cardInstructions.ts'
 import ProgramCard from './ProgramCard.tsx'
+import ProgrammingCountdown from './ProgrammingCountdown.tsx'
 import useCardDrag from './useCardDrag.ts'
 
 type RegisterPanelProps = {
@@ -18,6 +19,8 @@ type RegisterPanelProps = {
   awaitingSubmitConfirm: boolean
   submission: ClientGameState['submission']
   status: string
+  programmingTimer: ClientGameState['programmingTimer']
+  serverTime: number | null
   error: string | null
   onRemove: (registerIndex: number) => void
   onMove: (fromIndex: number, toIndex: number) => void
@@ -94,6 +97,8 @@ function RegisterPanel({
   awaitingSubmitConfirm,
   submission,
   status,
+  programmingTimer,
+  serverTime,
   error,
   onRemove,
   onMove,
@@ -117,6 +122,9 @@ function RegisterPanel({
       <h2 className="register-panel__heading">Registers</h2>
       <div className="game-status">
         <p role="status">{status}</p>
+        {programmingTimer.status === 'RUNNING' && serverTime !== null && (
+          <ProgrammingCountdown deadline={programmingTimer.deadline} serverTime={serverTime} />
+        )}
         {error && <p role="alert">{error}</p>}
       </div>
       <ol className="registers">

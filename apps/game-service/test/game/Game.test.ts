@@ -86,7 +86,7 @@ describe('Game programming', () => {
       board.placeRobot(robot.id, { x: Integer(index), y: Integer(0) })
       const player = new Player(`player-${index}`, robot, new Deck(deck))
       if (index === 0) player.drawHand(() => 0)
-      player.updateRegisters([true, true, true, true, true])
+      player.updateRegisters([deck[0], deck[1], deck[2], deck[3], deck[4]])
       player.revealRegister(0, 'TURN_LEFT')
       return player
     })

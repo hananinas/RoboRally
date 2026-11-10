@@ -36,7 +36,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
         extraHeaders: authCookieHeader(sessionStore, usernames[index], usernames[index]),
       })
       clients.push(socket)
-      socket.onAny((name, payload: unknown) => events[index].push({ name, payload }))
+      socket.onAny((name, payload: unknown) => { if (name !== 'program.timerChanged') events[index].push({ name, payload }) })
       const connected = new Promise<void>((resolve) => socket.once('connect', resolve))
       socket.connect()
       await connected
@@ -71,10 +71,10 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
         const waiting = await socket.timeout(1000).emitWithAck('session.get', {})
         expect(waiting).toMatchObject({ outcome: 'IN_GAME', initialization: { state: { phase: 'PROGRAMMING' } } })
       }
-      expect(events[0]).toEqual([])
-      expect(events[1]).toEqual([{
-        name: 'program.submitted', payload: { gameId, playerId: players[0].id },
-      }])
+      expect(events[0].map((event) => event.name)).toEqual([
+        'program.finalized', 'game.registersChanged', 'program.submitted',
+      ])
+      expect(events[1].map((event) => event.name)).toEqual(['game.registersChanged', 'program.submitted'])
       expect(await clients[0].timeout(1000).emitWithAck('program.submit', submissions[0]))
         .toEqual({ outcome: 'ALREADY_SUBMITTED' })
 
@@ -86,11 +86,21 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
       for (let index = 0; index < clients.length; index++) {
         expect(hands[index]).toMatchObject({ gameId, playerId: players[index].id })
         expect(events[index].map((event) => event.name)).toEqual([
-          'program.submitted',
+          ...[0, 1].flatMap((playerIndex) => [
+            ...(playerIndex === index ? ['program.finalized'] : []),
+            'game.registersChanged', 'program.submitted',
+          ]),
           ...Array.from({ length: 10 }, () => 'robot.actionResolved'),
           'cards.dealt',
         ])
-        expect(events[index][0].payload).toEqual({ gameId, playerId: players[1 - index].id })
+        expect(events[index].filter((event) => event.name === 'program.submitted').map((event) => event.payload))
+          .toEqual(players.map((player) => ({ gameId, playerId: player.id })))
+        expect(events[index].filter((event) => event.name === 'program.finalized').map((event) => event.payload))
+          .toEqual([{ gameId, playerId: players[index].id, reason: 'SUBMITTED', cards: players[index].hand }])
+        const publicEvents = events[index].filter((event) => !['program.finalized', 'cards.dealt'].includes(event.name))
+        for (const card of players.flatMap((player) => player.hand)) {
+          expect(JSON.stringify(publicEvents)).not.toContain(card.id)
+        }
         const actions = events[index].filter((event) => event.name === 'robot.actionResolved')
         expect(actions.map((event) => event.payload)).toEqual(
           Array.from({ length: 5 }, (_, registerIndex) => [1, 0].map((playerIndex) => ({

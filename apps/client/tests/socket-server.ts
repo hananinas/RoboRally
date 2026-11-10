@@ -6,11 +6,16 @@ import type {
   LobbyState,
   ProgramResultAcknowledgement,
   ProgramResultOutcome,
+  PrivateProgram,
+  ProgramFinalized,
+  ProgrammingTimer,
   PublicGameState,
   ServerToClientEvents,
   SubmitProgram,
+  UpdateRegisters,
   User,
 } from '@robo-rally/game-events'
+import { updateRegistersSchema } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
 import {
   createPublicState,
@@ -28,6 +33,8 @@ type Fixture = {
   cards: readonly Card[]
   state: PublicGameState
   submissions: SubmitProgram[]
+  registerUpdates: UpdateRegisters[]
+  program: PrivateProgram
   sockets: Set<GameSocket>
   outcome: ProgramResultOutcome
   deferred: boolean
@@ -37,7 +44,7 @@ type Fixture = {
   programSubmitted: boolean
   started: boolean
   pendingStarts: { socket: GameSocket; respond: () => void }[]
-  pending: { socket: GameSocket; acknowledge: ProgramResultAcknowledgement }[]
+  pending: { socket: GameSocket; acknowledge: ProgramResultAcknowledgement; submission: SubmitProgram }[]
 }
 
 const fixtures = new Map<string, Fixture>()
@@ -55,9 +62,15 @@ function snapshot(fixture: Fixture): FixtureSnapshot {
     cards: fixture.cards,
     state: fixture.state,
     submissions: fixture.submissions,
+    registerUpdates: fixture.registerUpdates,
     entryRequests: fixture.entryRequests,
     pendingStarts: fixture.pendingStarts.length,
   }
+}
+
+function timerChanged(fixture: Fixture, timer: ProgrammingTimer, serverTime = Date.now()) {
+  fixture.state = { ...fixture.state, serverTime, programmingTimer: timer }
+  for (const socket of fixture.sockets) socket.emit('program.timerChanged', { gameId: GAME_ID, serverTime, timer })
 }
 
 function acknowledgeProgram(
@@ -65,15 +78,26 @@ function acknowledgeProgram(
   sender: GameSocket,
   acknowledge: ProgramResultAcknowledgement,
   outcome: ProgramResultOutcome,
+  submission: SubmitProgram,
 ) {
   acknowledge({ outcome })
   if (outcome === 'ACCEPTED') {
+    const cards: readonly Card[] = submission.cardIds.map((id) => fixture.cards.find((card) => card.id === id)!)
+    fixture.program = cards as PrivateProgram
+    fixture.programSubmitted = true
+    sender.emit('program.finalized', {
+      gameId: GAME_ID, playerId: PLAYER_ID, reason: 'SUBMITTED', cards: cards as ProgramFinalized['cards'],
+    })
     for (const observer of fixture.sockets) {
-      if (observer === sender) continue
+      observer.emit('game.registersChanged', {
+        gameId: GAME_ID, playerId: PLAYER_ID,
+        registers: [{ status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' }],
+      })
       observer.emit('program.submitted', {
         gameId: GAME_ID, playerId: PLAYER_ID,
       })
     }
+    if (fixture.state.programmingTimer.status === 'IDLE') timerChanged(fixture, { status: 'RUNNING', deadline: Date.now() + 30_000 })
   }
 }
 
@@ -84,14 +108,26 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
       break
     case 'hand':
       for (const socket of fixture.sockets) socket.emit('cards.dealt', control.hand)
+      if (control.hand.gameId === GAME_ID && control.hand.playerId === PLAYER_ID) timerChanged(fixture, { status: 'IDLE' })
       break
     case 'submitted':
       for (const socket of fixture.sockets) socket.emit('program.submitted', control.submission)
+      break
+    case 'finalized':
+      if (control.program.gameId === GAME_ID && control.program.playerId === PLAYER_ID) {
+        fixture.program = control.program.cards
+        fixture.programSubmitted = true
+      }
+      for (const socket of fixture.sockets) socket.emit('program.finalized', control.program)
+      break
+    case 'timer':
+      timerChanged(fixture, control.timer, control.serverTime)
       break
     case 'deal':
       for (const socket of fixture.sockets) socket.emit('cards.dealt', {
         gameId: GAME_ID, playerId: PLAYER_ID, cards: fixture.cards,
       })
+      timerChanged(fixture, { status: 'IDLE' })
       break
     case 'early-hand':
       // Exercise out-of-order delivery without changing the authoritative join hand.
@@ -113,6 +149,7 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
       fixture.state = control.state
       fixture.cards = control.hand
       fixture.programSubmitted = control.programSubmitted
+      fixture.program = control.program ?? [null, null, null, null, null]
       break
     case 'submission':
       fixture.outcome = control.outcome
@@ -120,10 +157,11 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
       break
     case 'acknowledge':
       for (const pending of fixture.pending.splice(0)) {
-        acknowledgeProgram(fixture, pending.socket, pending.acknowledge, control.outcome)
+        acknowledgeProgram(fixture, pending.socket, pending.acknowledge, control.outcome, pending.submission)
       }
       break
     case 'round': {
+      timerChanged(fixture, { status: 'CLOSED' })
       let robots = fixture.state.robots
       for (const action of control.actions) {
         robots = robots.map((robot) => {
@@ -134,12 +172,15 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
       }
       fixture.state = { ...fixture.state, phase: 'PROGRAMMING', robots }
       fixture.cards = dealCards()
+      fixture.program = [null, null, null, null, null]
+      fixture.programSubmitted = false
       for (const socket of fixture.sockets) {
         for (const action of control.actions) socket.emit('robot.actionResolved', action)
         if (!control.deferHand) socket.emit('cards.dealt', {
           gameId: GAME_ID, playerId: PLAYER_ID, cards: fixture.cards,
         })
       }
+      if (!control.deferHand) timerChanged(fixture, { status: 'IDLE' })
       break
     }
   }
@@ -162,6 +203,8 @@ const httpServer = createServer(async (request, response) => {
       cards: dealCards(),
       state: createPublicState(),
       submissions: [],
+      registerUpdates: [],
+      program: [null, null, null, null, null],
       sockets: new Set(),
       outcome: 'ACCEPTED',
       deferred: false,
@@ -222,7 +265,7 @@ io.on('connection', (socket) => {
   const initialization = () => ({
     outcome: 'JOINED' as const,
     assignment: { gameId: GAME_ID, playerId: PLAYER_ID, robotId: ROBOT_ID },
-    state: fixture.state, hand: fixture.cards, programSubmitted: fixture.programSubmitted,
+    state: { ...fixture.state, serverTime: Date.now() }, hand: fixture.cards, program: fixture.program, programSubmitted: fixture.programSubmitted,
   })
   const lobbyState = (): LobbyState => ({ lobbyId: GAME_ID, name: 'Lobby 1', ownerUserId: user.userId, playerCount: 1, maxPlayers: 6, players: [user] })
   socket.on('session.get', (_, acknowledge) => {
@@ -262,6 +305,21 @@ io.on('connection', (socket) => {
     acknowledge({ outcome: 'LEFT' })
   })
 
+  socket.on('game.updateRegisters', (payload, acknowledge) => {
+    const parsed = updateRegistersSchema.safeParse(payload)
+    if (!parsed.success) return acknowledge({ outcome: 'INVALID_REQUEST' })
+    const ids = parsed.data.cardIds.filter((id) => id !== null)
+    if (new Set(ids).size !== ids.length || ids.some((id) => !fixture.cards.some((card) => card.id === id))) {
+      return acknowledge({ outcome: 'INVALID_PROGRAM' })
+    }
+    fixture.registerUpdates.push(parsed.data)
+    const program: readonly (Card | null)[] = parsed.data.cardIds.map((id) =>
+      id === null ? null : fixture.cards.find((card) => card.id === id)!,
+    )
+    fixture.program = program as PrivateProgram
+    acknowledge({ outcome: 'ACCEPTED' })
+  })
+
   socket.on('program.submit', (payload, acknowledge) => {
     fixture.submissions.push(payload)
     const valid = payload.cardIds.length === 5
@@ -270,9 +328,9 @@ io.on('connection', (socket) => {
     if (!valid) {
       acknowledge({ outcome: 'INVALID_PROGRAM' })
     } else if (fixture.deferred) {
-      fixture.pending.push({ socket, acknowledge })
+      fixture.pending.push({ socket, acknowledge, submission: payload })
     } else {
-      acknowledgeProgram(fixture, socket, acknowledge, fixture.outcome)
+      acknowledgeProgram(fixture, socket, acknowledge, fixture.outcome, payload)
     }
   })
 

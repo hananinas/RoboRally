@@ -72,10 +72,10 @@ describe('checkpoint activation', () => {
     expect(game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrapErr()).toBe('GAME_FINISHED')
   })
 
-  it('rejects register updates after a checkpoint win returns the game to programming', () => {
+  it('rejects register updates and automatic completion after a checkpoint win returns the game to programming', () => {
     const { board, players: [player], cards: c, game } = createGame()
     const program = [c.move2, c.back, c.step, c.stepAgain, c.left]
-    game.updateRegisters(player.id, [true, true, true, true, true])._unsafeUnwrap()
+    game.updateRegisters(player.id, program.map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
     for (let register = 0; register < 4; register++) game.executeNextAction()
 
@@ -106,7 +106,8 @@ describe('checkpoint activation', () => {
     })
     const expectRejected = (playerId: string, error: 'GAME_FINISHED' | 'GAME_ABORTED') => {
       const before = state()
-      expect(game.updateRegisters(playerId, [true, true, true, true, true])._unsafeUnwrapErr()).toBe(error)
+      expect(game.updateRegisters(playerId, [null, null, null, null, null])._unsafeUnwrapErr()).toBe(error)
+      expect(game.completePrograms()._unsafeUnwrapErr()).toBe(error)
       expect(player.registers).toBe(registers)
       expect(state()).toEqual(before)
     }
@@ -171,7 +172,6 @@ describe('checkpoint activation', () => {
     expect(players.map((player) => player.lastCheckpoint)).toEqual([1, 0])
     expect(game.currentRegister).toBe(1)
   })
-
 
   it('declares the winner when a departure completes the register', () => {
     const { players, cards: c, game } = createGame([

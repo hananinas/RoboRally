@@ -13,8 +13,9 @@ import {
   type User,
 } from '@robo-rally/game-events'
 import type { Player, Game } from '@/game/index'
-import { presentCardsDealt } from '@/socket/gamePresenter'
+import { presentCardsDealt, presentProgrammingTimer } from '@/socket/gamePresenter'
 import type { ActionScheduler } from '@/actionScheduler'
+import type { ProgrammingTimer } from '@/programmingTimer'
 import type { GameSocket, GameSocketServer } from '@/socket/gameServer'
 
 export type GameMembership = {
@@ -32,6 +33,7 @@ export type MembershipContext = {
   memberships: Map<string, GameMembership>
   publicState: () => PublicGameState
   actionScheduler: ActionScheduler
+  programmingTimer: ProgrammingTimer
 }
 
 function anyDisconnected(ctx: MembershipContext): boolean {
@@ -52,6 +54,7 @@ function notifyReconnected(ctx: MembershipContext, playerId: string): void {
   ctx.io.to(ctx.publicRoom).emit('game.playerConnectionChanged', {
     gameId: ctx.gameId, playerId, connected: true, paused: ctx.game.paused,
   })
+  ctx.io.to(ctx.playerRoom(playerId)).emit('program.timerChanged', presentProgrammingTimer(ctx.gameId, ctx.programmingTimer.state()))
   ctx.actionScheduler.scheduleNextAction()
 }
 
@@ -151,6 +154,7 @@ export function handleLeave(
     })
     actionScheduler.broadcastCheckpointProgress()
     actionScheduler.announceWinner()
+    if (game.phase === 'activation') ctx.programmingTimer.close()
     if (phaseBeforeLeave === 'activation' && game.phase === 'programming') actionScheduler.dealHands()
     actionScheduler.scheduleNextAction()
   }, (error) => {
@@ -185,6 +189,7 @@ export function presentInitialization(
     assignment: { gameId: ctx.gameId, playerId: player.id, robotId: player.robot.id },
     state,
     hand: presentCardsDealt(ctx.gameId, player).cards,
+    program: player.program,
     programSubmitted: ctx.game.hasSubmittedProgram(player.id),
   }
 }

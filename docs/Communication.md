@@ -188,6 +188,8 @@ For both submission and timeout, the public room receives `game.registersChanged
 
 On reconnect, the service sends the current timer with a fresh `serverTime`; `session.get` includes the timer and the player's private program. The existing [reconnection flow](#game-membership) applies.
 
+A disconnect pauses gameplay without extending the programming deadline. At expiry, the service finalizes programs and sends CLOSED; activation waits until all remaining members are connected.
+
 #### Timer sequence
 
 This sequence shows the timer messages for two players. Public register updates and activation are described in their own sections.

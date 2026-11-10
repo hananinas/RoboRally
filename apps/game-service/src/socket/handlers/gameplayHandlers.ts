@@ -15,24 +15,34 @@ import type { GameSocket } from '@/socket/gameServer'
 import { logError, logWarn } from '@/logger'
 import { ownedMembership, type MembershipContext } from '@/socket/handlers/membershipHandlers'
 import { toRejection, type Rejection } from '@/socket/utilities/rejection'
+import { publishProgramFinalized } from '@/socket/programFinalization'
 
-type ValidateGameplayRequestError =
+type ValidateSubmissionRequestError =
   | 'NOT_A_MEMBER'
   | Rejection<'INVALID_REQUEST', ZodError>
 
-function validateGameplayRequest(
+function validateSubmissionRequest(
   ctx: MembershipContext,
   socket: GameSocket,
-  schema: typeof submitProgramSchema,
   payload: unknown,
-): Result<{ player: Player; data: SubmitProgram }, ValidateGameplayRequestError> {
+): Result<{ player: Player; data: SubmitProgram }, ValidateSubmissionRequestError> {
   const player = ownedMembership(ctx, socket)?.player
   if (!player) return err('NOT_A_MEMBER')
 
-  const parsed = schema.safeParse(payload)
+  const parsed = submitProgramSchema.safeParse(payload)
   if (!parsed.success) return err({ outcome: 'INVALID_REQUEST', detail: parsed.error })
 
   return ok({ player, data: parsed.data })
+}
+
+function expireProgrammingIfDue(ctx: MembershipContext): Result<void, 'WRONG_PHASE'> {
+  if (ctx.game.aborted || ctx.game.winner !== undefined || ctx.game.paused) return ok(undefined)
+
+  const expired = ctx.programmingTimer.expireIfDue()
+  // Let the game operation report GAME_ABORTED if automatic completion failed.
+  if (ctx.game.aborted) return ok(undefined)
+
+  return expired ? err('WRONG_PHASE') : ok(undefined)
 }
 
 export function handleSubmitProgram(
@@ -44,10 +54,11 @@ export function handleSubmitProgram(
   let playerId: string | undefined
 
   withAcknowledgeOnce(acknowledge, (ack) => {
-    const result = validateGameplayRequest(ctx, socket, submitProgramSchema, payload)
+    const result = validateSubmissionRequest(ctx, socket, payload)
       .andThen(({ player, data }) => {
         playerId = player.id
-        return ctx.game.submitProgram(player.id, data.cardIds).map(() => player)
+        return expireProgrammingIfDue(ctx)
+          .andThen(() => ctx.game.submitProgram(player.id, data.cardIds)).map(() => player)
       })
       .mapErr(toRejection)
 
@@ -60,12 +71,10 @@ export function handleSubmitProgram(
 
     ack({ outcome: 'ACCEPTED' })
 
-    socket.to(ctx.publicRoom).emit('program.submitted', {
-      gameId: ctx.gameId,
-      playerId: result.value.id,
-    })
-
-    ctx.actionScheduler.scheduleNextAction()
+    const player = result.value
+    publishProgramFinalized(ctx, { playerId: player.id, cards: player.robot.program }, 'SUBMITTED')
+    ctx.programmingTimer.start()
+    if (ctx.game.phase === 'activation') ctx.programmingTimer.close()
   }, (error) => {
     logError('Failed to process program submission', error, { command: 'program.submit', gameId: ctx.gameId, playerId, payload })
     return { outcome: 'INTERNAL_ERROR' } as const
@@ -90,7 +99,8 @@ export function handleUpdateRegisters(
       return
     }
     const { player } = membership
-    const result = ctx.game.updateRegisters(player.id, parsed.data.occupied).mapErr(toRejection)
+    const result = expireProgrammingIfDue(ctx)
+      .andThen(() => ctx.game.updateRegisters(player.id, parsed.data.cardIds)).mapErr(toRejection)
     if (result.isErr()) {
       ack({ outcome: result.error.outcome })
       return

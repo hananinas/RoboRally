@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { Game, UpdateRegistersError } from '@/game/Game'
+import type { Player } from '@/game/Player'
 import { createGame } from '@/game/GameFactory'
 
-const occupied = [true, false, true, false, true] as const
+const selection = (player: Player) => [player.hand[0].id, null, player.hand[2].id, null, player.hand[4].id] as const
 const empty = Array.from({ length: 5 }, () => ({ status: 'EMPTY' }))
 
 function expectRejectedWithoutMutation(game: Game, playerId: string, error: UpdateRegistersError) {
@@ -19,6 +20,7 @@ function expectRejectedWithoutMutation(game: Game, playerId: string, error: Upda
       id: player.id,
       registers: player.registers.map((register) => ({ ...register })),
       program: player.robot.program,
+      selection: player.program,
       hand: player.hand,
       submitted: game.hasSubmittedProgram(player.id),
       lastCheckpoint: player.lastCheckpoint,
@@ -28,7 +30,7 @@ function expectRejectedWithoutMutation(game: Game, playerId: string, error: Upda
   })
   const before = state()
 
-  expect(game.updateRegisters(playerId, [false, false, false, false, false])._unsafeUnwrapErr()).toBe(error)
+  expect(game.updateRegisters(playerId, [null, null, null, null, null])._unsafeUnwrapErr()).toBe(error)
 
   expect(game.players).toEqual(players)
   players.forEach((player, index) => expect(player.registers).toBe(registers[index]))
@@ -36,14 +38,15 @@ function expectRejectedWithoutMutation(game: Game, playerId: string, error: Upda
 }
 
 describe('public register lifecycle', () => {
-  it('keeps occupancy independent from private cards and preserves prior snapshots', () => {
+
+  it('stores private selections without submitting and preserves prior public snapshots', () => {
     const { game } = createGame('empty-map')
     const first = game.addPlayer()._unsafeUnwrap()
     const second = game.addPlayer()._unsafeUnwrap()
     const initial = first.registers
     const hand = first.hand
     expect(initial).toEqual(empty)
-    expect(game.updateRegisters(first.id, occupied)._unsafeUnwrap()).toBeUndefined()
+    expect(game.updateRegisters(first.id, selection(first))._unsafeUnwrap()).toBeUndefined()
     const snapshot = first.registers
     expect(snapshot).toEqual([
       { status: 'HIDDEN' }, { status: 'EMPTY' }, { status: 'HIDDEN' },
@@ -51,29 +54,33 @@ describe('public register lifecycle', () => {
     ])
     expect(initial).toEqual(empty)
     expect(second.registers).toEqual(empty)
+    expect(first.program).toEqual([hand[0], null, hand[2], null, hand[4]])
     expect(first.robot.program).toEqual([])
     expect(first.hand).toEqual(hand)
     expect(game.phase).toBe('programming')
     expect(game.currentRegister).toBe(0)
     expect(game.hasStarted).toBe(false)
     expect(game.hasSubmittedProgram(first.id)).toBe(false)
-    expect(game.updateRegisters(first.id, [false, false, false, false, false])._unsafeUnwrap()).toBeUndefined()
+    expect(game.updateRegisters(first.id, [null, null, null, null, null])._unsafeUnwrap()).toBeUndefined()
     expect(snapshot[0]).toEqual({ status: 'HIDDEN' })
     expect(first.registers).toEqual(empty)
+    expect(first.program).toEqual([null, null, null, null, null])
   })
 
   it('rejects unavailable writes without changing slots or stored programs', () => {
     const { game } = createGame('empty-map')
     const first = game.addPlayer()._unsafeUnwrap()
     const second = game.addPlayer()._unsafeUnwrap()
-    game.updateRegisters(first.id, occupied)._unsafeUnwrap()
-    const registers = first.registers
+    game.updateRegisters(first.id, selection(first))._unsafeUnwrap()
     expectRejectedWithoutMutation(game, 'removed-player', 'PLAYER_NOT_IN_GAME')
     game.pause()
     expectRejectedWithoutMutation(game, first.id, 'GAME_PAUSED')
     game.resume()
     game.submitProgram(first.id, first.hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
     const program = first.robot.program
+    const registers = first.registers
+    expect(first.program).toEqual(program)
+    expect(registers.every((slot) => slot.status === 'HIDDEN')).toBe(true)
     expectRejectedWithoutMutation(game, first.id, 'ALREADY_SUBMITTED')
     game.submitProgram(second.id, second.hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
     expectRejectedWithoutMutation(game, first.id, 'WRONG_PHASE')
@@ -84,7 +91,7 @@ describe('public register lifecycle', () => {
   it('rejects register updates after aborting without changing the snapshot', () => {
     const { game } = createGame('empty-map')
     const player = game.addPlayer()._unsafeUnwrap()
-    game.updateRegisters(player.id, occupied)._unsafeUnwrap()
+    game.updateRegisters(player.id, selection(player))._unsafeUnwrap()
     const snapshot = player.registers
     game.abort()
 
@@ -97,7 +104,7 @@ describe('public register lifecycle', () => {
     const { game } = createGame('empty-map')
     const first = game.addPlayer()._unsafeUnwrap()
     const second = game.addPlayer()._unsafeUnwrap()
-    for (const player of [first, second]) game.updateRegisters(player.id, occupied)._unsafeUnwrap()
+    for (const player of [first, second]) game.updateRegisters(player.id, selection(player))._unsafeUnwrap()
     game.submitProgram(first.id, first.hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
 
     expectRejectedWithoutMutation(game, 'missing-player', 'PLAYER_NOT_IN_GAME')
@@ -125,7 +132,7 @@ describe('public register lifecycle', () => {
     const { game } = createGame('empty-map')
     const player = game.addPlayer()._unsafeUnwrap()
     const hand = player.hand
-    game.updateRegisters(player.id, [true, true, true, true, true])._unsafeUnwrap()
+    game.updateRegisters(player.id, hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(player.id, hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
     for (let index = 0; index < 5; index++) {
       const result = game.executeNextAction()
@@ -140,7 +147,8 @@ describe('public register lifecycle', () => {
     expect(game.phase).toBe('programming')
     expect(player.registers).toEqual(empty)
     expect(game.hasSubmittedProgram(player.id)).toBe(false)
-    expect(game.updateRegisters(player.id, occupied)._unsafeUnwrap()).toBeUndefined()
+    expect(player.program).toEqual([null, null, null, null, null])
+    expect(game.updateRegisters(player.id, selection(player))._unsafeUnwrap()).toBeUndefined()
   })
 
   it('locks the roster after program submission and preserves colours across departure', () => {
