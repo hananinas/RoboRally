@@ -53,6 +53,8 @@ export type UpdateRegistersError = Exclude<SubmitProgramError, 'INVALID_PROGRAM'
 
 export const DEFAULT_GAME_NAME = 'Game'
 
+const REGISTERS_PER_ROUND = 5
+
 export type GameOptions = Readonly<{
   board: Board
   players: readonly Player[]
@@ -92,7 +94,7 @@ export class Game {
     random = Math.random,
     drawRandom = random,
   }: GameOptions) {
-    if (deck.length < 5 || new Set(deck.map((card) => card.id)).size !== deck.length) {
+    if (deck.length < REGISTERS_PER_ROUND || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')
     }
     if (rebootTile === undefined) {
@@ -251,7 +253,7 @@ export class Game {
   }
 
   private checkProgram(player: Player, cardIds: readonly CardId[]): Result<readonly Card[], 'INVALID_PROGRAM'> {
-    if (cardIds.length !== 5 || new Set(cardIds).size !== 5) {
+    if (cardIds.length !== REGISTERS_PER_ROUND || new Set(cardIds).size !== REGISTERS_PER_ROUND) {
       return err('INVALID_PROGRAM')
     }
     const hand = new Map(player.hand.map((card) => [card.id, card]))
@@ -299,13 +301,17 @@ export class Game {
       return { roundConcluded: true }
     }
     if (this.activatedRobotIds.size !== this.roster.length) return { roundConcluded: false }
+    return this.concludeRegister()
+  }
+
+  private concludeRegister(): { roundConcluded: boolean } {
     this.activateBoardElements()
     this.finishRegister()
     if (this.winner !== undefined) {
       this.clearRound()
       return { roundConcluded: false }
     }
-    if (this.registerIndex === 5) {
+    if (this.registerIndex === REGISTERS_PER_ROUND) {
       this.finishRound()
       return { roundConcluded: true }
     }
