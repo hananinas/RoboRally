@@ -32,6 +32,11 @@ export class Deck {
     this.drawPile = [...cards]
   }
 
+  // A player's private deck: fresh copies of the template cards with new ids.
+  static fromTemplate(template: readonly Card[] = createDeckCards()): Deck {
+    return new Deck(template.map((card) => new Card(randomUUID(), card.instruction)))
+  }
+
   get size(): number {
     return this.drawPile.length
   }
@@ -82,12 +87,4 @@ export class Deck {
     }
     return drawn
   }
-}
-
-export function createHand(
-  deck: Deck,
-  random: () => number = Math.random,
-  size: number = HAND_SIZE,
-): Card[] {
-  return deck.draw(size, random)
 }

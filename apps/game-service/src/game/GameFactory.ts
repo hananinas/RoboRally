@@ -12,8 +12,7 @@ const GAME_ID: GameId = '00000000-0000-4000-8000-000000000001'
 const SHARED_GAME_NAME = 'Shared game'
 
 export function createPlayer(random?: () => number): Player {
-  const deck = new Deck(createDeckCards())
-  const player = new Player(randomUUID(), new Robot(randomUUID(), Direction.NORTH), deck)
+  const player = new Player(randomUUID(), new Robot(randomUUID(), Direction.NORTH), Deck.fromTemplate())
   player.drawHand(random)
   return player
 }

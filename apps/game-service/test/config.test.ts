@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_GAME_SERVICE_PORT,
   parseGameServicePort,
+  parseAppConfig,
   parseCardSeed,
   parseStartTileOrder,
 } from '@/config.ts'
@@ -32,5 +33,12 @@ describe('game service configuration', () => {
     for (const value of ['', '-1', '1.5', 'abc']) {
       expect(() => parseCardSeed(value)).toThrow(RangeError)
     }
+  })
+
+  it('only allows a card seed outside production', () => {
+    expect(parseAppConfig({ CARD_SEED: '7' }).cardSeed).toBe(7)
+    expect(parseAppConfig({ NODE_ENV: 'development', CARD_SEED: '7' }).cardSeed).toBe(7)
+    expect(parseAppConfig({ NODE_ENV: 'production' }).cardSeed).toBeUndefined()
+    expect(() => parseAppConfig({ NODE_ENV: 'production', CARD_SEED: '7' })).toThrow('CARD_SEED')
   })
 })

@@ -204,8 +204,7 @@ export class Game {
     return this.checkCanAddPlayer().andThen(() =>
       this.findSpawn().map((position) => {
         const robot = new Robot(randomUUID(), Direction.NORTH, colour)
-        const cards = this.deck.map((card) => new Card(randomUUID(), card.instruction))
-        const player = new Player(randomUUID(), robot, new Deck(cards))
+        const player = new Player(randomUUID(), robot, Deck.fromTemplate(this.deck))
         player.drawHand(this.drawRandom)
         this.board.placeRobot(robot.id, position)
         this.startPositions.set(robot.id, position)

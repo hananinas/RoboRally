@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
 import { Card } from '@/game/Card'
-import { Deck, HAND_SIZE, createDeckCards, createHand } from '@/game/Deck'
+import { Deck, HAND_SIZE, createDeckCards } from '@/game/Deck'
 import { Board, Direction, EmptyTile, Game, Player, Robot, createGame } from '@/game/index'
 import { Integer } from '@/numbers'
 
@@ -25,7 +25,7 @@ describe('createDeckCards', () => {
 describe('Deck', () => {
   it('draws distinct cards from the draw pile', () => {
     const deck = new Deck(createDeckCards())
-    const hand = createHand(deck)
+    const hand = deck.draw(HAND_SIZE)
     expect(hand).toHaveLength(HAND_SIZE)
     expect(new Set(hand.map((card) => card.id)).size).toBe(HAND_SIZE)
     expect(deck.size).toBe(createDeckCards().length - HAND_SIZE)

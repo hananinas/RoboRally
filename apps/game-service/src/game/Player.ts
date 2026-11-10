@@ -1,6 +1,6 @@
 import type { Instruction, PublicRegisters, RegisterOccupancy } from '@robo-rally/game-events'
 import type { Card } from '@/game/Card'
-import { Deck, HAND_SIZE, createHand } from '@/game/Deck'
+import { Deck, HAND_SIZE } from '@/game/Deck'
 import type { PlayerId } from '@/game/ids'
 import type { Robot } from '@/game/Robot'
 
@@ -20,7 +20,7 @@ export class Player {
   }
 
   drawHand(random?: () => number, size: number = HAND_SIZE): void {
-    this.currentHand = createHand(this.deck, random, size)
+    this.currentHand = this.deck.draw(size, random)
   }
 
   // Moves the cards to the discard pile, removing any that are in hand.
