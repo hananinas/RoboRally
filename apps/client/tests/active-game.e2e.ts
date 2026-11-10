@@ -69,6 +69,7 @@ test('shows checkpoint counts from snapshots and broadcasts once queued playback
     },
     players: [...game.initial.state.players, {
       playerId: OTHER_PLAYER_ID, username: 'Other player', connected: true, programSubmitted: false, lastCheckpoint: 0,
+      registers: game.initial.state.players[0].registers,
     }],
   }
   await game.control({ type: 'joined-state', state, hand: game.initial.cards, programSubmitted: false })
@@ -822,6 +823,7 @@ test('displays all basic cards and plays their results across two programs', asy
       gameId: GAME_ID,
       registerIndex,
       robotId: ROBOT_ID,
+      playerId: PLAYER_ID,
       instruction: step.instruction,
       position: { coordinate: { x: step.x, y: step.y }, orientation: step.orientation },
       pushedRobots: [],
