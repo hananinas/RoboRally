@@ -15,10 +15,8 @@ export type ActionSchedulerDeps = {
 
 export type ActionScheduler = {
   scheduleNextAction: () => void
-  broadcastCheckpointProgress: () => void
-  announceWinner: () => void
+  announceProgress: (result: { roundConcluded: boolean }) => void
   winner: () => Winner | null
-  announceHands: () => void
   stop: () => void
 }
 
@@ -55,17 +53,21 @@ export function createActionScheduler(
   }
 
   function announceWinner(): void {
-    const result = winner()
-    if (result === null || winnerAnnounced) return
+    if (winnerAnnounced) return
     winnerAnnounced = true
-    io.to(publicRoom).emit('game.won', { gameId, ...result })
+    io.to(publicRoom).emit('game.won', { gameId, ...winner()! })
   }
 
   function announceHands(): void {
-    if (game.winner !== undefined) return
     for (const player of game.players) {
       io.to(playerRoom(player.id)).emit('cards.dealt', presentCardsDealt(gameId, player))
     }
+  }
+
+  function announceProgress(result: { roundConcluded: boolean }): void {
+    broadcastCheckpointProgress()
+    if (game.winner !== undefined) announceWinner()
+    if (result.roundConcluded) announceHands()
   }
 
   function scheduleNextAction(): void {
@@ -79,13 +81,8 @@ export function createActionScheduler(
           'robot.actionResolved',
           presentRobotActionResolved(gameId, game, result),
         )
-        broadcastCheckpointProgress()
-        announceWinner()
-        if (result.roundConcluded) {
-          announceHands()
-        } else {
-          scheduleNextAction()
-        }
+        announceProgress(result)
+        scheduleNextAction()
       } catch (error) {
         logError('Failed to execute next robot action', error, {
           source: 'actionScheduler',
@@ -105,5 +102,5 @@ export function createActionScheduler(
     clearImmediate(scheduledAction)
   }
 
-  return { scheduleNextAction, broadcastCheckpointProgress, announceWinner,winner, announceHands, stop }
+  return { scheduleNextAction, announceProgress, winner, stop }
 }

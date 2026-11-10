@@ -47,7 +47,7 @@ function reattachMembership(membership: GameMembership, socketId: string): boole
 function resumeUnlessStillDisconnected(ctx: MembershipContext): void {
   if (anyDisconnected(ctx)) return
   const result = ctx.game.resume()
-  if (result.isOk() && result.value.roundConcluded) ctx.actionScheduler.announceHands()
+  if (result.isOk()) ctx.actionScheduler.announceProgress(result.value)
 }
 
 function notifyReconnected(ctx: MembershipContext, playerId: string): void {
@@ -150,9 +150,7 @@ export function handleLeave(
     io.to(publicRoom).emit('game.playerLeft', {
       gameId, playerId: player.id, robotId: player.robot.id,
     })
-    actionScheduler.broadcastCheckpointProgress()
-    actionScheduler.announceWinner()
-    if (roundConcluded) actionScheduler.announceHands()
+    actionScheduler.announceProgress({ roundConcluded })
     actionScheduler.scheduleNextAction()
   }, (error) => {
     logError('Failed to process player leaving', error, { command: 'game.leave', gameId, playerId })
