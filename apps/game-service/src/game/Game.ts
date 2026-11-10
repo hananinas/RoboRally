@@ -147,16 +147,15 @@ export class Game {
   }
 
   get paused(): boolean {
-    return this.lifecycle.current.kind === 'paused'
+    return this.lifecycle.isPaused
   }
 
   get aborted(): boolean {
-    return this.lifecycle.current.kind === 'aborted'
+    return this.lifecycle.isAborted
   }
 
   get winner(): PlayerId | undefined {
-    const state = this.lifecycle.current
-    return state.kind === 'finished' ? state.winnerId : undefined
+    return this.lifecycle.winnerId
   }
 
   pause(): Result<void, PauseError> {

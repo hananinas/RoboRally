@@ -25,6 +25,18 @@ export class GameLifecycle {
     return { ...this.#state }
   }
 
+  get isPaused(): boolean {
+    return this.#state.kind === 'paused'
+  }
+
+  get isAborted(): boolean {
+    return this.#state.kind === 'aborted'
+  }
+
+  get winnerId(): PlayerId | undefined {
+    return this.#state.kind === 'finished' ? this.#state.winnerId : undefined
+  }
+
   get lastPhase(): GamePhase {
     switch (this.#state.kind) {
       case 'active':
