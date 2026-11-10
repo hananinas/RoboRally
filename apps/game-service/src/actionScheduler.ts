@@ -18,7 +18,7 @@ export type ActionScheduler = {
   broadcastCheckpointProgress: () => void
   announceWinner: () => void
   winner: () => Winner | null
-  dealHands: () => void
+  announceHands: () => void
   stop: () => void
 }
 
@@ -61,7 +61,7 @@ export function createActionScheduler(
     io.to(publicRoom).emit('game.won', { gameId, ...result })
   }
 
-  function dealHands(): void {
+  function announceHands(): void {
     if (game.winner !== undefined) return
     for (const player of game.players) {
       io.to(playerRoom(player.id)).emit('cards.dealt', presentCardsDealt(gameId, player))
@@ -82,7 +82,7 @@ export function createActionScheduler(
         broadcastCheckpointProgress()
         announceWinner()
         if (result.roundConcluded) {
-          dealHands()
+          announceHands()
         } else {
           scheduleNextAction()
         }
@@ -105,5 +105,5 @@ export function createActionScheduler(
     clearImmediate(scheduledAction)
   }
 
-  return { scheduleNextAction, broadcastCheckpointProgress, announceWinner,winner, dealHands, stop }
+  return { scheduleNextAction, broadcastCheckpointProgress, announceWinner,winner, announceHands, stop }
 }
