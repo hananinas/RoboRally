@@ -2,6 +2,8 @@ import { useMemo, useRef, type CSSProperties } from 'react'
 import antennaSprites from '../board/assets/antenna.hbls?raw'
 import laserSprites from '../board/assets/lasers.hbls?raw'
 import tankSprites from '../board/assets/tanks.hbls?raw'
+import StartTilePiece from './StartTilePiece.tsx'
+
 import {
   BOARD_COMPONENTS,
   BOARD_CONFIG,
@@ -234,6 +236,9 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
             >
               {pieces.map((piece) => (
                 <BoardPiece key={piece.key} piece={piece} />
+              ))}
+              {layer === 3 && robots.map((robot) => (
+                <StartTilePiece board={board} key={`start:${robot.robotId}`} robot={robot} />
               ))}
               {checkpointTiles.map((tile) => (
                 <CheckpointPiece key={`${tile.cell.x},${tile.cell.y}`} tile={tile} layer={layer} />

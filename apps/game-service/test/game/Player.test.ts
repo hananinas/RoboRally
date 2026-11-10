@@ -18,6 +18,43 @@ describe('Player', () => {
     expect(player.hand.map((card) => card.id)).toEqual(['left-1'])
   })
 
+  it('keeps immutable register snapshots independent from hands and other players', () => {
+    const card = new Card('move-1', 'MOVE_1')
+    const first = new Player('player-1', new Robot('robot-1', Direction.EAST), [card])
+    const second = new Player('player-2', new Robot('robot-2', Direction.EAST))
+    const empty = Array.from({ length: 5 }, () => ({ status: 'EMPTY' }))
+    const initial = first.registers
+    expect(initial).toEqual(empty)
+
+    first.updateRegisters([true, false, true, false, true])
+    const occupied = first.registers
+    expect(occupied).toEqual([
+      { status: 'HIDDEN' }, { status: 'EMPTY' }, { status: 'HIDDEN' },
+      { status: 'EMPTY' }, { status: 'HIDDEN' },
+    ])
+    expect(initial).toEqual(empty)
+    expect(second.registers).toEqual(empty)
+    expect(first.hand).toEqual([card])
+    expect(first.robot.program).toEqual([])
+    expect(Object.isFrozen(occupied)).toBe(true)
+    expect(occupied.every(Object.isFrozen)).toBe(true)
+
+    const revealed = first.revealRegister(2, card.instruction)
+    expect(first.registers).toBe(revealed)
+    expect(revealed).toEqual([
+      { status: 'HIDDEN' }, { status: 'EMPTY' }, { status: 'REVEALED', instruction: 'MOVE_1' },
+      { status: 'EMPTY' }, { status: 'HIDDEN' },
+    ])
+    expect(occupied[2]).toEqual({ status: 'HIDDEN' })
+    expect(Object.isFrozen(revealed)).toBe(true)
+    expect(revealed.every(Object.isFrozen)).toBe(true)
+
+    first.resetRegisters()
+    expect(first.registers).toEqual(empty)
+    expect(revealed[2]).toEqual({ status: 'REVEALED', instruction: 'MOVE_1' })
+    expect(first.hand).toEqual([card])
+  })
+
   it('starts each player at checkpoint zero and tracks their progress independently', () => {
     const first = new Player('player-1', new Robot('robot-1', Direction.EAST))
     const second = new Player('player-2', new Robot('robot-2', Direction.EAST))
