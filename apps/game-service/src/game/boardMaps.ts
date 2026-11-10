@@ -23,6 +23,11 @@ export type WallSpec = Readonly<{
   directions: readonly Direction[]
 }>
 
+export type LaserSpec = Readonly<{
+  at: readonly [x: number, y: number]
+  direction: Direction
+}>
+
 export type MapSpec = BoardMap & Readonly<{
   width: number
   height: number
@@ -30,6 +35,7 @@ export type MapSpec = BoardMap & Readonly<{
   walls: readonly WallSpec[]
   checkpoints: readonly (readonly [x: number, y: number])[]
   pits?: readonly (readonly [x: number, y: number])[]
+  lasers?: readonly LaserSpec[]
   startTiles: readonly (readonly [x: number, y: number])[]
   rebootTile: Position
 }>
@@ -54,6 +60,20 @@ export const boardMaps = {
     width: 16,
     height: 15,
     pits: [[3, 3], [13, 4], [12, 7], [15, 9], [5, 10], [12, 11]],
+    lasers: [
+      // Beam stops at the robot starting at (3, 8)
+      { at: [0, 8], direction: E },
+      // Long beam down the centre column, ends at the robot starting at (10, 13)
+      { at: [10, 5], direction: S },
+      // Beam stops at the wall below (6, 5)
+      { at: [6, 4], direction: S },
+      // Beam stops at the robot starting at (5, 12)
+      { at: [5, 14], direction: N },
+      // Beam runs across the whole map to the east edge
+      { at: [2, 6], direction: E },
+      // Beam stops at the west wall of (12, 2)
+      { at: [15, 2], direction: W },
+    ],
     rebootTile: { x: Integer(10), y: Integer(7) },
     antenna: { x: Integer(10), y: Integer(0), angle: Math.PI / 2 },
     checkpoints: [[10, 6], [8, 9]],

@@ -89,4 +89,19 @@ describe('createBoardScene', () => {
     ])
   })
 
+  it.each([
+    ['EAST', 0],
+    ['SOUTH', 90],
+    ['WEST', 180],
+    ['NORTH', -90],
+  ] as const)('turns laser artwork, but not the floor, to face %s', (orientation, angle) => {
+    const board = createBoardRenderModel(1, 1, { laser: [{ x: 0, y: 0, orientation }] })
+    const pieces = createBoardScene(board, BOARD_CONFIG, BOARD_COMPONENTS, BOARD_RECIPES)
+      .planes.flat()
+    expect(pieces.filter((piece) => piece.component.asset).map((piece) => piece.angle))
+      .toEqual([angle, angle, angle, angle])
+    expect(pieces.filter((piece) => !piece.component.asset).every((piece) => piece.angle === undefined))
+      .toBe(true)
+  })
+
 })

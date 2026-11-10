@@ -14,7 +14,7 @@ describe('createBoardRenderModel', () => {
   it('creates a complete row-major grid', () => {
     const board = createBoardRenderModel(3, 2, {
       hole: [[1, 0]],
-      laser: [[2, 1]],
+      laser: [{ x: 2, y: 1, orientation: 'WEST' }],
     })
 
     expect(board.cells.map(({ x, y, tile }) => ({ x, y, tile }))).toEqual([
@@ -26,6 +26,9 @@ describe('createBoardRenderModel', () => {
       { x: 2, y: 1, tile: 'laser' },
     ])
     expect(board.cells.every((cell) => Object.values(cell.walls).every((wall) => !wall))).toBe(true)
+    expect(board.cells.map((cell) => cell.laserOrientation)).toEqual([
+      undefined, undefined, undefined, undefined, undefined, 'WEST',
+    ])
   })
 
   it('copies antenna configuration and rejects off-board positions or invalid facing', () => {
@@ -46,7 +49,7 @@ describe('createBoardRenderModel', () => {
     expect(() =>
       createBoardRenderModel(2, 1, {
         hole: [[1, 0]],
-        laser: [[1, 0]],
+        laser: [{ x: 1, y: 0, orientation: 'EAST' }],
       }),
     ).toThrow(/assigned twice/)
   })
@@ -149,7 +152,7 @@ describe('board rendering definition', () => {
     expect(BOARD_RECIPES.laser.slices.slice(4)).toEqual([
       { layer: 3, component: 'laser1', order: 1 },
       { layer: 4, component: 'laser1' },
-      { layer: 5, component: 'laser2' },
+      { layer: 5, component: 'laser1' },
       { layer: 6, component: 'laser3' },
     ])
   })

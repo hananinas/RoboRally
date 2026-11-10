@@ -11,6 +11,7 @@ import type {
   BoardVisualComponent,
 } from './boardModel.ts'
 import { BOARD_WALL_SIDES, hasAllWalls } from './boardModel.ts'
+import { laserAngle } from './laserBeam.ts'
 
 export type BoardScenePiece = Readonly<{
   cell: BoardCell
@@ -100,12 +101,18 @@ export function createBoardScene(
               height,
               stackBaseLayer / config.parallaxReferenceLayer,
             )
+      const component = components[slice.component]
+      const angle = antenna && !slice.wall
+        ? antenna.angle * 180 / Math.PI - 90
+        : cell.laserOrientation && component.asset
+          ? laserAngle(cell.laserOrientation)
+          : undefined
       planes[slice.layer].push({
         cell,
-        component: components[slice.component],
+        component,
         componentName: slice.component,
         height,
-        angle: antenna && !slice.wall ? antenna.angle * 180 / Math.PI - 90 : undefined,
+        angle,
         key: `${cell.x},${cell.y},${slice.layer},${slice.component},${slice.wall ?? 'tile'},${sliceIndex}`,
         liftHeight,
         slice,

@@ -20,10 +20,10 @@ export const DEMO_BOARD = createBoardRenderModel(21, 15, {
     { x: 12, y: 10, north: true, east: true, south: true, west: true },
   ],
   laser: [
-    [10, 3],
-    [6, 7],
-    [14, 7],
-    [10, 11],
+    { x: 10, y: 3, orientation: 'SOUTH' },
+    { x: 6, y: 7, orientation: 'EAST' },
+    { x: 14, y: 7, orientation: 'WEST' },
+    { x: 10, y: 11, orientation: 'EAST' },
   ],
 })
 

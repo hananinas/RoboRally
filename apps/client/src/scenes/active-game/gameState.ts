@@ -270,6 +270,8 @@ export function gameStateReducer(
             antenna: snapshot.antenna,
             hole: snapshot.board.tiles.filter((tile) => tile.type === 'PIT')
               .map((tile) => [tile.position.x, tile.position.y] as const),
+            laser: snapshot.board.tiles.flatMap((tile) => tile.type === 'LASER' && tile.laserOrientation
+              ? [{ ...tile.position, orientation: tile.laserOrientation }] : []),
             checkpoints: snapshot.board.tiles.flatMap((tile) => tile.checkpointNumber === undefined
               ? [] : [{ ...tile.position, checkpointNumber: tile.checkpointNumber }]),
             walls: snapshot.board.tiles.map((tile) => ({

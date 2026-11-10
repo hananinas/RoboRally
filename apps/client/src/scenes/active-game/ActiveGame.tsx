@@ -82,7 +82,14 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
 
   return (
     <div className="game">
-      {state.board && <BoardViewport board={state.board} robots={state.playback.robots} />}
+      {state.board && (
+        <BoardViewport
+          board={state.board}
+          robots={state.playback.robots}
+          // Placeholder until board elements activate in their own phase
+          lasersActive={state.phase === 'PROGRAMMING'}
+        />
+      )}
       <div ref={overlayRef} className={overlayClassName}>
         <aside className="game-hud" aria-label="Game controls">
           <div ref={hudContentRef} className="game-hud__content">

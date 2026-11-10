@@ -1,4 +1,4 @@
-import type { Antenna } from '@robo-rally/game-events'
+import type { Antenna, Orientation } from '@robo-rally/game-events'
 
 export type BoardPoint = Readonly<{ x: number; y: number }>
 
@@ -12,6 +12,8 @@ export type BoardCell = BoardPoint &
     tile: BoardTileType
     walls: BoardTileWalls
     checkpointNumber?: number
+    // The direction a laser tile fires in; only set when tile is 'laser'
+    laserOrientation?: Orientation
   }>
 
 export type BoardRenderModel = Readonly<{
@@ -25,7 +27,6 @@ export type BoardComponentName =
   | `antenna${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10}`
   | 'ground'
   | 'laser1'
-  | 'laser2'
   | 'laser3'
   | 'testTank1'
   | 'testTank2'
@@ -105,7 +106,7 @@ type BoardWallAssignment = BoardPoint & Partial<BoardTileWalls>
 type BoardAssignments = Readonly<{
   antenna?: Antenna
   hole?: readonly (readonly [number, number])[]
-  laser?: readonly (readonly [number, number])[]
+  laser?: readonly (BoardPoint & Readonly<{ orientation: Orientation }>)[]
   walls?: readonly BoardWallAssignment[]
   checkpoints?: readonly (BoardPoint & { checkpointNumber: number })[]
 }>
@@ -166,15 +167,20 @@ export function createBoardRenderModel(
   }
 
   const tiles = new Map<string, BoardTileType>()
-  for (const tile of ['hole', 'laser'] as const) {
-    const positions = assignments[tile] ?? []
-    for (const [x, y] of positions) {
-      const key = positionKey(x, y)
-      if (tiles.has(key)) {
-        throw new RangeError(`Board cell ${key} is assigned twice`)
-      }
-      tiles.set(key, tile)
+  const laserOrientations = new Map<string, Orientation>()
+  function assignTile(key: string, tile: BoardTileType) {
+    if (tiles.has(key)) {
+      throw new RangeError(`Board cell ${key} is assigned twice`)
     }
+    tiles.set(key, tile)
+  }
+  for (const [x, y] of assignments.hole ?? []) {
+    assignTile(positionKey(x, y), 'hole')
+  }
+  for (const { x, y, orientation } of assignments.laser ?? []) {
+    const key = positionKey(x, y)
+    assignTile(key, 'laser')
+    laserOrientations.set(key, orientation)
   }
 
   const walls = new Map<string, BoardTileWalls>()
@@ -204,6 +210,7 @@ export function createBoardRenderModel(
           tile: tiles.get(`${x},${y}`) ?? 'empty',
           walls: walls.get(`${x},${y}`) ?? EMPTY_WALLS,
           ...(checkpoints.has(`${x},${y}`) ? { checkpointNumber: checkpoints.get(`${x},${y}`) } : {}),
+          ...(laserOrientations.has(`${x},${y}`) ? { laserOrientation: laserOrientations.get(`${x},${y}`) } : {}),
         }),
       ),
     ).flat(),

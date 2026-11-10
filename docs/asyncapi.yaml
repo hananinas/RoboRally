@@ -1378,15 +1378,20 @@ components:
           $ref: '#/components/schemas/Coordinate'
         type:
           type: string
-          enum: [ EMPTY, PIT ]
+          enum: [ EMPTY, PIT, LASER ]
           description: >-
             PIT triggers an immediate server-side reboot on entry during movement,
             discarding the remaining steps of that instruction. Walls can block entry.
+            LASER is a wall-mounted laser emitter on an otherwise ordinary tile; it
+            does not affect movement and always carries laserOrientation.
         walls:
           type: array
           uniqueItems: true
           items:
             $ref: '#/components/schemas/Orientation'
+        laserOrientation:
+          $ref: '#/components/schemas/Orientation'
+          description: Firing direction of a LASER tile. Omitted for other tile types.
         checkpointNumber:
           type: integer
           minimum: 1
