@@ -271,7 +271,11 @@ pkgs.writeShellApplication {
     export WEB_BIND="''${WEB_BIND:-127.0.0.1}"
     export WEB_SCHEME="''${WEB_SCHEME:-http}"
     export WEB_HOST="''${WEB_HOST:-}"
-    export PUBLIC_ORIGIN="''${PUBLIC_ORIGIN:-$WEB_SCHEME://''${WEB_HOST:-127.0.0.1}:$WEB_PORT}"
+    webOrigin="$WEB_SCHEME://''${WEB_HOST:-127.0.0.1}"
+    if [ "$WEB_SCHEME:$WEB_PORT" != "https:443" ]; then
+      webOrigin="$webOrigin:$WEB_PORT"
+    fi
+    export PUBLIC_ORIGIN="''${PUBLIC_ORIGIN:-$webOrigin}"
 
     stateDir="''${XDG_STATE_HOME:-$HOME/.local/state}/robo-rally"
     export KRATOS_DATA_DIR="''${KRATOS_DATA_DIR:-$stateDir/kratos}"
