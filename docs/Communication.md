@@ -135,7 +135,7 @@ The service creates a fresh game, moves every member into its public and private
 
 `state` includes `serverTime` and `programmingTimer`. The private `program` contains five register slots, each a card or `null`. Initialization restores the player's current selection or finalized program.
 
-Each map has six starting tiles. When the game starts, the service places every robot on a random free starting tile. `Robot.startPosition` records that tile for the whole game, so clients can mark where each robot started.
+Each map has six starting tiles. When the game starts, the service places every robot on a random free starting tile.
 
 ### Programming
 During the programming phase, each player submits five distinct card IDs in register order for the current round.
