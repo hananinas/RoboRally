@@ -39,13 +39,11 @@ export function createPublicState(): PublicGameState {
       colour: '#c74f4f',
       playerId: PLAYER_ID,
       position: { coordinate: { x: 5, y: 5 }, orientation: 'NORTH' },
-      startPosition: { x: 5, y: 5 },
     }, {
       robotId: OTHER_ROBOT_ID,
       colour: '#4D8DEB',
       playerId: OTHER_PLAYER_ID,
       position: { coordinate: { x: 7, y: 5 }, orientation: 'NORTH' },
-      startPosition: { x: 7, y: 5 },
     }],
   }
 }
