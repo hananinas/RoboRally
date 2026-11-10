@@ -15,9 +15,14 @@ process.on('uncaughtExceptionMonitor', (error, origin) => {
 const host = '127.0.0.1'
 const config = parseAppConfig(process.env)
 const oidcClient = await createOidcClient(config.oidc)
-const sessionStore = createSessionStore()
+const sessionStore = createSessionStore({ oidcClient, refreshBufferSeconds: config.oidc.refreshBufferSeconds })
 const httpServer = createServer()
-const authApp = createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl: config.kratosSettingsUrl })
+const authApp = createAuthApp({
+  oidcClient,
+  sessionStore,
+  kratosSettingsUrl: config.kratosSettingsUrl,
+  refreshTokenTtlSeconds: config.refreshTokenTtlSeconds,
+})
 httpServer.on('request', (req, res) => {
   if (req.url?.startsWith('/auth/')) {
     authApp(req, res)

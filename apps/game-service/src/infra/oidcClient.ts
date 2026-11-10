@@ -8,6 +8,7 @@ export type OidcClient = Readonly<{
     checks: { pkceCodeVerifier: string; expectedState: string },
   ): Promise<client.TokenEndpointResponse & client.TokenEndpointResponseHelpers>
   buildEndSessionUrl(idTokenHint: string): Promise<URL>
+  refreshToken(refreshToken: string): Promise<client.TokenEndpointResponse & client.TokenEndpointResponseHelpers>
   postLogoutRedirectUrl: URL
 }>
 
@@ -31,6 +32,9 @@ export async function createOidcClient(oidcConfig: OidcConfig): Promise<OidcClie
         post_logout_redirect_uri: oidcConfig.postLogoutRedirectUrl.toString(),
         id_token_hint: idTokenHint,
       })
+    },
+    async refreshToken(refreshToken) {
+      return client.refreshTokenGrant(config, refreshToken)
     },
   }
 }

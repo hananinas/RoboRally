@@ -17,9 +17,10 @@ export type AuthAppDeps = Readonly<{
   oidcClient: OidcClient
   sessionStore: SessionStore
   kratosSettingsUrl: URL
+  refreshTokenTtlSeconds: number
 }>
 
-export function createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl }: AuthAppDeps): Express {
+export function createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl, refreshTokenTtlSeconds }: AuthAppDeps): Express {
   const app = express()
 
   app.get('/auth/login', async (req, res) => {
@@ -28,7 +29,7 @@ export function createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl }: A
     const state = randomState()
 
     const authorizationUrl = await oidcClient.buildAuthorizationUrl({
-      scope: 'openid profile',
+      scope: 'openid profile offline_access',
       code_challenge: codeChallenge,
       code_challenge_method: 'S256',
       state,
@@ -62,13 +63,13 @@ export function createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl }: A
       return
     }
 
-    const { sub, username, idToken, expiresIn } = result.value
-    const sessionId = sessionStore.create(sub, username, idToken, expiresIn)
+    const { sub, username, idToken, refreshToken, expiresIn } = result.value
+    const sessionId = sessionStore.create(sub, username, idToken, refreshToken, expiresIn)
     logInfo('OIDC callback succeeded', { sub })
 
     res.setHeader('Set-Cookie', [
       ...clearTransactionCookies,
-      sessionCookie(sessionId, expiresIn),
+      sessionCookie(sessionId, refreshTokenTtlSeconds),
     ])
     res.redirect('/')
   })
@@ -114,8 +115,15 @@ type CallbackError =
   | 'MISSING_SUBJECT_CLAIM'
   | 'MISSING_USERNAME_CLAIM'
   | 'MISSING_ID_TOKEN'
+  | 'MISSING_REFRESH_TOKEN'
 
-type CallbackSession = Readonly<{ sub: string; username: string; idToken: string; expiresIn: number }>
+type CallbackSession = Readonly<{
+  sub: string
+  username: string
+  idToken: string
+  refreshToken: string
+  expiresIn: number
+}>
 
 async function exchangeCallback(
   oidcClient: OidcClient,
@@ -144,11 +152,13 @@ async function exchangeCallback(
   if (typeof username !== 'string' || username.length === 0) return err('MISSING_USERNAME_CLAIM')
 
   if (!tokens.id_token) return err('MISSING_ID_TOKEN')
+  if (!tokens.refresh_token) return err('MISSING_REFRESH_TOKEN')
 
   return ok({
     sub,
     username,
     idToken: tokens.id_token,
+    refreshToken: tokens.refresh_token,
     expiresIn: tokens.expires_in ?? DEFAULT_SESSION_EXPIRES_IN_SECONDS,
   })
 }
