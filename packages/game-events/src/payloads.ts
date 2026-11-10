@@ -46,10 +46,18 @@ export type Robot = Readonly<{
 
 export type Tile = Readonly<{
   position: Coordinate
-  type: 'EMPTY' | 'PIT'
   walls?: readonly Orientation[]
   checkpointNumber?: number
-}>
+}> & (
+  | Readonly<{
+      type: 'EMPTY' | 'PIT'
+    }>
+  | Readonly<{
+    type: 'CONVEYOR'
+    sprite: string
+    direction: Orientation
+  }>
+)
 
 export type Board = Readonly<{
   width: number

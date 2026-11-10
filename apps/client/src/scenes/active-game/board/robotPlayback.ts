@@ -38,7 +38,7 @@ export type RobotPlaybackEvent =
   | Readonly<{ type: 'reset'; robots: readonly Robot[] }>
   | Readonly<{ type: 'remove'; robotId: string }>
 
-const orientationAngle: Record<Orientation, number> = {
+export const orientationAngle: Record<Orientation, number> = {
   NORTH: 0,
   EAST: 90,
   SOUTH: 180,
