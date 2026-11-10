@@ -1,6 +1,6 @@
-import type { PublicRobotActionResolved } from '../src/scenes/active-game/publicRegisters.ts'
+import type { RobotActionResolved } from '@robo-rally/game-events'
 import { GAME_ID } from './game-fixture-data.ts'
-import { ADA_ID, NOOR_ID, REGISTER_ROBOT_IDS, createRegisterState, executionPlayers } from './player-registers-fixtures.ts'
+import { ADA_ID, ADA_OCCUPANCY, NOOR_ID, REGISTER_ROBOT_IDS, createRegisterState, executionPlayers } from './player-registers-fixtures.ts'
 import { expect, openGame, test } from './game-fixture.ts'
 import { reconnect } from './browserClient.ts'
 
@@ -32,7 +32,7 @@ test('opponents expose only public registers on hover and keyboard focus', async
   await expect(panel.getByRole('button', { name: /^Mikkel,/ })).toHaveAttribute('aria-expanded', 'true')
 })
 
-test('reveals each register during playback and defers the displayed reset until playback ends', async ({ page, game }) => {
+test('reveals each register during playback and clears the panel when the new hand arrives', async ({ page, game }) => {
   const snapshot = createRegisterState(true)
   await game.control({
     type: 'joined-state',
@@ -50,7 +50,7 @@ test('reveals each register during playback and defers the displayed reset until
   const ada = page.getByRole('button', { name: /^Ada,/ })
   await ada.focus()
   await expect(ada.locator('.other-player__slot-label')).toHaveText(['Move 1', 'Turn Right', 'Filled', 'Filled', 'Filled'])
-  const action: PublicRobotActionResolved = {
+  const action: RobotActionResolved = {
     gameId: GAME_ID, playerId: ADA_ID, robotId: REGISTER_ROBOT_IDS[0], registerIndex: 2, instruction: 'MOVE_2',
     position: { coordinate: { x: 3, y: 1 }, orientation: 'NORTH' },
     pushedRobots: [],
@@ -59,14 +59,14 @@ test('reveals each register during playback and defers the displayed reset until
   await expect(ada.locator('.other-player__slot--current .other-player__slot-label')).toHaveText('Move 2')
   await expect(ada.locator('.other-player__slot--future .other-player__slot-label')).toHaveText(['Filled', 'Filled'])
   await expect(ada).not.toHaveAccessibleName(/Back Up/)
-  await game.control({ type: 'programming-started', payload: { gameId: GAME_ID } })
   await expect(ada.locator('.other-player__slot--current .other-player__slot-label')).toHaveText('Move 2')
   await game.control({ type: 'deal' })
   await page.clock.runFor(600)
   await expect(ada.locator('.other-player__slot--current .other-player__slot-label')).toHaveText('Back Up')
-  await game.control({ type: 'registers-changed', payload: { gameId: GAME_ID, playerId: ADA_ID, registers: createRegisterState().players[1].registers } })
-  await expect(ada.locator('.other-player__slot--current .other-player__slot-label')).toHaveText('Back Up')
   await page.clock.runFor(700)
+  await expect(ada.locator('.other-player__slot-label')).toHaveText(['Empty', 'Empty', 'Empty', 'Empty', 'Empty'])
+  await expect(ada.locator('.other-player__status')).toHaveText('0/5 programmed')
+  await game.control({ type: 'registers-changed', payload: { gameId: GAME_ID, playerId: ADA_ID, registers: ADA_OCCUPANCY } })
   await expect(ada.locator('.other-player__slot-label')).toHaveText(['Filled', 'Filled', 'Filled', 'Empty', 'Empty'])
   await expect(ada.locator('.other-player__status')).toHaveText('3/5 programmed')
   await game.control({ type: 'submitted', submission: { gameId: GAME_ID, playerId: ADA_ID } })

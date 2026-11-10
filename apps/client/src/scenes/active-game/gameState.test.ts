@@ -600,7 +600,7 @@ describe('client game state', () => {
     const registers = state.registers
     const first = actions[0]
     const second: RobotActionResolved = {
-      ...first, robotId: stationaryRobotId,
+      ...first, robotId: stationaryRobotId, playerId: publicState.robots[1].playerId,
       position: { coordinate: { x: 3, y: 4 }, orientation: 'WEST' },
     }
     state = gameStateReducer(state, { type: 'action', action: first })
@@ -920,7 +920,7 @@ describe('membership updates', () => {
   it('continues with the next queued action when the active robot leaves', () => {
     let state = programmingState()
     state = gameStateReducer(state, { type: 'action', action: actions[0] })
-    const next = { ...actions[0], robotId: stationaryRobotId }
+    const next = { ...actions[0], robotId: stationaryRobotId, playerId: publicState.robots[1].playerId }
     state = gameStateReducer(state, { type: 'action', action: next })
     const updated = gameStateReducer(state, { type: 'player-left', payload: {
       gameId: publicState.gameId, playerId: result.assignment.playerId, robotId,

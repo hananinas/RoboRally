@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import type { RobotActionResolved } from '@robo-rally/game-events'
 import {
   canProgram, createClientGameState, gameStateReducer, getOtherPlayers,
 } from './gameState.ts'
-import type { PublicRobotActionResolved } from './publicRegisters.ts'
-import { ADA_ID, MIKKEL_ID, REGISTER_ROBOT_IDS, createRegisterState } from '../../../tests/player-registers-fixtures.ts'
+import { ADA_ID, ADA_OCCUPANCY, MIKKEL_ID, MIKKEL_OCCUPANCY, REGISTER_ROBOT_IDS, createRegisterState } from '../../../tests/player-registers-fixtures.ts'
 import { GAME_ID, PLAYER_ID, ROBOT_ID } from '../../../tests/game-fixture-data.ts'
 
 function joined(executing = false) {
@@ -16,7 +16,7 @@ function joined(executing = false) {
   })
 }
 
-const action: PublicRobotActionResolved = {
+const action: RobotActionResolved = {
   gameId: GAME_ID, playerId: ADA_ID, robotId: REGISTER_ROBOT_IDS[0], registerIndex: 2, instruction: 'MOVE_2',
   position: { coordinate: { x: 3, y: 1 }, orientation: 'NORTH' },
   pushedRobots: [],
@@ -33,19 +33,21 @@ describe('public registers', () => {
     })
     expect(getOtherPlayers(after).map((player) => player.colour)).toEqual(opponents.slice(1).map((player) => player.colour))
     expect(gameStateReducer(after, {
-      type: 'registers-changed', payload: { gameId: GAME_ID, playerId: ADA_ID, registers: opponents[0].registers },
+      type: 'registers-changed', payload: { gameId: GAME_ID, playerId: ADA_ID, registers: ADA_OCCUPANCY },
     })).toBe(after)
   })
 
-  it('ignores foreign occupancy and reset events without disturbing a selected private card', () => {
+  it('ignores foreign occupancy and deals without disturbing a selected private card', () => {
     let state = joined()
     state = gameStateReducer(state, {
       type: 'player-connection-changed', payload: { gameId: GAME_ID, playerId: ADA_ID, connected: true, paused: false },
     })
     state = gameStateReducer(state, { type: 'place', cardId: 'private-card', registerIndex: 0 })
-    const payload = { gameId: 'another-game', playerId: ADA_ID, registers: createRegisterState(true).players[1].registers }
+    const payload = { gameId: 'another-game', playerId: ADA_ID, registers: ADA_OCCUPANCY }
     expect(gameStateReducer(state, { type: 'registers-changed', payload })).toBe(state)
-    expect(gameStateReducer(state, { type: 'programming-started', payload: { gameId: 'another-game' } })).toBe(state)
+    expect(gameStateReducer(state, {
+      type: 'dealt', hand: { gameId: 'another-game', playerId: PLAYER_ID, cards: [{ id: 'foreign', instruction: 'MOVE_1' }] },
+    })).toBe(state)
     const updated = gameStateReducer(state, { type: 'registers-changed', payload: { ...payload, gameId: GAME_ID } })
     expect(updated.registers[0]?.id).toBe('private-card')
     expect(updated.handReady).toBe(true)
@@ -58,7 +60,7 @@ describe('public registers', () => {
     expect(getOtherPlayers(updated)[0].registers.map((slot) => slot.status)).toEqual(['HIDDEN', 'HIDDEN', 'REVEALED', 'EMPTY', 'EMPTY'])
     expect(getOtherPlayers(updated)[0].registers[2]).toEqual({ status: 'REVEALED', instruction: 'MOVE_2' })
     expect(updated.players.find((player) => player.playerId === MIKKEL_ID)?.registers).toBe(state.players.find((player) => player.playerId === MIKKEL_ID)?.registers)
-    const mismatched: PublicRobotActionResolved = { ...action, playerId: MIKKEL_ID }
+    const mismatched: RobotActionResolved = { ...action, playerId: MIKKEL_ID }
     expect(gameStateReducer(state, { type: 'action', action: mismatched })).toBe(state)
   })
 
@@ -79,16 +81,15 @@ describe('public registers', () => {
   it('keeps queued faces hidden and finishes playback before showing the next round', () => {
     let state = gameStateReducer(joined(), {
       type: 'registers-changed',
-      payload: { gameId: GAME_ID, playerId: ADA_ID, registers: createRegisterState().players[2].registers },
+      payload: { gameId: GAME_ID, playerId: ADA_ID, registers: MIKKEL_OCCUPANCY },
     })
     state = gameStateReducer(state, { type: 'action', action })
     state = gameStateReducer(state, { type: 'action', action: { ...action, registerIndex: 3, instruction: 'BACK_UP' } })
     expect(getOtherPlayers(state)[0].registers[3]).toEqual({ status: 'HIDDEN' })
-    state = gameStateReducer(state, { type: 'programming-started', payload: { gameId: GAME_ID } })
     state = gameStateReducer(state, { type: 'dealt', hand: { gameId: GAME_ID, playerId: PLAYER_ID, cards: [{ id: 'next-private', instruction: 'BACK_UP' }] } })
     expect(getOtherPlayers(state)[0].registers[2]).toEqual({ status: 'REVEALED', instruction: 'MOVE_2' })
     expect(state.hand[0].id).toBe('private-card')
-    const nextRegisters = createRegisterState().players[1].registers
+    const nextRegisters = ADA_OCCUPANCY
     state = gameStateReducer(state, { type: 'registers-changed', payload: { gameId: GAME_ID, playerId: ADA_ID, registers: nextRegisters } })
     state = gameStateReducer(state, { type: 'complete' })
     expect(getOtherPlayers(state)[0].registers[3]).toEqual({ status: 'REVEALED', instruction: 'BACK_UP' })
@@ -99,7 +100,7 @@ describe('public registers', () => {
     expect(getOtherPlayers(state).every((player) => !player.programSubmitted)).toBe(true)
   })
 
-  it('keeps a new hand usable when the programming reset arrives after the deal', () => {
+  it('keeps a new hand usable when the deal arrives after playback ends', () => {
     let state = gameStateReducer(joined(), { type: 'action', action })
     state = gameStateReducer(state, { type: 'complete' })
     state = gameStateReducer(state, {
@@ -110,10 +111,23 @@ describe('public registers', () => {
       type: 'dealt',
       hand: { gameId: GAME_ID, playerId: PLAYER_ID, cards: [{ id: 'next-private', instruction: 'BACK_UP' }] },
     })
-    state = gameStateReducer(state, { type: 'programming-started', payload: { gameId: GAME_ID } })
     state = gameStateReducer(state, { type: 'place', cardId: 'next-private', registerIndex: 0 })
     expect(state.registers[0]?.id).toBe('next-private')
     expect(canProgram(state)).toBe(true)
+  })
+
+  it('resets every player’s registers when the local hand arrives and lets new occupancy stick', () => {
+    let state = joined(true)
+    expect(getOtherPlayers(state)[0].registers[0].status).toBe('REVEALED')
+    state = gameStateReducer(state, {
+      type: 'dealt',
+      hand: { gameId: GAME_ID, playerId: PLAYER_ID, cards: [{ id: 'next-private', instruction: 'BACK_UP' }] },
+    })
+    expect(state.players.every((player) => player.registers.every((slot) => slot.status === 'EMPTY'))).toBe(true)
+    expect(state.players.every((player) => !player.programSubmitted)).toBe(true)
+    const nextRegisters = ADA_OCCUPANCY
+    state = gameStateReducer(state, { type: 'registers-changed', payload: { gameId: GAME_ID, playerId: ADA_ID, registers: nextRegisters } })
+    expect(state.players.find((player) => player.playerId === ADA_ID)?.registers).toEqual(nextRegisters)
   })
 
   it('replaces revealed registers from JOINED rather than carrying them into a reconnect', () => {

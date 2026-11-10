@@ -1,6 +1,6 @@
-import type { GamePhase, RobotActionResolved } from '@robo-rally/game-events'
+import type { GamePhase, PublicRegisterSlot, RobotActionResolved } from '@robo-rally/game-events'
 import { useEffect, useState, type CSSProperties } from 'react'
-import type { OpponentPlayer, PublicRegisterSlot } from '../publicRegisters.ts'
+import type { OpponentPlayer } from '../gameState.ts'
 import { cardPresentation } from './cardInstructions.ts'
 import './OtherPlayersPanel.css'
 

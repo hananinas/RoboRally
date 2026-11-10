@@ -6,10 +6,10 @@ import type {
   ProgramResultOutcome,
   ProgramSubmitted,
   PublicGameState,
+  RegistersChanged,
   RobotActionResolved,
   SubmitProgram,
 } from '@robo-rally/game-events'
-import type { ProgrammingStarted, RegistersChanged } from '../src/scenes/active-game/publicRegisters.ts'
 
 export const GAME_SERVICE_URL = 'http://127.0.0.1:4174'
 export const GAME_ID = '11111111-1111-4111-8111-111111111111'
@@ -69,7 +69,6 @@ export type FixtureControl =
   | { type: 'checkpoint-progress'; progress: PlayerCheckpointProgress }
   | { type: 'connection-changed'; payload: PlayerConnectionChanged }
   | { type: 'registers-changed'; payload: RegistersChanged }
-  | { type: 'programming-started'; payload: ProgrammingStarted }
   | { type: 'submission'; outcome: ProgramResultOutcome; deferred: boolean }
   | { type: 'acknowledge'; outcome: ProgramResultOutcome }
   | { type: 'disconnect' }

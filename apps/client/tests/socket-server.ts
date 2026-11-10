@@ -7,6 +7,7 @@ import type {
   ProgramResultAcknowledgement,
   ProgramResultOutcome,
   PublicGameState,
+  RegistersChanged,
   ServerToClientEvents,
   SubmitProgram,
   User,
@@ -21,9 +22,8 @@ import {
   type FixtureControl,
   type FixtureSnapshot,
 } from './game-fixture-data.ts'
-import type { PublicRegisterCommands, PublicRegisterEvents, PublicRegisters } from '../src/scenes/active-game/publicRegisters.ts'
 
-type GameSocket = Socket<ClientToServerEvents & PublicRegisterCommands, ServerToClientEvents & PublicRegisterEvents>
+type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents>
 type Fixture = {
   id: string
   cards: readonly Card[]
@@ -88,9 +88,6 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
       break
     case 'registers-changed':
       for (const socket of fixture.sockets) socket.emit('game.registersChanged', control.payload)
-      break
-    case 'programming-started':
-      for (const socket of fixture.sockets) socket.emit('game.programmingStarted', control.payload)
       break
     case 'hand':
       for (const socket of fixture.sockets) socket.emit('cards.dealt', control.hand)
@@ -212,7 +209,7 @@ const httpServer = createServer(async (request, response) => {
   send(200, snapshot(fixture))
 })
 
-const io = new Server<ClientToServerEvents & PublicRegisterCommands, ServerToClientEvents & PublicRegisterEvents>(httpServer, {
+const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
   cors: { origin: 'http://127.0.0.1:4173', allowedHeaders: ['x-fixture-id', 'x-fixture-user'] },
 })
 
@@ -273,7 +270,7 @@ io.on('connection', (socket) => {
   })
 
   socket.on('game.updateRegisters', (payload, acknowledge) => {
-    const registers: PublicRegisters = [
+    const registers: RegistersChanged['registers'] = [
       { status: payload.occupied[0] ? 'HIDDEN' : 'EMPTY' },
       { status: payload.occupied[1] ? 'HIDDEN' : 'EMPTY' },
       { status: payload.occupied[2] ? 'HIDDEN' : 'EMPTY' },

@@ -5,6 +5,7 @@ import type {
   GameWon,
   PlayerConnectionChanged,
   PlayerCheckpointProgress,
+  RegistersChanged,
   RobotActionResolved,
   PlayerLeft,
   ProgramSubmitted,
@@ -21,7 +22,6 @@ import {
   gameStateReducer,
   type GameStateEvent,
 } from './gameState.ts'
-import type { ProgrammingStarted, RegistersChanged } from './publicRegisters.ts'
 
 export default function useGameConnection(socket: GameSocket) {
   const [state, setState] = useState(createClientGameState)
@@ -88,7 +88,6 @@ export default function useGameConnection(socket: GameSocket) {
     const handleCheckpointProgress = (payload: PlayerCheckpointProgress) =>
       receive({ type: 'checkpoint-progress', payload })
     const handleRegistersChanged = (payload: RegistersChanged) => receive({ type: 'registers-changed', payload })
-    const handleProgrammingStarted = (payload: ProgrammingStarted) => receive({ type: 'programming-started', payload })
     const handleProgramSubmitted = (payload: ProgramSubmitted) => receive({ type: 'program-submitted', payload })
 
     socket.on('disconnect', handleDisconnect)
@@ -102,7 +101,6 @@ export default function useGameConnection(socket: GameSocket) {
     socket.on('game.won', handleWon)
     socket.on('player.checkpointProgress', handleCheckpointProgress)
     socket.on('game.registersChanged', handleRegistersChanged)
-    socket.on('game.programmingStarted', handleProgrammingStarted)
     socket.on('program.submitted', handleProgramSubmitted)
     return () => {
       generation.current += 1
@@ -117,7 +115,6 @@ export default function useGameConnection(socket: GameSocket) {
       socket.off('game.won', handleWon)
       socket.off('player.checkpointProgress', handleCheckpointProgress)
       socket.off('game.registersChanged', handleRegistersChanged)
-      socket.off('game.programmingStarted', handleProgrammingStarted)
       socket.off('program.submitted', handleProgramSubmitted)
     }
   }, [dispatch, socket])

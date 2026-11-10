@@ -1,5 +1,4 @@
-import type { PublicGameState } from '@robo-rally/game-events'
-import type { PublicPlayerState, PublicRobotActionResolved } from '../src/scenes/active-game/publicRegisters.ts'
+import type { PlayerState, PublicGameState, RegistersChanged, RobotActionResolved } from '@robo-rally/game-events'
 import { createPublicState, GAME_ID } from './game-fixture-data.ts'
 
 export const ADA_ID = '22222222-2222-4222-8222-222222222224'
@@ -11,7 +10,18 @@ export const REGISTER_ROBOT_IDS = [
   '33333333-3333-4333-8333-333333333337',
 ] as const
 
-export const programmingPlayers: readonly PublicPlayerState[] = [
+// `game.registersChanged` carries occupancy only: a slot is EMPTY or HIDDEN, never REVEALED.
+export type RegistersOccupancy = RegistersChanged['registers']
+
+export const ADA_OCCUPANCY: RegistersOccupancy = [
+  { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'EMPTY' }, { status: 'EMPTY' },
+]
+
+export const MIKKEL_OCCUPANCY: RegistersOccupancy = [
+  { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' },
+]
+
+export const programmingPlayers: readonly PlayerState[] = [
   {
     playerId: ADA_ID, username: 'Ada', lastCheckpoint: 1, connected: true, programSubmitted: false,
     registers: [{ status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'EMPTY' }, { status: 'EMPTY' }],
@@ -26,7 +36,7 @@ export const programmingPlayers: readonly PublicPlayerState[] = [
   },
 ]
 
-export const executionPlayers: readonly PublicPlayerState[] = programmingPlayers.map((player) => ({
+export const executionPlayers: readonly PlayerState[] = programmingPlayers.map((player) => ({
   ...player,
   programSubmitted: true,
   registers: player.playerId === ADA_ID
@@ -34,13 +44,13 @@ export const executionPlayers: readonly PublicPlayerState[] = programmingPlayers
     : [{ status: 'REVEALED', instruction: 'MOVE_1' }, { status: 'REVEALED', instruction: 'TURN_RIGHT' }, { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' }],
 }))
 
-export const executionAction: PublicRobotActionResolved = {
+export const executionAction: RobotActionResolved = {
   gameId: GAME_ID, playerId: ADA_ID, robotId: REGISTER_ROBOT_IDS[0], registerIndex: 2, instruction: 'MOVE_2',
   position: { coordinate: { x: 3, y: 1 }, orientation: 'NORTH' },
   pushedRobots: [],
 }
 
-export function createRegisterState(executing = false): PublicGameState & { players: readonly PublicPlayerState[] } {
+export function createRegisterState(executing = false): PublicGameState & { players: readonly PlayerState[] } {
   const base = createPublicState()
   return {
     ...base,
@@ -57,6 +67,7 @@ export function createRegisterState(executing = false): PublicGameState & { play
         robotId: REGISTER_ROBOT_IDS[index], playerId: player.playerId,
         colour: ['#4D8DEB', '#4CAF70', '#A66BE0'][index],
         position: { coordinate: { x: 3 + index, y: 3 }, orientation: 'NORTH' as const },
+        startPosition: { x: 3 + index, y: 3 },
       })),
     ],
     board: {
