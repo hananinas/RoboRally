@@ -241,7 +241,7 @@ After a win, `program.submit` is rejected with `GAME_FINISHED`. Players leave wi
 The client shows the winner once the remaining actions have played, with a button to leave the game.
 
 ### Aborting
-If the service hits a failure it cannot recover from, the game moves straight to `aborted`, from either `active` or `paused`. This is a sefety mechanism and not an expected part of play like winning or pausing. Like winning it is game ending and permanent.
+If the service hits a failure it cannot recover from, the game moves straight to `aborted`, from either `active` or `paused`. This is a safety mechanism and not an expected part of play like winning or pausing. Like winning it is game ending and permanent.
 
 The server broadcasts this to the [public room](#rooms) with `game.aborted {gameId}`. See [Errors and rejections](#errors-and-rejections) for the full payload.
 
