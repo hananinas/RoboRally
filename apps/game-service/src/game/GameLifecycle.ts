@@ -24,7 +24,7 @@ export class GameLifecycle {
   }
 
   get current(): LifecycleState {
-    return this.#state
+    return { ...this.#state }
   }
 
   get lastPhase(): GamePhase {
