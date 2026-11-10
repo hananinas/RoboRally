@@ -130,6 +130,7 @@ export function presentRobotActionResolved(
     robotId: action.robotId,
     playerId: player.id,
     instruction: action.card.instruction,
+    resolvedInstruction: action.resolvedInstruction ?? null,
     position: {
       coordinate: action.position,
       orientation: orientations[action.direction],

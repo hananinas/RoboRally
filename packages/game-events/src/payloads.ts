@@ -1,4 +1,4 @@
-import type { Instruction } from './instructions.js'
+import type { Instruction, ResolvedInstruction } from './instructions.js'
 
 export type { UpdateRegisters } from './updateRegisters.js'
 
@@ -149,6 +149,8 @@ export type RobotActionResolved = Readonly<{
   robotId: RobotId
   playerId: PlayerId
   instruction: Instruction
+  // What the register actually did; null when Again had nothing to repeat.
+  resolvedInstruction: ResolvedInstruction | null
   position: Position
   pushedRobots: readonly Pick<Robot, 'robotId' | 'position'>[]
 }>
