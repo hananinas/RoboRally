@@ -19,7 +19,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     clients = []
     factory.mockReset().mockImplementation(createDefaultGame)
     const http = createServer()
-    sessionStore = createSessionStore()
+    sessionStore = createSessionStore({ oidcClient: { refreshToken: vi.fn() }, refreshBufferSeconds: 0 })
     server = createGameSocketServer(http, sessionStore, factory)
     await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve))
     url = `http://127.0.0.1:${(http.address() as AddressInfo).port}`

@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { Direction, Card, Player, Robot, createGame } from '@/game/index'
+import { Deck, Direction, Card, Player, Robot, createGame } from '@/game/index'
 
 describe('Player', () => {
-  it('keeps its robot and copies assigned hands', () => {
+  it('keeps its robot and manages hands through its private deck', () => {
     const robot = new Robot('robot-1', Direction.EAST)
     const firstHand = [new Card('move-1', 'MOVE_1')]
-    const player = new Player('player-1', robot, firstHand)
+    const player = new Player('player-1', robot, new Deck(firstHand))
+    player.drawHand(() => 0)
     firstHand.pop()
 
     expect(player.id).toBe('player-1')
@@ -13,14 +14,41 @@ describe('Player', () => {
     expect(player.hand.map((card) => card.id)).toEqual(['move-1'])
 
     const nextHand = [new Card('left-1', 'TURN_LEFT')]
-    player.setHand(nextHand)
+    player.discard(player.hand)
+    expect(player.hand).toEqual([])
+    player.deck.add(nextHand)
+    player.drawHand(() => 0)
     nextHand.pop()
-    expect(player.hand.map((card) => card.id)).toEqual(['left-1'])
+    // New cards are drawn first, then the discard pile is recycled.
+    expect(player.hand.map((card) => card.id)).toEqual(['left-1', 'move-1'])
+  })
+
+  it('moves programmed cards to the registers on submit and discards them at round end', () => {
+    const cards = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => new Card(id, 'MOVE_1'))
+    const player = new Player('player-1', new Robot('robot-1', Direction.EAST), new Deck(cards))
+    player.drawHand(() => 0, 6)
+    const program = cards.slice(0, 5)
+
+    player.robot.setProgram(program)
+    player.discard(player.hand.filter((card) => !program.includes(card)))
+    player.clearHand()
+
+    expect(player.hand).toEqual([])
+    expect(player.robot.program).toEqual(program)
+    expect(player.deck.discarded).toBe(1)
+    expect(player.deck.size).toBe(0)
+
+    player.discard(player.robot.program)
+    player.robot.clearProgram()
+
+    expect(player.robot.program).toEqual([])
+    expect(player.deck.discarded).toBe(6)
   })
 
   it('keeps immutable register snapshots independent from hands and other players', () => {
     const card = new Card('move-1', 'MOVE_1')
-    const first = new Player('player-1', new Robot('robot-1', Direction.EAST), [card])
+    const first = new Player('player-1', new Robot('robot-1', Direction.EAST), new Deck([card]))
+    first.drawHand(() => 0)
     const second = new Player('player-2', new Robot('robot-2', Direction.EAST))
     const empty = Array.from({ length: 5 }, () => ({ status: 'EMPTY' }))
     const initial = first.registers

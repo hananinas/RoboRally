@@ -33,7 +33,7 @@ describe('public registers over Socket.IO', () => {
     clients = []
     sessions = []
     const http = createServer()
-    sessionStore = createSessionStore()
+    sessionStore = createSessionStore({ oidcClient: { refreshToken: vi.fn() }, refreshBufferSeconds: 0 })
     server = createGameSocketServer(http, sessionStore, () => {
       const session = { ...createGame('empty-map'), gameId: randomUUID() }
       sessions.push(session)
@@ -303,7 +303,9 @@ describe('public registers over Socket.IO', () => {
       expect(current.state.phase).toBe(index < 9 ? 'EXECUTING' : 'PROGRAMMING')
       expect(current.state).toHaveProperty('board')
       expect(current.state.players.map((player) => player.registers)).toEqual(index < 9 ? expected : [empty, empty])
-      expect(current.hand).toEqual(a.hand)
+      // After submitting, the programmed cards live in the registers, not the hand.
+      if (index < 9) expect(current.hand).toEqual([])
+      else expect(current.hand).not.toEqual(a.hand)
       expect((await snapshot(second)).state).toEqual(current.state)
       expect(actions).toHaveLength(index + 1)
       if (index < 9) {

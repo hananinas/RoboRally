@@ -19,7 +19,8 @@ function createGame(
   const instructions: Instruction[] = [instruction, 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'MOVE_1']
   const program = instructions.map((instruction, index) => new Card(`card-${index}`, instruction))
   const reboot = { x: Integer(1), y: Integer(2) }
-  const game = new Game(board, [player], program, reboot)
+  player.deck.add(program)
+  const game = new Game({ board, players: [player], deck: program, rebootTile: reboot, random: () => 0 })
   return { board, robot, player, program, reboot, game }
 }
 
@@ -85,7 +86,7 @@ describe('board-edge falls', () => {
     expect(board.occupantAt(start)).toBeUndefined()
     expect(robot.direction).toBe(direction)
     expect(robot.program).toEqual(program)
-    expect(player.hand).toEqual(program)
+    expect(player.hand).toEqual([])
     expect(player.lastCheckpoint).toBe(1)
     expect(game.currentRegister).toBe(1)
     expect(game.phase).toBe('activation')
@@ -117,7 +118,8 @@ describe('board-edge falls', () => {
     board.placeRobot(robot.id, reboot)
     const player = new Player('player', robot)
     const program = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_3'))
-    const game = new Game(board, [player], program, reboot)
+    player.deck.add(program)
+    const game = new Game({ board, players: [player], deck: program, rebootTile: reboot })
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
     for (let register = 0; register < 5; register++) {

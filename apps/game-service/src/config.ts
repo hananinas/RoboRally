@@ -16,9 +16,19 @@ export const DEFAULT_OAUTH_CLIENT_SECRET = 'game-service-dev-secret'
 export const DEFAULT_AUTH_CALLBACK_URL = 'https://127.0.0.1:3001/auth/callback'
 export const DEFAULT_POST_LOGOUT_REDIRECT_URL = 'https://127.0.0.1:3001/'
 export const DEFAULT_KRATOS_SETTINGS_URL = 'https://127.0.0.1:3001/ory/ui/settings'
+export const DEFAULT_REFRESH_BUFFER_SECONDS = 5 * 60
+export const DEFAULT_REFRESH_TOKEN_TTL_SECONDS = 24 * 60 * 60
 
 export function parseUrlEnv(value: string | undefined, fallback: string): URL {
   return new URL(value ?? fallback)
+}
+
+export function parseRefreshBufferSeconds(value: string | undefined): number {
+  return PositiveInteger(value === undefined ? DEFAULT_REFRESH_BUFFER_SECONDS : Number(value))
+}
+
+export function parseRefreshTokenTtlSeconds(value: string | undefined): number {
+  return PositiveInteger(value === undefined ? DEFAULT_REFRESH_TOKEN_TTL_SECONDS : Number(value))
 }
 
 export type OidcConfig = Readonly<{
@@ -27,10 +37,16 @@ export type OidcConfig = Readonly<{
   clientSecret: string
   callbackUrl: URL
   postLogoutRedirectUrl: URL
+  refreshBufferSeconds: number
 }>
 
 export function parseOidcConfig(env: Partial<Record<
-  'HYDRA_ISSUER_URL' | 'OAUTH_CLIENT_ID' | 'OAUTH_CLIENT_SECRET' | 'AUTH_CALLBACK_URL' | 'POST_LOGOUT_REDIRECT_URL',
+  | 'HYDRA_ISSUER_URL'
+  | 'OAUTH_CLIENT_ID'
+  | 'OAUTH_CLIENT_SECRET'
+  | 'AUTH_CALLBACK_URL'
+  | 'POST_LOGOUT_REDIRECT_URL'
+  | 'REFRESH_BUFFER_SECONDS',
   string
 >>): OidcConfig {
   return {
@@ -39,6 +55,7 @@ export function parseOidcConfig(env: Partial<Record<
     clientSecret: env.OAUTH_CLIENT_SECRET ?? DEFAULT_OAUTH_CLIENT_SECRET,
     callbackUrl: parseUrlEnv(env.AUTH_CALLBACK_URL, DEFAULT_AUTH_CALLBACK_URL),
     postLogoutRedirectUrl: parseUrlEnv(env.POST_LOGOUT_REDIRECT_URL, DEFAULT_POST_LOGOUT_REDIRECT_URL),
+    refreshBufferSeconds: parseRefreshBufferSeconds(env.REFRESH_BUFFER_SECONDS),
   }
 }
 
@@ -53,18 +70,32 @@ export function parseStartTileOrder(value: string | undefined): StartTileOrder {
   throw new RangeError('START_TILE_ORDER must be "random" or "ordered"')
 }
 
+// Test-only: makes card draws deterministic. parseAppConfig rejects it in production.
+export function parseCardSeed(value: string | undefined): number | undefined {
+  if (value === undefined) return undefined
+  if (!/^\d+$/.test(value)) throw new RangeError('CARD_SEED must be a non-negative integer')
+  return Number(value)
+}
+
 export type AppConfig = Readonly<{
   port: number
   kratosSettingsUrl: URL
   oidc: OidcConfig
+  refreshTokenTtlSeconds: number
   startTileOrder: StartTileOrder
+  cardSeed: number | undefined
 }>
 
 export function parseAppConfig(env: NodeJS.ProcessEnv): AppConfig {
+  if (env.NODE_ENV === 'production' && env.CARD_SEED !== undefined) {
+    throw new Error('CARD_SEED is test-only and must not be set in production')
+  }
   return {
     port: parseGameServicePort(env.PORT),
     kratosSettingsUrl: parseKratosSettingsUrl(env.KRATOS_SETTINGS_URL),
     oidc: parseOidcConfig(env),
+    refreshTokenTtlSeconds: parseRefreshTokenTtlSeconds(env.REFRESH_TOKEN_TTL_SECONDS),
     startTileOrder: parseStartTileOrder(env.START_TILE_ORDER),
+    cardSeed: parseCardSeed(env.CARD_SEED),
   }
 }

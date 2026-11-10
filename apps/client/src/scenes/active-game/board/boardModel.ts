@@ -1,15 +1,27 @@
+import type { Orientation } from '@robo-rally/game-events'
 import type { Antenna } from '@robo-rally/game-events'
 
 export type BoardPoint = Readonly<{ x: number; y: number }>
-
-export type BoardTileType = 'empty' | 'hole' | 'laser'
-export type BoardRecipeName = BoardTileType | 'pillar' | 'antenna'
 export type BoardWallSide = 'north' | 'east' | 'south' | 'west'
 export type BoardTileWalls = Readonly<Record<BoardWallSide, boolean>>
 
+export type BoardTile =
+  | Readonly<{
+      tile: 'empty' | 'hole' | 'laser'
+    }>
+  | Readonly<{
+      tile: 'conveyor'
+      sprite: string
+      direction: Orientation
+    }>
+
+export type BoardTileType = BoardTile['tile']
+export type BoardRecipeName = BoardTileType | 'pillar' | 'antenna'
+
+
 export type BoardCell = BoardPoint &
+  BoardTile &
   Readonly<{
-    tile: BoardTileType
     walls: BoardTileWalls
     checkpointNumber?: number
   }>
@@ -22,6 +34,7 @@ export type BoardRenderModel = Readonly<{
 }>
 
 export type BoardComponentName =
+  | 'conveyor'
   | `antenna${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10}`
   | 'ground'
   | 'laser1'
@@ -106,6 +119,10 @@ type BoardAssignments = Readonly<{
   antenna?: Antenna
   hole?: readonly (readonly [number, number])[]
   laser?: readonly (readonly [number, number])[]
+  conveyor?: readonly (BoardPoint & Readonly<{
+    sprite: string
+    direction: Orientation
+  }>)[]
   walls?: readonly BoardWallAssignment[]
   checkpoints?: readonly (BoardPoint & { checkpointNumber: number })[]
 }>
@@ -165,7 +182,7 @@ export function createBoardRenderModel(
     }
   }
 
-  const tiles = new Map<string, BoardTileType>()
+  const tiles = new Map<string, BoardTile>()
   for (const tile of ['hole', 'laser'] as const) {
     const positions = assignments[tile] ?? []
     for (const [x, y] of positions) {
@@ -173,8 +190,20 @@ export function createBoardRenderModel(
       if (tiles.has(key)) {
         throw new RangeError(`Board cell ${key} is assigned twice`)
       }
-      tiles.set(key, tile)
+      tiles.set(key, { tile })
     }
+  }
+
+  for (const { x, y, sprite, direction } of assignments.conveyor ?? []) {
+    const key = positionKey(x, y)
+    if (tiles.has(key)) {
+      throw new RangeError(`Board cell ${key} is assigned twice`)
+    }
+    tiles.set(key, { 
+      tile: 'conveyor', 
+      sprite, 
+      direction,
+    })
   }
 
   const walls = new Map<string, BoardTileWalls>()
@@ -195,13 +224,13 @@ export function createBoardRenderModel(
     checkpoints.set(key, checkpointNumber)
   }
 
-  const cells = Object.freeze(
+  const cells: readonly BoardCell[] = Object.freeze(
     Array.from({ length: rows }, (_, y) =>
       Array.from({ length: columns }, (_, x) =>
         Object.freeze({
           x,
           y,
-          tile: tiles.get(`${x},${y}`) ?? 'empty',
+          ...(tiles.get(`${x},${y}`) ?? { tile: 'empty' as const }),
           walls: walls.get(`${x},${y}`) ?? EMPTY_WALLS,
           ...(checkpoints.has(`${x},${y}`) ? { checkpointNumber: checkpoints.get(`${x},${y}`) } : {}),
         }),

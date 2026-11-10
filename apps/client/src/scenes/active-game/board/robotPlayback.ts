@@ -1,4 +1,4 @@
-import { instructions } from '@robo-rally/game-events'
+import { effects } from '@robo-rally/game-events'
 import type {
   Coordinate,
   Orientation,
@@ -34,7 +34,8 @@ export const PIT_FALL_DURATION_MS = 450
 export const PIT_RESPAWN_DURATION_MS = 300
 export function robotActionDuration(action: ResolvedRobotAction, reducedMotion: boolean): number {
   return reducedMotion ? 200
-    : instructions[action.instruction].kind === 'turn' ? ROBOT_TURN_DURATION_MS : ROBOT_MOVE_DURATION_MS
+    : action.resolvedInstruction !== null && effects[action.resolvedInstruction].kind === 'turn'
+      ? ROBOT_TURN_DURATION_MS : ROBOT_MOVE_DURATION_MS
 }
 
 export type RobotPlaybackState = Readonly<{
@@ -55,7 +56,7 @@ export type RobotPlaybackEvent =
   | Readonly<{ type: 'reset'; robots: readonly Robot[] }>
   | Readonly<{ type: 'remove'; robotId: string }>
 
-const orientationAngle: Record<Orientation, number> = {
+export const orientationAngle: Record<Orientation, number> = {
   NORTH: 0,
   EAST: 90,
   SOUTH: 180,
@@ -89,15 +90,16 @@ export function findPitEntry(
   start: Position,
   action: ResolvedRobotAction,
 ): Coordinate | null {
-  const instruction = instructions[action.instruction]
-  if (instruction.kind !== 'move') return null
-  const direction = instruction.steps < 0
+  const effect = action.resolvedInstruction === null
+    ? null : effects[action.resolvedInstruction]
+  if (!effect || effect.kind !== 'move') return null
+  const direction = effect.steps < 0
     ? oppositeOrientation[start.orientation] : start.orientation
   const cellAt = ({ x, y }: Coordinate) =>
     x >= 0 && x < board.columns && y >= 0 && y < board.rows
       ? board.cells[y * board.columns + x] : undefined
   let current = start.coordinate
-  for (let step = 0; step < Math.abs(instruction.steps); step++) {
+  for (let step = 0; step < Math.abs(effect.steps); step++) {
     const next = { x: current.x + stepOffset[direction].x, y: current.y + stepOffset[direction].y }
     const nextCell = cellAt(next)
     if (!nextCell || cellAt(current)?.walls[wallSide[direction]] ||

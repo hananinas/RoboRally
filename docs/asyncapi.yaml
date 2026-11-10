@@ -123,6 +123,10 @@ channels:
         $ref: '#/components/messages/GameStarted'
       cardsDealt:
         $ref: '#/components/messages/CardsDealt'
+      programFinalized:
+        $ref: '#/components/messages/ProgramFinalized'
+      programTimerChanged:
+        $ref: '#/components/messages/ProgramTimerChanged'
 
   public:
     address: 'game:{gameId}:public'
@@ -132,6 +136,8 @@ channels:
     messages:
       programSubmitted:
         $ref: '#/components/messages/ProgramSubmitted'
+      programTimerChanged:
+        $ref: '#/components/messages/ProgramTimerChanged'
       robotActionResolved:
         $ref: '#/components/messages/RobotActionResolved'
       registersChanged:
@@ -359,7 +365,9 @@ components:
       name: game.started
       payload:
         $ref: '#/components/schemas/GameStarted'
-      description: Initializes the player with their assignment, public state including every player's registers, private hand, and submission status.
+      description: >-
+        Initializes the player with their assignment, public state including the
+        timer, private hand and program, and submission status.
       examples:
         - name: started
           summary: One-tile illustrative board; normal initial hand
@@ -373,6 +381,9 @@ components:
                 robotId: 00000000-0000-4000-8000-000000000003
               state:
                 gameId: 00000000-0000-4000-8000-000000000001
+                serverTime: 1794052800000
+                programmingTimer:
+                  status: IDLE
                 checkpointCount: 0
                 board:
                   width: 1
@@ -386,6 +397,9 @@ components:
                   - robotId: 00000000-0000-4000-8000-000000000003
                     playerId: 00000000-0000-4000-8000-000000000002
                     colour: red
+                    startPosition:
+                      x: 0
+                      y: 0
                     position:
                       coordinate:
                         x: 0
@@ -410,6 +424,7 @@ components:
                       - status: EMPTY
                 paused: false
                 aborted: false
+                winner: null
               hand:
                 - id: 00000000-0000-4000-8000-000000000101
                   instruction: MOVE_1
@@ -429,6 +444,7 @@ components:
                   instruction: MOVE_1
                 - id: 00000000-0000-4000-8000-000000000109
                   instruction: TURN_LEFT
+              program: [ null, null, null, null, null ]
               programSubmitted: false
 
     LeaveGame:
@@ -504,8 +520,8 @@ components:
             items:
               $ref: "#/components/schemas/CardId"
       description: >-
-        Submits five cards in register order for the connection's owned game
-        and player, both derived from the authenticated session.
+        Submits five cards in register order for the game and player identified
+        by the authenticated session.
       examples:
         - name: submit
           payload:
@@ -543,7 +559,7 @@ components:
         GAME_ABORTED: rejected because the game has stopped irrecoverably after an unexpected service failure.
         GAME_FINISHED: rejected because a player has won and the game has ended.
         ALREADY_SUBMITTED: this player already has a stored program for the current round; it is unchanged.
-        WRONG_PHASE: the round had already moved into activation before this submission arrived.
+        WRONG_PHASE: programming has closed, including when the deadline has passed but activation has not started yet.
         NOT_A_MEMBER: this connection does not own a membership for this game.
         INVALID_REQUEST: the request did not match the expected shape.
         PLAYER_NOT_IN_GAME: the player is no longer part of the game (left or otherwise removed).
@@ -554,7 +570,8 @@ components:
     ProgramSubmitted:
       name: program.submitted
       description: >-
-        Event signaling another player has submitted their program.
+        Announces to all game members that a player's program has been finalized
+        by submission or timeout.
       payload:
         type: object
         required:
@@ -574,30 +591,40 @@ components:
     UpdateRegisters:
       name: game.updateRegisters
       description: >-
-        Updates register occupancy for the connection's owned game and player,
-        both derived from the authenticated session, and returns an acknowledgement outcome.
+        Updates the player's current register selection and acknowledges the
+        result. The game and player are identified by the authenticated session.
       payload:
         type: object
         additionalProperties: false
-        required: [ occupied ]
+        required: [ cardIds ]
         properties:
-          occupied:
-            type: array
-            minItems: 5
-            maxItems: 5
-            items:
-              type: boolean
-            description: 'Five occupancy flags in register order: true is HIDDEN; false is EMPTY.'
+          cardIds:
+            $ref: '#/components/schemas/RegisterCardIds'
       examples:
-        - name: partiallyOccupied
+        - name: partialProgram
           payload:
-            occupied: [ true, false, true, false, false ]
+            cardIds:
+              - 00000000-0000-4000-8000-000000000101
+              - null
+              - 00000000-0000-4000-8000-000000000103
+              - null
+              - null
 
     UpdateRegistersResult:
       name: game.updateRegistersResult
-      description: >-
-        Acknowledges a register occupancy update with ACCEPTED or a rejection.
-        GAME_PAUSED, GAME_ABORTED and GAME_FINISHED identify lifecycle rejections.
+      description: |
+        ACCEPTED: the register selection was stored and public occupancy updated.
+        INVALID_REQUEST: the request does not match the expected shape.
+        INVALID_PROGRAM: non-null IDs repeat or do not belong to the player's current dealt hand.
+        NOT_A_MEMBER: this connection does not own a game membership.
+        PLAYER_NOT_IN_GAME: the resolved player is absent from the game roster.
+        WRONG_PHASE: programming has closed, including at the deadline before activation starts.
+        ALREADY_SUBMITTED: the player's program is finalized while programming is still open.
+        GAME_PAUSED: gameplay is paused.
+        GAME_ABORTED: the game has stopped after an unexpected failure.
+        GAME_FINISHED: the game has a winner.
+        INTERNAL_ERROR: unexpected service failure.
+        No acknowledgement means the outcome is unknown.
       payload:
         type: object
         additionalProperties: false
@@ -605,7 +632,7 @@ components:
         properties:
           outcome:
             type: string
-            enum: [ ACCEPTED, INVALID_REQUEST, NOT_A_MEMBER, GAME_PAUSED, GAME_ABORTED, PLAYER_NOT_IN_GAME, GAME_FINISHED, WRONG_PHASE, ALREADY_SUBMITTED, INTERNAL_ERROR ]
+            enum: [ ACCEPTED, INVALID_REQUEST, INVALID_PROGRAM, NOT_A_MEMBER, PLAYER_NOT_IN_GAME, WRONG_PHASE, ALREADY_SUBMITTED, GAME_PAUSED, GAME_ABORTED, GAME_FINISHED, INTERNAL_ERROR ]
       examples:
         - name: accepted
           payload:
@@ -638,6 +665,80 @@ components:
               - status: EMPTY
               - status: EMPTY
 
+    ProgramFinalized:
+      name: program.finalized
+      description: >-
+        Sends the player's finalized five-register program privately after
+        submission or automatic completion at expiry.
+      payload:
+        type: object
+        additionalProperties: false
+        required: [ gameId, playerId, reason, cards ]
+        properties:
+          gameId:
+            $ref: '#/components/schemas/GameId'
+          playerId:
+            $ref: '#/components/schemas/PlayerId'
+          reason:
+            type: string
+            enum: [ SUBMITTED, TIMEOUT ]
+          cards:
+            type: array
+            minItems: 5
+            maxItems: 5
+            items:
+              $ref: '#/components/schemas/Card'
+            description: Five cards with distinct instance IDs, in register order.
+      examples:
+        - name: finalizedAtDeadline
+          summary: Finalized program after the timer expires.
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            playerId: 00000000-0000-4000-8000-000000000002
+            reason: TIMEOUT
+            cards:
+              - id: 00000000-0000-4000-8000-000000000101
+                instruction: MOVE_1
+              - id: 00000000-0000-4000-8000-000000000102
+                instruction: TURN_LEFT
+              - id: 00000000-0000-4000-8000-000000000103
+                instruction: MOVE_2
+              - id: 00000000-0000-4000-8000-000000000110
+                instruction: TURN_RIGHT
+              - id: 00000000-0000-4000-8000-000000000111
+                instruction: BACK_UP
+
+    ProgramTimerChanged:
+      name: program.timerChanged
+      description: >-
+        Broadcasts the current programming timer state to game members. Also
+        sent privately when a player reconnects.
+      payload:
+        type: object
+        additionalProperties: false
+        required: [ gameId, serverTime, timer ]
+        properties:
+          gameId:
+            $ref: '#/components/schemas/GameId'
+          serverTime:
+            $ref: '#/components/schemas/ServerTime'
+          timer:
+            $ref: '#/components/schemas/ProgrammingTimer'
+      examples:
+        - name: firstSubmission
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            serverTime: 1794052800000
+            timer:
+              status: RUNNING
+              deadline: 1794052830000
+        - name: programmingClosed
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            serverTime: 1794052830000
+            timer:
+              status: CLOSED
+
     RobotActionResolved:
       name: robot.actionResolved
       payload:
@@ -650,6 +751,7 @@ components:
           - gameId
           - registerIndex
           - pushedRobots
+          - resolvedInstruction
         properties:
           robotId:
             $ref: "#/components/schemas/RobotId"
@@ -657,6 +759,11 @@ components:
             $ref: "#/components/schemas/PlayerId"
           instruction:
             $ref: "#/components/schemas/Instruction"
+          resolvedInstruction:
+            description: What the register actually did. Differs from instruction for AGAIN, which repeats the previous register's resolved instruction. Null when AGAIN had nothing to repeat.
+            oneOf:
+              - $ref: "#/components/schemas/Instruction"
+              - type: 'null'
           position:
             $ref: "#/components/schemas/Position"
           pushedRobots:
@@ -690,6 +797,7 @@ components:
             robotId: 00000000-0000-4000-8000-000000000003
             playerId: 00000000-0000-4000-8000-000000000002
             instruction: MOVE_1
+            resolvedInstruction: MOVE_1
             pushedRobots: []
             position:
               coordinate:
@@ -744,7 +852,7 @@ components:
           playerId:
             $ref: "#/components/schemas/PlayerId"
       description: >-
-        Private hand dealt to the named player for a programming round.
+        Sends the next programming hand privately to the player.
       examples:
         - name: nextHand
           payload:
@@ -1073,6 +1181,7 @@ components:
         - assignment
         - state
         - hand
+        - program
         - programSubmitted
       properties:
         outcome:
@@ -1087,12 +1196,23 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Card"
-          description: The player's current private hand.
+          description: >-
+            The player's current private hand, including selected cards during
+            programming.
+
+        program:
+          $ref: '#/components/schemas/PrivateProgram'
 
         programSubmitted:
           type: boolean
-          description: Whether this player has submitted for the current round.
-      description:  Private initialization in game.started or session.get; reconnecting preserves the assignment.
+          description: >-
+            Whether this player's program is finalized for the current round, by
+            submission or timeout.
+      description: >-
+        Private initialization in game.started or session.get; reconnecting
+        preserves the assignment and restores the current register selection or
+        finalized program. The public state includes fresh serverTime and the
+        current timer.
 
     LeaveResult:
       type: object
@@ -1138,6 +1258,7 @@ components:
           $ref: "#/components/schemas/Username"
         programSubmitted:
           type: boolean
+          description: True for a manually submitted or automatically completed program.
         connected:
           type: boolean
         lastCheckpoint:
@@ -1203,11 +1324,13 @@ components:
 
     PublicGameState:
       description: >-
-        Public board, robot, player, phase, and antenna state for a game.
+        Public board, robot, player, phase, antenna, and timer state for a game.
         Robot positions include any completed pit reboot.
       type: object
       required:
         - gameId
+        - serverTime
+        - programmingTimer
         - board
         - antenna
         - players
@@ -1218,6 +1341,10 @@ components:
         - checkpointCount
         - winner
       properties:
+        serverTime:
+          $ref: '#/components/schemas/ServerTime'
+        programmingTimer:
+          $ref: '#/components/schemas/ProgrammingTimer'
         gameId:
           $ref: "#/components/schemas/GameId"
         board:
@@ -1239,7 +1366,9 @@ components:
           description: Whether gameplay is paused because a game member is disconnected.
         aborted:
           type: boolean
-          description: Whether gameplay has stopped irrecoverably after an unexpected service failure.
+          description: >-
+            Whether gameplay has stopped irrecoverably after an unexpected
+            service failure.
         checkpointCount:
           $ref: '#/components/schemas/CheckpointCount'
         winner:
@@ -1247,6 +1376,61 @@ components:
           oneOf:
             - $ref: '#/components/schemas/Winner'
             - type: 'null'
+
+    ServerTime:
+      type: integer
+      minimum: 0
+      maximum: 9007199254740991
+      description: Server Unix time in milliseconds when the event or snapshot is produced.
+
+    ProgrammingTimer:
+      description: >-
+        Current programming timer state. RUNNING includes the server deadline.
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [ status ]
+          properties:
+            status:
+              type: string
+              enum: [ IDLE, CLOSED ]
+        - type: object
+          additionalProperties: false
+          required: [ status, deadline ]
+          properties:
+            status:
+              type: string
+              enum: [ RUNNING ]
+            deadline:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+              description: Server Unix timestamp in milliseconds when programming closes.
+
+    RegisterCardIds:
+      type: array
+      minItems: 5
+      maxItems: 5
+      items:
+        oneOf:
+          - $ref: '#/components/schemas/CardId'
+          - type: 'null'
+      description: >-
+        Five register slots in order. Null means empty; repeated nulls are
+        allowed. Card IDs must be distinct and belong to the player's current
+        hand.
+
+    PrivateProgram:
+      type: array
+      minItems: 5
+      maxItems: 5
+      items:
+        oneOf:
+          - $ref: '#/components/schemas/Card'
+          - type: 'null'
+      description: >-
+        The player's private register selection. Each slot contains a card or
+        null. A finalized program contains five cards with distinct IDs.
 
     LastCheckpoint:
       type: integer
@@ -1292,7 +1476,7 @@ components:
 
     Instruction:
       type: string
-      enum: [ MOVE_1, MOVE_2, MOVE_3, BACK_UP, TURN_LEFT, TURN_RIGHT, U_TURN ]
+      enum: [ MOVE_1, MOVE_2, MOVE_3, BACK_UP, TURN_LEFT, TURN_RIGHT, U_TURN, AGAIN ]
 
     Card:
       type: object

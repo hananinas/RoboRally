@@ -4,11 +4,11 @@ import { GAME_ID, PLAYER_ID, ROBOT_ID, type FixtureControl, type FixtureSnapshot
 
 const ROUND = [
   {
-    gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 0, robotId: ROBOT_ID, instruction: 'MOVE_1',
+    gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 0, robotId: ROBOT_ID, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1',
     position: { coordinate: { x: 5, y: 4 }, orientation: 'NORTH' }, pushedRobots: [],
   },
   {
-    gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 1, robotId: ROBOT_ID, instruction: 'MOVE_2',
+    gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 1, robotId: ROBOT_ID, instruction: 'MOVE_2', resolvedInstruction: 'MOVE_2',
     position: { coordinate: { x: 1, y: 9 }, orientation: 'EAST' }, pushedRobots: [],
   },
 ] as const

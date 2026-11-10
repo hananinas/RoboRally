@@ -81,11 +81,11 @@ const publicState: PublicGameState = {
   ],
 }
 const actions: readonly RobotActionResolved[] = [
-  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 0, pushedRobots: [], robotId, instruction: 'MOVE_1', position: { coordinate: { x: 2, y: 2 }, orientation: 'NORTH' } },
-  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 1, pushedRobots: [], robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 2, y: 2 }, orientation: 'WEST' } },
-  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 2, pushedRobots: [], robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 2 }, orientation: 'WEST' } },
-  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 3, pushedRobots: [], robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 1, y: 2 }, orientation: 'SOUTH' } },
-  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 4, pushedRobots: [], robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 3 }, orientation: 'SOUTH' } },
+  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 0, pushedRobots: [], robotId, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 2, y: 2 }, orientation: 'NORTH' } },
+  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 1, pushedRobots: [], robotId, instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 2, y: 2 }, orientation: 'WEST' } },
+  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 2, pushedRobots: [], robotId, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 1, y: 2 }, orientation: 'WEST' } },
+  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 3, pushedRobots: [], robotId, instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 1, y: 2 }, orientation: 'SOUTH' } },
+  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 4, pushedRobots: [], robotId, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 1, y: 3 }, orientation: 'SOUTH' } },
 ]
 const hand = { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, cards }
 
@@ -140,6 +140,15 @@ describe('join initialization', () => {
     expect(state.submission).toBe('accepted')
     expect(canProgram(state)).toBe(false)
     expect(gameStateReducer(state, { type: 'reset' })).toEqual(createClientGameState())
+  })
+
+  it('treats an empty hand after submitting as ready, not as waiting for cards', () => {
+    const state = gameStateReducer(createClientGameState(), {
+      type: 'joined', result: { ...result, hand: [], programSubmitted: true },
+    })
+    expect(state.handReady).toBe(true)
+    expect(state.submission).toBe('accepted')
+    expect(canProgram(state)).toBe(false)
   })
 })
 
@@ -911,7 +920,7 @@ describe('pit playback', () => {
     type: 'joined', result: { ...result, state: pitState },
   })
   const fall: RobotActionResolved = {
-    ...actions[0], instruction: 'MOVE_2', position: { coordinate: { x: 0, y: 4 }, orientation: 'NORTH' },
+    ...actions[0], instruction: 'MOVE_2', resolvedInstruction: 'MOVE_2', position: { coordinate: { x: 0, y: 4 }, orientation: 'NORTH' },
   }
 
   const progress = (playerId: string) => ({ type: 'checkpoint-progress' as const, payload: {
