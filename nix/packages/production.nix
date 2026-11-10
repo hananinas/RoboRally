@@ -185,8 +185,20 @@ let
         game-service = {
           command = ''
             export PORT="$GAME_PORT"
+            export HYDRA_ISSUER_URL="$PUBLIC_ORIGIN/ory/hydra/"
+            export OAUTH_CLIENT_ID="game-service"
+            export AUTH_CALLBACK_URL="$PUBLIC_ORIGIN/auth/callback"
+            export POST_LOGOUT_REDIRECT_URL="$PUBLIC_ORIGIN/"
+            export KRATOS_SETTINGS_URL="$PUBLIC_ORIGIN/ory/ui/settings"
+            export NODE_EXTRA_CA_CERTS="$CADDY_DATA_DIR/pki/authorities/local/root.crt"
+            : "''${OAUTH_CLIENT_SECRET:?Missing OAUTH_CLIENT_SECRET in /etc/robo-rally.env}"
             exec ${game-service}/bin/game-service
           '';
+
+          depends_on = {
+            hydra.condition = "process_healthy";
+            web.condition = "process_healthy";
+          };
 
           availability = {
             restart = "on_failure";
@@ -214,8 +226,6 @@ let
 
         web = {
           command = "exec ${pkgs.caddy}/bin/caddy run --config ${caddyConfig} --adapter caddyfile";
-
-          depends_on.game-service.condition = "process_healthy";
 
           availability = {
             restart = "on_failure";

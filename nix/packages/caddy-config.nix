@@ -18,6 +18,18 @@ pkgs.writeText "robo-rally.Caddyfile" ''
       reverse_proxy 127.0.0.1:{$GAME_PORT}
     }
 
+    handle_path /ory/kratos/* {
+      reverse_proxy 127.0.0.1:14433
+    }
+
+    handle_path /ory/hydra/* {
+      reverse_proxy 127.0.0.1:14444
+    }
+
+    handle /ory/ui/* {
+      reverse_proxy 127.0.0.1:14455
+    }
+
     handle {
       root * ${client}
       try_files {path} /index.html
