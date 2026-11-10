@@ -163,7 +163,10 @@ export class Game {
   }
 
   resume(): Result<{ roundConcluded: boolean }, ResumeError> {
-    return this.lifecycle.resume().map(() => this.recheckActivationPhase())
+    return this.lifecycle.resume().map(() => {
+      this.recheckProgrammingPhase()
+      return this.recheckActivationPhase()
+    })
   }
 
   abort(): Result<void, AbortError> {
