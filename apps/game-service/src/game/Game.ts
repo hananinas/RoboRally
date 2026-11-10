@@ -294,17 +294,24 @@ export class Game {
     }
   }
 
+  private checkRegisterComplete(): Result<void, 'NOT_COMPLETE'> {
+    return this.roster.length === 0 || this.activatedRobotIds.size === this.roster.length
+      ? ok(undefined)
+      : err('NOT_COMPLETE')
+  }
+
   private recheckActivationPhase(): { roundConcluded: boolean } {
-    if (this.requirePhase('activation').isErr()) return { roundConcluded: false }
+    return this.requirePhase('activation')
+      .andThen(() => this.checkRegisterComplete())
+      .map(() => this.concludeRegister())
+      .unwrapOr({ roundConcluded: false })
+  }
+
+  private concludeRegister(): { roundConcluded: boolean } {
     if (this.roster.length === 0) {
       this.finishRound()
       return { roundConcluded: true }
     }
-    if (this.activatedRobotIds.size !== this.roster.length) return { roundConcluded: false }
-    return this.concludeRegister()
-  }
-
-  private concludeRegister(): { roundConcluded: boolean } {
     this.activateBoardElements()
     this.finishRegister()
     if (this.winner !== undefined) {
