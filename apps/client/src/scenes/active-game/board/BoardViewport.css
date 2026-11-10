@@ -22,8 +22,6 @@
   --board-wall-yellow-end: #b4a301;
   --tank-move-duration: 600ms;
   --tank-turn-duration: 300ms;
-  --pit-fall-duration: 450ms;
-  --pit-respawn-duration: 300ms;
   --tank-motion-easing: cubic-bezier(0.4, 0, 0.2, 1);
 
   overflow: hidden;
@@ -76,7 +74,7 @@
 }
 
 /* The tank sinks into the hole, then appears at its reboot position. */
-.board-piece--test-tank[data-pit-phase='fall'] {
+.board-piece--test-tank[data-playback-phase='pit-fall'] {
   scale: 0.35;
   opacity: 0;
   transition:
@@ -85,7 +83,7 @@
 }
 
 /* Respawn places the tank at once; only its appearance animates. */
-.board-piece--test-tank[data-pit-phase='respawn'] {
+.board-piece--test-tank[data-playback-phase='pit-respawn'] {
   transition:
     left 0s,
     top 0s,

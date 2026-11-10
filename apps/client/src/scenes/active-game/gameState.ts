@@ -77,7 +77,7 @@ export type GameStateEvent =
   | { type: 'reset' }
   | { type: 'error'; message: string }
   | { type: 'action'; action: RobotActionResolved; reducedMotion?: boolean }
-  | { type: 'pit-advance' }
+  | { type: 'advance' }
   | { type: 'complete' }
   | { type: 'place'; cardId: string; registerIndex: number }
   | { type: 'remove'; registerIndex: number }
@@ -354,12 +354,11 @@ export function gameStateReducer(
           type: 'enqueue', action: event.action, board: event.reducedMotion ? null : state.board,
         }),
       }
-    case 'pit-advance':
-      return { ...state, playback: robotPlaybackReducer(state.playback, { type: 'pit-advance' }) }
+    case 'advance':
     case 'complete': {
       const settled = settleProgress({
         ...state,
-        playback: robotPlaybackReducer(state.playback, { type: 'complete' }),
+        playback: robotPlaybackReducer(state.playback, { type: event.type }),
       })
       if (settled.playback.active) return settled
       if (state.phase !== 'PROGRAMMING') return settled

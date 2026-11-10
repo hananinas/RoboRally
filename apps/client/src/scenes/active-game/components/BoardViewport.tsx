@@ -184,7 +184,7 @@ function RobotPiece({
       )}
       data-board-tile={`${robot.position.coordinate.x},${robot.position.coordinate.y}`}
       data-robot-id={robot.robotId}
-      data-pit-phase={robot.pitPhase}
+      data-playback-phase={robot.phase}
       preserveAspectRatio="xMidYMid meet"
       style={style}
       viewBox={component.asset.viewBox}
@@ -209,7 +209,7 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
   )
   useBoardInteraction({ canvasRef, robots, scene, viewportRef })
   const checkpointTiles = scene.tiles.filter((tile) => tile.cell.checkpointNumber !== undefined)
-  const fallingInto = new Set(robots.flatMap((robot) => robot.pitPhase === 'fall'
+  const fallingInto = new Set(robots.flatMap((robot) => robot.phase === 'pit-fall'
     ? [`${robot.position.coordinate.x},${robot.position.coordinate.y}`] : []))
 
   return (

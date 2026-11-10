@@ -19,13 +19,13 @@ export type Robot = Readonly<{
   startPosition: Coordinate
 }>
 export type ResolvedRobotAction = RobotActionResolved
-// Moving onto the pit, sinking into it, then appearing at the reboot position.
-export type PitPhase = 'move' | 'fall' | 'respawn'
-export type DisplayRobot = Robot & Readonly<{ angle: number; pitPhase?: PitPhase }>
+// A step the acting robot shows before its action completes. Producers own the kinds.
+export type PlaybackPhase = Readonly<{ kind: string; durationMs: number; position: Position }>
+export type DisplayRobot = Robot & Readonly<{ angle: number; phase?: string }>
 export type PlaybackAction = Readonly<{
   sequence: number
   action: ResolvedRobotAction
-  pit: Coordinate | null
+  phases: readonly PlaybackPhase[]
 }>
 
 export const ROBOT_MOVE_DURATION_MS = 600
@@ -37,24 +37,20 @@ export function robotActionDuration(action: ResolvedRobotAction, reducedMotion: 
     : instructions[action.instruction].kind === 'turn' ? ROBOT_TURN_DURATION_MS : ROBOT_MOVE_DURATION_MS
 }
 
-export function pitPhaseDuration(phase: PitPhase): number {
-  return phase === 'move' ? ROBOT_MOVE_DURATION_MS
-    : phase === 'fall' ? PIT_FALL_DURATION_MS : PIT_RESPAWN_DURATION_MS
-}
-
 export type RobotPlaybackState = Readonly<{
   robots: readonly DisplayRobot[]
   pending: readonly PlaybackAction[]
   active: ResolvedRobotAction | null
   activeSequence: number | null
-  pitPhase: PitPhase | null
+  // The active action's phases still to play; the first is showing.
+  phases: readonly PlaybackPhase[]
   nextSequence: number
 }>
 
 export type RobotPlaybackEvent =
-  // Without a board the action plays without a pit sequence.
+  // Without a board the action plays without phases.
   | Readonly<{ type: 'enqueue'; action: ResolvedRobotAction; board?: BoardRenderModel | null }>
-  | Readonly<{ type: 'pit-advance' }>
+  | Readonly<{ type: 'advance' }>
   | Readonly<{ type: 'complete' }>
   | Readonly<{ type: 'reset'; robots: readonly Robot[] }>
   | Readonly<{ type: 'remove'; robotId: string }>
@@ -114,6 +110,31 @@ export function findPitEntry(
   return null
 }
 
+// Moving onto the pit, sinking into it, then appearing at the reboot position.
+function pitPhases(
+  action: ResolvedRobotAction,
+  board: BoardRenderModel,
+  start: Position,
+): readonly PlaybackPhase[] {
+  const pit = findPitEntry(board, start, action)
+  if (!pit) return []
+  const inPit = { ...start, coordinate: pit }
+  return [
+    { kind: 'pit-enter', durationMs: ROBOT_MOVE_DURATION_MS, position: inPit },
+    { kind: 'pit-fall', durationMs: PIT_FALL_DURATION_MS, position: inPit },
+    { kind: 'pit-respawn', durationMs: PIT_RESPAWN_DURATION_MS, position: action.position },
+  ]
+}
+
+// Each effect (pit, laser, board edge) contributes its phases here.
+export function playbackPhases(
+  action: ResolvedRobotAction,
+  board: BoardRenderModel,
+  start: Position,
+): readonly PlaybackPhase[] {
+  return pitPhases(action, board, start)
+}
+
 export function createRobotPlaybackState(robots: readonly Robot[]): RobotPlaybackState {
   return {
     robots: robots.map((robot) => ({
@@ -123,7 +144,7 @@ export function createRobotPlaybackState(robots: readonly Robot[]): RobotPlaybac
     pending: [],
     active: null,
     activeSequence: null,
-    pitPhase: null,
+    phases: [],
     nextSequence: 0,
   }
 }
@@ -149,21 +170,28 @@ function placeRobot(robot: DisplayRobot, position: Position): DisplayRobot {
   return { ...robot, position, angle: robot.angle + delta }
 }
 
-function clearPitPhase(robot: DisplayRobot): DisplayRobot {
-  return robot.pitPhase === undefined ? robot : { ...robot, pitPhase: undefined }
+function clearPhase(robot: DisplayRobot): DisplayRobot {
+  return robot.phase === undefined ? robot : { ...robot, phase: undefined }
+}
+
+function showPhase(
+  robots: readonly DisplayRobot[],
+  robotId: string,
+  phase: PlaybackPhase,
+): readonly DisplayRobot[] {
+  return robots.map((robot) => robot.robotId !== robotId ? robot
+    : { ...placeRobot(robot, phase.position), phase: phase.kind })
 }
 
 function applyAction(
   robots: readonly DisplayRobot[],
-  { action, pit }: PlaybackAction,
+  { action, phases: [phase] }: PlaybackAction,
 ): readonly DisplayRobot[] {
-  return robots.map(clearPitPhase).map((robot) => {
-    if (pit && robot.robotId === action.robotId) {
-      return { ...robot, position: { ...robot.position, coordinate: pit }, pitPhase: 'move' }
-    }
+  const placed = robots.map(clearPhase).map((robot) => {
     const position = affectedPosition(action, robot.robotId)
     return position === undefined ? robot : placeRobot(robot, position)
   })
+  return phase ? showPhase(placed, action.robotId, phase) : placed
 }
 
 function startNext(state: RobotPlaybackState): RobotPlaybackState {
@@ -171,10 +199,10 @@ function startNext(state: RobotPlaybackState): RobotPlaybackState {
   if (!next) {
     return {
       ...state,
-      robots: state.robots.map(clearPitPhase),
+      robots: state.robots.map(clearPhase),
       active: null,
       activeSequence: null,
-      pitPhase: null,
+      phases: [],
     }
   }
   return {
@@ -182,20 +210,20 @@ function startNext(state: RobotPlaybackState): RobotPlaybackState {
     pending,
     active: next.action,
     activeSequence: next.sequence,
-    pitPhase: next.pit ? 'move' : null,
+    phases: next.phases,
     nextSequence: state.nextSequence,
   }
 }
 
-function advancePit(state: RobotPlaybackState): RobotPlaybackState {
-  const active = state.active
-  if (!active || state.pitPhase === null || state.pitPhase === 'respawn') return state
-  const pitPhase = state.pitPhase === 'move' ? 'fall' : 'respawn'
+// Shows the next phase, or completes the action once its phases are exhausted.
+function advance(state: RobotPlaybackState): RobotPlaybackState {
+  if (!state.active) return state
+  const [, next, ...rest] = state.phases
+  if (!next) return startNext(state)
   return {
     ...state,
-    pitPhase,
-    robots: state.robots.map((robot) => robot.robotId !== active.robotId ? robot
-      : { ...(pitPhase === 'respawn' ? placeRobot(robot, active.position) : robot), pitPhase }),
+    phases: [next, ...rest],
+    robots: showPhase(state.robots, state.active.robotId, next),
   }
 }
 
@@ -214,31 +242,30 @@ export function robotPlaybackReducer(
     return state.active?.robotId === event.robotId ? startNext(next) : next
   }
   if (event.type === 'complete') return startNext(state)
-  if (event.type === 'pit-advance') return advancePit(state)
+  if (event.type === 'advance') return advance(state)
 
   const start = settledPosition(state, event.action.robotId)
   const entry: PlaybackAction = {
     sequence: state.nextSequence,
     action: event.action,
-    pit: event.board && start ? findPitEntry(event.board, start, event.action) : null,
+    phases: event.board && start ? playbackPhases(event.action, event.board, start) : [],
   }
   const queued = { ...state, pending: [...state.pending, entry], nextSequence: state.nextSequence + 1 }
   return state.active ? queued : startNext(queued)
 }
 
 export function useRobotPlaybackTimer(
-  playback: Pick<RobotPlaybackState, 'active' | 'pitPhase'>,
-  dispatch: (event: { type: 'complete' } | { type: 'pit-advance' }) => void,
+  playback: Pick<RobotPlaybackState, 'active' | 'phases'>,
+  dispatch: (event: { type: 'advance' }) => void,
 ) {
-  const { active, pitPhase } = playback
+  const { active, phases: [phase] } = playback
   useEffect(() => {
     if (!active) return
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const duration = pitPhase ? pitPhaseDuration(pitPhase) : robotActionDuration(active, reducedMotion)
-    const event = pitPhase === 'move' || pitPhase === 'fall' ? 'pit-advance' : 'complete'
-    const timer = window.setTimeout(() => dispatch({ type: event }), duration)
+    const duration = phase ? phase.durationMs : robotActionDuration(active, reducedMotion)
+    const timer = window.setTimeout(() => dispatch({ type: 'advance' }), duration)
     return () => window.clearTimeout(timer)
-  }, [active, pitPhase, dispatch])
+  }, [active, phase, dispatch])
 }
 
 export function useRobotPlayback(initialRobots: readonly Robot[]) {

@@ -914,29 +914,74 @@ describe('pit playback', () => {
     ...actions[0], instruction: 'MOVE_2', position: { coordinate: { x: 0, y: 4 }, orientation: 'NORTH' },
   }
 
+  const progress = (playerId: string) => ({ type: 'checkpoint-progress' as const, payload: {
+    gameId: publicState.gameId, playerId, lastCheckpoint: 1, checkpointCount: 2,
+  } })
+  const lastCheckpoint = (state: ClientGameState, playerId: string) =>
+    state.players.find((player) => player.playerId === playerId)?.lastCheckpoint
+
   it('runs the pit sequence before the action completes', () => {
     let state = gameStateReducer(joined(), { type: 'action', action: fall })
-    expect(state.playback.pitPhase).toBe('move')
-    expect(state.playback.robots[0].position.coordinate).toEqual({ x: 2, y: 1 })
-    state = gameStateReducer(state, { type: 'checkpoint-progress', payload: {
-      gameId: publicState.gameId, playerId: result.assignment.playerId, lastCheckpoint: 1, checkpointCount: 2,
-    } })
-    state = gameStateReducer(state, { type: 'pit-advance' })
-    expect(state.playback.pitPhase).toBe('fall')
-    state = gameStateReducer(state, { type: 'pit-advance' })
-    expect(state.playback.pitPhase).toBe('respawn')
-    expect(state.playback.robots[0].position).toEqual(fall.position)
+    expect(state.playback.robots[0]).toMatchObject({ phase: 'pit-enter', position: { coordinate: { x: 2, y: 1 } } })
+    state = gameStateReducer(state, progress(result.assignment.playerId))
+    state = gameStateReducer(state, { type: 'advance' })
+    expect(state.playback.robots[0].phase).toBe('pit-fall')
+    state = gameStateReducer(state, { type: 'advance' })
+    expect(state.playback.robots[0]).toMatchObject({ phase: 'pit-respawn', position: fall.position })
     expect(state.players[0].lastCheckpoint).toBe(0)
-    state = gameStateReducer(state, { type: 'complete' })
+    state = gameStateReducer(state, { type: 'advance' })
     expect(state.playback.active).toBeNull()
     expect(state.players[0].lastCheckpoint).toBe(1)
   })
 
   it('goes straight to the final position with reduced motion', () => {
     const state = gameStateReducer(joined(), { type: 'action', action: fall, reducedMotion: true })
-    expect(state.playback.pitPhase).toBeNull()
+    expect(state.playback.robots[0].phase).toBeUndefined()
     expect(state.playback.robots[0].position).toEqual(fall.position)
-    expect(gameStateReducer(state, { type: 'complete' }).playback.active).toBeNull()
+    expect(gameStateReducer(state, { type: 'advance' }).playback.active).toBeNull()
+  })
+
+  it('plays the next robot and still holds its progress when the falling player leaves', () => {
+    const second = publicState.players[1].playerId
+    const turn: RobotActionResolved = {
+      ...actions[1], playerId: second, robotId: stationaryRobotId,
+      position: { coordinate: { x: 4, y: 4 }, orientation: 'NORTH' },
+    }
+    let state = gameStateReducer(joined(), { type: 'action', action: fall })
+    state = gameStateReducer(state, { type: 'action', action: turn })
+    state = gameStateReducer(state, progress(second))
+    state = gameStateReducer(state, { type: 'advance' })
+    expect(state.playback.robots[0].phase).toBe('pit-fall')
+
+    state = gameStateReducer(state, { type: 'player-left', payload: {
+      gameId: publicState.gameId, playerId: result.assignment.playerId, robotId,
+    } })
+    expect(state.playback.robots.map((robot) => [robot.robotId, robot.phase])).toEqual([[stationaryRobotId, undefined]])
+    expect(state.playback.active).toBe(turn)
+    expect(lastCheckpoint(state, second)).toBe(0)
+
+    state = gameStateReducer(state, { type: 'advance' })
+    expect(state.playback.active).toBeNull()
+    expect(lastCheckpoint(state, second)).toBe(1)
+  })
+
+  it('drops the fall and its held progress on reset', () => {
+    let state = gameStateReducer(joined(), { type: 'action', action: fall })
+    state = gameStateReducer(state, progress(result.assignment.playerId))
+    state = gameStateReducer(state, { type: 'advance' })
+    expect(state.playback.robots[0].phase).toBe('pit-fall')
+
+    state = gameStateReducer(state, { type: 'reset' })
+    expect(state.playback.active).toBeNull()
+    expect(state.playback.robots).toEqual([])
+    expect(gameStateReducer(state, { type: 'advance' }).playback.active).toBeNull()
+
+    state = gameStateReducer(gameStateReducer(state, { type: 'joined', result: { ...result, state: pitState } }),
+      { type: 'action', action: fall })
+    expect(state.playback.robots[0].phase).toBe('pit-enter')
+    for (let phase = 0; phase < 3; phase++) state = gameStateReducer(state, { type: 'advance' })
+    expect(state.playback.active).toBeNull()
+    expect(state.players[0].lastCheckpoint).toBe(0)
   })
 })
 
