@@ -7,10 +7,10 @@ import { Direction, createGame, createPlayer } from '@/game/index'
 
 describe('game factory', () => {
   it.each(['empty-map', 'test-map'] as const)('reboots at the configured destination after falling off %s', (mapName) => {
-    const { game } = createGame(mapName)
+    const { game } = createGame(mapName, undefined, () => 0)
     const player = game.addPlayer()._unsafeUnwrap()
     game.board.relocateRobot(player.robot.id, { x: Integer(0), y: Integer(0) })
-    game.submitProgram(player.id, [0, 4, 5, 3, 6].map((index) => player.hand[index].id))._unsafeUnwrap()
+    game.submitProgram(player.id, [0, 1, 2, 3, 4].map((index) => player.hand[index].id))._unsafeUnwrap()
 
     expect(game.executeNextAction().action.position).toEqual(boardMaps[mapName].rebootTile)
     expect(player.robot.direction).toBe(Direction.NORTH)
@@ -18,10 +18,10 @@ describe('game factory', () => {
   })
 
   it('uses the map reboot tile when a robot enters a test pit', () => {
-    const { game } = createDefaultGame()
+    const { game } = createDefaultGame(() => 0)
     const player = game.addPlayer()._unsafeUnwrap()
     game.board.relocateRobot(player.robot.id, { x: Integer(5), y: Integer(11) })
-    game.submitProgram(player.id, [0, 4, 5, 3, 6].map((index) => player.hand[index].id))._unsafeUnwrap()
+    game.submitProgram(player.id, [0, 1, 2, 3, 4].map((index) => player.hand[index].id))._unsafeUnwrap()
 
     expect(game.executeNextAction().action.position).toEqual(boardMaps['test-map'].rebootTile)
     expect(player.robot.direction).toBe(Direction.NORTH)
@@ -54,7 +54,7 @@ describe('game factory', () => {
     expect(game.board.antenna).toEqual(boardMaps['test-map'].antenna)
   })
 
-  it('creates players with unique ids, a north-facing robot and nine cards in a fixed order', () => {
+  it('creates players with unique ids, a north-facing robot and a hand of nine drawn cards', () => {
     const first = createPlayer()
     const second = createPlayer()
     const cardIds = first.hand.map((card) => card.id)
@@ -64,9 +64,8 @@ describe('game factory', () => {
     expect(first.robot.direction).toBe(Direction.NORTH)
     expect(first.hand).toHaveLength(9)
     expect(new Set(cardIds).size).toBe(9)
-    expect(first.hand.map((card) => card.instruction)).toEqual([
-      'MOVE_1', 'MOVE_2', 'MOVE_3', 'BACK_UP', 'TURN_LEFT',
-      'TURN_RIGHT', 'U_TURN', 'MOVE_1', 'TURN_LEFT',
+    expect(createPlayer(() => 0).hand.map((card) => card.instruction)).toEqual([
+      'MOVE_1', 'MOVE_1', 'MOVE_1', 'MOVE_1', 'MOVE_2', 'MOVE_2', 'MOVE_2', 'MOVE_3', 'BACK_UP',
     ])
     expect(submitProgramSchema.parse({
       cardIds: cardIds.slice(0, 5),
