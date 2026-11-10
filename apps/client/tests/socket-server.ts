@@ -100,7 +100,7 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
       })
       break
     case 'disconnect':
-      for (const socket of fixture.sockets) socket.disconnect(true)
+      for (const socket of fixture.sockets) socket.conn.close()
       break
     case 'start':
       fixture.startOutcome = control.outcome ?? 'STARTED'
