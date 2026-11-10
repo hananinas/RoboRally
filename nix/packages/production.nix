@@ -190,7 +190,7 @@ let
             export AUTH_CALLBACK_URL="$PUBLIC_ORIGIN/auth/callback"
             export POST_LOGOUT_REDIRECT_URL="$PUBLIC_ORIGIN/"
             export KRATOS_SETTINGS_URL="$PUBLIC_ORIGIN/ory/ui/settings"
-            export NODE_EXTRA_CA_CERTS="$CADDY_DATA_DIR/self-signed/cert.pem"
+            export NODE_EXTRA_CA_CERTS="$CADDY_DATA_DIR/pki/authorities/local/root.crt"
             : "''${OAUTH_CLIENT_SECRET:?Missing OAUTH_CLIENT_SECRET in /etc/robo-rally.env}"
             exec ${game-service}/bin/game-service
           '';
@@ -236,7 +236,7 @@ let
               if [ "$WEB_SCHEME" = https ]; then
                 exec ${pkgs.curl}/bin/curl --fail --silent --show-error \
                   --max-time 3 --noproxy '*' \
-                  --cacert "$CADDY_DATA_DIR/self-signed/cert.pem" \
+                  --cacert "$CADDY_DATA_DIR/pki/authorities/local/root.crt" \
                   --resolve "$WEB_HOST:$WEB_PORT:127.0.0.1" \
                   "https://$WEB_HOST:$WEB_PORT/" > /dev/null
               else
