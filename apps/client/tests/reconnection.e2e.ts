@@ -7,7 +7,7 @@ test('recovers the existing game after a temporary disconnect', async ({ browser
   try {
     await startTogether(page, pageB, 'bence', 'dane')
     await expect.poll(() => robotIds(page)).toHaveLength(2)
-    await pageB.getByRole('region', { name: 'Programming hand' }).getByRole('button').first().click()
+    await pageB.getByRole('region', { name: 'Programming hand' }).getByRole('button', { name: 'Move 1', exact: true }).first().click()
     const selected = pageB.getByRole('button', { name: 'Move 1, remove from register 1', exact: true })
     await expect(selected).toBeEnabled()
 
@@ -33,7 +33,7 @@ test('recovers the existing game after a temporary disconnect', async ({ browser
     await expect(overlay).toHaveCount(0)
     await expect(page.locator('.disconnect-overlay')).toHaveCount(0)
     await expect(selected).toBeEnabled()
-    await expect(pageB.getByRole('region', { name: 'Programming hand' }).getByRole('button', { name: 'Move 2', exact: true })).toBeEnabled()
+    await expect(pageB.getByRole('region', { name: 'Programming hand' }).getByRole('button', { name: 'Move 2', exact: true }).first()).toBeEnabled()
 
     await expect.poll(() => robotIds(page), { timeout: 10000 }).toHaveLength(2)
   } finally {

@@ -1,4 +1,6 @@
-import type { Instruction } from './instructions.js'
+import type { Instruction, ResolvedInstruction } from './instructions.js'
+
+export type { UpdateRegisters } from './updateRegisters.js'
 
 export type GameId = string
 export type PlayerId = string
@@ -10,8 +12,6 @@ export type User = Readonly<{
   userId: UserId
   username: string
 }>
-
-export type LeaveGame = Readonly<{ gameId: GameId }>
 
 export type PlayerAssignment = Readonly<{
   gameId: GameId
@@ -41,6 +41,7 @@ export type Robot = Readonly<{
   playerId: PlayerId
   colour: string
   position: Position
+  startPosition: Coordinate
 }>
 
 export type Tile = Readonly<{
@@ -79,6 +80,7 @@ export type PlayerState = Readonly<{
   username: string
   programSubmitted: boolean
   connected: boolean
+  registers: PublicRegisters
 }>
 
 export type PlayerLeft = Readonly<{ gameId: GameId; playerId: PlayerId; robotId: RobotId }>
@@ -121,8 +123,6 @@ export type ProgramResultOutcome =
   | 'WRONG_PHASE'
   | 'NOT_A_MEMBER'
   | 'INVALID_REQUEST'
-  | 'GAME_ID_MISMATCH'
-  | 'PLAYER_ID_MISMATCH'
   | 'PLAYER_NOT_IN_GAME'
   | 'INTERNAL_ERROR'
 
@@ -139,9 +139,55 @@ export type RobotActionResolved = Readonly<{
   gameId: GameId
   registerIndex: number
   robotId: RobotId
+  playerId: PlayerId
   instruction: Instruction
+  // What the register actually did; null when Again had nothing to repeat.
+  resolvedInstruction: ResolvedInstruction | null
   position: Position
   pushedRobots: readonly Pick<Robot, 'robotId' | 'position'>[]
+}>
+
+export type PublicRegisterStatus = 'EMPTY' | 'HIDDEN' | 'REVEALED'
+
+export type PublicRegisterSlot =
+  | Readonly<{ status: 'EMPTY' }>
+  | Readonly<{ status: 'HIDDEN' }>
+  | Readonly<{ status: 'REVEALED'; instruction: Instruction }>
+
+export type PublicRegisters = readonly [
+  PublicRegisterSlot,
+  PublicRegisterSlot,
+  PublicRegisterSlot,
+  PublicRegisterSlot,
+  PublicRegisterSlot,
+]
+
+export type UpdateRegistersResult = Readonly<{
+  outcome:
+    | 'ACCEPTED'
+    | 'INVALID_REQUEST'
+    | 'NOT_A_MEMBER'
+    | 'GAME_PAUSED'
+    | 'GAME_ABORTED'
+    | 'PLAYER_NOT_IN_GAME'
+    | 'GAME_FINISHED'
+    | 'WRONG_PHASE'
+    | 'ALREADY_SUBMITTED'
+    | 'INTERNAL_ERROR'
+}>
+
+type ProgrammingRegisterSlot = Readonly<{ status: 'EMPTY' | 'HIDDEN' }>
+
+export type RegistersChanged = Readonly<{
+  gameId: GameId
+  playerId: PlayerId
+  registers: readonly [
+    ProgrammingRegisterSlot,
+    ProgrammingRegisterSlot,
+    ProgrammingRegisterSlot,
+    ProgrammingRegisterSlot,
+    ProgrammingRegisterSlot,
+  ]
 }>
 
 export type GameInitialization = Readonly<{

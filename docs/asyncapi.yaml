@@ -573,16 +573,14 @@ components:
 
     UpdateRegisters:
       name: game.updateRegisters
-      description: Updates a player's register occupancy and returns an acknowledgement outcome.
+      description: >-
+        Updates register occupancy for the connection's owned game and player,
+        both derived from the authenticated session, and returns an acknowledgement outcome.
       payload:
         type: object
         additionalProperties: false
-        required: [ gameId, playerId, occupied ]
+        required: [ occupied ]
         properties:
-          gameId:
-            $ref: '#/components/schemas/GameId'
-          playerId:
-            $ref: '#/components/schemas/PlayerId'
           occupied:
             type: array
             minItems: 5
@@ -593,13 +591,13 @@ components:
       examples:
         - name: partiallyOccupied
           payload:
-            gameId: 00000000-0000-4000-8000-000000000001
-            playerId: 00000000-0000-4000-8000-000000000002
             occupied: [ true, false, true, false, false ]
 
     UpdateRegistersResult:
       name: game.updateRegistersResult
-      description: Acknowledges a register occupancy update with ACCEPTED or a rejection.
+      description: >-
+        Acknowledges a register occupancy update with ACCEPTED or a rejection.
+        GAME_PAUSED, GAME_ABORTED and GAME_FINISHED identify lifecycle rejections.
       payload:
         type: object
         additionalProperties: false
@@ -607,7 +605,7 @@ components:
         properties:
           outcome:
             type: string
-            enum: [ ACCEPTED, INVALID_REQUEST, NOT_A_MEMBER, PLAYER_ID_MISMATCH, WRONG_PHASE, ALREADY_SUBMITTED, INTERNAL_ERROR ]
+            enum: [ ACCEPTED, INVALID_REQUEST, NOT_A_MEMBER, GAME_PAUSED, GAME_ABORTED, PLAYER_NOT_IN_GAME, GAME_FINISHED, WRONG_PHASE, ALREADY_SUBMITTED, INTERNAL_ERROR ]
       examples:
         - name: accepted
           payload:
@@ -652,6 +650,7 @@ components:
           - gameId
           - registerIndex
           - pushedRobots
+          - resolvedInstruction
         properties:
           robotId:
             $ref: "#/components/schemas/RobotId"
@@ -659,6 +658,11 @@ components:
             $ref: "#/components/schemas/PlayerId"
           instruction:
             $ref: "#/components/schemas/Instruction"
+          resolvedInstruction:
+            description: What the register actually did. Differs from instruction for AGAIN, which repeats the previous register's resolved instruction. Null when AGAIN had nothing to repeat.
+            oneOf:
+              - $ref: "#/components/schemas/Instruction"
+              - type: 'null'
           position:
             $ref: "#/components/schemas/Position"
           pushedRobots:
@@ -692,6 +696,7 @@ components:
             robotId: 00000000-0000-4000-8000-000000000003
             playerId: 00000000-0000-4000-8000-000000000002
             instruction: MOVE_1
+            resolvedInstruction: MOVE_1
             pushedRobots: []
             position:
               coordinate:
@@ -1294,7 +1299,7 @@ components:
 
     Instruction:
       type: string
-      enum: [ MOVE_1, MOVE_2, MOVE_3, BACK_UP, TURN_LEFT, TURN_RIGHT, U_TURN ]
+      enum: [ MOVE_1, MOVE_2, MOVE_3, BACK_UP, TURN_LEFT, TURN_RIGHT, U_TURN, AGAIN ]
 
     Card:
       type: object
@@ -1333,7 +1338,7 @@ components:
 
     Robot:
       type: object
-      required: [ robotId, playerId, colour, position ]
+      required: [ robotId, playerId, colour, position, startPosition ]
       properties:
         robotId:
           $ref: '#/components/schemas/RobotId'
@@ -1344,6 +1349,11 @@ components:
           description: Server-assigned colour, fixed for the lifetime of this robot.
         position:
           $ref: '#/components/schemas/Position'
+        startPosition:
+          $ref: '#/components/schemas/Coordinate'
+          description: >-
+            Starting tile the robot was placed on when the game started. It does not
+            change when the robot moves or reboots.
 
     Board:
       type: object

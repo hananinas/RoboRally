@@ -1,5 +1,6 @@
-import { instructions } from '@robo-rally/game-events'
+import { effects } from '@robo-rally/game-events'
 import type {
+  Coordinate,
   Orientation,
   Position,
   RobotActionResolved,
@@ -12,6 +13,7 @@ export type Robot = Readonly<{
   robotId: string
   colour: string
   position: RobotPosition
+  startPosition: Coordinate
 }>
 export type ResolvedRobotAction = RobotActionResolved
 export type DisplayRobot = Robot & Readonly<{ angle: number }>
@@ -20,7 +22,8 @@ export const ROBOT_MOVE_DURATION_MS = 600
 export const ROBOT_TURN_DURATION_MS = 300
 export function robotActionDuration(action: ResolvedRobotAction, reducedMotion: boolean): number {
   return reducedMotion ? 200
-    : instructions[action.instruction].kind === 'turn' ? ROBOT_TURN_DURATION_MS : ROBOT_MOVE_DURATION_MS
+    : action.resolvedInstruction !== null && effects[action.resolvedInstruction].kind === 'turn'
+      ? ROBOT_TURN_DURATION_MS : ROBOT_MOVE_DURATION_MS
 }
 
 export type RobotPlaybackState = Readonly<{

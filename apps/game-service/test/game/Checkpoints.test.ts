@@ -21,7 +21,8 @@ function createGame(starts = [{ x: 0, y: 1, direction: Direction.EAST }]) {
     right: new Card('right', 'TURN_RIGHT'),
     uturn: new Card('uturn', 'U_TURN'),
   }
-  const game = new Game(board, players, Object.values(cards), { x: Integer(0), y: Integer(2) })
+  for (const player of players) player.deck.add(Object.values(cards))
+  const game = new Game({ board, players, deck: Object.values(cards), rebootTile: { x: Integer(0), y: Integer(2) }, random: () => 0 })
   return { board, players, cards, game }
 }
 
@@ -69,6 +70,55 @@ describe('checkpoint activation', () => {
     expect(game.currentRegister).toBe(0)
     expect(player.robot.program).toEqual([])
     expect(game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrapErr()).toBe('GAME_FINISHED')
+  })
+
+  it('rejects register updates after a checkpoint win returns the game to programming', () => {
+    const { board, players: [player], cards: c, game } = createGame()
+    const program = [c.move2, c.back, c.step, c.stepAgain, c.left]
+    game.updateRegisters(player.id, [true, true, true, true, true])._unsafeUnwrap()
+    game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
+    for (let register = 0; register < 4; register++) game.executeNextAction()
+
+    expect(player.lastCheckpoint).toBe(2)
+    expect(game.winner).toBe(player.id)
+    expect(game.phase).toBe('programming')
+    expect(game.currentRegister).toBe(0)
+    expect(game.hasSubmittedProgram(player.id)).toBe(false)
+    expect(player.robot.program).toEqual([])
+    expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
+
+    const registers = player.registers
+    const state = () => ({
+      phase: game.phase,
+      currentRegister: game.currentRegister,
+      hasStarted: game.hasStarted,
+      paused: game.paused,
+      aborted: game.aborted,
+      winner: game.winner,
+      players: game.players,
+      registers: player.registers.map((register) => ({ ...register })),
+      program: player.robot.program,
+      hand: player.hand,
+      submitted: game.hasSubmittedProgram(player.id),
+      lastCheckpoint: player.lastCheckpoint,
+      direction: player.robot.direction,
+      position: board.positionOf(player.robot.id),
+    })
+    const expectRejected = (playerId: string, error: 'GAME_FINISHED' | 'GAME_ABORTED') => {
+      const before = state()
+      expect(game.updateRegisters(playerId, [true, true, true, true, true])._unsafeUnwrapErr()).toBe(error)
+      expect(player.registers).toBe(registers)
+      expect(state()).toEqual(before)
+    }
+
+    expectRejected(player.id, 'GAME_FINISHED')
+    expectRejected('missing-player', 'GAME_FINISHED')
+    game.pause()
+    expectRejected(player.id, 'GAME_FINISHED')
+    expectRejected('missing-player', 'GAME_FINISHED')
+    game.abort()
+    expectRejected(player.id, 'GAME_ABORTED')
+    expectRejected('missing-player', 'GAME_ABORTED')
   })
 
   it('does not award a later checkpoint before the next required checkpoint', () => {

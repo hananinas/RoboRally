@@ -137,8 +137,6 @@ export function createSubmission(state: ClientGameState): SubmitProgram | null {
   const [first, second, third, fourth, fifth] = state.registers
   if (!first || !second || !third || !fourth || !fifth) return null
   return {
-    gameId: state.assignment.gameId,
-    playerId: state.assignment.playerId,
     cardIds: [first.id, second.id, third.id, fourth.id, fifth.id],
   }
 }
@@ -249,7 +247,8 @@ export function gameStateReducer(
         assignment: result.assignment,
         hand: result.hand,
         handVersion: result.hand.length > 0 ? 1 : 0,
-        handReady: snapshot.phase === 'PROGRAMMING' && result.hand.length > 0,
+        // After submitting, the hand is empty until the next round is dealt.
+        handReady: snapshot.phase === 'PROGRAMMING' && (result.hand.length > 0 || result.programSubmitted),
         submission: result.programSubmitted ? 'accepted' : 'idle',
         phase: snapshot.phase,
         paused: snapshot.paused,

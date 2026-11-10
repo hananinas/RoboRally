@@ -51,8 +51,8 @@ const publicState: PublicGameState = {
   checkpointCount: 0,
   winner: null,
   players: [
-    { playerId: '50000000-0000-4000-8000-000000000001', lastCheckpoint: 0, username: 'First', connected: true, programSubmitted: false },
-    { playerId: '50000000-0000-4000-8000-000000000002', lastCheckpoint: 0, username: 'Second', connected: true, programSubmitted: false },
+    { playerId: '50000000-0000-4000-8000-000000000001', lastCheckpoint: 0, username: 'First', connected: true, programSubmitted: false, registers: [{ status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }] },
+    { playerId: '50000000-0000-4000-8000-000000000002', lastCheckpoint: 0, username: 'Second', connected: true, programSubmitted: false, registers: [{ status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }] },
   ],
   antenna: { x: 2, y: 0, angle: Math.PI / 2 },
   board: {
@@ -69,21 +69,23 @@ const publicState: PublicGameState = {
       colour: '#A66BE0',
       playerId: '50000000-0000-4000-8000-000000000001',
       position: { coordinate: { x: 2, y: 3 }, orientation: 'NORTH' },
+      startPosition: { x: 2, y: 3 },
     },
     {
       robotId: stationaryRobotId,
       colour: '#4DC9C0',
       playerId: '50000000-0000-4000-8000-000000000002',
       position: { coordinate: { x: 4, y: 4 }, orientation: 'EAST' },
+      startPosition: { x: 4, y: 4 },
     },
   ],
 }
 const actions: readonly RobotActionResolved[] = [
-  { gameId: publicState.gameId, registerIndex: 0, pushedRobots: [], robotId, instruction: 'MOVE_1', position: { coordinate: { x: 2, y: 2 }, orientation: 'NORTH' } },
-  { gameId: publicState.gameId, registerIndex: 1, pushedRobots: [], robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 2, y: 2 }, orientation: 'WEST' } },
-  { gameId: publicState.gameId, registerIndex: 2, pushedRobots: [], robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 2 }, orientation: 'WEST' } },
-  { gameId: publicState.gameId, registerIndex: 3, pushedRobots: [], robotId, instruction: 'TURN_LEFT', position: { coordinate: { x: 1, y: 2 }, orientation: 'SOUTH' } },
-  { gameId: publicState.gameId, registerIndex: 4, pushedRobots: [], robotId, instruction: 'MOVE_1', position: { coordinate: { x: 1, y: 3 }, orientation: 'SOUTH' } },
+  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 0, pushedRobots: [], robotId, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 2, y: 2 }, orientation: 'NORTH' } },
+  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 1, pushedRobots: [], robotId, instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 2, y: 2 }, orientation: 'WEST' } },
+  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 2, pushedRobots: [], robotId, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 1, y: 2 }, orientation: 'WEST' } },
+  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 3, pushedRobots: [], robotId, instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 1, y: 2 }, orientation: 'SOUTH' } },
+  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 4, pushedRobots: [], robotId, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 1, y: 3 }, orientation: 'SOUTH' } },
 ]
 const hand = { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, cards }
 
@@ -138,6 +140,15 @@ describe('join initialization', () => {
     expect(state.submission).toBe('accepted')
     expect(canProgram(state)).toBe(false)
     expect(gameStateReducer(state, { type: 'reset' })).toEqual(createClientGameState())
+  })
+
+  it('treats an empty hand after submitting as ready, not as waiting for cards', () => {
+    const state = gameStateReducer(createClientGameState(), {
+      type: 'joined', result: { ...result, hand: [], programSubmitted: true },
+    })
+    expect(state.handReady).toBe(true)
+    expect(state.submission).toBe('accepted')
+    expect(canProgram(state)).toBe(false)
   })
 })
 
@@ -298,18 +309,6 @@ describe('client game state', () => {
     expect(gameStateReducer(state, { type: 'dealt', hand })).toBe(state)
   })
 
-  it('uses the assignment game identity for submission', () => {
-    const assignment = { ...result.assignment, gameId: '40000000-0000-4000-8000-000000000002' }
-    const state = selectProgram(gameStateReducer(createClientGameState(), {
-      type: 'joined', result: { ...result, assignment },
-    }))
-    expect(createSubmission(state)).toEqual({
-      gameId: assignment.gameId,
-      playerId: assignment.playerId,
-      cardIds: selectedCardIds,
-    })
-  })
-
   it('requires a dealt hand and disables editing when execution starts', () => {
     let state = gameStateReducer(createClientGameState(), {
       type: 'joined', result: { ...result, hand: [] },
@@ -350,11 +349,7 @@ describe('client game state', () => {
       expect(createSubmission(state)).toBeNull()
       state = gameStateReducer(state, { type: 'place', cardId, registerIndex })
     }
-    expect(createSubmission(state)).toEqual({
-      gameId: publicState.gameId,
-      playerId: hand.playerId,
-      cardIds: selectedCardIds,
-    })
+    expect(createSubmission(state)).toEqual({ cardIds: selectedCardIds })
 
     state = gameStateReducer(state, { type: 'remove', registerIndex: 2 })
     expect(createSubmission(state)).toBeNull()
@@ -508,11 +503,7 @@ describe('client game state', () => {
 
     state = selectProgram(state)
     const submission = createSubmission(state)
-    expect(submission).toEqual({
-      gameId: publicState.gameId,
-      playerId: hand.playerId,
-      cardIds: selectedCardIds,
-    })
+    expect(submission).toEqual({ cardIds: selectedCardIds })
     state = gameStateReducer(state, { type: 'submit' })
     state = gameStateReducer(state, {
       type: 'result',
@@ -558,11 +549,7 @@ describe('client game state', () => {
 
     expect(canProgram(state)).toBe(true)
     state = selectProgram(state)
-    expect(createSubmission(state)).toEqual({
-      gameId: publicState.gameId,
-      playerId: hand.playerId,
-      cardIds: selectedCardIds,
-    })
+    expect(createSubmission(state)).toEqual({ cardIds: selectedCardIds })
     expect(state.playback.robots.find((robot) => robot.robotId === robotId)?.position)
       .toEqual(actions[4].position)
   })

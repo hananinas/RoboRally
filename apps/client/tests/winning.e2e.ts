@@ -24,17 +24,20 @@ test('announces the winner to every player and lets them leave', async ({ browse
       ['Turn Right', 'Move 2', 'Turn Left', 'Move 1', 'U-Turn'],
       ['Turn Right', 'Move 2', 'Turn Left', 'Move 3', 'Turn Left'],
     ] as const
-    const otherProgram = ['Turn Left', 'Turn Right', 'U-Turn', 'Turn Left', 'Back Up'] as const
+    const otherPrograms = [
+      ['Turn Left', 'Turn Right', 'U-Turn', 'Turn Left', 'Back Up'],
+      // The second hand has no U-Turn or Back Up, so this round only turns.
+      ['Turn Left', 'Turn Left', 'Turn Right', 'Turn Right', 'Turn Right'],
+    ] as const
 
     await program(page, rounds[0])
-    await program(other, otherProgram)
+    await program(other, otherPrograms[0])
     for (const client of [page, other]) {
       await expect(gameStatus(client)).toHaveText('Programming', { timeout: 15000 })
-      
     }
 
     await program(page, rounds[1])
-    await program(other, otherProgram)
+    await program(other, otherPrograms[1])
     for (const [client, heading] of [[page, 'You win!'], [other, 'bence wins!']] as const) {
       const dialog = client.getByRole('dialog', { name: 'Game over' })
       await expect(dialog.getByRole('heading')).toHaveText(heading, { timeout: 15000 })

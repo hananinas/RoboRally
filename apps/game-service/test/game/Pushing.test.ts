@@ -26,7 +26,8 @@ function createGame(
   })
   const instructions: Instruction[] = ['MOVE_1', 'MOVE_2', 'MOVE_3', 'BACK_UP', 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN']
   const cards = instructions.map((instruction) => new Card(instruction, instruction))
-  const game = new Game(board, players, cards, reboot)
+  for (const player of players) player.deck.add(cards)
+  const game = new Game({ board, players, deck: cards, rebootTile: reboot, random: () => 0 })
   return { board, players, robots: players.map((player) => player.robot), cards, game, reboot }
 }
 
@@ -45,6 +46,11 @@ describe('robot pushing', () => {
       { robotId: robots[2].id, position: reboot, direction: Direction.WEST },
     ]
     expect(result.pushedRobots).toEqual(expected)
+    expect(result.registers[0]).toEqual({ status: 'REVEALED', instruction: move.instruction })
+    expect(players[0].registers).toEqual(result.registers)
+    for (const player of players.slice(1)) {
+      expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
+    }
     game.moveRobot(robots[1], Direction.NORTH, PositiveInteger(1))
     expect(result.pushedRobots).toEqual(expected)
   })

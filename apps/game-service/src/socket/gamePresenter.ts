@@ -79,6 +79,7 @@ export function presentPublicGameState(
         coordinate: game.board.positionOf(player.robot.id),
         orientation: orientations[player.robot.direction],
       },
+      startPosition: game.startPositionOf(player.robot.id),
     })),
     phase: phases[game.phase],
     paused: game.paused,
@@ -96,14 +97,19 @@ export function presentCardsDealt(
 
 export function presentRobotActionResolved(
   gameId: GameId,
+  game: Game,
   result: NextActionResult,
 ): RobotActionResolved {
   const { action, registerIndex } = result
+  const player = game.players.find((candidate) => candidate.robot.id === action.robotId)
+  if (!player) throw new Error(`Missing owner for robot ${action.robotId}`)
   return {
     gameId,
     registerIndex,
     robotId: action.robotId,
+    playerId: player.id,
     instruction: action.card.instruction,
+    resolvedInstruction: action.resolvedInstruction ?? null,
     position: {
       coordinate: action.position,
       orientation: orientations[action.direction],

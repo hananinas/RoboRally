@@ -8,11 +8,11 @@ import {
 } from './robotPlayback.ts'
 
 const steps: readonly ResolvedRobotAction[] = [
-  { gameId: 'demo', registerIndex: 0, pushedRobots: [], robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 6 }, orientation: 'NORTH' } },
-  { gameId: 'demo', registerIndex: 1, pushedRobots: [], robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 10, y: 5 }, orientation: 'NORTH' } },
-  { gameId: 'demo', registerIndex: 2, pushedRobots: [], robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 10, y: 5 }, orientation: 'WEST' } },
-  { gameId: 'demo', registerIndex: 3, pushedRobots: [], robotId: 'red', instruction: 'MOVE_1', position: { coordinate: { x: 9, y: 5 }, orientation: 'WEST' } },
-  { gameId: 'demo', registerIndex: 4, pushedRobots: [], robotId: 'red', instruction: 'TURN_LEFT', position: { coordinate: { x: 9, y: 5 }, orientation: 'SOUTH' } },
+  { gameId: 'demo', playerId: 'red-player', registerIndex: 0, pushedRobots: [], robotId: 'red', instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 10, y: 6 }, orientation: 'NORTH' } },
+  { gameId: 'demo', playerId: 'red-player', registerIndex: 1, pushedRobots: [], robotId: 'red', instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 10, y: 5 }, orientation: 'NORTH' } },
+  { gameId: 'demo', playerId: 'red-player', registerIndex: 2, pushedRobots: [], robotId: 'red', instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 10, y: 5 }, orientation: 'WEST' } },
+  { gameId: 'demo', playerId: 'red-player', registerIndex: 3, pushedRobots: [], robotId: 'red', instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 9, y: 5 }, orientation: 'WEST' } },
+  { gameId: 'demo', playerId: 'red-player', registerIndex: 4, pushedRobots: [], robotId: 'red', instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 9, y: 5 }, orientation: 'SOUTH' } },
 ]
 
 describe('robot playback', () => {
@@ -119,8 +119,15 @@ describe('robot action timing', () => {
     ['MOVE_1', 600], ['MOVE_2', 600], ['MOVE_3', 600], ['BACK_UP', 600],
     ['TURN_LEFT', 300], ['TURN_RIGHT', 300], ['U_TURN', 300],
   ] as const)('times %s and respects reduced motion', (instruction, duration) => {
-    const action = { ...steps[0], instruction }
+    const action = { ...steps[0], instruction, resolvedInstruction: instruction }
     expect(robotActionDuration(action, false)).toBe(duration)
     expect(robotActionDuration(action, true)).toBe(200)
+  })
+
+  it('times AGAIN by the instruction it resolved to', () => {
+    const again = { ...steps[0], instruction: 'AGAIN' } as const
+    expect(robotActionDuration({ ...again, resolvedInstruction: 'TURN_LEFT' }, false)).toBe(300)
+    expect(robotActionDuration({ ...again, resolvedInstruction: 'MOVE_2' }, false)).toBe(600)
+    expect(robotActionDuration({ ...again, resolvedInstruction: null }, false)).toBe(600)
   })
 })
