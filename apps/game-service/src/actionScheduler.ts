@@ -90,7 +90,7 @@ export function createActionScheduler(
         logError('Failed to execute next robot action', error, {
           source: 'actionScheduler',
           gameId,
-          phase: game.phase,
+          phase: game.lastActivePhase,
           registerIndex: game.currentRegister,
         })
         stop()

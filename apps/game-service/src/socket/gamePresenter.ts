@@ -81,7 +81,7 @@ export function presentPublicGameState(
       },
       startPosition: game.startPositionOf(player.robot.id),
     })),
-    phase: phases[game.phase],
+    phase: phases[game.lastActivePhase],
     paused: game.paused,
     aborted: game.aborted,
     winner,

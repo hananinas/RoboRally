@@ -58,7 +58,7 @@ describe('Game programming', () => {
       deck.map((card) => ({ status: 'REVEALED', instruction: card.instruction })),
     )
     expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
-    expect(game.phase).toBe('programming')
+    expect(game.lastActivePhase).toBe('programming')
   })
 
   it('starts in programming and deals its card supply to the player', () => {
@@ -66,7 +66,7 @@ describe('Game programming', () => {
 
     expect(game.board).toBe(board)
     expect(game.players).toEqual([player])
-    expect(game.phase).toBe('programming')
+    expect(game.lastActivePhase).toBe('programming')
     expect(game.currentRegister).toBe(0)
     expect(player.hand).toEqual(deck)
     expect(robot.program).toEqual([])
@@ -111,7 +111,7 @@ describe('Game programming', () => {
     game.submitProgram(player.id, programIds)
 
     expect(robot.program).toEqual(program)
-    expect(game.phase).toBe('activation')
+    expect(game.lastActivePhase).toBe('activation')
     expect(game.currentRegister).toBe(0)
     expect(game.submitProgram(player.id, programIds)._unsafeUnwrapErr()).toBe('WRONG_PHASE')
   })
@@ -125,10 +125,10 @@ describe('Game programming', () => {
     expect(game.submitProgram(player.id, [deck[0].id, deck[0].id, ...deck.slice(1, 4).map((card) => card.id)])._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
     expect(game.submitProgram(player.id, [...deck.slice(0, 4).map((card) => card.id), 'foreign'])._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
 
-    expect(game.phase).toBe('programming')
+    expect(game.lastActivePhase).toBe('programming')
     expect(robot.program).toEqual([])
     game.submitProgram(player.id, validIds)
-    expect(game.phase).toBe('activation')
+    expect(game.lastActivePhase).toBe('activation')
   })
 
   it('accepts an empty roster but requires unique players and at least five distinct cards', () => {
@@ -154,12 +154,12 @@ describe('Game programming', () => {
 
     game.pause()
     expect(game.submitProgram(player.id, validIds)._unsafeUnwrapErr()).toBe('GAME_PAUSED')
-    expect(game.phase).toBe('programming')
+    expect(game.lastActivePhase).toBe('programming')
     expect(robot.program).toEqual([])
 
     game.resume()
     game.submitProgram(player.id, validIds)
-    expect(game.phase).toBe('activation')
+    expect(game.lastActivePhase).toBe('activation')
   })
 
   it('rejects an already-scheduled action once paused', () => {

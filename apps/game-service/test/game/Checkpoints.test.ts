@@ -66,7 +66,7 @@ describe('checkpoint activation', () => {
     game.executeNextAction()
 
     expect(game.winner).toBe(player.id)
-    expect(game.phase).toBe('activation')
+    expect(game.lastActivePhase).toBe('activation')
     expect(game.currentRegister).toBe(0)
     expect(player.robot.program).toEqual([])
     expect(game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrapErr()).toBe('GAME_FINISHED')
@@ -87,7 +87,7 @@ describe('checkpoint activation', () => {
 
     expect(game.winner).toBe(player.id)
     expect(result.roundConcluded).toBe(false)
-    expect(game.phase).toBe('activation')
+    expect(game.lastActivePhase).toBe('activation')
   })
 
   it('rejects register updates after a checkpoint win', () => {
@@ -99,7 +99,7 @@ describe('checkpoint activation', () => {
 
     expect(player.lastCheckpoint).toBe(2)
     expect(game.winner).toBe(player.id)
-    expect(game.phase).toBe('activation')
+    expect(game.lastActivePhase).toBe('activation')
     expect(game.currentRegister).toBe(0)
     expect(game.hasSubmittedProgram(player.id)).toBe(false)
     expect(player.robot.program).toEqual([])
@@ -110,7 +110,7 @@ describe('checkpoint activation', () => {
 
     const registers = player.registers
     const state = () => ({
-      phase: game.phase,
+      phase: game.lastActivePhase,
       currentRegister: game.currentRegister,
       hasStarted: game.hasStarted,
       paused: game.paused,
@@ -207,6 +207,6 @@ describe('checkpoint activation', () => {
     game.removePlayer(players[1].id)
 
     expect(game.winner).toBe(players[0].id)
-    expect(game.phase).toBe('activation')
+    expect(game.lastActivePhase).toBe('activation')
   })
 })

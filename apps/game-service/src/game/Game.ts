@@ -126,7 +126,7 @@ export class Game {
     this.dealInitialHands()
   }
 
-  get phase(): GamePhase {
+  get lastActivePhase(): GamePhase {
     return this.lifecycle.lastPhase
   }
 

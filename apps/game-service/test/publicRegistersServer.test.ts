@@ -247,13 +247,13 @@ describe('public registers over Socket.IO', () => {
     const execute = game.executeNextAction.bind(game)
     vi.spyOn(game, 'executeNextAction').mockImplementation(() => {
       const result = execute()
-      if (game.phase === 'activation') game.pause()
+      if (game.lastActivePhase === 'activation') game.pause()
       return result
     })
     const submit = game.submitProgram.bind(game)
     vi.spyOn(game, 'submitProgram').mockImplementation((...args) => {
       const result = submit(...args)
-      if (game.phase === 'activation') game.pause()
+      if (game.lastActivePhase === 'activation') game.pause()
       return result
     })
     const actions: RobotActionResolved[] = []

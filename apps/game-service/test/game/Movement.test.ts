@@ -43,7 +43,7 @@ describe('shared gameplay movement', () => {
     expect(robot.program).toEqual([])
     expect(player.hand).toEqual(program)
     expect(player.lastCheckpoint).toBe(1)
-    expect(game.phase).toBe('programming')
+    expect(game.lastActivePhase).toBe('programming')
     expect(game.currentRegister).toBe(0)
     expect(game.hasStarted).toBe(false)
     expect(game.hasSubmittedProgram(player.id)).toBe(false)
@@ -120,7 +120,7 @@ describe('shared gameplay movement', () => {
     expect(board.positionOf(robot.id)).toEqual(destination)
     expect(player.lastCheckpoint).toBe(initialProgress)
     expect(game.currentRegister).toBe(0)
-    expect(game.phase).toBe('programming')
+    expect(game.lastActivePhase).toBe('programming')
 
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
     expect(player.lastCheckpoint).toBe(initialProgress)
@@ -147,7 +147,7 @@ describe('shared gameplay movement', () => {
     expect(game.hasStarted).toBe(true)
     expect(game.hasSubmittedProgram(player.id)).toBe(true)
     expect(game.hasSubmittedProgram(other.id)).toBe(false)
-    expect(game.phase).toBe('programming')
+    expect(game.lastActivePhase).toBe('programming')
     expect(game.currentRegister).toBe(0)
   })
 
@@ -165,7 +165,7 @@ describe('shared gameplay movement', () => {
     expect(robot.program).toEqual(program)
     expect(player.hand).toEqual([])
     expect(player.lastCheckpoint).toBe(1)
-    expect(game.phase).toBe('activation')
+    expect(game.lastActivePhase).toBe('activation')
     expect(game.currentRegister).toBe(1)
     expect(game.hasSubmittedProgram(player.id)).toBe(true)
 
