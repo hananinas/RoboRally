@@ -15,19 +15,14 @@ pkgs.writeShellApplication {
     release=$1
     profile=/nix/var/nix/profiles/robo-rally
     service=robo-rally.service
-    envFile=/etc/robo-rally.env
 
     previous=""
     if [[ -e "$profile" ]]; then
       previous=$(readlink -f "$profile")
     fi
 
-    umask 077
-    cat > "$envFile"
-    chmod 600 "$envFile"
-
-    source "$envFile"
-    : "''${PC_PORT:?Missing PC_PORT in $envFile}"
+    source /etc/robo-rally.env
+    : "''${PC_PORT:?Missing PC_PORT in /etc/robo-rally.env}"
 
     healthy() {
       timeout 60s process-compose \

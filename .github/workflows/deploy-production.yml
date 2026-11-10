@@ -42,25 +42,8 @@ jobs:
             --print-build-logs
 
       - name: Deploy production
-        env:
-          SECRETS_COOKIE_0: ${{ secrets.KRATOS_SECRETS_COOKIE }}
-          SECRETS_CIPHER_0: ${{ secrets.KRATOS_SECRETS_CIPHER }}
-          SECRETS_SYSTEM: ${{ secrets.HYDRA_SECRETS_SYSTEM }}
-          OAUTH_CLIENT_SECRET: ${{ secrets.OAUTH_CLIENT_SECRET }}
-          COOKIE_SECRET: ${{ secrets.KRATOS_HYDRA_UI_COOKIE_SECRET }}
-          CSRF_COOKIE_SECRET: ${{ secrets.KRATOS_HYDRA_UI_CSRF_COOKIE_SECRET }}
         run: |
           release=$(readlink -e result)
 
-          sudo -n /nix/var/nix/profiles/robo-rally-tools/bin/deploy-robo-rally "$release" <<EOF
-          PC_PORT=18080
-          WEB_SCHEME=https
-          WEB_PORT=443
-          WEB_HOST=se2-c.compute.dtu.dk
-          SECRETS_COOKIE_0=$SECRETS_COOKIE_0
-          SECRETS_CIPHER_0=$SECRETS_CIPHER_0
-          SECRETS_SYSTEM=$SECRETS_SYSTEM
-          OAUTH_CLIENT_SECRET=$OAUTH_CLIENT_SECRET
-          COOKIE_SECRET=$COOKIE_SECRET
-          CSRF_COOKIE_SECRET=$CSRF_COOKIE_SECRET
-          EOF
+          sudo -n /nix/var/nix/profiles/robo-rally-tools/bin/deploy-robo-rally \
+            "$release"
