@@ -59,6 +59,8 @@ in
 
   ciphers.algorithm = "xchacha20-poly1305";
 
+  oauth2_provider.url = "http://127.0.0.1:4445";
+
   identity = {
     default_schema_id = "default";
     schemas = [
