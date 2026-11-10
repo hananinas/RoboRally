@@ -38,7 +38,7 @@ describe('GameLifecycle', () => {
     it('moves from active to paused, remembering the phase', () => {
       const lifecycle = new GameLifecycle('activation')
       lifecycle.pause()._unsafeUnwrap()
-      expect(lifecycle.current).toEqual({ kind: 'paused', resumePhase: 'activation' })
+      expect(lifecycle.current).toEqual({ kind: 'paused', lastPhase: 'activation' })
     })
 
     it('rejects pausing an already-paused game', () => {
@@ -91,14 +91,14 @@ describe('GameLifecycle', () => {
     it('moves from active to aborted', () => {
       const lifecycle = new GameLifecycle('programming')
       lifecycle.abort()._unsafeUnwrap()
-      expect(lifecycle.current).toEqual({ kind: 'aborted' })
+      expect(lifecycle.current).toEqual({ kind: 'aborted', lastPhase: 'programming' })
     })
 
     it('moves from paused to aborted', () => {
       const lifecycle = new GameLifecycle('programming')
       lifecycle.pause()
       lifecycle.abort()._unsafeUnwrap()
-      expect(lifecycle.current).toEqual({ kind: 'aborted' })
+      expect(lifecycle.current).toEqual({ kind: 'aborted', lastPhase: 'programming' })
     })
 
     it('rejects aborting an already-aborted game', () => {
@@ -158,7 +158,7 @@ describe('GameLifecycle', () => {
     it('moves from activation to finished, recording the winner', () => {
       const lifecycle = new GameLifecycle('activation')
       lifecycle.finish('player-1')
-      expect(lifecycle.current).toEqual({ kind: 'finished', winnerId: 'player-1' })
+      expect(lifecycle.current).toEqual({ kind: 'finished', winnerId: 'player-1', lastPhase: 'activation' })
     })
 
     it('throws when not in activation', () => {

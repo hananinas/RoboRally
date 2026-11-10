@@ -5,9 +5,9 @@ export type GamePhase = 'programming' | 'activation'
 
 export type LifecycleState =
   | { kind: 'active'; phase: GamePhase }
-  | { kind: 'paused'; resumePhase: GamePhase }
-  | { kind: 'aborted' }
-  | { kind: 'finished'; winnerId: PlayerId }
+  | { kind: 'paused'; lastPhase: GamePhase }
+  | { kind: 'aborted'; lastPhase: GamePhase }
+  | { kind: 'finished'; winnerId: PlayerId; lastPhase: GamePhase }
 
 export type PauseError = 'ALREADY_PAUSED' | 'GAME_ABORTED' | 'GAME_FINISHED'
 export type ResumeError = 'NOT_PAUSED' | 'GAME_ABORTED' | 'GAME_FINISHED'
@@ -16,11 +16,9 @@ export type PhaseError = 'GAME_ABORTED' | 'GAME_FINISHED' | 'GAME_PAUSED' | 'WRO
 
 export class GameLifecycle {
   #state: LifecycleState
-  #lastPhase: GamePhase
 
   constructor(initialPhase: GamePhase) {
     this.#state = { kind: 'active', phase: initialPhase }
-    this.#lastPhase = initialPhase
   }
 
   get current(): LifecycleState {
@@ -28,7 +26,14 @@ export class GameLifecycle {
   }
 
   get lastPhase(): GamePhase {
-    return this.#lastPhase
+    switch (this.#state.kind) {
+      case 'active':
+        return this.#state.phase
+      case 'paused':
+      case 'aborted':
+      case 'finished':
+        return this.#state.lastPhase
+    }
   }
 
   requirePhase(phase: GamePhase): Result<void, PhaseError> {
@@ -47,7 +52,7 @@ export class GameLifecycle {
   pause(): Result<void, PauseError> {
     switch (this.#state.kind) {
       case 'active':
-        this.#state = { kind: 'paused', resumePhase: this.#state.phase }
+        this.#state = { kind: 'paused', lastPhase: this.#state.phase }
         return ok(undefined)
       case 'paused':
         return err('ALREADY_PAUSED')
@@ -61,7 +66,7 @@ export class GameLifecycle {
   resume(): Result<void, ResumeError> {
     switch (this.#state.kind) {
       case 'paused':
-        this.#state = { kind: 'active', phase: this.#state.resumePhase }
+        this.#state = { kind: 'active', phase: this.#state.lastPhase }
         return ok(undefined)
       case 'active':
         return err('NOT_PAUSED')
@@ -75,8 +80,10 @@ export class GameLifecycle {
   abort(): Result<void, AbortError> {
     switch (this.#state.kind) {
       case 'active':
+        this.#state = { kind: 'aborted', lastPhase: this.#state.phase }
+        return ok(undefined)
       case 'paused':
-        this.#state = { kind: 'aborted' }
+        this.#state = { kind: 'aborted', lastPhase: this.#state.lastPhase }
         return ok(undefined)
       case 'aborted':
         return err('ALREADY_ABORTED')
@@ -90,7 +97,6 @@ export class GameLifecycle {
       throw new Error(`Cannot enter activation from ${JSON.stringify(this.#state)}`)
     }
     this.#state = { kind: 'active', phase: 'activation' }
-    this.#lastPhase = 'activation'
   }
 
   enterProgramming(): void {
@@ -98,13 +104,12 @@ export class GameLifecycle {
       throw new Error(`Cannot enter programming from ${JSON.stringify(this.#state)}`)
     }
     this.#state = { kind: 'active', phase: 'programming' }
-    this.#lastPhase = 'programming'
   }
 
   finish(winnerId: PlayerId): void {
     if (this.#state.kind !== 'active' || this.#state.phase !== 'activation') {
       throw new Error(`Cannot finish from ${JSON.stringify(this.#state)}`)
     }
-    this.#state = { kind: 'finished', winnerId }
+    this.#state = { kind: 'finished', winnerId, lastPhase: this.#state.phase }
   }
 }
