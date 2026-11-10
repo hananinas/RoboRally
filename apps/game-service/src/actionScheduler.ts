@@ -81,8 +81,7 @@ export function createActionScheduler(
         )
         broadcastCheckpointProgress()
         announceWinner()
-        const phaseCheck = game.requirePhase('activation')
-        if (phaseCheck.isOk() || phaseCheck.error === 'GAME_PAUSED') {
+        if (game.requirePhase('activation').isOk()) {
           scheduleNextAction()
         } else {
           dealHands()
