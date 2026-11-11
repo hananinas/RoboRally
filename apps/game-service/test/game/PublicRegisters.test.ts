@@ -11,7 +11,6 @@ function expectRejectedWithoutMutation(game: Game, playerId: string, error: Upda
   const state = () => ({
     phase: game.lastActivePhase,
     currentRegister: game.currentRegister,
-    hasStarted: game.hasStarted,
     paused: game.paused,
     aborted: game.aborted,
     winner: game.winner,
@@ -55,7 +54,6 @@ describe('public register lifecycle', () => {
     expect(first.hand).toEqual(hand)
     expect(game.lastActivePhase).toBe('programming')
     expect(game.currentRegister).toBe(0)
-    expect(game.hasStarted).toBe(false)
     expect(game.hasSubmittedProgram(first.id)).toBe(false)
     expect(game.updateRegisters(first.id, [false, false, false, false, false])._unsafeUnwrap()).toBeUndefined()
     expect(snapshot[0]).toEqual({ status: 'HIDDEN' })
@@ -143,14 +141,13 @@ describe('public register lifecycle', () => {
     expect(game.updateRegisters(player.id, occupied)._unsafeUnwrap()).toBeUndefined()
   })
 
-  it('locks the roster after program submission and preserves colours across departure', () => {
+  it('preserves colours across departure', () => {
     const { game } = createGame('empty-map')
     const first = game.addPlayer()._unsafeUnwrap()
     const second = game.addPlayer('#4d8deb')._unsafeUnwrap()
     expect(first.robot.colour).not.toBe(second.robot.colour)
     const colour = second.robot.colour
     game.submitProgram(first.id, first.hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
-    expect(game.addPlayer()._unsafeUnwrapErr()).toBe('GAME_ALREADY_STARTED')
     game.removePlayer(first.id)
     expect(game.players).toEqual([second])
     expect(second.robot.colour).toBe(colour)

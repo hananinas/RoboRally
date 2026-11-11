@@ -110,7 +110,6 @@ describe('Game multiplayer activation', () => {
     expect(game.lastActivePhase).toBe('programming')
     expect(game.currentRegister).toBe(0)
     expect(game.players).toEqual([])
-    expect(game.hasStarted).toBe(true)
   })
 
   it('executes every robot in register-major order and resets every hand and barrier for two rounds', () => {

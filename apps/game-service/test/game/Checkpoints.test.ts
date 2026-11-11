@@ -112,7 +112,6 @@ describe('checkpoint activation', () => {
     const state = () => ({
       phase: game.lastActivePhase,
       currentRegister: game.currentRegister,
-      hasStarted: game.hasStarted,
       paused: game.paused,
       aborted: game.aborted,
       winner: game.winner,

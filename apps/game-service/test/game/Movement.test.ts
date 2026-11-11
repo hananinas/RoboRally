@@ -45,7 +45,6 @@ describe('shared gameplay movement', () => {
     expect(player.lastCheckpoint).toBe(1)
     expect(game.lastActivePhase).toBe('programming')
     expect(game.currentRegister).toBe(0)
-    expect(game.hasStarted).toBe(false)
     expect(game.hasSubmittedProgram(player.id)).toBe(false)
   })
 
@@ -85,7 +84,6 @@ describe('shared gameplay movement', () => {
     expect(board.occupantAt(start)).toBe(robot.id)
     expect(board.occupantAt(pit)).toBeUndefined()
     expect(board.occupantAt(reboot)).toBeUndefined()
-    expect(game.hasStarted).toBe(false)
   })
 
   it('uses the nearest safe tile and deterministic tie order when the reboot tile is occupied', () => {
@@ -144,7 +142,6 @@ describe('shared gameplay movement', () => {
     expect(player.hand).toEqual([])
     expect(robot.direction).toBe(Direction.NORTH)
     expect(player.lastCheckpoint).toBe(0)
-    expect(game.hasStarted).toBe(true)
     expect(game.hasSubmittedProgram(player.id)).toBe(true)
     expect(game.hasSubmittedProgram(other.id)).toBe(false)
     expect(game.lastActivePhase).toBe('programming')

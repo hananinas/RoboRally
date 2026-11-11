@@ -47,7 +47,6 @@ describe('board-edge falls', () => {
     expect(player.lastCheckpoint).toBe(0)
     expect(game.lastActivePhase).toBe('programming')
     expect(game.currentRegister).toBe(0)
-    expect(game.hasStarted).toBe(false)
   })
 
   it.each(edges)('does not fall through a wall on the $direction edge', ({ direction, start, outside }) => {

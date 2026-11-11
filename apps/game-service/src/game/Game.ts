@@ -41,7 +41,7 @@ export type NextActionResult = Readonly<{
   roundConcluded: boolean
 }>
 
-export type AddPlayerError = 'GAME_ALREADY_STARTED' | 'NO_SPAWN_AVAILABLE'
+export type AddPlayerError = 'NO_SPAWN_AVAILABLE'
 
 export type SubmitProgramError =
   | PhaseError
@@ -78,11 +78,6 @@ export class Game {
   private registerIndex = 0
   private readonly submittedPlayerIds = new Set<PlayerId>()
   private readonly activatedRobotIds = new Set<RobotId>()
-  private started = false
-  private readonly startPositions = new Map<RobotId, Position>()
-  private isPaused = false
-  private isAborted = false
-  private winnerId: PlayerId | undefined
   private readonly random: () => number
   private readonly drawRandom: () => number
   // What each robot's registers resolved to this round, so Again repeats the real action.
@@ -142,10 +137,6 @@ export class Game {
     return Object.freeze([...this.roster])
   }
 
-  get hasStarted(): boolean {
-    return this.started
-  }
-
   requirePhase(phase: GamePhase): Result<void, PhaseError> {
     return this.lifecycle.requirePhase(phase)
   }
@@ -181,11 +172,6 @@ export class Game {
     return this.submittedPlayerIds.has(playerId)
   }
 
-  private checkCanAddPlayer(): Result<void, 'GAME_ALREADY_STARTED'> {
-    if (this.started) return err('GAME_ALREADY_STARTED')
-    return ok(undefined)
-  }
-
   private findSpawn(): Result<Position, 'NO_SPAWN_AVAILABLE'> {
     if (this.board.startTiles.length > 0) return this.findFreeStartTile()
 
@@ -209,16 +195,14 @@ export class Game {
   }
 
   addPlayer(colour: string = ROBOT_COLOURS[0]): Result<Player, AddPlayerError> {
-    return this.checkCanAddPlayer().andThen(() =>
-      this.findSpawn().map((position) => {
-        const robot = new Robot(randomUUID(), Direction.NORTH, colour)
-        const player = new Player(randomUUID(), robot, Deck.fromTemplate(this.deck))
-        player.drawHand(this.drawRandom)
-        this.board.placeRobot(robot.id, position)
-        this.roster.push(player)
-        return player
-      }),
-    )
+    return this.findSpawn().map((position) => {
+      const robot = new Robot(randomUUID(), Direction.NORTH, colour)
+      const player = new Player(randomUUID(), robot, Deck.fromTemplate(this.deck))
+      player.drawHand(this.drawRandom)
+      this.board.placeRobot(robot.id, position)
+      this.roster.push(player)
+      return player
+    })
   }
 
   removePlayer(playerId: PlayerId): { roundConcluded: boolean } {
@@ -265,7 +249,6 @@ export class Game {
         // Programmed cards stay out of both piles until the round ends.
         player.discard(player.hand.filter((card) => !program.includes(card)))
         player.clearHand()
-        this.started = true
         this.submittedPlayerIds.add(playerId)
         this.recheckProgrammingPhase()
       }),

@@ -220,16 +220,6 @@ describe('Game.addPlayer', () => {
     expect(second.hand.every((card) => !first.hand.some((other) => other.id === card.id))).toBe(true)
   })
 
-  it('rejects adding a player once the game has started', () => {
-    const { game, player, deck } = createGame()
-    game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
-
-    const result = game.addPlayer()
-
-    expect(result.isErr()).toBe(true)
-    expect(result._unsafeUnwrapErr()).toBe('GAME_ALREADY_STARTED')
-  })
-
   it('rejects adding a player when no spawn tile is free', () => {
     const { game } = createEmptyGame(2)
     game.addPlayer()._unsafeUnwrap()
