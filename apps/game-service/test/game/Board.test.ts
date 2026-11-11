@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Board, Direction, EmptyTile, PitTile } from '@/game/index.ts'
+import { Board, Direction, EmptyTile, PitTile, ConveyorTile } from '@/game/index.ts'
 import type { Position, Tile, TileKind } from '@/game/index.ts'
 import { Integer } from '@/numbers'
 
@@ -19,6 +19,18 @@ const steps: { direction: Direction; target: Position; opposite: Direction }[] =
 ]
 
 describe('Tile and Board layout', () => {
+    it('stores distinct starting tiles and rejects ones a robot cannot stand on', () => {
+    const at = (x: number, y: number) => ({ x: Integer(x), y: Integer(y) })
+    const tiles = grid()
+    tiles[2][2] = new PitTile()
+
+    expect(new Board(tiles, antenna, undefined, [at(1, 1), at(2, 1)]).startTiles).toEqual([at(1, 1), at(2, 1)])
+    expect(new Board(tiles, antenna).startTiles).toEqual([])
+    expect(() => new Board(tiles, antenna, undefined, [at(1, 1), at(1, 1)])).toThrow(RangeError)
+    expect(() => new Board(tiles, antenna, undefined, [at(2, 2)])).toThrow(RangeError)
+    expect(() => new Board(tiles, antenna, undefined, [at(0, 0)])).toThrow(RangeError)
+    expect(() => new Board(tiles, antenna, undefined, [at(3, 0)])).toThrow(RangeError)
+  })
   it('stores pits with walls without counting them as checkpoints', () => {
     const pit = new PitTile([Direction.NORTH])
     const board = new Board([[pit, new EmptyTile([], 1), new PitTile()]], antenna)
@@ -142,7 +154,8 @@ describe('Tile and Board layout', () => {
 describe('Board robot ownership', () => {
   const destinations: Record<TileKind, { tile: Tile; canOccupy: boolean }> = {
     EMPTY: { tile: new EmptyTile(), canOccupy: true },
-    PIT: { tile: new PitTile(), canOccupy: false },
+    PIT: { tile: new PitTile(), canOccupy: false},
+    CONVEYOR: { tile: new ConveyorTile('conveyor-1-straight', Direction.NORTH), canOccupy: true },
   }
 
   it.each(Object.entries(destinations))('uses %s rules for placement, relocation and safe destinations', (kind, { tile, canOccupy }) => {

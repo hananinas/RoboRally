@@ -1,9 +1,9 @@
-import { emptyRequestSchema, type EmptyRequest, type SessionResult, type LeaveGame, type LeaveResult, type SubmitProgram, type ProgramResult } from '@robo-rally/game-events'
+import { emptyRequestSchema, type EmptyRequest, type SessionResult, type LeaveResult, type SubmitProgram, type ProgramResult, type UpdateRegisters, type UpdateRegistersResult } from '@robo-rally/game-events'
 import type { GameSocket } from '@/socket/gameServer'
 import { currentGame, type SessionContext } from '@/socket/sessionContext'
 import { presentLobby, leaveLobby } from '@/socket/handlers/lobbyHandlers'
 import { handleReattachGame, handleLeave, handleDisconnect, reconnectIfRecovered } from '@/socket/handlers/membershipHandlers'
-import { handleSubmitProgram } from '@/socket/handlers/gameplayHandlers'
+import { handleSubmitProgram, handleUpdateRegisters } from '@/socket/handlers/gameplayHandlers'
 import { withSessionRequest } from '@/socket/utilities/withSessionRequest'
 
 export function handleGetSession(
@@ -52,7 +52,7 @@ export function recoverSession(context: SessionContext, socket: GameSocket): voi
 export function handleLeaveGame(
   context: SessionContext,
   socket: GameSocket,
-  payload: LeaveGame,
+  payload: EmptyRequest,
   acknowledge: (result: LeaveResult) => void,
 ): void {
   if (typeof acknowledge !== 'function') return
@@ -83,5 +83,17 @@ export function handleSessionProgram(
   if (typeof acknowledge !== 'function') return
   const game = currentGame(context, socket)
   if (game) handleSubmitProgram(game, socket, payload, acknowledge)
+  else acknowledge({ outcome: 'NOT_A_MEMBER' })
+}
+
+export function handleSessionRegisters(
+  context: SessionContext,
+  socket: GameSocket,
+  payload: UpdateRegisters,
+  acknowledge: (result: UpdateRegistersResult) => void,
+): void {
+  if (typeof acknowledge !== 'function') return
+  const game = currentGame(context, socket)
+  if (game) handleUpdateRegisters(game, socket, payload, acknowledge)
   else acknowledge({ outcome: 'NOT_A_MEMBER' })
 }

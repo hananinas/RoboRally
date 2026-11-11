@@ -2,6 +2,7 @@ import { useMemo, useRef, type CSSProperties } from 'react'
 import antennaSprites from '../board/assets/antenna.hbls?raw'
 import laserSprites from '../board/assets/lasers.hbls?raw'
 import tankSprites from '../board/assets/tanks.hbls?raw'
+import conveyorSprites from '../board/assets/conveyors.hbls?raw'
 import {
   BOARD_COMPONENTS,
   BOARD_CONFIG,
@@ -9,6 +10,7 @@ import {
 } from '../board/boardConfig.ts'
 import { tileCentre } from '../board/boardMath.ts'
 import {
+  orientationAngle,
   ROBOT_MOVE_DURATION_MS,
   ROBOT_TURN_DURATION_MS,
   type DisplayRobot,
@@ -22,7 +24,6 @@ import type {
 import useBoardInteraction from '../board/useBoardInteraction.ts'
 import CheckpointPiece from './CheckpointPiece.tsx'
 import '../board/BoardViewport.css'
-
 type BoardViewportProps = Readonly<{
   board: BoardRenderModel
   robots: readonly DisplayRobot[]
@@ -59,7 +60,10 @@ function pieceStyle(piece: BoardScenePiece): PieceStyle {
     top: piece.tileCentre.worldY,
     width: BOARD_CONFIG.tile * piece.component.width,
     zIndex: piece.slice.order ?? 0,
-    '--board-piece-angle': piece.angle === undefined ? undefined : `${piece.angle}deg`,
+    '--board-piece-angle':
+      piece.componentName === 'conveyor' && piece.cell.tile === 'conveyor'
+        ? `${orientationAngle[piece.cell.direction]}deg`
+        : `${piece.angle}deg`,   
   }
 
   if (!piece.slice.wall) return style
@@ -221,7 +225,7 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
       >
         <div
           aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: `${antennaSprites}${laserSprites}${tankSprites}` }}
+          dangerouslySetInnerHTML={{ __html: `${laserSprites}${antennaSprites}${tankSprites}${conveyorSprites}` }}
         />
         {scene.planes.map((pieces, layer) => {
           const robotComponent = ROBOT_COMPONENTS[layer - 3]

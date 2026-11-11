@@ -8,6 +8,7 @@ function createGame(pitWalls: readonly Direction[] = [], startWalls: readonly Di
   tiles[1][1] = new PitTile(pitWalls)
   tiles[0][4] = new EmptyTile([], 1)
   tiles[2][3] = new EmptyTile([], 2)
+  tiles[2][0] = new EmptyTile([], 3)
   const board = new Board(tiles, { x: Integer(4), y: Integer(1), angle: Math.PI / 2 })
   const robot = new Robot('robot', Direction.NORTH)
   const start = { x: Integer(0), y: Integer(1) }
@@ -22,7 +23,8 @@ function createGame(pitWalls: readonly Direction[] = [], startWalls: readonly Di
     new Card('move', 'MOVE_1'),
     new Card('back', 'BACK_UP'),
   ]
-  const game = new Game(board, [player], program, reboot)
+  player.deck.add(program)
+  const game = new Game({ board, players: [player], deck: program, rebootTile: reboot, random: () => 0 })
   return { board, robot, player, program, game, start, pit, reboot }
 }
 
@@ -139,7 +141,7 @@ describe('shared gameplay movement', () => {
 
     expect(board.positionOf(robot.id)).toEqual(reboot)
     expect(robot.program).toEqual(program)
-    expect(player.hand).toEqual(program)
+    expect(player.hand).toEqual([])
     expect(robot.direction).toBe(Direction.NORTH)
     expect(player.lastCheckpoint).toBe(0)
     expect(game.hasStarted).toBe(true)
@@ -161,7 +163,7 @@ describe('shared gameplay movement', () => {
     expect(board.positionOf(robot.id)).toEqual(reboot)
     expect(robot.direction).toBe(Direction.WEST)
     expect(robot.program).toEqual(program)
-    expect(player.hand).toEqual(program)
+    expect(player.hand).toEqual([])
     expect(player.lastCheckpoint).toBe(1)
     expect(game.phase).toBe('activation')
     expect(game.currentRegister).toBe(1)

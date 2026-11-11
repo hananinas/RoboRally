@@ -8,6 +8,7 @@ vi.mock('openid-client', () => ({
   buildAuthorizationUrl: vi.fn(),
   authorizationCodeGrant: vi.fn(),
   buildEndSessionUrl: vi.fn(),
+  refreshTokenGrant: vi.fn(),
 }))
 
 const oidcConfig: OidcConfig = {
@@ -16,6 +17,7 @@ const oidcConfig: OidcConfig = {
   clientSecret: 'game-service-dev-secret',
   callbackUrl: new URL('http://127.0.0.1:3001/auth/callback'),
   postLogoutRedirectUrl: new URL('http://127.0.0.1:3001/'),
+  refreshBufferSeconds: 60,
 }
 
 const fakeConfig = { fake: 'configuration' } as unknown as client.Configuration
@@ -25,6 +27,7 @@ beforeEach(() => {
   vi.mocked(client.buildAuthorizationUrl).mockReset()
   vi.mocked(client.authorizationCodeGrant).mockReset()
   vi.mocked(client.buildEndSessionUrl).mockReset()
+  vi.mocked(client.refreshTokenGrant).mockReset()
 })
 
 describe('createOidcClient', () => {
@@ -111,6 +114,21 @@ describe('createOidcClient', () => {
         id_token_hint: 'the-id-token',
       })
       expect(url).toBe(expectedUrl)
+    })
+  })
+
+  describe('refreshToken', () => {
+    it('redeems the given refresh token using the discovered configuration', async () => {
+      const tokens = { access_token: 'at', claims: () => undefined }
+      vi.mocked(client.refreshTokenGrant).mockResolvedValue(
+        tokens as unknown as client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
+      )
+
+      const oidcClient = await createOidcClient(oidcConfig)
+      const result = await oidcClient.refreshToken('refresh-token-abc')
+
+      expect(client.refreshTokenGrant).toHaveBeenCalledWith(fakeConfig, 'refresh-token-abc')
+      expect(result).toBe(tokens)
     })
   })
 })

@@ -4,6 +4,7 @@ import type {
   GamePhase as GamePhasePayload,
   Orientation,
   PublicGameState,
+  Winner,
   RobotActionResolved,
   PlayerState,
   Tile as TilePayload,
@@ -18,6 +19,7 @@ import {
   type Player,
 } from '@/game/index'
 import { Integer } from '@/numbers'
+import { ConveyorTile } from '@/game/Tile'
 
 const orientations: Record<Direction, Orientation> = {
   [Direction.NORTH]: 'NORTH',
@@ -42,18 +44,39 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
   }
 
   const walls = [...tile.walls].map((direction) => orientations[direction])
-  return {
-    position: { x: Integer(x), y: Integer(y) },
-    type: tile.kind,
+  
+  const common = {
+    position: { x, y },
     ...(walls.length === 0 ? {} : { walls }),
-    ...(tile.checkpointNumber === undefined ? {} : { checkpointNumber: tile.checkpointNumber }),
+    ...(tile.checkpointNumber === undefined
+      ? {}
+      : { checkpointNumber: tile.checkpointNumber }),
   }
+
+  if (tile instanceof ConveyorTile) {
+    return {
+      ...common,
+      type: tile.kind,
+      sprite: tile.sprite,
+      direction: orientations[tile.direction],
+    }
+  }
+
+  if (tile.kind === 'EMPTY' || tile.kind === 'PIT') {
+    return {
+      ...common,
+      type: tile.kind,
+    }
+  }
+
+  throw new Error(`Unsupported tile type at ${x},${y}: ${tile.kind}`)
 }
 
 export function presentPublicGameState(
   gameId: GameId,
   game: Game,
   players: readonly PlayerState[] = [],
+  winner: Winner | null = null,
 ): PublicGameState {
   const tiles = Array.from({ length: game.board.height }, (_, y) =>
     Array.from({ length: game.board.width }, (_, x) => presentTile(game, x, y)),
@@ -81,6 +104,7 @@ export function presentPublicGameState(
     phase: phases[game.phase],
     paused: game.paused,
     aborted: game.aborted,
+    winner,
   }
 }
 
@@ -93,14 +117,19 @@ export function presentCardsDealt(
 
 export function presentRobotActionResolved(
   gameId: GameId,
+  game: Game,
   result: NextActionResult,
 ): RobotActionResolved {
   const { action, registerIndex } = result
+  const player = game.players.find((candidate) => candidate.robot.id === action.robotId)
+  if (!player) throw new Error(`Missing owner for robot ${action.robotId}`)
   return {
     gameId,
     registerIndex,
     robotId: action.robotId,
+    playerId: player.id,
     instruction: action.card.instruction,
+    resolvedInstruction: action.resolvedInstruction ?? null,
     position: {
       coordinate: action.position,
       orientation: orientations[action.direction],

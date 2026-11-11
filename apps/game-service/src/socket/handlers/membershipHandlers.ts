@@ -4,8 +4,8 @@ import { toRejection, type Rejection } from '@/socket/utilities/rejection'
 import { logError, logWarn } from '@/logger'
 import { err, ok, type Result } from 'neverthrow'
 import {
-  leaveGameSchema,
-  type LeaveGame,
+  emptyRequestSchema,
+  type EmptyRequest,
   type GameInitialization,
   type SessionResult,
   type LeaveResult,
@@ -55,19 +55,15 @@ function notifyReconnected(ctx: MembershipContext, playerId: string): void {
   ctx.actionScheduler.scheduleNextAction()
 }
 
-type ValidateMembershipRequestError =
-  | 'GAME_NOT_FOUND'
-  | Rejection<'INVALID_REQUEST', ZodError>
+type ValidateMembershipRequestError = Rejection<'INVALID_REQUEST', ZodError>
 
 function validateMembershipRequest(
-  ctx: MembershipContext,
-  schema: typeof leaveGameSchema,
+  schema: typeof emptyRequestSchema,
   payload: unknown,
   user: User,
 ): Result<User, ValidateMembershipRequestError> {
   const parsed = schema.safeParse(payload)
   if (!parsed.success) return err({ outcome: 'INVALID_REQUEST', detail: parsed.error })
-  if (parsed.data.gameId !== ctx.gameId) return err('GAME_NOT_FOUND')
   return ok(user)
 }
 
@@ -122,14 +118,14 @@ export function handleReattachGame(
 export function handleLeave(
   ctx: MembershipContext,
   socket: GameSocket,
-  payload: LeaveGame,
+  payload: EmptyRequest,
   acknowledge: (result: LeaveResult) => void,
 ): void {
   const { io, game, gameId, memberships, publicRoom, playerRoom, actionScheduler } = ctx
   let playerId: string | undefined
 
   withAcknowledgeOnce(acknowledge, (ack) => {
-    const result = validateMembershipRequest(ctx, leaveGameSchema, payload, socket.data.user)
+    const result = validateMembershipRequest(emptyRequestSchema, payload, socket.data.user)
       .andThen(() => {
         const membership = ownedMembership(ctx, socket)
         return membership ? ok(membership) : err('GAME_NOT_FOUND' as const)
@@ -154,6 +150,7 @@ export function handleLeave(
       gameId, playerId: player.id, robotId: player.robot.id,
     })
     actionScheduler.broadcastCheckpointProgress()
+    actionScheduler.announceWinner()
     if (phaseBeforeLeave === 'activation' && game.phase === 'programming') actionScheduler.dealHands()
     actionScheduler.scheduleNextAction()
   }, (error) => {

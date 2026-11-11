@@ -23,6 +23,12 @@ export type WallSpec = Readonly<{
   directions: readonly Direction[]
 }>
 
+export type ConveyorSpec = Readonly<{
+  at: readonly [x: number, y: number]
+  sprite: string
+  direction: Direction
+}>
+
 export type MapSpec = BoardMap & Readonly<{
   width: number
   height: number
@@ -30,6 +36,8 @@ export type MapSpec = BoardMap & Readonly<{
   walls: readonly WallSpec[]
   checkpoints: readonly (readonly [x: number, y: number])[]
   pits?: readonly (readonly [x: number, y: number])[]
+  conveyors?: readonly ConveyorSpec[]
+  startTiles: readonly (readonly [x: number, y: number])[]
   rebootTile: Position
 }>
 
@@ -43,6 +51,7 @@ export const boardMaps = {
     antenna: { x: Integer(10), y: Integer(0), angle: Math.PI / 2 },
     rebootTile: { x: Integer(10), y: Integer(7) },
     walls: [],
+    startTiles: [[10, 7], [9, 7], [8, 7], [7, 7], [6, 7], [5, 7]],
     checkpoints: [[10, 6], [8, 9]],
   },
   'test-map': {
@@ -52,9 +61,24 @@ export const boardMaps = {
     width: 16,
     height: 15,
     pits: [[3, 3], [13, 4], [12, 7], [15, 9], [5, 10], [12, 11]],
+    conveyors: [
+      // Conveyor loop
+      { at: [4, 7], sprite: 'conveyor-1-from-right', direction: E },
+      { at: [5, 7], sprite: 'conveyor-1-straight', direction: E },
+      { at: [6, 7], sprite: 'conveyor-1-from-right', direction: S },
+
+      { at: [6, 8], sprite: 'conveyor-1-straight', direction: S },
+
+      { at: [6, 9], sprite: 'conveyor-1-from-right', direction: W },
+      { at: [5, 9], sprite: 'conveyor-1-straight', direction: W },
+      { at: [4, 9], sprite: 'conveyor-1-from-right', direction: N },
+
+      { at: [4, 8], sprite: 'conveyor-1-straight', direction: N },
+    ],
     rebootTile: { x: Integer(10), y: Integer(7) },
     antenna: { x: Integer(10), y: Integer(0), angle: Math.PI / 2 },
     checkpoints: [[10, 6], [8, 9]],
+    startTiles: [[8, 7], [3, 8], [10, 13], [1, 4], [10, 3], [5, 12]],
     walls: [
       // TEST written top left corner of map
       { at: [1, 1], directions: [N, E] },

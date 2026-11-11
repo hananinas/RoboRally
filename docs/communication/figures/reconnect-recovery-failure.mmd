@@ -23,7 +23,7 @@ sequenceDiagram
     Note over A,Public: Restore public room membership
     Note over A,PrivateA: Restore private room membership
 
-    S-->>A: Acknowledgement: IN_GAME {initialization}
+    S-->>A: Acknowledgement: IN_GAME {initialization, user}
     Note over A: Clear outdated state and apply initialization
 
     S->>Public: game.playerConnectionChanged {gameId, playerId: A, connected: true, paused: false}

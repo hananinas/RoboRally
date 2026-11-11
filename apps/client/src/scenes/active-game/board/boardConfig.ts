@@ -78,10 +78,19 @@ export const BOARD_COMPONENTS: Readonly<
   testTank2: sprite('testTank2', '0 0 57 87', 0.65),
   testTank3: sprite('testTank3', '0 0 57 87', 0.65),
   testTank4: sprite('testTank4', '0 0 57 87', 0.65),
-  testTank5: sprite('testTank5', '0 0 57 87', 0.65),
+  testTank5: sprite('testTank5', '0 0 57 87', 0.65), 
   testTank6: sprite('testTank6', '0 0 57 87', 0.65),
   testTank7: sprite('testTank7', '0 0 57 87', 0.65),
   testTank8: sprite('testTank8', '0 0 57 87', 0.65),
+
+  conveyor:{
+    asset: {
+      symbol: 'conveyor-1-straight',
+      viewBox: '0 0 72 72',
+    },
+    className: 'board-piece--asset',
+    width: 1,
+  }, 
 }
 
 const EMPTY_SLICES = [
@@ -140,6 +149,12 @@ export const BOARD_RECIPES: Readonly<
       { layer: 6, component: 'laser3' },
     ],
   },
+  conveyor: {
+    slices: [
+      ...EMPTY_SLICES,
+      { layer: 3, component: 'conveyor', order: 1 },
+    ],
+  },  
 }
 
 export const BOARD_EDGE_WALL_SLICES = [

@@ -84,10 +84,28 @@
   font-size: 11.5px;
   font-weight: 700;
 }
+/* Robots drop onto their starting tile when the board first appears. */
+.board-piece--test-tank {
+  animation: robot-drop 0.7s cubic-bezier(0.5, 0, 0.75, 0) both;
+}
+
+@keyframes robot-drop {
+  0% {
+    translate: 0 -160px;
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    translate: 0 0;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .board-piece--test-tank {
     transition-duration: 0s;
+    animation: none;
   }
 }
 

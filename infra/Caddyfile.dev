@@ -15,6 +15,22 @@ https://127.0.0.1:3001 {
 		}
 	}
 
+	# Kratos and Hydra always serve their own routes at root (e.g. /self-service/*,
+	# /oauth2/*) regardless of what path is in their base_url/issuer config, so the
+	# prefix must be stripped before forwarding.
+	handle_path /ory/kratos/* {
+		reverse_proxy 127.0.0.1:14433
+	}
+
+	handle_path /ory/hydra/* {
+		reverse_proxy 127.0.0.1:14444
+	}
+
+	# kratos-hydra-ui mounts itself under BASE_PATH, so forward the prefix as-is.
+	handle /ory/ui/* {
+		reverse_proxy 127.0.0.1:14455
+	}
+
 	handle {
 		reverse_proxy 127.0.0.1:5173
 	}

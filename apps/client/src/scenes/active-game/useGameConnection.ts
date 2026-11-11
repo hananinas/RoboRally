@@ -2,6 +2,7 @@ import type {
   CardsDealt,
   GameAborted,
   GameInitialization,
+  GameWon,
   PlayerConnectionChanged,
   PlayerCheckpointProgress,
   RobotActionResolved,
@@ -61,6 +62,7 @@ export default function useGameConnection(socket: GameSocket) {
     const handlePlayerConnectionChanged = (payload: PlayerConnectionChanged) =>
       receive({ type: 'player-connection-changed', payload })
     const handleAborted = (_payload: GameAborted) => receive({ type: 'aborted' })
+    const handleWon = (payload: GameWon) => receive({ type: 'won', payload })
     const handleCheckpointProgress = (payload: PlayerCheckpointProgress) =>
       receive({ type: 'checkpoint-progress', payload })
 
@@ -72,6 +74,7 @@ export default function useGameConnection(socket: GameSocket) {
     socket.on('game.playerLeft', handlePlayerLeft)
     socket.on('game.playerConnectionChanged', handlePlayerConnectionChanged)
     socket.on('game.aborted', handleAborted)
+    socket.on('game.won', handleWon)
     socket.on('player.checkpointProgress', handleCheckpointProgress)
     return () => {
       generation.current += 1
@@ -83,6 +86,7 @@ export default function useGameConnection(socket: GameSocket) {
       socket.off('game.playerLeft', handlePlayerLeft)
       socket.off('game.playerConnectionChanged', handlePlayerConnectionChanged)
       socket.off('game.aborted', handleAborted)
+      socket.off('game.won', handleWon)
       socket.off('player.checkpointProgress', handleCheckpointProgress)
     }
   }, [dispatch, socket])

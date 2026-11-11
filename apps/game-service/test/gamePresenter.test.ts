@@ -25,17 +25,25 @@ import {
 import { Integer } from '@/numbers'
 
 function createGameWithPlayer() {
-  const { gameId, game } = createGame('empty-map')
+    const { gameId, game } = createGame('empty-map', undefined, () => 0)
   const player = game.addPlayer()._unsafeUnwrap()
   return { gameId, game, player }
 }
 
 describe('game presenter', () => {
   it('serializes pushed robot positions and orientations alongside the acting robot', () => {
-    const { player } = createGameWithPlayer()
-    const resolved = presentRobotActionResolved('game', {
+    const { game, player } = createGameWithPlayer()
+    const resolvedInstruction = player.hand[0].instruction === 'AGAIN' ? undefined : player.hand[0].instruction
+    const resolved = presentRobotActionResolved('game', game, {
       registerIndex: 0,
-      action: { robotId: player.robot.id, card: player.hand[0], position: { x: Integer(2), y: Integer(3) }, direction: Direction.EAST },
+      registers: player.registers,
+      action: {
+        robotId: player.robot.id,
+        card: player.hand[0],
+        resolvedInstruction,
+        position: { x: Integer(2), y: Integer(3) },
+        direction: Direction.EAST,
+      },
       pushedRobots: [
         { robotId: 'pushed', position: { x: Integer(3), y: Integer(3) }, direction: Direction.NORTH },
         { robotId: 'rebooted', position: { x: Integer(0), y: Integer(0) }, direction: Direction.WEST },
@@ -60,7 +68,7 @@ describe('game presenter', () => {
       new EmptyTile([Direction.SOUTH], 1),
     ]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
-    const game = new Game(board, [], cards, { x: Integer(0), y: Integer(0) })
+    const game = new Game({ board, players: [], deck: cards, rebootTile: { x: Integer(0), y: Integer(0) }, random: () => 0 })
     const state = presentPublicGameState('game', game)
 
     expect(state.checkpointCount).toBe(1)
@@ -82,6 +90,7 @@ describe('game presenter', () => {
       checkpointCount: 2,
       board: { width: 21, height: 15 },
       phase: 'PROGRAMMING',
+      winner: null,
       robots: [
         {
           robotId: player.robot.id,
@@ -123,7 +132,8 @@ describe('game presenter', () => {
       { length: 5 },
       (_, index) => new Card(`card-${index}`, 'MOVE_1'),
     )
-    const game = new Game(board, [player], cards, { x: Integer(0), y: Integer(0) })
+    player.deck.add(cards)
+    const game = new Game({ board, players: [player], deck: cards, rebootTile: { x: Integer(0), y: Integer(0) } })
     game.submitProgram(player.id, cards.map((card) => card.id))
 
     const state = presentPublicGameState('game', game)
@@ -141,6 +151,26 @@ describe('game presenter', () => {
     expect(state.robots[0].position.orientation).toBe('EAST')
   })
 
+  it('presents the winner once a player completes the final checkpoint', () => {
+    const board = new Board([
+      [new EmptyTile(), new EmptyTile([], 1), new EmptyTile()],
+    ], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
+    const robot = new Robot('robot', Direction.EAST)
+    board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })
+    const player = new Player('player', robot)
+    const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
+    player.deck.add(cards)
+    const game = new Game({ board, players: [player], deck: cards, rebootTile: { x: Integer(0), y: Integer(0) } })
+    game.submitProgram(player.id, cards.map((card) => card.id))
+    expect(presentPublicGameState('game', game).winner).toBeNull()
+
+    game.executeNextAction()
+
+    expect(game.winner).toBe(player.id)
+    const winner = { playerId: player.id, username: 'Winner' }
+    expect(presentPublicGameState('game', game, [], winner).winner).toEqual(winner)
+  })
+
   it('presents all dealt card instruction types without exposing domain objects', () => {
     const { gameId, player } = createGameWithPlayer()
     const dealt = presentCardsDealt(gameId, player)
@@ -148,15 +178,7 @@ describe('game presenter', () => {
     expectTypeOf(dealt).toEqualTypeOf<CardsDealt>()
     expect(dealt.cards).toHaveLength(9)
     expect(dealt.cards.map((card) => card.instruction)).toEqual([
-      'MOVE_1',
-      'MOVE_2',
-      'MOVE_3',
-      'BACK_UP',
-      'TURN_LEFT',
-      'TURN_RIGHT',
-      'U_TURN',
-      'MOVE_1',
-      'TURN_LEFT',
+      'MOVE_1', 'MOVE_1', 'MOVE_1', 'MOVE_1', 'MOVE_2', 'MOVE_2', 'MOVE_2', 'MOVE_3', 'BACK_UP',
     ])
     expect(dealt.cards[0]).toEqual({
       id: player.hand[0].id,
@@ -166,27 +188,30 @@ describe('game presenter', () => {
   })
 
   it.each([
-    { cardIndex: 0, instruction: 'MOVE_1' },
-    { cardIndex: 1, instruction: 'MOVE_2' }, { cardIndex: 2, instruction: 'MOVE_3' },
-    { cardIndex: 3, instruction: 'BACK_UP' }, { cardIndex: 4, instruction: 'TURN_LEFT' },
-    { cardIndex: 5, instruction: 'TURN_RIGHT' }, { cardIndex: 6, instruction: 'U_TURN' },
-  ] as const)('presents a resolved $instruction action', ({ cardIndex, instruction }) => {
-    const { player } = createGameWithPlayer()
+    { instruction: 'MOVE_1' }, { instruction: 'MOVE_2' }, { instruction: 'MOVE_3' },
+    { instruction: 'BACK_UP' }, { instruction: 'TURN_LEFT' }, { instruction: 'TURN_RIGHT' },
+    { instruction: 'U_TURN' }, { instruction: 'AGAIN' },
+  ] as const)('presents a resolved $instruction action', ({ instruction }) => {
+    const { game, player } = createGameWithPlayer()
+    const resolvedInstruction = instruction === 'AGAIN' ? undefined : instruction
     const action = {
       robotId: player.robot.id,
-      card: player.hand[cardIndex],
+      card: new Card('card', instruction),
+      resolvedInstruction,
       position: { x: Integer(4), y: Integer(5) },
       direction: Direction.SOUTH,
     }
 
-    const resolved = presentRobotActionResolved('game', { registerIndex: 4, action, pushedRobots: [] })
+    const resolved = presentRobotActionResolved('game', game, { registerIndex: 4, action, pushedRobots: [], registers: player.registers })
 
     expectTypeOf(resolved).toEqualTypeOf<RobotActionResolved>()
     expect(resolved).toEqual({
       gameId: 'game',
       registerIndex: 4,
       robotId: player.robot.id,
+      playerId: player.id,
       instruction,
+      resolvedInstruction: resolvedInstruction ?? null,
       pushedRobots: [],
       position: {
         coordinate: { x: 4, y: 5 },

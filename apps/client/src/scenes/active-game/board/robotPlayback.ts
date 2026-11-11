@@ -1,4 +1,4 @@
-import { instructions } from '@robo-rally/game-events'
+import { effects } from '@robo-rally/game-events'
 import type {
   Orientation,
   Position,
@@ -20,7 +20,8 @@ export const ROBOT_MOVE_DURATION_MS = 600
 export const ROBOT_TURN_DURATION_MS = 300
 export function robotActionDuration(action: ResolvedRobotAction, reducedMotion: boolean): number {
   return reducedMotion ? 200
-    : instructions[action.instruction].kind === 'turn' ? ROBOT_TURN_DURATION_MS : ROBOT_MOVE_DURATION_MS
+    : action.resolvedInstruction !== null && effects[action.resolvedInstruction].kind === 'turn'
+      ? ROBOT_TURN_DURATION_MS : ROBOT_MOVE_DURATION_MS
 }
 
 export type RobotPlaybackState = Readonly<{
@@ -35,7 +36,7 @@ export type RobotPlaybackEvent =
   | Readonly<{ type: 'reset'; robots: readonly Robot[] }>
   | Readonly<{ type: 'remove'; robotId: string }>
 
-const orientationAngle: Record<Orientation, number> = {
+export const orientationAngle: Record<Orientation, number> = {
   NORTH: 0,
   EAST: 90,
   SOUTH: 180,

@@ -19,11 +19,12 @@ export const OTHER_ROBOT_ID = '33333333-3333-4333-8333-333333333334'
 export function createPublicState(): PublicGameState {
   return {
     gameId: GAME_ID,
-    players: [{ playerId: PLAYER_ID, lastCheckpoint: 0, username: 'Player 1', programSubmitted: false, connected: true }],
+    players: [{ playerId: PLAYER_ID, lastCheckpoint: 0, username: 'Player 1', programSubmitted: false, connected: true, registers: [{ status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }] }],
     phase: 'PROGRAMMING',
     paused: false,
     aborted: false,
     checkpointCount: 0,
+    winner: null,
     antenna: { x: 5, y: 0, angle: Math.PI / 2 },
     board: {
       width: 11,
@@ -53,11 +54,11 @@ export const HAND_INSTRUCTIONS = [
 ] as const
 
 export const ROUND_ACTIONS: readonly RobotActionResolved[] = [
-  { gameId: GAME_ID, registerIndex: 0, pushedRobots: [], robotId: ROBOT_ID, instruction: 'MOVE_1', position: { coordinate: { x: 5, y: 4 }, orientation: 'NORTH' } },
-  { gameId: GAME_ID, registerIndex: 1, pushedRobots: [], robotId: ROBOT_ID, instruction: 'MOVE_1', position: { coordinate: { x: 5, y: 3 }, orientation: 'NORTH' } },
-  { gameId: GAME_ID, registerIndex: 2, pushedRobots: [], robotId: ROBOT_ID, instruction: 'TURN_LEFT', position: { coordinate: { x: 5, y: 3 }, orientation: 'WEST' } },
-  { gameId: GAME_ID, registerIndex: 3, pushedRobots: [], robotId: ROBOT_ID, instruction: 'MOVE_1', position: { coordinate: { x: 4, y: 3 }, orientation: 'WEST' } },
-  { gameId: GAME_ID, registerIndex: 4, pushedRobots: [], robotId: ROBOT_ID, instruction: 'TURN_LEFT', position: { coordinate: { x: 4, y: 3 }, orientation: 'SOUTH' } },
+  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 0, pushedRobots: [], robotId: ROBOT_ID, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 5, y: 4 }, orientation: 'NORTH' } },
+  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 1, pushedRobots: [], robotId: ROBOT_ID, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 5, y: 3 }, orientation: 'NORTH' } },
+  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 2, pushedRobots: [], robotId: ROBOT_ID, instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 5, y: 3 }, orientation: 'WEST' } },
+  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 3, pushedRobots: [], robotId: ROBOT_ID, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 4, y: 3 }, orientation: 'WEST' } },
+  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 4, pushedRobots: [], robotId: ROBOT_ID, instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 4, y: 3 }, orientation: 'SOUTH' } },
 ]
 
 export type FixtureControl =
@@ -80,8 +81,8 @@ export type FixtureSnapshot = {
   state: PublicGameState
   submissions: readonly SubmitProgram[]
   entryRequests: readonly (
-    | { event: 'session.get' | 'lobby.create'; socketId: string; payload: Record<string, never> }
-    | { event: 'lobby.join' | 'lobby.start'; socketId: string; payload: { lobbyId: string } }
+    | { event: 'session.get' | 'lobby.create' | 'lobby.start'; socketId: string; payload: Record<string, never> }
+    | { event: 'lobby.join'; socketId: string; payload: { lobbyId: string } }
   )[]
   pendingStarts: number
 }

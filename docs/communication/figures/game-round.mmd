@@ -8,16 +8,16 @@ sequenceDiagram
     participant Public as game:{gameId}:public
 
     loop Each round
-        A->>Server: game.updateRegisters {gameId, playerId: A, occupied}
+        A->>Server: game.updateRegisters {occupied}
         Server-->>A: Acknowledgement: ACCEPTED
         Server->>Public: game.registersChanged {gameId, playerId: A, registers}
         Public-->>B: game.registersChanged {gameId, playerId: A, registers}
-        A->>Server: program.submit {gameId, cardIds}
+        A->>Server: program.submit {cardIds}
         Server-->>A: Acknowledgement: ACCEPTED
         Server->>Public: program.submitted {playerId: A}
         Public-->>B: program.submitted
 
-        B->>Server: program.submit {gameId, cardIds}
+        B->>Server: program.submit {cardIds}
         Server-->>B: Acknowledgement: ACCEPTED
         Server->>Public: program.submitted {playerId: B}
         Public-->>A: program.submitted
