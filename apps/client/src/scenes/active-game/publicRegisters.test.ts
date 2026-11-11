@@ -17,7 +17,7 @@ function joined(executing = false) {
 }
 
 const action: RobotActionResolved = {
-  gameId: GAME_ID, playerId: ADA_ID, robotId: REGISTER_ROBOT_IDS[0], registerIndex: 2, instruction: 'MOVE_2',
+  gameId: GAME_ID, playerId: ADA_ID, robotId: REGISTER_ROBOT_IDS[0], registerIndex: 2, instruction: 'MOVE_2', resolvedInstruction: 'MOVE_2',
   position: { coordinate: { x: 3, y: 1 }, orientation: 'NORTH' },
   pushedRobots: [],
 }
@@ -84,7 +84,7 @@ describe('public registers', () => {
       payload: { gameId: GAME_ID, playerId: ADA_ID, registers: MIKKEL_OCCUPANCY },
     })
     state = gameStateReducer(state, { type: 'action', action })
-    state = gameStateReducer(state, { type: 'action', action: { ...action, registerIndex: 3, instruction: 'BACK_UP' } })
+    state = gameStateReducer(state, { type: 'action', action: { ...action, registerIndex: 3, instruction: 'BACK_UP', resolvedInstruction: 'BACK_UP' } })
     expect(getOtherPlayers(state)[0].registers[3]).toEqual({ status: 'HIDDEN' })
     state = gameStateReducer(state, { type: 'dealt', hand: { gameId: GAME_ID, playerId: PLAYER_ID, cards: [{ id: 'next-private', instruction: 'BACK_UP' }] } })
     expect(getOtherPlayers(state)[0].registers[2]).toEqual({ status: 'REVEALED', instruction: 'MOVE_2' })

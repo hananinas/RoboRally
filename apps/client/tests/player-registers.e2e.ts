@@ -51,11 +51,11 @@ test('reveals each register during playback and clears the panel when the new ha
   await ada.focus()
   await expect(ada.locator('.other-player__slot-label')).toHaveText(['Move 1', 'Turn Right', 'Filled', 'Filled', 'Filled'])
   const action: RobotActionResolved = {
-    gameId: GAME_ID, playerId: ADA_ID, robotId: REGISTER_ROBOT_IDS[0], registerIndex: 2, instruction: 'MOVE_2',
+    gameId: GAME_ID, playerId: ADA_ID, robotId: REGISTER_ROBOT_IDS[0], registerIndex: 2, instruction: 'MOVE_2', resolvedInstruction: 'MOVE_2',
     position: { coordinate: { x: 3, y: 1 }, orientation: 'NORTH' },
     pushedRobots: [],
   }
-  await game.control({ type: 'round', actions: [action, { ...action, registerIndex: 3, instruction: 'BACK_UP' }], deferHand: true })
+  await game.control({ type: 'round', actions: [action, { ...action, registerIndex: 3, instruction: 'BACK_UP', resolvedInstruction: 'BACK_UP' }], deferHand: true })
   await expect(ada.locator('.other-player__slot--current .other-player__slot-label')).toHaveText('Move 2')
   await expect(ada.locator('.other-player__slot--future .other-player__slot-label')).toHaveText(['Filled', 'Filled'])
   await expect(ada).not.toHaveAccessibleName(/Back Up/)

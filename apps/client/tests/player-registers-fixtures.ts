@@ -45,7 +45,7 @@ export const executionPlayers: readonly PlayerState[] = programmingPlayers.map((
 }))
 
 export const executionAction: RobotActionResolved = {
-  gameId: GAME_ID, playerId: ADA_ID, robotId: REGISTER_ROBOT_IDS[0], registerIndex: 2, instruction: 'MOVE_2',
+  gameId: GAME_ID, playerId: ADA_ID, robotId: REGISTER_ROBOT_IDS[0], registerIndex: 2, instruction: 'MOVE_2', resolvedInstruction: 'MOVE_2',
   position: { coordinate: { x: 3, y: 1 }, orientation: 'NORTH' },
   pushedRobots: [],
 }
