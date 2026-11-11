@@ -3,6 +3,7 @@ import { handleGetSession, handleLeaveGame, handleDisconnectSession, handleSessi
 import type { SessionContext } from '@/socket/sessionContext'
 import type { Server as HttpServer } from 'node:http'
 import type {
+  BoardMapName,
   ClientToServerEvents,
   ServerToClientEvents,
   User,
@@ -61,7 +62,7 @@ function rejectExpiredSession(sessionStore: SessionStore, socket: GameSocket, ne
 export function createGameSocketServer(
   httpServer: HttpServer,
   sessionStore: SessionStore,
-  createGame: () => GameSession = createDefaultGame,
+  createGame: (mapName: BoardMapName) => GameSession = (mapName) => createDefaultGame(undefined, undefined, mapName),
 ): GameSocketServer {
   const io = new Server<
     ClientToServerEvents,

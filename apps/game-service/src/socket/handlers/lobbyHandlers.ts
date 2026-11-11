@@ -5,8 +5,8 @@ import type { Lobby, SessionContext } from '@/socket/sessionContext'
 import { withSessionRequest } from '@/socket/utilities/withSessionRequest'
 import { ROBOT_COLOURS } from '@/game/Robot'
 import {
-  emptyRequestSchema, lobbyRequestSchema,
-  type EmptyRequest, type LobbyRequest, type GameInitialization, type LobbyState, type User,
+  emptyRequestSchema, lobbyRequestSchema, createLobbyRequestSchema,
+  type EmptyRequest, type LobbyRequest, type CreateLobbyRequest, type GameInitialization, type LobbyState, type User,
   type LobbyListResult, type LobbyJoinResult, type LobbyLeaveResult, type LobbyStartResult,
 } from '@robo-rally/game-events'
 import { createGameContext } from '@/socket/gameContext'
@@ -16,7 +16,7 @@ import type { GameSocket } from '@/socket/gameServer'
 const MAX_PLAYERS = 6
 const lobbyRoom = (id: string) => `lobby:${id}`
 export function presentLobby(lobby: Lobby): LobbyState {
-  return { lobbyId: lobby.lobbyId, name: lobby.name, ownerUserId: lobby.members.keys().next().value!,
+  return { lobbyId: lobby.lobbyId, name: lobby.name, mapName: lobby.mapName, ownerUserId: lobby.members.keys().next().value!,
     playerCount: lobby.members.size, maxPlayers: MAX_PLAYERS,
     players: [...lobby.members.values()].map(({ user }) => ({ userId: user.userId, username: user.username })) }
 }
@@ -44,8 +44,8 @@ export function handleListLobbies(
 ): void {
   withSessionRequest(socket, 'lobby.list', emptyRequestSchema, payload, acknowledge, (_user, ack) => {
     ack({ outcome: 'LOBBIES_FOUND', lobbies: [...context.lobbies.values()].map((lobby) => {
-      const { lobbyId, name, playerCount, maxPlayers } = presentLobby(lobby)
-      return { lobbyId, name, playerCount, maxPlayers }
+      const { lobbyId, name, mapName, playerCount, maxPlayers } = presentLobby(lobby)
+      return { lobbyId, name, mapName, playerCount, maxPlayers }
     }) })
   })
 }
@@ -53,10 +53,10 @@ export function handleListLobbies(
 export function handleCreateLobby(
   context: SessionContext,
   socket: GameSocket,
-  payload: EmptyRequest,
+  payload: CreateLobbyRequest,
   acknowledge: (result: LobbyJoinResult) => void,
 ): void {
-  withSessionRequest(socket, 'lobby.create', emptyRequestSchema, payload, acknowledge, (user, ack) => {
+  withSessionRequest(socket, 'lobby.create', createLobbyRequestSchema, payload, acknowledge, (user, ack) => {
     const session = context.sessionsByUser.get(user.userId)
     if (session) {
       const existing = session.kind === 'lobby' ? context.lobbies.get(session.lobbyId) : undefined
@@ -65,7 +65,7 @@ export function handleCreateLobby(
         : { outcome: 'USER_ALREADY_IN_SESSION' })
     }
     const lobbyId = randomUUID()
-    const lobby: Lobby = { lobbyId, name: `Lobby ${lobbyId.slice(0, 8)}`,
+    const lobby: Lobby = { lobbyId, name: `Lobby ${lobbyId.slice(0, 8)}`, mapName: payload.mapName ?? 'test-map',
       members: new Map([[user.userId, { user, connectionId: socket.id }]]) }
     void socket.join(lobbyRoom(lobbyId))
     context.lobbies.set(lobbyId, lobby)
@@ -150,7 +150,7 @@ export function handleStartLobby(
     let gameContext: MembershipContext | undefined
     let prepared: { member: { user: User; player: Player }; socket: GameSocket; initialization: GameInitialization }[] = []
     try {
-      const preparedContext = createGameContext(io, context.createGame())
+      const preparedContext = createGameContext(io, context.createGame(lobby.mapName))
       gameContext = preparedContext
       const members = connected.value.map(({ socket: connection, ...member }) => {
         const result = preparedContext.game.addPlayer(ROBOT_COLOURS[preparedContext.memberships.size])

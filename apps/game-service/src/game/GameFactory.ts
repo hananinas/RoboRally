@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { createBoard, type BoardMapName } from '@/game/BoardFactory'
+import { createBoard } from '@/game/BoardFactory'
 import { boardMaps, type MapSpec } from '@/game/boardMaps'
 import { Deck, createDeckCards } from '@/game/Deck'
 import { Game } from '@/game/Game'
@@ -7,6 +7,7 @@ import type { GameId } from '@/game/ids'
 import { Player } from '@/game/Player'
 import { Robot } from '@/game/Robot'
 import { Direction } from '@/game/spatial'
+import type { BoardMapName } from '@robo-rally/game-events'
 
 const GAME_ID: GameId = '00000000-0000-4000-8000-000000000001'
 const SHARED_GAME_NAME = 'Shared game'
@@ -43,6 +44,7 @@ export function createGame(
 export function createDefaultGame(
   random?: () => number,
   drawRandom?: () => number,
+  mapName: BoardMapName = 'test-map',
 ): Readonly<{ gameId: string; game: Game }> {
-  return { ...createGame('test-map', undefined, random, drawRandom), gameId: randomUUID() }
+  return { ...createGame(mapName, undefined, random, drawRandom), gameId: randomUUID() }
 }

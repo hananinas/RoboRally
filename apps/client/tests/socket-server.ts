@@ -231,16 +231,19 @@ io.on('connection', (socket) => {
     assignment: { gameId: GAME_ID, playerId: PLAYER_ID, robotId: ROBOT_ID },
     state: fixture.state, hand: fixture.cards, programSubmitted: fixture.programSubmitted,
   })
-  const lobbyState = (): LobbyState => ({ lobbyId: GAME_ID, name: 'Lobby 1', ownerUserId: user.userId, playerCount: 1, maxPlayers: 6, players: [user] })
+  const lobbyState = (mapName: LobbyState['mapName'] = 'test-map'): LobbyState => ({
+    lobbyId: GAME_ID, name: 'Lobby 1', mapName, ownerUserId: user.userId,
+    playerCount: 1, maxPlayers: 6, players: [user],
+  })
   socket.on('session.get', (_, acknowledge) => {
     fixture.entryRequests.push({ event: 'session.get', socketId: socket.id, payload: {} })
     acknowledge(fixture.started ? { outcome: 'IN_GAME', initialization: initialization(), user }
       : lobby ? { outcome: 'IN_LOBBY', lobby, user } : { outcome: 'NO_SESSION', user })
   })
   socket.on('lobby.list', (_, acknowledge) => acknowledge({ outcome: 'LOBBIES_FOUND', lobbies: [lobbyState()] }))
-  socket.on('lobby.create', (_, acknowledge) => {
-    fixture.entryRequests.push({ event: 'lobby.create', socketId: socket.id, payload: {} })
-    lobby = lobbyState()
+  socket.on('lobby.create', (payload, acknowledge) => {
+    fixture.entryRequests.push({ event: 'lobby.create', socketId: socket.id, payload })
+    lobby = lobbyState(payload.mapName)
     acknowledge({ outcome: 'LOBBY_JOINED', lobby })
   })
   socket.on('lobby.join', (payload, acknowledge) => {

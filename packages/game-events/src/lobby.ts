@@ -3,12 +3,20 @@ import type { GameInitialization, User } from './payloads.js'
 
 export const emptyRequestSchema = z.strictObject({}).readonly()
 export const lobbyRequestSchema = z.strictObject({ lobbyId: z.uuid() }).readonly()
+export const BOARD_MAP_NAMES = ['empty-map', 'test-map'] as const
+export const boardMapNameSchema = z.enum(BOARD_MAP_NAMES)
+export const createLobbyRequestSchema = z.strictObject({
+  mapName: boardMapNameSchema.optional(),
+}).readonly()
 export type EmptyRequest = z.infer<typeof emptyRequestSchema>
 export type LobbyRequest = z.infer<typeof lobbyRequestSchema>
+export type BoardMapName = typeof BOARD_MAP_NAMES[number]
+export type CreateLobbyRequest = z.infer<typeof createLobbyRequestSchema>
 
 export type LobbySummary = Readonly<{
   lobbyId: string
   name: string
+  mapName: BoardMapName
   playerCount: number
   maxPlayers: number
 }>

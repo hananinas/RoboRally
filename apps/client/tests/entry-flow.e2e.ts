@@ -1,15 +1,27 @@
 import { expect, test } from './game-fixture.ts'
 
-test('creating a lobby opens map selection and can return to the lobby list', async ({ page, game }) => {
+test('creating a lobby uses the selected map and can return to the lobby list', async ({ page, game }) => {
   await page.goto('/')
   await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeEnabled()
   await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Choose a map', exact: true })).toBeVisible()
-  await expect(page.getByText('Map options will be available in the next step.', { exact: true })).toBeVisible()
-  await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
-  await expect((await game.snapshot()).entryRequests.map((request) => request.event)).not.toContain('lobby.create')
+  const emptyMap = page.getByRole('button', { name: 'Empty Map', exact: true })
+  await expect(emptyMap).toHaveAttribute('aria-pressed', 'false')
+  await page.getByRole('button', { name: 'Test Map', exact: true }).click()
+  await expect(page.getByText('Selected map: Test Map', { exact: true })).toBeVisible()
+  await emptyMap.click()
+  await expect(emptyMap).toHaveAttribute('aria-pressed', 'true')
   await page.getByRole('button', { name: 'Back to lobbies', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
+  await expect(page.getByText('Selected map: Empty Map', { exact: true })).toBeVisible()
+  await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
+  await expect(page.getByText('Map: Empty Map', { exact: true })).toBeVisible()
+  const createRequest = (await game.snapshot()).entryRequests.find((request) => request.event === 'lobby.create')
+  expect(createRequest).toMatchObject({ payload: { mapName: 'empty-map' } })
+  await page.getByRole('button', { name: 'Leave lobby', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeVisible()
 })
 

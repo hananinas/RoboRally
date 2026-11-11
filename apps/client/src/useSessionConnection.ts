@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { LobbySummary, ServerToClientEvents } from '@robo-rally/game-events'
+import type { BoardMapName, LobbySummary, ServerToClientEvents } from '@robo-rally/game-events'
 import useGameConnection from './scenes/active-game/useGameConnection.ts'
 import { createSessionState, sessionReducer, type SessionEvent } from './sessionState.ts'
 import useGameSocket, { ACKNOWLEDGEMENT_TIMEOUT_MS } from './useGameSocket.ts'
@@ -104,12 +104,18 @@ export default function useSessionConnection() {
     if (session.status === 'browsing') refreshLobbies()
   }, [session.status, refreshLobbies])
 
-  function joinLobby(lobbyId: string | null) {
+  function joinLobby(lobbyId: string) {
     if (pending.current || !socket.connected) return
     dispatch({ type: 'lobby-requested', lobbyId })
-    void run(async () => ({ type: 'lobby-result', result: lobbyId === null
-      ? await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.create', {})
-      : await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.join', { lobbyId }) }))
+    void run(async () => ({ type: 'lobby-result', result: await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.join', { lobbyId }) }))
+  }
+  function createLobby(mapName: BoardMapName) {
+    if (pending.current || !socket.connected) return
+    dispatch({ type: 'lobby-requested', lobbyId: null })
+    void run(async () => ({
+      type: 'lobby-result',
+      result: await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.create', { mapName }),
+    }))
   }
   function startLobby() {
     if (session.status !== 'waiting') return
@@ -134,7 +140,7 @@ export default function useSessionConnection() {
   return {
     connection, game, session, busy, lobbies, listError,
     joinLobby, startLobby, leaveSession, refreshLobbies,
-    createLobby: () => joinLobby(null),
+    createLobby,
     retrySession: () => socket.connected ? dispatch({ type: 'sync-requested' }) : connection.connect(),
   }
 }

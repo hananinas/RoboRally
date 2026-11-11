@@ -130,6 +130,33 @@
   box-shadow: 0 0 0 2px #dcbd05;
 }
 
+.map-options {
+  display: grid;
+  gap: 10px;
+  margin-block: 16px;
+}
+
+.map-option {
+  padding: 12px;
+  border: 1px solid var(--entry-border);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.map-option--selected {
+  border-color: #dcbd05;
+  background: rgb(220 189 5 / 12%);
+  box-shadow: 0 0 0 2px #dcbd05;
+}
+
+.map-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
 
 .lobby__details {
   display: grid;
