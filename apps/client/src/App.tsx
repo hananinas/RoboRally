@@ -22,7 +22,7 @@ function errorMessage(code: string): string {
 function App() {
   const {
     connection, game, session, busy, lobbies, listError,
-    createLobby, joinLobby, startLobby, leaveSession, refreshLobbies, retrySession,
+    joinLobby, startLobby, leaveSession, refreshLobbies, retrySession,
   } = useSessionConnection()
 
   useEffect(() => {
@@ -49,7 +49,7 @@ function App() {
     content = <LobbyScreen
       username={session.user.username} error={error} lobbies={lobbies}
       pending={busy || session.status === 'joining'} connected={connection.status === 'connected'}
-      onCreate={createLobby} onJoin={joinLobby} onRefresh={refreshLobbies}
+      onJoin={joinLobby} onRefresh={refreshLobbies}
     />
   } else if (session.status === 'waiting') {
     content = <WaitingLobby

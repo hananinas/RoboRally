@@ -8,14 +8,26 @@ type LobbyScreenProps = {
   connected: boolean
   error: string | null
   onJoin: (lobbyId: string) => void
-  onCreate: () => void
   onRefresh: () => void
 }
 
-export default function LobbyScreen({ username, lobbies, pending, connected, error, onJoin, onCreate, onRefresh }: LobbyScreenProps) {
+export default function LobbyScreen({ username, lobbies, pending, connected, error, onJoin, onRefresh }: LobbyScreenProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [creatingLobby, setCreatingLobby] = useState(false)
   const selected = lobbies.find((lobby) => lobby.lobbyId === selectedId)
   const firstJoinable = lobbies.find((lobby) => lobby.playerCount < lobby.maxPlayers)
+
+  if (creatingLobby) {
+    return (
+      <section aria-labelledby="map-selection-title">
+        <h2 id="map-selection-title">Choose a map</h2>
+        <p>Map options will be available in the next step.</p>
+        <button className="entry-secondary-button" type="button" onClick={() => setCreatingLobby(false)}>
+          Back to lobbies
+        </button>
+      </section>
+    )
+  }
 
   return (
     <>
@@ -47,7 +59,7 @@ export default function LobbyScreen({ username, lobbies, pending, connected, err
           </li>
         ))}
       </ul>
-      <button className="entry-secondary-button" type="button" disabled={pending || !connected} onClick={onCreate}>Create lobby</button>
+      <button className="entry-secondary-button" type="button" disabled={pending || !connected} onClick={() => setCreatingLobby(true)}>Create lobby</button>
       <button className="entry-secondary-button" type="button" disabled={pending || !connected} onClick={onRefresh}>Refresh</button>
       {error && <p className="entry-validation entry-validation--error" role="alert">{error}</p>}
       <button

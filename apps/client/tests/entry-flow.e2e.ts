@@ -1,16 +1,16 @@
 import { expect, test } from './game-fixture.ts'
 
-test('browses real results and creation waits for explicit Start', async ({ page, game }) => {
+test('creating a lobby opens map selection and can return to the lobby list', async ({ page, game }) => {
   await page.goto('/')
   await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeEnabled()
   await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
-  await expect(page.getByText('Waiting for players.', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Choose a map', exact: true })).toBeVisible()
+  await expect(page.getByText('Map options will be available in the next step.', { exact: true })).toBeVisible()
   await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
-  await page.getByRole('button', { name: 'Start', exact: true }).click()
-  await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
-  const requests = (await game.snapshot()).entryRequests.map((request) => request.event)
-  expect(requests).toContain('lobby.create')
+  await expect((await game.snapshot()).entryRequests.map((request) => request.event)).not.toContain('lobby.create')
+  await page.getByRole('button', { name: 'Back to lobbies', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeVisible()
 })
 
 test('joining requires selection and enters the waiting screen', async ({ page }) => {
