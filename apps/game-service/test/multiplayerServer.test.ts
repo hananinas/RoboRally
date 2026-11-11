@@ -16,9 +16,13 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
     Array.from({ length: 3 }, () => new EmptyTile())), { x: Integer(1), y: Integer(0), angle: Math.PI / 2 })
   const deck = Array.from({ length: 5 }, (_, index) =>
     new Card(`00000000-0000-4000-8000-00000000010${index}`, 'TURN_LEFT'))
-  const game = new Game(board, players, deck, { x: Integer(0), y: Integer(0) })
+  for (const player of players) player.deck.add(deck)
+  const game = new Game({ board, players, deck, rebootTile: { x: Integer(0), y: Integer(0) }, random: () => 0 })
   const httpServer = createServer()
-  const sessionStore = createSessionStore()
+  const sessionStore = createSessionStore({
+    oidcClient: { refreshToken: () => Promise.reject(new Error('not used in this test')) },
+    refreshBufferSeconds: 0,
+  })
   const server = createGameSocketServer(httpServer, sessionStore, () => ({ gameId, game }))
   const clients: Socket<ServerToClientEvents, ClientToServerEvents>[] = []
   const events: { name: string; payload: unknown }[][] = [[], []]
@@ -44,9 +48,6 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
     for (let index = 0; index < clients.length; index++) {
       const player = game.players[index]
       players.push(player)
-      player.setHand(deck.map((card, cardIndex) => new Card(
-        `00000000-0000-4000-8000-00000000${index + 2}${cardIndex.toString().padStart(3, '0')}`, 'TURN_LEFT',
-      )))
       board.removeRobot(player.robot.id)
       board.placeRobot(player.robot.id, index === 0
         ? { x: Integer(0), y: Integer(2) }
@@ -98,6 +99,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
             robotId: players[playerIndex].robot.id,
             playerId: players[playerIndex].id,
             instruction: 'TURN_LEFT',
+            resolvedInstruction: 'TURN_LEFT',
             position: {
               coordinate: playerIndex === 0 ? { x: 0, y: 2 } : { x: 1, y: 1 },
               orientation: ['WEST', 'SOUTH', 'EAST', 'NORTH'][(registerIndex + round - 1) % 4],

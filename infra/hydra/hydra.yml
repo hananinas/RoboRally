@@ -21,3 +21,6 @@ oidc:
   subject_identifiers:
     supported_types:
       - public
+
+ttl:
+  access_token: 30m

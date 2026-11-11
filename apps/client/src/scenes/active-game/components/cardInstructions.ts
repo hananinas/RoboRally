@@ -6,6 +6,7 @@ import arrowRight from './svg/arrow-right.svg'
 import arrowUp1 from './svg/arrow-up-1.svg'
 import arrowUp2 from './svg/arrow-up-2.svg'
 import arrowUp3 from './svg/arrow-up-3.svg'
+import repeat from './svg/repeat.svg'
 import uTurn from './svg/u-turn.svg'
 
 export const cardPresentation: Record<Instruction, { label: string; icon: string }> = {
@@ -16,4 +17,5 @@ export const cardPresentation: Record<Instruction, { label: string; icon: string
   TURN_LEFT: { label: 'Turn Left', icon: arrowLeft },
   TURN_RIGHT: { label: 'Turn Right', icon: arrowRight },
   U_TURN: { label: 'U-Turn', icon: uTurn },
+  AGAIN: { label: 'Again', icon: repeat },
 }

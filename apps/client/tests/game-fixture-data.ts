@@ -41,13 +41,11 @@ export function createPublicState(): PublicGameState {
       colour: '#c74f4f',
       playerId: PLAYER_ID,
       position: { coordinate: { x: 5, y: 5 }, orientation: 'NORTH' },
-      startPosition: { x: 5, y: 5 },
     }, {
       robotId: OTHER_ROBOT_ID,
       colour: '#4D8DEB',
       playerId: OTHER_PLAYER_ID,
       position: { coordinate: { x: 7, y: 5 }, orientation: 'NORTH' },
-      startPosition: { x: 7, y: 5 },
     }],
   }
 }
@@ -58,11 +56,11 @@ export const HAND_INSTRUCTIONS = [
 ] as const
 
 export const ROUND_ACTIONS: readonly RobotActionResolved[] = [
-  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 0, pushedRobots: [], robotId: ROBOT_ID, instruction: 'MOVE_1', position: { coordinate: { x: 5, y: 4 }, orientation: 'NORTH' } },
-  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 1, pushedRobots: [], robotId: ROBOT_ID, instruction: 'MOVE_1', position: { coordinate: { x: 5, y: 3 }, orientation: 'NORTH' } },
-  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 2, pushedRobots: [], robotId: ROBOT_ID, instruction: 'TURN_LEFT', position: { coordinate: { x: 5, y: 3 }, orientation: 'WEST' } },
-  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 3, pushedRobots: [], robotId: ROBOT_ID, instruction: 'MOVE_1', position: { coordinate: { x: 4, y: 3 }, orientation: 'WEST' } },
-  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 4, pushedRobots: [], robotId: ROBOT_ID, instruction: 'TURN_LEFT', position: { coordinate: { x: 4, y: 3 }, orientation: 'SOUTH' } },
+  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 0, pushedRobots: [], robotId: ROBOT_ID, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 5, y: 4 }, orientation: 'NORTH' } },
+  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 1, pushedRobots: [], robotId: ROBOT_ID, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 5, y: 3 }, orientation: 'NORTH' } },
+  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 2, pushedRobots: [], robotId: ROBOT_ID, instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 5, y: 3 }, orientation: 'WEST' } },
+  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 3, pushedRobots: [], robotId: ROBOT_ID, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 4, y: 3 }, orientation: 'WEST' } },
+  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 4, pushedRobots: [], robotId: ROBOT_ID, instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 4, y: 3 }, orientation: 'SOUTH' } },
 ]
 
 export type FixtureControl =

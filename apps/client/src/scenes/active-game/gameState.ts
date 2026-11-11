@@ -311,7 +311,8 @@ export function gameStateReducer(
         assignment: result.assignment,
         hand: result.hand,
         handVersion: result.hand.length > 0 ? 1 : 0,
-        handReady: snapshot.phase === 'PROGRAMMING' && result.hand.length > 0,
+        // After submitting, the hand is empty until the next round is dealt.
+        handReady: snapshot.phase === 'PROGRAMMING' && (result.hand.length > 0 || result.programSubmitted),
         submission: result.programSubmitted ? 'accepted' : 'idle',
         phase: snapshot.phase,
         paused: snapshot.paused,
@@ -336,6 +337,12 @@ export function gameStateReducer(
             antenna: snapshot.antenna,
             hole: snapshot.board.tiles.filter((tile) => tile.type === 'PIT')
               .map((tile) => [tile.position.x, tile.position.y] as const),
+            conveyor: snapshot.board.tiles.flatMap((tile) => tile.type === 'CONVEYOR' ? [{
+              ...tile.position,
+              sprite: tile.sprite,
+              direction: tile.direction,
+            }] : []),
+            
             checkpoints: snapshot.board.tiles.flatMap((tile) => tile.checkpointNumber === undefined
               ? [] : [{ ...tile.position, checkpointNumber: tile.checkpointNumber }]),
             walls: snapshot.board.tiles.map((tile) => ({

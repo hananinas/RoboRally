@@ -1,4 +1,4 @@
-import type { Instruction } from './instructions.js'
+import type { Instruction, ResolvedInstruction } from './instructions.js'
 
 export type { UpdateRegisters } from './updateRegisters.js'
 
@@ -41,15 +41,22 @@ export type Robot = Readonly<{
   playerId: PlayerId
   colour: string
   position: Position
-  startPosition: Coordinate
 }>
 
 export type Tile = Readonly<{
   position: Coordinate
-  type: 'EMPTY' | 'PIT'
   walls?: readonly Orientation[]
   checkpointNumber?: number
-}>
+}> & (
+  | Readonly<{
+      type: 'EMPTY' | 'PIT'
+    }>
+  | Readonly<{
+    type: 'CONVEYOR'
+    sprite: string
+    direction: Orientation
+  }>
+)
 
 export type Board = Readonly<{
   width: number
@@ -141,6 +148,8 @@ export type RobotActionResolved = Readonly<{
   robotId: RobotId
   playerId: PlayerId
   instruction: Instruction
+  // What the register actually did; null when Again had nothing to repeat.
+  resolvedInstruction: ResolvedInstruction | null
   position: Position
   pushedRobots: readonly Pick<Robot, 'robotId' | 'position'>[]
 }>

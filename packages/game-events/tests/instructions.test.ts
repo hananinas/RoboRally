@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { instructions } from '../src/index.js'
+import { effects } from '../src/index.js'
 
 describe('instruction contract', () => {
   it('documents every supported instruction in AsyncAPI', () => {
@@ -8,6 +8,6 @@ describe('instruction contract', () => {
     const enumValues = spec.match(/\n    Instruction:\n      type: string\n      enum: \[([^\]]+)\]/)?.[1]
     expect(enumValues).toBeDefined()
     expect(enumValues?.split(',').map(value => value.trim()).sort())
-      .toEqual(Object.keys(instructions).sort())
+      .toEqual([...Object.keys(effects), 'AGAIN'].sort())
   })
 })
