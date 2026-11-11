@@ -26,7 +26,7 @@ describe('started game membership over Socket.IO', () => {
   })
   async function start() {
     const http = createServer()
-    sessionStore = createSessionStore()
+    sessionStore = createSessionStore({ oidcClient: { refreshToken: vi.fn() }, refreshBufferSeconds: 0 })
     server = createGameSocketServer(http, sessionStore, () => shared)
     await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve))
     url = `http://127.0.0.1:${(http.address() as AddressInfo).port}`
@@ -62,7 +62,7 @@ describe('started game membership over Socket.IO', () => {
     return { members, initializations: await Promise.all(ready) }
   }
   async function connectWithSessionId(username: string, expiresInSeconds = 3600): Promise<{ client: Client; sessionId: string }> {
-    const sessionId = sessionStore.create(username, username, 'test-id-token', expiresInSeconds)
+    const sessionId = sessionStore.create(username, username, 'test-id-token', 'test-refresh-token', expiresInSeconds)
     const client: Client = io(url, {
       autoConnect: false, transports: ['websocket'], reconnection: false, ackTimeout: 1000,
       extraHeaders: { Cookie: `game_session=${sessionId}` },
@@ -457,7 +457,6 @@ describe('started game membership over Socket.IO', () => {
         robotId: initial.assignment.robotId, playerId: initial.assignment.playerId,
         colour: initial.state.robots[0].colour,
         position: actions[4].position,
-        startPosition: initial.state.robots[0].startPosition,
       }])
       expect(snapshot.state.players[0].lastCheckpoint).toBe(1)
       expect(shared.game.board.occupantAt({ x: Integer(2), y: Integer(1) })).toBeUndefined()
@@ -513,7 +512,6 @@ describe('started game membership over Socket.IO', () => {
           robotId: joined.assignment.robotId, playerId: joined.assignment.playerId,
           colour: initializations[0].state.robots.find((robot) => robot.robotId === joined.assignment.robotId)!.colour,
           position: actions[0].findLast((action) => action.robotId === joined.assignment.robotId)!.position,
-          startPosition: initializations[0].state.robots.find((robot) => robot.robotId === joined.assignment.robotId)!.startPosition,
         })))
         expect(new Set(snapshot.state.robots.map(({ position }) =>
           `${position.coordinate.x},${position.coordinate.y}`)).size).toBe(3)

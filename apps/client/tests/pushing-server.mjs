@@ -24,9 +24,14 @@ const CARD_SEED = 3674
 const game = new Game({ board, players: [], deck: createDeckCards(), rebootTile: { x: Integer(5), y: Integer(5) }, name: 'Shared game', random: Math.random, drawRandom: seededRandom(CARD_SEED) })
 const config = parseAppConfig(process.env)
 const oidcClient = await createOidcClient(config.oidc)
-const sessionStore = createSessionStore()
+const sessionStore = createSessionStore({ oidcClient, refreshBufferSeconds: config.oidc.refreshBufferSeconds })
 const server = createServer()
-const authApp = createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl: config.kratosSettingsUrl })
+const authApp = createAuthApp({
+  oidcClient,
+  sessionStore,
+  kratosSettingsUrl: config.kratosSettingsUrl,
+  refreshTokenTtlSeconds: config.refreshTokenTtlSeconds,
+})
 server.on('request', (req, res) => {
   if (req.url?.startsWith('/auth/')) {
     authApp(req, res)

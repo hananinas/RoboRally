@@ -19,6 +19,7 @@ import {
   type Player,
 } from '@/game/index'
 import { Integer } from '@/numbers'
+import { ConveyorTile } from '@/game/Tile'
 
 const orientations: Record<Direction, Orientation> = {
   [Direction.NORTH]: 'NORTH',
@@ -43,12 +44,32 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
   }
 
   const walls = [...tile.walls].map((direction) => orientations[direction])
-  return {
-    position: { x: Integer(x), y: Integer(y) },
-    type: tile.kind,
+  
+  const common = {
+    position: { x, y },
     ...(walls.length === 0 ? {} : { walls }),
-    ...(tile.checkpointNumber === undefined ? {} : { checkpointNumber: tile.checkpointNumber }),
+    ...(tile.checkpointNumber === undefined
+      ? {}
+      : { checkpointNumber: tile.checkpointNumber }),
   }
+
+  if (tile instanceof ConveyorTile) {
+    return {
+      ...common,
+      type: tile.kind,
+      sprite: tile.sprite,
+      direction: orientations[tile.direction],
+    }
+  }
+
+  if (tile.kind === 'EMPTY' || tile.kind === 'PIT') {
+    return {
+      ...common,
+      type: tile.kind,
+    }
+  }
+
+  throw new Error(`Unsupported tile type at ${x},${y}: ${tile.kind}`)
 }
 
 export function presentPublicGameState(
@@ -79,7 +100,6 @@ export function presentPublicGameState(
         coordinate: game.board.positionOf(player.robot.id),
         orientation: orientations[player.robot.direction],
       },
-      startPosition: game.startPositionOf(player.robot.id),
     })),
     phase: phases[game.lastActivePhase],
     paused: game.paused,

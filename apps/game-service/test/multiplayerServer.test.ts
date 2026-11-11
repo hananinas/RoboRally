@@ -19,7 +19,10 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
   for (const player of players) player.deck.add(deck)
   const game = new Game({ board, players, deck, rebootTile: { x: Integer(0), y: Integer(0) }, random: () => 0 })
   const httpServer = createServer()
-  const sessionStore = createSessionStore()
+  const sessionStore = createSessionStore({
+    oidcClient: { refreshToken: () => Promise.reject(new Error('not used in this test')) },
+    refreshBufferSeconds: 0,
+  })
   const server = createGameSocketServer(httpServer, sessionStore, () => ({ gameId, game }))
   const clients: Socket<ServerToClientEvents, ClientToServerEvents>[] = []
   const events: { name: string; payload: unknown }[][] = [[], []]

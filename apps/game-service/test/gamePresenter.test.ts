@@ -101,7 +101,6 @@ describe('game presenter', () => {
             coordinate: { x: 10, y: 7 },
             orientation: 'NORTH',
           },
-          startPosition: { x: 10, y: 7 },
         },
       ],
     })

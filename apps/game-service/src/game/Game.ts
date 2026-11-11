@@ -80,6 +80,9 @@ export class Game {
   private readonly activatedRobotIds = new Set<RobotId>()
   private started = false
   private readonly startPositions = new Map<RobotId, Position>()
+  private isPaused = false
+  private isAborted = false
+  private winnerId: PlayerId | undefined
   private readonly random: () => number
   private readonly drawRandom: () => number
   // What each robot's registers resolved to this round, so Again repeats the real action.
@@ -115,7 +118,6 @@ export class Game {
       }
       playerIds.add(player.id)
       robotIds.add(player.robot.id)
-      this.startPositions.set(player.robot.id, board.positionOf(player.robot.id))
     }
 
     this.board = board
@@ -184,12 +186,6 @@ export class Game {
     return ok(undefined)
   }
 
-  startPositionOf(robotId: RobotId): Position {
-    const position = this.startPositions.get(robotId)
-    if (!position) throw new Error(`Robot ${robotId} is not in this game`)
-    return { ...position }
-  }
-
   private findSpawn(): Result<Position, 'NO_SPAWN_AVAILABLE'> {
     if (this.board.startTiles.length > 0) return this.findFreeStartTile()
 
@@ -219,7 +215,6 @@ export class Game {
         const player = new Player(randomUUID(), robot, Deck.fromTemplate(this.deck))
         player.drawHand(this.drawRandom)
         this.board.placeRobot(robot.id, position)
-        this.startPositions.set(robot.id, position)
         this.roster.push(player)
         return player
       }),
@@ -231,7 +226,6 @@ export class Game {
     if (index < 0) return { roundConcluded: false }
     const [player] = this.roster.splice(index, 1)
     this.board.removeRobot(player.robot.id)
-    this.startPositions.delete(player.robot.id)
     player.robot.clearProgram()
     this.submittedPlayerIds.delete(playerId)
     this.activatedRobotIds.delete(player.robot.id)
