@@ -5,8 +5,10 @@ import type {
   GameWon,
   PlayerConnectionChanged,
   PlayerCheckpointProgress,
+  RegistersChanged,
   RobotActionResolved,
   PlayerLeft,
+  ProgramSubmitted,
 } from '@robo-rally/game-events'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -27,11 +29,31 @@ export default function useGameConnection(socket: GameSocket) {
   const generation = useRef(0)
 
   // Keep event-time state current so submission checks see updates before React renders.
-  const dispatch = useCallback((event: GameStateEvent) => {
-    const next = gameStateReducer(current.current, event)
+  const dispatch = useCallback(function dispatch(event: GameStateEvent): void {
+    const previous = current.current
+    const next = gameStateReducer(previous, event)
     current.current = next
     setState(next)
-  }, [])
+    if (!socket.connected || !next.assignment || previous.registers === next.registers ||
+        !(event.type === 'place' || event.type === 'remove' || event.type === 'move' ||
+          event.type === 'clear' || event.type === 'undo' || event.type === 'redo') ||
+        !next.registers.some((card, index) => Boolean(card) !== Boolean(previous.registers[index]))) return
+    const requestGeneration = generation.current
+    const handVersion = next.handVersion
+    socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit('game.updateRegisters', {
+      occupied: [
+        !!next.registers[0], !!next.registers[1], !!next.registers[2],
+        !!next.registers[3], !!next.registers[4],
+      ],
+    }, (error, result) => {
+      if (!socket.connected || generation.current !== requestGeneration ||
+          current.current.handVersion !== handVersion || current.current.submission !== 'idle' ||
+          current.current.phase !== 'PROGRAMMING') return
+      if (error || result.outcome !== 'ACCEPTED') {
+        dispatch({ type: 'error', message: 'Could not share register progress with other players.' })
+      }
+    })
+  }, [socket])
 
   const initialize = useCallback((result: GameInitialization) => {
     generation.current += 1
@@ -65,6 +87,8 @@ export default function useGameConnection(socket: GameSocket) {
     const handleWon = (payload: GameWon) => receive({ type: 'won', payload })
     const handleCheckpointProgress = (payload: PlayerCheckpointProgress) =>
       receive({ type: 'checkpoint-progress', payload })
+    const handleRegistersChanged = (payload: RegistersChanged) => receive({ type: 'registers-changed', payload })
+    const handleProgramSubmitted = (payload: ProgramSubmitted) => receive({ type: 'program-submitted', payload })
 
     socket.on('disconnect', handleDisconnect)
     socket.on('connect', handleConnect)
@@ -76,6 +100,8 @@ export default function useGameConnection(socket: GameSocket) {
     socket.on('game.aborted', handleAborted)
     socket.on('game.won', handleWon)
     socket.on('player.checkpointProgress', handleCheckpointProgress)
+    socket.on('game.registersChanged', handleRegistersChanged)
+    socket.on('program.submitted', handleProgramSubmitted)
     return () => {
       generation.current += 1
       socket.off('disconnect', handleDisconnect)
@@ -88,6 +114,8 @@ export default function useGameConnection(socket: GameSocket) {
       socket.off('game.aborted', handleAborted)
       socket.off('game.won', handleWon)
       socket.off('player.checkpointProgress', handleCheckpointProgress)
+      socket.off('game.registersChanged', handleRegistersChanged)
+      socket.off('program.submitted', handleProgramSubmitted)
     }
   }, [dispatch, socket])
 

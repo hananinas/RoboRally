@@ -7,6 +7,7 @@ import type {
   ProgramResultAcknowledgement,
   ProgramResultOutcome,
   PublicGameState,
+  RegistersChanged,
   ServerToClientEvents,
   SubmitProgram,
   User,
@@ -81,6 +82,12 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
   switch (control.type) {
     case 'checkpoint-progress':
       for (const socket of fixture.sockets) socket.emit('player.checkpointProgress', control.progress)
+      break
+    case 'connection-changed':
+      for (const socket of fixture.sockets) socket.emit('game.playerConnectionChanged', control.payload)
+      break
+    case 'registers-changed':
+      for (const socket of fixture.sockets) socket.emit('game.registersChanged', control.payload)
       break
     case 'hand':
       for (const socket of fixture.sockets) socket.emit('cards.dealt', control.hand)
@@ -260,6 +267,24 @@ io.on('connection', (socket) => {
     fixture.started = false
     lobby = undefined
     acknowledge({ outcome: 'LEFT' })
+  })
+
+  socket.on('game.updateRegisters', (payload, acknowledge) => {
+    const registers: RegistersChanged['registers'] = [
+      { status: payload.occupied[0] ? 'HIDDEN' : 'EMPTY' },
+      { status: payload.occupied[1] ? 'HIDDEN' : 'EMPTY' },
+      { status: payload.occupied[2] ? 'HIDDEN' : 'EMPTY' },
+      { status: payload.occupied[3] ? 'HIDDEN' : 'EMPTY' },
+      { status: payload.occupied[4] ? 'HIDDEN' : 'EMPTY' },
+    ]
+    fixture.state = {
+      ...fixture.state,
+      players: fixture.state.players.map((player) => player.playerId === PLAYER_ID ? { ...player, registers } : player),
+    }
+    acknowledge({ outcome: 'ACCEPTED' })
+    for (const observer of fixture.sockets) observer.emit('game.registersChanged', {
+      gameId: GAME_ID, playerId: PLAYER_ID, registers,
+    })
   })
 
   socket.on('program.submit', (payload, acknowledge) => {

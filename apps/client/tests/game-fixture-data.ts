@@ -2,9 +2,11 @@ import type {
   Card,
   CardsDealt,
   PlayerCheckpointProgress,
+  PlayerConnectionChanged,
   ProgramResultOutcome,
   ProgramSubmitted,
   PublicGameState,
+  RegistersChanged,
   RobotActionResolved,
   SubmitProgram,
 } from '@robo-rally/game-events'
@@ -63,6 +65,8 @@ export const ROUND_ACTIONS: readonly RobotActionResolved[] = [
 
 export type FixtureControl =
   | { type: 'checkpoint-progress'; progress: PlayerCheckpointProgress }
+  | { type: 'connection-changed'; payload: PlayerConnectionChanged }
+  | { type: 'registers-changed'; payload: RegistersChanged }
   | { type: 'submission'; outcome: ProgramResultOutcome; deferred: boolean }
   | { type: 'acknowledge'; outcome: ProgramResultOutcome }
   | { type: 'disconnect' }
