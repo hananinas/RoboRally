@@ -397,9 +397,6 @@ components:
                   - robotId: 00000000-0000-4000-8000-000000000003
                     playerId: 00000000-0000-4000-8000-000000000002
                     colour: red
-                    startPosition:
-                      x: 0
-                      y: 0
                     position:
                       coordinate:
                         x: 0
@@ -1515,7 +1512,7 @@ components:
 
     Robot:
       type: object
-      required: [ robotId, playerId, colour, position, startPosition ]
+      required: [ robotId, playerId, colour, position ]
       properties:
         robotId:
           $ref: '#/components/schemas/RobotId'
@@ -1526,11 +1523,6 @@ components:
           description: Server-assigned colour, fixed for the lifetime of this robot.
         position:
           $ref: '#/components/schemas/Position'
-        startPosition:
-          $ref: '#/components/schemas/Coordinate'
-          description: >-
-            Starting tile the robot was placed on when the game started. It does not
-            change when the robot moves or reboots.
 
     Board:
       type: object
