@@ -17,6 +17,7 @@ export type LobbySummary = Readonly<{
   lobbyId: string
   name: string
   mapName: BoardMapName
+  mapIcon: string
   playerCount: number
   maxPlayers: number
 }>

@@ -4,6 +4,7 @@ import type { Player } from '@/game/Player'
 import type { Lobby, SessionContext } from '@/socket/sessionContext'
 import { withSessionRequest } from '@/socket/utilities/withSessionRequest'
 import { ROBOT_COLOURS } from '@/game/Robot'
+import { boardMaps } from '@/game/boardMaps'
 import {
   emptyRequestSchema, lobbyRequestSchema, createLobbyRequestSchema,
   type EmptyRequest, type LobbyRequest, type CreateLobbyRequest, type GameInitialization, type LobbyState, type User,
@@ -16,7 +17,8 @@ import type { GameSocket } from '@/socket/gameServer'
 const MAX_PLAYERS = 6
 const lobbyRoom = (id: string) => `lobby:${id}`
 export function presentLobby(lobby: Lobby): LobbyState {
-  return { lobbyId: lobby.lobbyId, name: lobby.name, mapName: lobby.mapName, ownerUserId: lobby.members.keys().next().value!,
+  return { lobbyId: lobby.lobbyId, name: lobby.name, mapName: lobby.mapName, mapIcon: boardMaps[lobby.mapName].icon,
+    ownerUserId: lobby.members.keys().next().value!,
     playerCount: lobby.members.size, maxPlayers: MAX_PLAYERS,
     players: [...lobby.members.values()].map(({ user }) => ({ userId: user.userId, username: user.username })) }
 }
@@ -44,8 +46,8 @@ export function handleListLobbies(
 ): void {
   withSessionRequest(socket, 'lobby.list', emptyRequestSchema, payload, acknowledge, (_user, ack) => {
     ack({ outcome: 'LOBBIES_FOUND', lobbies: [...context.lobbies.values()].map((lobby) => {
-      const { lobbyId, name, mapName, playerCount, maxPlayers } = presentLobby(lobby)
-      return { lobbyId, name, mapName, playerCount, maxPlayers }
+      const { lobbyId, name, mapName, mapIcon, playerCount, maxPlayers } = presentLobby(lobby)
+      return { lobbyId, name, mapName, mapIcon, playerCount, maxPlayers }
     }) })
   })
 }

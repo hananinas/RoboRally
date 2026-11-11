@@ -4,6 +4,7 @@ import type { BoardMapName, ClientToServerEvents, GameInitialization, LobbyState
 import { io, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDefaultGame } from '@/game/GameFactory'
+import { boardMaps } from '@/game/boardMaps'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
 import { createSessionStore, type SessionStore } from '@/auth/sessionStore'
 import { authCookieHeader } from './authTestHelper.ts'
@@ -100,7 +101,8 @@ describe('lobby lifecycle over Socket.IO', () => {
     const listed = await outsider.emitWithAck('lobby.list', {})
     if (listed.outcome !== 'LOBBIES_FOUND') throw new Error(listed.outcome)
     expect(listed.lobbies.find(({ lobbyId }) => lobbyId === lobby.lobbyId)).toEqual({
-      lobbyId: lobby.lobbyId, name: lobby.name, mapName: lobby.mapName, playerCount: 2, maxPlayers: 6,
+      lobbyId: lobby.lobbyId, name: lobby.name, mapName: lobby.mapName, mapIcon: boardMaps[lobby.mapName].icon,
+      playerCount: 2, maxPlayers: 6,
     })
 
     const left = new Promise<LobbyState>((resolve) => other.once('lobby.updated', ({ lobby: state }) => resolve(state)))
@@ -160,6 +162,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     const owner = await connect('Map Owner')
     const lobby = await create(owner, 'empty-map')
     expect(lobby.mapName).toBe('empty-map')
+    expect(lobby.mapIcon).toBe(boardMaps['empty-map'].icon)
 
     const ready = started(owner)
     expect((await owner.emitWithAck('lobby.start', {})).outcome).toBe('STARTED')
