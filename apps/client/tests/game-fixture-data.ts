@@ -9,6 +9,7 @@ import type {
   PublicGameState,
   RegistersChanged,
   RobotActionResolved,
+  RobotSpriteId,
   SubmitProgram,
 } from '@robo-rally/game-events'
 
@@ -89,8 +90,8 @@ export type FixtureSnapshot = {
   submissions: readonly SubmitProgram[]
   entryRequests: readonly (
     | { event: 'session.get' | 'lobby.start'; socketId: string; payload: Record<string, never> }
-    | { event: 'lobby.create'; socketId: string; payload: { mapName?: BoardMapName } }
-    | { event: 'lobby.join'; socketId: string; payload: { lobbyId: string } }
+    | { event: 'lobby.create'; socketId: string; payload: { mapName?: BoardMapName; robotSpriteId?: RobotSpriteId } }
+    | { event: 'lobby.join'; socketId: string; payload: { lobbyId: string; robotSpriteId?: RobotSpriteId } }
   )[]
   pendingStarts: number
 }

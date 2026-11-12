@@ -39,9 +39,10 @@ test('a lobby robot selection is used by every client during gameplay', async ({
     await browse(page, 'bence')
     await createLobby(page)
     await browse(other, 'dane')
+    await other.getByRole('group', { name: 'Choose a robot' }).getByRole('button', { name: 'Scout robot' }).click()
     await other.getByRole('list', { name: 'Lobbies' }).getByRole('button', { disabled: false }).first().click()
     await other.getByRole('button', { name: 'Join game', exact: true }).click()
-    await other.getByRole('group', { name: 'Choose a robot' }).getByRole('button', { name: 'Scout robot' }).click()
+    await expect(other.getByRole('group', { name: 'Choose a robot' }).getByRole('button', { name: 'Scout robot' })).toHaveAttribute('aria-pressed', 'true')
     await expect(page.getByRole('list', { name: 'Connected players' }).getByRole('img', { name: 'Scout robot' })).toBeVisible()
     await page.getByRole('button', { name: 'Start', exact: true }).click()
 

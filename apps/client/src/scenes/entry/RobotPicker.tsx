@@ -17,8 +17,8 @@ export default function RobotPicker({ selectedRobotId, disabled, onSelect }: Pro
 
   function chooseRobot(robotSpriteId: RobotSpriteId) {
     setOptimisticSelection(robotSpriteId)
-    void onSelect(robotSpriteId).then((saved) => {
-      if (!saved) setOptimisticSelection(null)
+    void onSelect(robotSpriteId).then(() => {
+      setOptimisticSelection(null)
     })
   }
 

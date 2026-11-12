@@ -66,6 +66,30 @@ test('selects a robot in the waiting lobby', async ({ page }) => {
   await expect(page.getByRole('list', { name: 'Connected players' }).getByLabel('Scout robot')).toBeVisible()
 })
 
+test('keeps a robot selected before creating a lobby', async ({ page, game }) => {
+  await page.goto('/')
+  const picker = page.getByRole('group', { name: 'Choose a robot' })
+  await picker.getByRole('button', { name: 'Guardian robot' }).click()
+  await expect(page.getByRole('heading', { name: 'Guardian', exact: true })).toBeVisible()
+  await createLobby(page)
+
+  await expect(page.getByRole('list', { name: 'Connected players' }).getByLabel('Guardian robot')).toBeVisible()
+  const createdLobby = (await game.snapshot()).entryRequests.find((request) => request.event === 'lobby.create')
+  expect(createdLobby).toMatchObject({ payload: { robotSpriteId: 'guardian' } })
+})
+
+test('keeps a robot selected before joining a lobby', async ({ page, game }) => {
+  await page.goto('/')
+  const picker = page.getByRole('group', { name: 'Choose a robot' })
+  await picker.getByRole('button', { name: 'Sentinel robot' }).click()
+  await page.getByRole('list', { name: 'Lobbies' }).getByRole('button', { name: /Lobby 1/ }).click()
+  await page.getByRole('button', { name: 'Join game', exact: true }).click()
+
+  await expect(page.getByRole('list', { name: 'Connected players' }).getByLabel('Sentinel robot')).toBeVisible()
+  const joinedLobby = (await game.snapshot()).entryRequests.find((request) => request.event === 'lobby.join')
+  expect(joinedLobby).toMatchObject({ payload: { robotSpriteId: 'sentinel' } })
+})
+
 test('a disconnected member during Start leaves the owner waiting and able to retry', async ({ page, game }) => {
   await game.control({ type: 'start', deferred: false, outcome: 'LOBBY_MEMBER_DISCONNECTED' })
   await page.goto('/')

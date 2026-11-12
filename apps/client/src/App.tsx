@@ -21,7 +21,7 @@ function errorMessage(code: string): string {
 
 function App() {
   const {
-    connection, game, session, busy, lobbies, maps, mapsLoaded, listError,
+    connection, game, session, busy, lobbies, maps, mapsLoaded, listError, selectedRobotId,
     createLobby, joinLobby, startLobby, leaveSession, refreshLobbies, retrySession, selectRobot,
   } = useSessionConnection()
 
@@ -62,8 +62,12 @@ function App() {
       <button className="entry-secondary-button" type="button" disabled={busy || connection.status === 'connecting'} onClick={retrySession}>Retry</button>
     </>
   }
-  return <EntryScreen onLogout={connection.status === 'connected' || session.user ? logout : undefined} aside={session.status === 'waiting' ? <RobotPicker
-    selectedRobotId={session.lobby.players.find((player) => player.userId === session.user.userId)?.robotSpriteId ?? 'tank'}
+  const currentUserId = session.user?.userId
+  const lobbyPlayerSpriteId = session.status === 'waiting' && currentUserId
+    ? session.lobby.players.find((player) => player.userId === currentUserId)?.robotSpriteId
+    : undefined
+  return <EntryScreen onLogout={connection.status === 'connected' || session.user ? logout : undefined} aside={session.status === 'waiting' || session.status === 'browsing' ? <RobotPicker
+    selectedRobotId={lobbyPlayerSpriteId ?? selectedRobotId}
     disabled={busy || connection.status !== 'connected'}
     onSelect={selectRobot}
   /> : undefined}>

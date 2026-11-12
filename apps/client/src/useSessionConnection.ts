@@ -10,6 +10,7 @@ export default function useSessionConnection() {
   const game = useGameConnection(socket)
   const { initialize, dispatch: dispatchGame } = game
   const [session, setSession] = useState(createSessionState)
+  const [selectedRobotId, setSelectedRobotId] = useState<RobotSpriteId>('tank')
   const current = useRef(session)
   const generation = useRef(0)
   const pending = useRef(false)
@@ -111,18 +112,30 @@ export default function useSessionConnection() {
   function joinLobby(lobbyId: string) {
     if (pending.current || !socket.connected) return
     dispatch({ type: 'lobby-requested', lobbyId })
-    void run(async () => ({ type: 'lobby-result', result: await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.join', { lobbyId }) }))
+    void run(async () => ({
+      type: 'lobby-result',
+      result: await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.join', {
+        lobbyId, robotSpriteId: selectedRobotId,
+      }),
+    }))
   }
   function createLobby(mapName: BoardMapName, name: string) {
     if (pending.current || !socket.connected) return
     dispatch({ type: 'lobby-requested', lobbyId: null })
     void run(async () => ({
       type: 'lobby-result',
-      result: await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.create', { mapName, name }),
+      result: await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.create', {
+        mapName, name, robotSpriteId: selectedRobotId,
+      }),
     }))
   }
   async function selectRobot(robotSpriteId: RobotSpriteId): Promise<boolean> {
-    if (pending.current || !socket.connected || current.current.status !== 'waiting') return false
+    if (pending.current || !socket.connected) return false
+    if (current.current.status === 'browsing') {
+      setSelectedRobotId(robotSpriteId)
+      return true
+    }
+    if (current.current.status !== 'waiting') return false
     pending.current = true
     setBusy(true)
     const attempt = generation.current
@@ -131,6 +144,7 @@ export default function useSessionConnection() {
         .emitWithAck('lobby.selectRobot', { robotSpriteId })
       if (generation.current !== attempt || !socket.connected) return false
       if (result.outcome === 'ROBOT_SELECTED') {
+        setSelectedRobotId(robotSpriteId)
         dispatch({ type: 'lobby-updated', lobby: result.lobby })
         return true
       }
@@ -167,7 +181,7 @@ export default function useSessionConnection() {
   }
 
   return {
-    connection, game, session, busy, lobbies, maps, mapsLoaded, listError,
+    connection, game, session, busy, lobbies, maps, mapsLoaded, listError, selectedRobotId,
     joinLobby, startLobby, leaveSession, refreshLobbies,
     createLobby,
     selectRobot,
