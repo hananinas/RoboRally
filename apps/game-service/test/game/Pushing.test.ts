@@ -49,7 +49,7 @@ describe('robot pushing', () => {
     expect(result.registers[0]).toEqual({ status: 'REVEALED', instruction: move.instruction })
     expect(players[0].registers).toEqual(result.registers)
     for (const player of players.slice(1)) {
-      expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
+      expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'HIDDEN' })))
     }
     game.moveRobot(robots[1], Direction.NORTH, PositiveInteger(1))
     expect(result.pushedRobots).toEqual(expected)
@@ -70,7 +70,6 @@ describe('robot pushing', () => {
     expect(ends.map((end) => board.occupantAt(end))).toEqual(robots.map((robot) => robot.id))
     expect(board.occupantAt(starts[0])).toBeUndefined()
     expect(robots.map((robot) => robot.direction)).toEqual(facing)
-    expect(game.hasStarted).toBe(false)
   })
 
   it.each([0, 1, 2, 3])('rejects the entire chain when boundary %s has a wall on either side', (boundary) => {

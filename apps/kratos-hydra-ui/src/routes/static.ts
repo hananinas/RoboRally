@@ -13,12 +13,15 @@ export const registerStaticRoutes: RouteRegistrator = (
   createHelpers = defaultConfig,
 ) => {
   RegisterOryElementsExpress(app, defaultLightTheme, createHelpers)
-  app.use("/", express.static("public"))
+  app.use("/", express.static(`${__dirname}/../../public`))
   app.use("/.well-known/ory/webauthn.js", (req, res) => {
     res.contentType("text/javascript")
     sdk.frontend.getWebAuthnJavaScript().then(({ data }) => {
       res.send(data)
     })
   })
-  app.use("/", express.static("node_modules/@ory/elements-markup/dist/"))
+  app.use(
+    "/",
+    express.static(`${__dirname}/../../node_modules/@ory/elements-markup/dist/`),
+  )
 }

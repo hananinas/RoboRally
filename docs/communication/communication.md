@@ -86,6 +86,22 @@ The following diagram documents the lobby lifecycle:
 Source: [figures/lobby-lifecycle.mmd](figures/lobby-lifecycle.mmd)
 
 ## Game has started
+### Game lifecycle
+A game is always in one lifecycle state: `active`, `paused`, `aborted`, or `finished`. While the game is `active` it can be in one of these phases: `programming` or `activation`. A phase only exists while the game is active. Pausing does not clear the current phase, it is remembered and restored once the game resumes.
+
+The diagram below shows every state and every transition between them:
+
+![Game lifecycle](game-lifecycle-statemachine.svg)
+
+- **`programming` → `activation`**, once every player has submitted their program. See [Programming](#programming).
+- **`activation` → `programming`**, once all five registers have resolved and no robot has won. See [Dealing the next hand](#dealing-the-next-hand).
+- **`active` → `finished`**, when a robot completes the final checkpoint. See [Winning](#winning).
+- **`active` → `paused`**, when a player disconnects. See [Pausing on disconnection](#pausing-on-disconnection).
+- **`paused` → `active`**, once every disconnected player has reconnected. The game resumes in the same phase it paused in. See [Restoring the connections](#restoring-the-connections).
+- **`active` or `paused` → `aborted`**, on an unrecoverable service failure. See [Aborting](#aborting).
+
+`aborted` and `finished` are final: once a game reaches either one, it does not change state again.
+
 ### Initialization
 The service creates a fresh game, moves every member into its public and private player rooms, and removes the lobby room and record. The service sends each player the following through their own `game:{gameId}:player:{playerId}` room:
 
@@ -132,7 +148,23 @@ The first accepted `program.submit` starts a shared 30-second countdown. The ser
 
 `program.timerChanged {gameId, serverTime, timer}`
 
-`serverTime` and `deadline` are Unix timestamps in milliseconds. Clients use them to display the countdown. `PublicGameState.programmingTimer` contains the same timer state.
+`serverTime` and `deadline` are Unix timestamps in milliseconds. `PublicGameState.programmingTimer` contains the same timer state.
+
+An authenticated connection can send `clock.get {}` to obtain `CLOCK {serverTime}`
+through its acknowledgement. The service reads the timestamp immediately before
+sending the reply, allowing clients to measure a round trip and estimate the
+server clock. No lobby or game membership is required. Invalid payloads receive
+`INVALID_REQUEST`; the request does not change game state or broadcast events.
+
+When a RUNNING timer arrives or a connection resumes, the client samples `clock.get`,
+recording `sentAt` and `receivedAt` with `performance.now()`. In the reply callback,
+it estimates `midpoint = sentAt + (receivedAt - sentAt) / 2` and anchors
+`localDeadline = midpoint + (deadline - serverTime)` using the reply's timestamp.
+The display counts down from `localDeadline - performance.now()`, independently of
+timer-event delivery, rendering delays and the browser's wall clock. The midpoint
+assumes similar travel times in both directions; the server enforces the deadline.
+Old connection or timer replies are ignored. A failed sample keeps an existing
+estimate; without one, the numeric countdown stays hidden until a sample succeeds.
 
 | State | Payload | Meaning |
 |---|---|---|
@@ -145,6 +177,8 @@ When all players submit or the deadline expires, the service finalizes the progr
 For both submission and timeout, the public room receives `game.registersChanged` with five HIDDEN slots and `program.submitted`. The service sends finalization events before the CLOSED timer event, followed by activation events. Further programming requests receive `WRONG_PHASE`.
 
 On reconnect, the service sends the current timer with a fresh `serverTime`; `session.get` includes the timer and the player's private program. The existing [reconnection flow](#game-membership) applies.
+
+A disconnect pauses gameplay without extending the programming deadline. At expiry, the service finalizes programs and sends CLOSED; activation waits until all remaining members are connected.
 
 #### Timer sequence
 
@@ -221,7 +255,7 @@ The event follows the related `robot.actionResolved`.
 ### Winning
 A player wins when their robot completes the final checkpoint, so `lastCheckpoint` reaches `checkpointCount`. Like every checkpoint, this is checked at the end of a register. Robots cannot share a space, so only one robot can win. A board without checkpoints has no winner.
 
-The game ends at once: remaining registers are not resolved and no new hand is dealt. The service broadcasts to the [public room](#rooms):
+This is the `active` → `finished` transition, and it is final. The game ends at once: remaining registers are not resolved and no new hand is dealt. The service broadcasts to the [public room](#rooms):
 
 `game.won {gameId, playerId, username}`
 
@@ -231,9 +265,14 @@ After a win, `program.submit` is rejected with `GAME_FINISHED`. Players leave wi
 
 The client shows the winner once the remaining actions have played, with a button to leave the game.
 
+### Aborting
+If the service hits a failure it cannot recover from, the game moves straight to `aborted`, from either `active` or `paused`. This is a safety mechanism and not an expected part of play like winning or pausing. Like winning it is game ending and permanent.
+
+The server broadcasts this to the [public room](#rooms) with `game.aborted {gameId}`. See [Errors and rejections](#errors-and-rejections) for the full payload.
+
 ### Dealing the next hand
 
-After all five registers have been resolved, the service deals each player a private hand for the next programming round.
+After all five registers have been resolved, the service deals each player a private hand for the next programming round. This is the `activation` → `programming` transition.
 
 Each player receives:
 
@@ -241,11 +280,11 @@ Each player receives:
 
 through the player's [private room](#rooms).
 
-A new hand may arrive while the client is still playing animations from the previous activation. The client should store the new hand immediately but must not enable programming until all queued resolved actions have finished playing.
+A new hand may arrive while the client is still playing animations from the previous activation. The client stores the new hand immediately and enables programming after queued resolved actions have finished playing. If another player starts the shared timer first, the client finishes that playback immediately so the hand becomes available.
 
 The new hand also opens the next programming round, so the client resets every player's registers to five EMPTY slots when its own hand arrives. A player who reconnects after that point gets the reset registers from `session.get`.
 
-The service sends each private hand before broadcasting `program.timerChanged` with `IDLE` for the new round.
+The service sends each private hand before broadcasting `program.timerChanged` with `IDLE` for the new round. If the next round timer starts while a client is still playing the previous round, the client finishes queued actions immediately and makes the new hand available.
 
 ### Game sequence
 
@@ -264,7 +303,9 @@ A player's game membership and their authenticated session are both independent 
 A membership can only be owned by one live connection at a time: the first connection to reclaim it — whether through automatic Socket.IO recovery or an explicit `session.get {}` — becomes its owner, and a later connection attempting the same claim receives `USER_ALREADY_IN_SESSION` instead, leaving the authenticated session unaffected.
 
 #### Pausing on disconnection
-When the server detects that a player has disconnected, it pauses the game. An action already in progress completes, but no subsequent action is executed. The current game state is preserved. The server announces this to the [public room](#rooms):
+When the server detects that a player has disconnected, it pauses the game. This is the `active` → `paused` transition: no further action executes until the game resumes, including one that was already scheduled when the disconnect was detected. The current game state is preserved, including the current phase (`programming` or `activation`).
+
+The server announces this to the [public room](#rooms):
 
 `game.playerConnectionChanged {gameId, playerId, connected: false, paused: true}`
 
@@ -284,6 +325,8 @@ If recovery succeeds, Socket.IO replays the missed events. The client applies th
 
 ![Successful connection state recovery sequence](figures/reconnect-recovery-success.svg)
 
+After connection recovery, a client with an unacknowledged or failed register save requests `session.get` before enabling programming. It restores the authoritative private selection or finalized program from that snapshot.
+
 Source: [figures/reconnect-recovery-success.mmd](figures/reconnect-recovery-success.mmd)
 
 ##### Failed connection state recovery
@@ -293,7 +336,7 @@ If state recovery is unsuccessful, the client reinitializes by sending `session.
 
 Source: [figures/reconnect-recovery-failure.mmd](figures/reconnect-recovery-failure.mmd)
 
-The game remains paused while any remaining player is disconnected. Once all remaining players are connected, the same `game.playerConnectionChanged` event (now with `paused: false`) announces that the game has resumed, and gameplay continues from the preserved game state.
+The game remains paused while any remaining player is disconnected. Once all remaining players are connected, the same `game.playerConnectionChanged` event (now with `paused: false`) announces that the game has resumed. This is the `paused` → `active` transition: the game resumes in the phase it was in before pausing, and gameplay continues from the preserved game state.
 
 #### Leaving a game
 
@@ -304,4 +347,3 @@ An explicit `game.leave {}` removes the owning connection's player and robot, fr
 Most commands acknowledge failures with a specific outcome string rather than throwing. See [AsyncAPI](asyncapi.yaml), with a [rendered reference](asyncapi.html), for the exact payload shapes and the full set of rejection codes per command.
 
 If an unexpected service failure makes gameplay unrecoverable, members receive `game.aborted {gameId}` through the [public room](#rooms), and the game ends permanently.
-

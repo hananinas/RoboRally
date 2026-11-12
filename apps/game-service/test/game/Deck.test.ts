@@ -85,10 +85,10 @@ describe('Game card cycle', () => {
     expect(first.deck.discarded).toBe(HAND_SIZE - 5)
     expect(first.deck.size).toBe(19 - HAND_SIZE)
     expect(game.submitProgram(second.id, second.hand.slice(0, 5).map((card) => card.id)).isOk()).toBe(true)
-    expect(game.phase).toBe('activation')
+    expect(game.lastActivePhase).toBe('activation')
     for (let i = 0; i < 10; i++) game.executeNextAction()
 
-    expect(game.phase).toBe('programming')
+    expect(game.lastActivePhase).toBe('programming')
     expect(first.hand).toHaveLength(HAND_SIZE)
     // 19-card deck: 9 drawn, 10 left, so the next hand has no overlap with the previous one.
     expect(first.hand.some((card) => firstIds.has(card.id))).toBe(false)

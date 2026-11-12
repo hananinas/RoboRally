@@ -1,4 +1,4 @@
-import { emptyRequestSchema, lobbyRequestSchema, type LobbyFailure, type User } from '@robo-rally/game-events'
+import { createLobbyRequestSchema, emptyRequestSchema, lobbyRequestSchema, type LobbyFailure, type User } from '@robo-rally/game-events'
 import { logError, logWarn } from '@/logger'
 import type { GameSocket } from '@/socket/gameServer'
 import { withAcknowledgeOnce } from '@/socket/utilities/acknowledgeOnce'
@@ -6,7 +6,7 @@ import { withAcknowledgeOnce } from '@/socket/utilities/acknowledgeOnce'
 export function withSessionRequest<R>(
   socket: GameSocket,
   command: string,
-  schema: typeof emptyRequestSchema | typeof lobbyRequestSchema,
+  schema: typeof emptyRequestSchema | typeof lobbyRequestSchema | typeof createLobbyRequestSchema,
   payload: unknown,
   acknowledge: (result: R | LobbyFailure) => void,
   run: (user: User, ack: (result: R | LobbyFailure) => void) => void,

@@ -1,0 +1,176 @@
+.other-players {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  width: fit-content;
+  max-width: 100%;
+  pointer-events: none;
+  font: 13px system-ui, sans-serif;
+}
+
+.other-player {
+  position: relative;
+  width: 148px;
+  max-width: 100%;
+  height: 66px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0 11px 11px 0;
+  background: #405769;
+  box-shadow: 0 3px #253746;
+  color: #edf3f8;
+  text-align: left;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.other-player:hover { background: #4b6477; }
+.other-player:active { background: #354b5e; }
+.other-player:focus-visible { outline: 2px solid #edf3f8; outline-offset: -3px; }
+
+.other-player__name,
+.other-player__checkpoints {
+  position: absolute;
+  left: 48px;
+  right: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.other-player__name { top: 7px; font-size: 13px; }
+
+.other-player::before {
+  content: '';
+  position: absolute;
+  left: 18px;
+  top: 12px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--robot-colour);
+  box-shadow: inset 1px 2px #ffffff60, 0 3px #0004;
+}
+
+.other-player__checkpoints { top: 26px; font-size: 11px; color: #d1dce5; }
+.other-player__registers {
+  position: absolute;
+  left: 48px;
+  top: 46px;
+  display: flex;
+  gap: 7px;
+}
+
+.other-player__slot {
+  box-sizing: border-box;
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border: 1px solid #b1c1ce;
+  border-radius: 50%;
+}
+
+.other-player__slot--hidden,
+.other-player__slot--revealed { background: #a3b7c8; }
+
+.other-player__slot-number,
+.other-player__slot-label { display: none; }
+
+.other-player[aria-expanded='true'] {
+  z-index: 1;
+  width: min(394px, 100vw);
+  background: #4b6477;
+}
+
+.other-player[aria-expanded='true'] .other-player__name,
+.other-player[aria-expanded='true'] .other-player__checkpoints {
+  right: auto;
+  max-width: 100px;
+  transform: translateY(-3px);
+}
+
+.other-player[aria-expanded='true'] .other-player__registers {
+  left: 156px;
+  right: 7px;
+  top: 7px;
+  gap: 4px;
+}
+
+.other-player[aria-expanded='true'] .other-player__slot {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  min-width: 0;
+  height: 50px;
+  padding: 12px 2px 0;
+  border-radius: 6px;
+  background: #536e82;
+  box-shadow: inset 0 1px #ffffff40, 0 3px #263a4b;
+  color: #edf3f8;
+  font-size: 11px;
+  text-align: center;
+}
+
+.other-player[aria-expanded='true'] .other-player__slot-number {
+  display: block;
+  position: absolute;
+  left: 4px;
+  top: 3px;
+  color: #d1dce5;
+  font-size: 9px;
+}
+
+.other-player[aria-expanded='true'] .other-player__slot-label { display: block; }
+.other-player[aria-expanded='true'] .other-player__slot--empty {
+  border-style: dashed;
+  background: #354b5e;
+  color: #d1dce5;
+}
+
+@media (max-width: 393px) {
+  .other-player[aria-expanded='true'] .other-player__registers { left: 128px; }
+  .other-player[aria-expanded='true'] .other-player__name,
+  .other-player[aria-expanded='true'] .other-player__checkpoints { max-width: 72px; }
+}
+
+.other-player__status {
+  position: absolute;
+  left: 48px;
+  top: 46px;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #d1dce5;
+  font-size: 10px;
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+}
+
+.other-player[aria-expanded='true'] .other-player__status { opacity: 1; }
+.other-player__slot--past { background: #7f909f; opacity: 0.5; }
+.other-player__slot--future { background: #607383; }
+.other-player__slot--current { background: var(--robot-colour); border-color: var(--robot-colour); }
+
+.other-player[aria-expanded='true'] .other-player__slot--past {
+  background: #394c5b;
+  color: #c3d0da;
+  opacity: 1;
+}
+
+.other-player[aria-expanded='true'] .other-player__slot--current {
+  background: var(--robot-colour);
+  color: var(--robot-ink);
+  border-color: #edf3f8;
+  transform: translateY(-2px);
+}
+
+.other-player[aria-expanded='true'] .other-player__slot--current .other-player__slot-number { color: inherit; }
+
+@media (prefers-reduced-motion: reduce) {
+  .other-player__status { transition: none; }
+}

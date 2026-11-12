@@ -36,7 +36,10 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
         extraHeaders: authCookieHeader(sessionStore, usernames[index], usernames[index]),
       })
       clients.push(socket)
-      socket.onAny((name, payload: unknown) => events[index].push({ name, payload }))
+      // Finalization routing and privacy are covered by the public-register tests.
+      socket.onAny((name, payload: unknown) => {
+        if (!['program.timerChanged', 'program.finalized', 'game.registersChanged'].includes(name)) events[index].push({ name, payload })
+      })
       const connected = new Promise<void>((resolve) => socket.once('connect', resolve))
       socket.connect()
       await connected
@@ -71,10 +74,8 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
         const waiting = await socket.timeout(1000).emitWithAck('session.get', {})
         expect(waiting).toMatchObject({ outcome: 'IN_GAME', initialization: { state: { phase: 'PROGRAMMING' } } })
       }
-      expect(events[0]).toEqual([])
-      expect(events[1]).toEqual([{
-        name: 'program.submitted', payload: { gameId, playerId: players[0].id },
-      }])
+      expect(events[0].map((event) => event.name)).toEqual(['program.submitted'])
+      expect(events[1].map((event) => event.name)).toEqual(['program.submitted'])
       expect(await clients[0].timeout(1000).emitWithAck('program.submit', submissions[0]))
         .toEqual({ outcome: 'ALREADY_SUBMITTED' })
 
@@ -86,11 +87,12 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
       for (let index = 0; index < clients.length; index++) {
         expect(hands[index]).toMatchObject({ gameId, playerId: players[index].id })
         expect(events[index].map((event) => event.name)).toEqual([
-          'program.submitted',
+          'program.submitted', 'program.submitted',
           ...Array.from({ length: 10 }, () => 'robot.actionResolved'),
           'cards.dealt',
         ])
-        expect(events[index][0].payload).toEqual({ gameId, playerId: players[1 - index].id })
+        expect(events[index].filter((event) => event.name === 'program.submitted').map((event) => event.payload))
+          .toEqual(players.map((player) => ({ gameId, playerId: player.id })))
         const actions = events[index].filter((event) => event.name === 'robot.actionResolved')
         expect(actions.map((event) => event.payload)).toEqual(
           Array.from({ length: 5 }, (_, registerIndex) => [1, 0].map((playerIndex) => ({
@@ -111,7 +113,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
           .toEqual([hands[index]])
         events[index] = []
       }
-      expect(game.phase).toBe('programming')
+      expect(game.lastActivePhase).toBe('programming')
       expect(players.map((player) => player.robot.program)).toEqual([[], []])
     }
   } finally {

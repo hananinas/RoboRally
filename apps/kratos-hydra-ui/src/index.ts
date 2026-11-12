@@ -73,6 +73,7 @@ app.use(addFavicon(defaultConfig))
 app.use(detectLanguage)
 app.use(bodyParser.urlencoded({ extended: false }))
 app.set("view engine", "hbs")
+app.set("views", `${__dirname}/../views`)
 
 app.engine(
   "hbs",
