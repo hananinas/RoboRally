@@ -230,6 +230,14 @@ function finishPlayback(state: ClientGameState): ClientGameState {
   })
 }
 
+// A timer started by another client must make the new hand available immediately.
+function finishPreviousRound(state: ClientGameState): ClientGameState {
+  if (state.phase !== 'PROGRAMMING' || !state.pendingHand || state.programmingTimer.status !== 'RUNNING') return state
+  let playback = state.playback
+  while (playback.active) playback = robotPlaybackReducer(playback, { type: 'complete' })
+  return finishPlayback(updatePlayback(state, playback))
+}
+
 function registersForPlayback(state: ClientGameState, playback: RobotPlaybackState): ReadonlyMap<PlayerId, PublicRegisters> | null {
   return playback.active === state.playback.active
     ? state.playbackRegisters
@@ -383,7 +391,7 @@ export function gameStateReducer(
       const hand = event.hand
       if (!isHandEligible(state, hand) ||
         (state.phase === 'PROGRAMMING' && (state.handReady || state.pendingHand))) return state
-      return activateHand({
+      return finishPreviousRound(activateHand({
         ...state,
         phase: 'PROGRAMMING',
         handReady: false,
@@ -393,7 +401,7 @@ export function gameStateReducer(
           programSubmitted: false,
           registers: [{ status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }],
         })),
-      })
+      }))
     }
     case 'action': {
       const actionPlayerId = event.action.playerId
@@ -501,7 +509,7 @@ export function gameStateReducer(
     }
     case 'timer-changed':
       if (event.payload.gameId !== state.assignment?.gameId) return state
-      return { ...state, programmingTimer: event.payload.timer }
+      return finishPreviousRound({ ...state, programmingTimer: event.payload.timer })
     case 'result': {
       if (event.handVersion !== state.handVersion || state.submission !== 'pending') return state
       if (event.result.outcome === 'ACCEPTED' || event.result.outcome === 'ALREADY_SUBMITTED') {

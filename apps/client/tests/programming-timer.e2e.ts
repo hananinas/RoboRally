@@ -1,5 +1,5 @@
 import { expect, openGame, test } from './game-fixture.ts'
-import { GAME_ID, PLAYER_ID } from './game-fixture-data.ts'
+import { GAME_ID, PLAYER_ID, ROUND_ACTIONS } from './game-fixture-data.ts'
 
 test('corrects delivery delay, ignores stale clock replies and waits for server finalization', async ({ page, game }) => {
   await page.clock.install({ time: new Date('2040-01-01T00:00:00Z') })
@@ -128,3 +128,20 @@ for (const mode of ['drop', 'save-without-ack'] as const) {
     })
   }
 }
+
+
+test('makes the next hand editable immediately when a timer starts during playback', async ({ page, game }) => {
+  await page.clock.install()
+  await openGame(page)
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
+  await game.control({ type: 'round', actions: Array.from({ length: 6 }, () => ROUND_ACTIONS).flat() })
+  const hand = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
+  await expect(hand.first()).toBeDisabled()
+  const serverTime = 1_900_000_000_000
+  await game.control({ type: 'clock', serverTime, deferred: false })
+  await game.control({ type: 'timer', serverTime, timer: { status: 'RUNNING', deadline: serverTime + 30_000 } })
+  await expect(hand.first()).toBeEnabled()
+  await expect(page.getByRole('timer')).toHaveText('Time remaining: 30s')
+  await hand.first().click()
+  await expect(page.locator('.registers').getByRole('button', { name: /remove from register/ })).toHaveCount(1)
+})

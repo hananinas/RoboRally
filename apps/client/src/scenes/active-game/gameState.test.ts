@@ -970,3 +970,34 @@ describe('membership updates', () => {
     expect(updated.playback.robots.some((robot) => robot.robotId === robotId)).toBe(false)
   })
 })
+
+
+it('finishes a six-player playback queue when the next round timer starts', () => {
+  const players = Array.from({ length: 6 }, (_, index) => ({ ...publicState.players[0], playerId: `player-${index}` }))
+  const robots = players.map((player, index) => ({ ...publicState.robots[0], playerId: player.playerId, robotId: `robot-${index}` }))
+  let state = gameStateReducer(createClientGameState(), { type: 'joined', result: {
+    ...result, assignment: { ...result.assignment, playerId: players[0].playerId, robotId: robots[0].robotId },
+    state: { ...publicState, players, robots },
+  } })
+  for (const action of actions) {
+    for (const robot of robots) state = gameStateReducer(state, { type: 'action', action: { ...action, robotId: robot.robotId, playerId: robot.playerId } })
+  }
+  state = gameStateReducer(state, { type: 'dealt', hand: { ...hand, playerId: players[0].playerId } })
+  expect(state.playback.pending).toHaveLength(29)
+  expect(canProgram(state)).toBe(false)
+  state = gameStateReducer(state, { type: 'timer-changed', payload: {
+    gameId: publicState.gameId, serverTime: 0, timer: { status: 'RUNNING', deadline: 30_000 },
+  } })
+  expect(state.playback.active).toBeNull()
+  expect(state.playback.pending).toHaveLength(0)
+  for (const robot of state.playback.robots) expect(robot.position).toEqual(actions[4].position)
+  expect(state.pendingHand).toBeNull()
+  expect(canProgram(state)).toBe(true)
+  const program = [cards[0], cards[1], cards[2], cards[3], cards[4]] as const
+  state = gameStateReducer(state, { type: 'program-finalized', payload: {
+    gameId: publicState.gameId, playerId: players[0].playerId, reason: 'TIMEOUT', cards: program,
+  } })
+  state = gameStateReducer(state, { type: 'complete' })
+  expect(state.registers).toEqual(program)
+  expect(canProgram(state)).toBe(false)
+})
