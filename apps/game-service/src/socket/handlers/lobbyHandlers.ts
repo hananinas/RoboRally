@@ -33,7 +33,15 @@ function presentBoardMaps() {
     mapName,
     name: map.name,
     icon: map.icon,
+    defaultForLobbyCreation: map.defaultForLobbyCreation,
   }))
+}
+
+function defaultLobbyMapName(): BoardMapName {
+  const mapName = (Object.keys(boardMaps) as BoardMapName[])
+    .find((name) => boardMaps[name].defaultForLobbyCreation)
+  if (!mapName) throw new Error('No default map is configured for lobby creation')
+  return mapName
 }
 
 export function leaveLobby(context: SessionContext, socket: GameSocket): void {
@@ -76,7 +84,7 @@ export function handleCreateLobby(
   acknowledge: (result: LobbyJoinResult) => void,
 ): void {
   withSessionRequest(socket, 'lobby.create', createLobbyRequestSchema, payload, acknowledge, (user, ack) => {
-    const mapName = payload.mapName ?? 'test-map'
+    const mapName = payload.mapName ?? defaultLobbyMapName()
     if (!isBoardMapName(mapName)) return ack({ outcome: 'INVALID_REQUEST' })
     const session = context.sessionsByUser.get(user.userId)
     if (session) {

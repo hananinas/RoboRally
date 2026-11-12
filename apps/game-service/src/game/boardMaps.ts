@@ -30,6 +30,7 @@ export type ConveyorSpec = Readonly<{
 }>
 
 export type MapSpec = BoardMap & Readonly<{
+  defaultForLobbyCreation: boolean
   width: number
   height: number
   antenna: Antenna
@@ -45,6 +46,7 @@ export const boardMaps = {
   'empty-map': {
     name: 'Empty Map',
     icon: `data:image/svg+xml;base64,${Buffer.from(EMPTY_MAP_SVG).toString('base64')}`,
+    defaultForLobbyCreation: false,
     maxPlayers: 6,
     width: 21,
     height: 15,
@@ -57,6 +59,7 @@ export const boardMaps = {
   'test-map': {
     name: 'Test Map',
     icon: `data:image/svg+xml;base64,${Buffer.from(TEST_MAP_SVG).toString('base64')}`,
+    defaultForLobbyCreation: true,
     maxPlayers: 6,
     width: 16,
     height: 15,

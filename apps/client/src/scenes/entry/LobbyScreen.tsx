@@ -99,7 +99,7 @@ export default function LobbyScreen({ username, lobbies, maps, mapsLoaded, pendi
       {!mapsLoaded && <p role="status">Loading maps…</p>}
       {mapsLoaded && maps.length === 0 && <p role="status">No maps are available.</p>}
       <button className="entry-secondary-button" type="button" disabled={pending || !connected || !mapsLoaded || maps.length === 0} onClick={() => {
-        setSelectedMap(maps[0]?.mapName ?? null)
+        setSelectedMap(maps.find((map) => map.defaultForLobbyCreation)?.mapName ?? null)
         setCreatingLobby(true)
       }}>Create lobby</button>
       <button className="entry-secondary-button" type="button" disabled={pending || !connected} onClick={onRefresh}>Refresh</button>
