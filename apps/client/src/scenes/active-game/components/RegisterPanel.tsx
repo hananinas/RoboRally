@@ -19,8 +19,7 @@ type RegisterPanelProps = {
   awaitingSubmitConfirm: boolean
   submission: ClientGameState['submission']
   status: string
-  programmingTimer: ClientGameState['programmingTimer']
-  serverTime: number | null
+  localDeadline: number | null
   error: string | null
   onRemove: (registerIndex: number) => void
   onMove: (fromIndex: number, toIndex: number) => void
@@ -97,8 +96,7 @@ function RegisterPanel({
   awaitingSubmitConfirm,
   submission,
   status,
-  programmingTimer,
-  serverTime,
+  localDeadline,
   error,
   onRemove,
   onMove,
@@ -122,8 +120,8 @@ function RegisterPanel({
       <h2 className="register-panel__heading">Registers</h2>
       <div className="game-status">
         <p role="status">{status}</p>
-        {programmingTimer.status === 'RUNNING' && serverTime !== null && (
-          <ProgrammingCountdown deadline={programmingTimer.deadline} serverTime={serverTime} />
+        {localDeadline !== null && (
+          <ProgrammingCountdown localDeadline={localDeadline} />
         )}
         {error && <p role="alert">{error}</p>}
       </div>

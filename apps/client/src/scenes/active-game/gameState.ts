@@ -52,7 +52,6 @@ export type ClientGameState = {
   connected: boolean
   assignment: PlayerAssignment | null
   phase: GamePhase | null
-  serverTime: number | null
   programmingTimer: ProgrammingTimer
   paused: boolean
   players: readonly Player[]
@@ -122,7 +121,6 @@ export function createClientGameState(): ClientGameState {
     connected: false,
     assignment: null,
     phase: null,
-    serverTime: null,
     programmingTimer: { status: 'IDLE' },
     paused: false,
     players: [],
@@ -339,7 +337,6 @@ export function gameStateReducer(
         handReady: snapshot.phase === 'PROGRAMMING' && (result.hand.length > 0 || result.programSubmitted),
         submission: result.programSubmitted ? 'accepted' : 'idle',
         phase: snapshot.phase,
-        serverTime: snapshot.serverTime,
         programmingTimer: snapshot.programmingTimer,
         paused: snapshot.paused,
         aborted: snapshot.aborted,
@@ -504,7 +501,7 @@ export function gameStateReducer(
     }
     case 'timer-changed':
       if (event.payload.gameId !== state.assignment?.gameId) return state
-      return { ...state, serverTime: event.payload.serverTime, programmingTimer: event.payload.timer }
+      return { ...state, programmingTimer: event.payload.timer }
     case 'result': {
       if (event.handVersion !== state.handVersion || state.submission !== 'pending') return state
       if (event.result.outcome === 'ACCEPTED' || event.result.outcome === 'ALREADY_SUBMITTED') {

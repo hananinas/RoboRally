@@ -45,6 +45,8 @@ type Fixture = {
   programSubmitted: boolean
   started: boolean
   pendingStarts: { socket: GameSocket; respond: () => void }[]
+  clock: { serverTime?: number; deferred: boolean }
+  pendingClocks: { socket: GameSocket; respond: () => void }[]
   pending: { socket: GameSocket; acknowledge: ProgramResultAcknowledgement; submission: SubmitProgram }[]
 }
 
@@ -66,6 +68,7 @@ function snapshot(fixture: Fixture): FixtureSnapshot {
     registerUpdates: fixture.registerUpdates,
     entryRequests: fixture.entryRequests,
     pendingStarts: fixture.pendingStarts.length,
+    pendingClocks: fixture.pendingClocks.length,
   }
 }
 
@@ -129,6 +132,12 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
       break
     case 'timer':
       timerChanged(fixture, control.timer, control.serverTime)
+      break
+    case 'clock':
+      fixture.clock = { serverTime: control.serverTime, deferred: control.deferred }
+      break
+    case 'respond-clock':
+      for (const pending of fixture.pendingClocks.splice(0)) pending.respond()
       break
     case 'deal':
       for (const socket of fixture.sockets) socket.emit('cards.dealt', {
@@ -222,6 +231,8 @@ const httpServer = createServer(async (request, response) => {
       programSubmitted: false,
       started: false,
       pendingStarts: [],
+      clock: { deferred: false },
+      pendingClocks: [],
     }
     fixtures.set(fixture.id, fixture)
     send(201, snapshot(fixture))
@@ -275,6 +286,13 @@ io.on('connection', (socket) => {
     state: { ...fixture.state, serverTime: Date.now() }, hand: fixture.cards, program: fixture.program, programSubmitted: fixture.programSubmitted,
   })
   const lobbyState = (): LobbyState => ({ lobbyId: GAME_ID, name: 'Lobby 1', ownerUserId: user.userId, playerCount: 1, maxPlayers: 6, players: [user] })
+  socket.on('clock.get', (_, acknowledge) => {
+    // Capture before deferring to simulate time spent delivering the reply.
+    const serverTime = fixture.clock.serverTime ?? Date.now()
+    const respond = () => acknowledge({ outcome: 'CLOCK', serverTime })
+    if (fixture.clock.deferred) fixture.pendingClocks.push({ socket, respond })
+    else respond()
+  })
   socket.on('session.get', (_, acknowledge) => {
     fixture.entryRequests.push({ event: 'session.get', socketId: socket.id, payload: {} })
     acknowledge(fixture.started ? { outcome: 'IN_GAME', initialization: initialization(), user }
@@ -359,6 +377,7 @@ io.on('connection', (socket) => {
     fixture.sockets.delete(socket)
     fixture.pending = fixture.pending.filter((pending) => pending.socket !== socket)
     fixture.pendingStarts = fixture.pendingStarts.filter((pending) => pending.socket !== socket)
+    fixture.pendingClocks = fixture.pendingClocks.filter((pending) => pending.socket !== socket)
   })
 })
 

@@ -190,13 +190,23 @@ The first accepted `program.submit` starts a shared 30-second countdown. The ser
 
 `program.timerChanged {gameId, serverTime, timer}`
 
-`serverTime` and `deadline` are Unix timestamps in milliseconds. Clients use them to display the countdown. `PublicGameState.programmingTimer` contains the same timer state.
+`serverTime` and `deadline` are Unix timestamps in milliseconds. `PublicGameState.programmingTimer` contains the same timer state.
 
 An authenticated connection can send `clock.get {}` to obtain `CLOCK {serverTime}`
 through its acknowledgement. The service reads the timestamp immediately before
 sending the reply, allowing clients to measure a round trip and estimate the
 server clock. No lobby or game membership is required. Invalid payloads receive
 `INVALID_REQUEST`; the request does not change game state or broadcast events.
+
+When a RUNNING timer arrives or a connection resumes, the client samples `clock.get`,
+recording `sentAt` and `receivedAt` with `performance.now()`. In the reply callback,
+it estimates `midpoint = sentAt + (receivedAt - sentAt) / 2` and anchors
+`localDeadline = midpoint + (deadline - serverTime)` using the reply's timestamp.
+The display counts down from `localDeadline - performance.now()`, independently of
+timer-event delivery, rendering delays and the browser's wall clock. The midpoint
+assumes similar travel times in both directions; the server enforces the deadline.
+Old connection or timer replies are ignored. A failed sample keeps an existing
+estimate; without one, the numeric countdown stays hidden until a sample succeeds.
 
 | State | Payload | Meaning |
 |---|---|---|

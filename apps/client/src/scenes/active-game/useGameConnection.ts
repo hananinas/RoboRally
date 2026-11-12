@@ -33,8 +33,27 @@ const registerEditEvents = new Set<GameStateEvent['type']>([
 
 export default function useGameConnection(socket: GameSocket) {
   const [state, setState] = useState(createClientGameState)
+  const [localDeadline, setLocalDeadline] = useState<number | null>(null)
   const current = useRef(state)
   const generation = useRef(0)
+  const clockRequest = useRef(0)
+
+  const sampleClock = useCallback((deadline: number) => {
+    const request = ++clockRequest.current
+    const requestGeneration = generation.current
+    const sentAt = performance.now()
+    socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit('clock.get', {}, (error, result) => {
+      const receivedAt = performance.now()
+      const timer = current.current.programmingTimer
+      if (error || result.outcome !== 'CLOCK' || !socket.connected ||
+          generation.current !== requestGeneration || clockRequest.current !== request ||
+          timer.status !== 'RUNNING' || timer.deadline !== deadline) return
+
+      // Estimate the server timestamp at the midpoint of the round trip.
+      const midpoint = sentAt + (receivedAt - sentAt) / 2
+      setLocalDeadline(midpoint + (deadline - result.serverTime))
+    })
+  }, [socket])
 
   // Keep event-time state current so submission checks see updates before React renders.
   const dispatch = useCallback(function dispatch(event: GameStateEvent): void {
@@ -42,6 +61,15 @@ export default function useGameConnection(socket: GameSocket) {
     const next = gameStateReducer(previous, event)
     current.current = next
     setState(next)
+
+    const timer = next.programmingTimer
+    if (timer.status !== 'RUNNING' || previous.programmingTimer.status !== 'RUNNING' ||
+        timer.deadline !== previous.programmingTimer.deadline ||
+        next.assignment?.gameId !== previous.assignment?.gameId) setLocalDeadline(null)
+    if (socket.connected && timer.status === 'RUNNING' && next !== previous &&
+        (event.type === 'joined' || event.type === 'reconnected' || event.type === 'timer-changed')) {
+      sampleClock(timer.deadline)
+    }
 
     if (!socket.connected || !registerEditEvents.has(event.type) ||
         next.registers === previous.registers) return
@@ -59,7 +87,7 @@ export default function useGameConnection(socket: GameSocket) {
         dispatch({ type: 'error', message: 'Could not save your register selection. Change it again or reconnect to restore the saved selection.' })
       }
     })
-  }, [socket])
+  }, [socket, sampleClock])
 
   const initialize = useCallback((result: GameInitialization) => {
     generation.current += 1
@@ -148,5 +176,5 @@ export default function useGameConnection(socket: GameSocket) {
     })
   }, [dispatch, socket])
 
-  return { state, dispatch, submit, initialize }
+  return { state, localDeadline, dispatch, submit, initialize }
 }

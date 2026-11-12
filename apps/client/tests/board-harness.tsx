@@ -117,8 +117,7 @@ export default function BoardHarness() {
               awaitingSubmitConfirm={awaitingSubmitConfirm}
               submission={confirmed ? 'accepted' : 'idle'}
               status="Programming"
-              programmingTimer={{ status: 'IDLE' }}
-              serverTime={null}
+              localDeadline={null}
               error={null}
               onRemove={handleRemove}
               onMove={handleMove}

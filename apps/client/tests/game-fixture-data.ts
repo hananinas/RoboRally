@@ -82,6 +82,8 @@ export type FixtureControl =
   | { type: 'submitted'; submission: ProgramSubmitted }
   | { type: 'finalized'; program: ProgramFinalized }
   | { type: 'timer'; timer: ProgrammingTimer; serverTime?: number }
+  | { type: 'clock'; serverTime?: number; deferred: boolean }
+  | { type: 'respond-clock' }
   | { type: 'early-hand'; cards: readonly Card[] }
   | { type: 'start'; deferred: boolean; outcome?: 'STARTED' | 'LOBBY_MEMBER_DISCONNECTED' }
   | { type: 'respond-start' }
@@ -98,4 +100,5 @@ export type FixtureSnapshot = {
     | { event: 'lobby.join'; socketId: string; payload: { lobbyId: string } }
   )[]
   pendingStarts: number
+  pendingClocks: number
 }
