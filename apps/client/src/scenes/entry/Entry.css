@@ -32,15 +32,24 @@
 .entry-panel {
   min-width: 0;
   padding: var(--entry-space-6) var(--entry-space-5);
-  border: 1px solid #4c5560;
-  border-radius: 16px;
-  background: rgb(58 66 76 / 92%);
+  border: 1px solid var(--entry-border);
+  border-radius: var(--entry-radius-lg);
+  background: var(--entry-panel);
   box-shadow: 0 20px 60px rgb(0 0 0 / 35%);
 }
 
 .entry-panel h1 {
   margin: 0;
   font-size: 22px;
+}
+
+.entry-panel__eyebrow {
+  margin: 0;
+  color: var(--entry-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
 }
 
 .entry-panel__header {
@@ -262,8 +271,15 @@
 }
 
 .entry-layout--wide {
+  align-items: start;
   grid-template-columns: 1.08fr 1fr;
   width: min(100% - 48px, 984px);
+}
+
+.entry-side-panels {
+  display: grid;
+  min-width: 0;
+  gap: var(--entry-space-4);
 }
 
 .entry-header {
