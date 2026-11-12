@@ -247,13 +247,13 @@ describe('public registers over Socket.IO', () => {
     const execute = game.executeNextAction.bind(game)
     vi.spyOn(game, 'executeNextAction').mockImplementation(() => {
       const result = execute()
-      if (game.phase === 'activation') game.pause()
+      if (game.lastActivePhase === 'activation') game.pause()
       return result
     })
     const submit = game.submitProgram.bind(game)
     vi.spyOn(game, 'submitProgram').mockImplementation((...args) => {
       const result = submit(...args)
-      if (game.phase === 'activation') game.pause()
+      if (game.lastActivePhase === 'activation') game.pause()
       return result
     })
     const actions: RobotActionResolved[] = []
@@ -414,7 +414,7 @@ describe('public registers over Socket.IO', () => {
       .toEqual(executedPlayer.registers)
   })
 
-  it('resets registers before dealing the next hand when a departure completes the final register', async () => {
+  it('resets registers once resumed after a departure completes the final register', async () => {
     const first = await connect('A')
     const second = await connect('B')
     const joined = await start([first, second])
@@ -440,16 +440,10 @@ describe('public registers over Socket.IO', () => {
     const remainingIndex = joined.findIndex((player) => player.assignment.playerId === lastActor)
     const remaining = [first, second][remainingIndex]
     const departing = [first, second][1 - remainingIndex]
-    const events: string[] = []
-    remaining.onAny((name) => events.push(name))
-    const dealt = new Promise<void>((resolve) => remaining.once('cards.dealt', () => resolve()))
     expect(await departing.timeout(1000).emitWithAck('game.leave', {})).toEqual({ outcome: 'LEFT' })
-    await dealt
+    game.resume()
     const restored = await snapshot(remaining)
     expect(restored.state.players.map((player) => player.registers)).toEqual([empty])
-    expect(events.indexOf('game.playerLeft')).toBeLessThan(events.indexOf('cards.dealt'))
-    expect(events.filter((name) => name !== 'player.checkpointProgress'))
-      .toEqual(['game.playerLeft', 'cards.dealt'])
     expect(count).toBe(9)
   })
 

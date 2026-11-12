@@ -34,7 +34,7 @@ describe('game factory', () => {
     expect(game.players).toEqual([])
     expect(game.board.width).toBe(boardMaps['test-map'].width)
     expect(game.board.height).toBe(boardMaps['test-map'].height)
-    expect(game.phase).toBe('programming')
+    expect(game.lastActivePhase).toBe('programming')
   })
 
   it('creates a fresh lobby game on the test map', () => {
