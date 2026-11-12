@@ -100,7 +100,9 @@ export function handleCreateLobby(
     }
     const lobbyId = randomUUID()
     const lobby: Lobby = { lobbyId, name: payload.name ?? `Lobby ${lobbyId.slice(0, 8)}`, mapName,
-      members: new Map([[user.userId, { user, connectionId: socket.id, robotSpriteId: ROBOT_SPRITE_IDS[0] }]]) }
+      members: new Map([[user.userId, {
+        user, connectionId: socket.id, robotSpriteId: payload.robotSpriteId ?? ROBOT_SPRITE_IDS[0],
+      }]]) }
     void socket.join(lobbyRoom(lobbyId))
     context.lobbies.set(lobbyId, lobby)
     context.sessionsByUser.set(user.userId, { kind: 'lobby', lobbyId })
@@ -126,7 +128,9 @@ export function handleJoinLobby(
     }
     if (lobby.members.size >= MAX_PLAYERS) return ack({ outcome: 'LOBBY_FULL' })
     void socket.join(lobbyRoom(lobby.lobbyId))
-    lobby.members.set(user.userId, { user, connectionId: socket.id, robotSpriteId: ROBOT_SPRITE_IDS[0] })
+    lobby.members.set(user.userId, {
+      user, connectionId: socket.id, robotSpriteId: payload.robotSpriteId ?? ROBOT_SPRITE_IDS[0],
+    })
     context.sessionsByUser.set(user.userId, { kind: 'lobby', lobbyId: lobby.lobbyId })
     ack({ outcome: 'LOBBY_JOINED', lobby: presentLobby(lobby) })
     socket.to(lobbyRoom(lobby.lobbyId)).emit('lobby.updated', { lobby: presentLobby(lobby) })
