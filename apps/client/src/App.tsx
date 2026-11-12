@@ -62,10 +62,16 @@ function App() {
       <button className="entry-secondary-button" type="button" disabled={busy || connection.status === 'connecting'} onClick={retrySession}>Retry</button>
     </>
   }
-  return <EntryScreen onLogout={connection.status === 'connected' || session.user ? logout : undefined} aside={session.status === 'waiting' ? <RobotPicker /> : undefined}>
+  return (
+  <EntryScreen
+    onLogout={connection.status === 'connected' || session.user ? logout : undefined}
+    onSettings={openSettings}
+    aside={session.status === 'waiting' ? <RobotPicker /> : undefined}
+  >
     {error && (session.status === 'waiting' || session.status === 'resyncing' || session.status === 'sync-failed') &&
       <p role="alert" className="entry-validation entry-validation--error">{error}</p>}
     {content}
-  </EntryScreen>
+  </EntryScreen>  
+  )
 }
 export default App

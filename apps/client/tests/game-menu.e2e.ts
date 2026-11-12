@@ -116,34 +116,26 @@ test('includes the leave action without trapping keyboard focus', async ({ page 
   const trigger = page.getByRole('button', { name: 'Game options', exact: true })
   const options = page.getByRole('region', { name: 'Game options' })
   const collapse = page.getByRole('button', { name: 'Collapse player details' })
-  const keybindsSummary = options.getByText('Keybinds', { exact: true })
   const settings = options.getByRole('button', { name: 'Account Settings' })
   const logout = options.getByRole('button', { name: 'Logout' })
+  const leave = options.getByRole('button', { name: 'Leave game' })
+  const keybindings = options.locator('summary')
 
   await page.keyboard.press('Tab')
   await expect(trigger).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(options).toBeVisible()
-  await page.keyboard.press('Tab')
-  await expect(options.getByRole('button', { name: 'Leave game' })).toBeFocused()
-  await page.keyboard.press('Tab')
-  await expect(settings).toBeFocused()
-  await page.keyboard.press('Tab')
-  await expect(logout).toBeFocused()
-  await page.keyboard.press('Tab')
-  await expect(keybindsSummary).toBeFocused()
-  await page.keyboard.press('Tab')
-  await expect(collapse).toBeFocused()
-  await page.keyboard.press('Shift+Tab')
-  await expect(keybindsSummary).toBeFocused()
-  await page.keyboard.press('Shift+Tab')
-  await expect(logout).toBeFocused()
-  await page.keyboard.press('Shift+Tab')
-  await expect(settings).toBeFocused()
-  await page.keyboard.press('Shift+Tab')
-  await expect(options.getByRole('button', { name: 'Leave game' })).toBeFocused()
-  await page.keyboard.press('Shift+Tab')
-  await expect(trigger).toBeFocused()
+
+  for (const control of [settings, logout, leave, keybindings, collapse]) {
+    await page.keyboard.press('Tab')
+    await expect(control).toBeFocused()
+  }
+
+  for (const control of [keybindings, leave, logout, settings, trigger]) {
+    await page.keyboard.press('Shift+Tab')
+    await expect(control).toBeFocused()
+  }
+
   await page.keyboard.press('Escape')
   await expect(options).toBeHidden()
 })
@@ -196,4 +188,23 @@ test.describe('touch interaction', () => {
     await trigger.tap()
     await expect(options).toBeHidden()
   })
+})
+
+test('expands and collapses keybindings', async ({ page }) => {
+  await page.getByRole('button', {
+    name: 'Game options',
+    exact: true,
+  }).click()
+
+  const options = page.getByRole('region', { name: 'Game options' })
+  const summary = options.locator('summary')
+  const bindings = options.locator('.game-menu__keybinds')
+
+  await expect(bindings).toBeHidden()
+
+  await summary.click()
+  await expect(bindings).toBeVisible()
+
+    await summary.click()
+  await expect(bindings).toBeHidden()
 })
