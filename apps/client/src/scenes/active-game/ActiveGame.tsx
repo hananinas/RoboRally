@@ -119,7 +119,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
             checkpointCount={state.checkpointCount}
             phase={state.playback.active ? 'EXECUTING' : state.phase}
             activeAction={state.playback.active}
-            queuedActions={state.playback.pending}
+            queuedActions={state.playback.pending.map(({ action }) => action)}
             paused={state.paused || !state.connected}
           />
         )}

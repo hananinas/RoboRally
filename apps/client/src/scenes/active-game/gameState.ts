@@ -68,11 +68,18 @@ export type ClientGameState = {
   handVersion: number
   handReady: boolean
   pendingHand: (CardsDealt & { program?: ProgramFinalized['cards'] }) | null
+  // Progress held until the playback action it belongs to has finished.
+  deferredProgress: readonly DeferredProgress[]
   submission: 'idle' | 'pending' | 'accepted' | 'uncertain'
   aborted: boolean
   winner: Winner | null
   error: string | null
 }
+
+export type DeferredProgress = Readonly<{
+  sequence: number
+  payload: PlayerCheckpointProgress
+}>
 
 export type GameStateEvent =
   | { type: 'joined'; result: GameInitialization }
@@ -89,7 +96,8 @@ export type GameStateEvent =
   | { type: 'dealt'; hand: CardsDealt }
   | { type: 'reset' }
   | { type: 'error'; message: string }
-  | { type: 'action'; action: RobotActionResolved }
+  | { type: 'action'; action: RobotActionResolved; reducedMotion?: boolean }
+  | { type: 'advance' }
   | { type: 'complete' }
   | { type: 'place'; cardId: string; registerIndex: number }
   | { type: 'remove'; registerIndex: number }
@@ -136,6 +144,7 @@ export function createClientGameState(): ClientGameState {
     handVersion: 0,
     handReady: false,
     pendingHand: null,
+    deferredProgress: [],
     submission: 'idle',
     aborted: false,
     winner:null,
@@ -206,12 +215,53 @@ function activateHand(state: ClientGameState): ClientGameState {
   return {
     ...adoptPendingHand(state),
     handReady: true,
+    deferredProgress: [],
     playbackProgram: null,
     submission: hand.program ? 'accepted' : 'idle',
     error: state.connected ? null : state.error,
   }
 }
 
+function applyCheckpointProgress(
+  state: ClientGameState,
+  { gameId, playerId, lastCheckpoint, checkpointCount }: PlayerCheckpointProgress,
+): ClientGameState {
+  const player = state.players.find((candidate) => candidate.playerId === playerId)
+  if (gameId !== state.assignment?.gameId || !player ||
+      !Number.isSafeInteger(lastCheckpoint) || !Number.isSafeInteger(checkpointCount) ||
+      lastCheckpoint > checkpointCount || lastCheckpoint <= player.lastCheckpoint) return state
+  return {
+    ...state,
+    checkpointCount,
+    players: state.players.map((candidate) =>
+      candidate.playerId === playerId ? { ...candidate, lastCheckpoint } : candidate),
+  }
+}
+
+// The latest action in playback that moves the player's robot.
+function playbackSequenceFor(state: ClientGameState, playerId: PlayerId): number | null {
+  const robotId = state.playback.robots.find((robot) => robot.playerId === playerId)?.robotId
+  if (robotId === undefined) return null
+  const moves = (action: RobotActionResolved) => action.robotId === robotId ||
+    action.pushedRobots.some((pushed) => pushed.robotId === robotId)
+  const pending = state.playback.pending.findLast(({ action }) => moves(action))
+  if (pending) return pending.sequence
+  return state.playback.active && moves(state.playback.active) ? state.playback.activeSequence : null
+}
+
+// Apply progress whose action is no longer active or pending.
+function settleProgress(state: ClientGameState): ClientGameState {
+  const held = new Set([
+    state.playback.activeSequence,
+    ...state.playback.pending.map((entry) => entry.sequence),
+  ])
+  const ready = state.deferredProgress.filter((entry) => !held.has(entry.sequence))
+  if (ready.length === 0) return state
+  return ready.reduce<ClientGameState>((next, entry) => applyCheckpointProgress(next, entry.payload), {
+    ...state,
+    deferredProgress: state.deferredProgress.filter((entry) => held.has(entry.sequence)),
+  })
+}
 function updatePlayback(state: ClientGameState, playback: RobotPlaybackState): ClientGameState {
   return {
     ...state,
@@ -273,22 +323,19 @@ export function gameStateReducer(
       const { gameId, playerId, robotId } = event.payload
       if (gameId !== state.assignment?.gameId ||
         !state.players.some((player) => player.playerId === playerId)) return state
-      return finishPlayback(updatePlayback({
+      return finishPlayback(settleProgress(updatePlayback({
         ...state,
         players: state.players.filter((player) => player.playerId !== playerId),
-      }, robotPlaybackReducer(state.playback, { type: 'remove', robotId })))
+      }, robotPlaybackReducer(state.playback, { type: 'remove', robotId }))))
     }
     case 'checkpoint-progress': {
-      const { gameId, playerId, lastCheckpoint, checkpointCount } = event.payload
-      const player = state.players.find((candidate) => candidate.playerId === playerId)
-      if (gameId !== state.assignment?.gameId || !player ||
-          !Number.isSafeInteger(lastCheckpoint) || !Number.isSafeInteger(checkpointCount) ||
-          lastCheckpoint > checkpointCount || lastCheckpoint <= player.lastCheckpoint) return state
+      const sequence = playbackSequenceFor(state, event.payload.playerId)
+      if (sequence === null || event.payload.gameId !== state.assignment?.gameId) {
+        return applyCheckpointProgress(state, event.payload)
+      }
       return {
         ...state,
-        checkpointCount,
-        players: state.players.map((candidate) =>
-          candidate.playerId === playerId ? { ...candidate, lastCheckpoint } : candidate),
+        deferredProgress: [...state.deferredProgress, { sequence, payload: event.payload }],
       }
     }
     case 'player-connection-changed': {
@@ -427,11 +474,20 @@ export function gameStateReducer(
         ...next,
         phase: 'EXECUTING',
         handReady: false,
+        pendingHand: null,
+        playbackProgram: state.playbackProgram ??
+          (state.registers.some((card) => card !== null) ? state.registers : null),
         players,
-      }, robotPlaybackReducer(next.playback, { type: 'enqueue', action }))
+      }, robotPlaybackReducer(next.playback, {
+        type: 'enqueue', action, board: event.reducedMotion ? null : state.board,
+      }))
     }
+    case 'advance':
     case 'complete':
-      return finishPlayback(updatePlayback(state, robotPlaybackReducer(state.playback, { type: 'complete' })))
+      return finishPlayback(settleProgress(updatePlayback(
+        state,
+        robotPlaybackReducer(state.playback, { type: event.type }),
+      )))
     case 'place': {
       if (!canProgram(state)) return state
       const card = state.hand.find((candidate) => candidate.id === event.cardId)

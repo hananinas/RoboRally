@@ -73,6 +73,25 @@
     --board-piece-angle var(--tank-turn-duration) var(--tank-motion-easing);
 }
 
+/* The tank sinks into the hole, then appears at its reboot position. */
+.board-piece--test-tank[data-playback-phase='pit-fall'] {
+  scale: 0.35;
+  opacity: 0;
+  transition:
+    scale var(--pit-fall-duration) ease-in,
+    opacity var(--pit-fall-duration) ease-in;
+}
+
+/* Respawn places the tank at once; only its appearance animates. */
+.board-piece--test-tank[data-playback-phase='pit-respawn'] {
+  transition:
+    left 0s,
+    top 0s,
+    --board-piece-angle 0s,
+    scale var(--pit-respawn-duration) var(--tank-motion-easing),
+    opacity var(--pit-respawn-duration) var(--tank-motion-easing);
+}
+
 .board-piece--checkpoint {
   display: block;
   height: auto;
@@ -84,9 +103,11 @@
   font-size: 11.5px;
   font-weight: 700;
 }
-/* Robots drop onto their starting tile when the board first appears. */
+/* Robots drop onto their starting tile when the board first appears.
+   Backwards fill only: a forwards fill keeps opacity in the animation effect
+   stack, which stops the transition that fades the tank back in at respawn. */
 .board-piece--test-tank {
-  animation: robot-drop 0.7s cubic-bezier(0.5, 0, 0.75, 0) both;
+  animation: robot-drop 0.7s cubic-bezier(0.5, 0, 0.75, 0) backwards;
 }
 
 @keyframes robot-drop {
@@ -177,6 +198,11 @@
 .board-piece--hole {
   overflow: hidden;
   box-shadow: var(--board-hole-shadow);
+  transition: box-shadow var(--pit-fall-duration) ease-in;
+}
+
+.board-piece--hole[data-pit-active] {
+  box-shadow: var(--board-hole-shadow), inset 0 0 0 3px var(--board-hole-bottom);
 }
 
 .board-hole-depth {

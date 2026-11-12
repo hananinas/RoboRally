@@ -133,7 +133,11 @@ export default function useGameConnection(socket: GameSocket) {
     const handleCardsDealt = (hand: CardsDealt) => receive({ type: 'dealt', hand })
     const handleProgramFinalized = (payload: ProgramFinalized) => receive({ type: 'program-finalized', payload })
     const handleTimerChanged = (payload: ProgramTimerChanged) => receive({ type: 'timer-changed', payload })
-    const handleActionResolved = (action: RobotActionResolved) => receive({ type: 'action', action })
+    const handleActionResolved = (action: RobotActionResolved) => receive({
+      type: 'action',
+      action,
+      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    })
     const handlePlayerLeft = (payload: PlayerLeft) => receive({ type: 'player-left', payload })
     const handlePlayerConnectionChanged = (payload: PlayerConnectionChanged) =>
       receive({ type: 'player-connection-changed', payload })
@@ -177,7 +181,7 @@ export default function useGameConnection(socket: GameSocket) {
     }
   }, [dispatch, socket, needsReconciliation])
 
-  useRobotPlaybackTimer(state.playback.active, dispatch)
+  useRobotPlaybackTimer(state.playback, dispatch)
 
   const submit = useCallback(() => {
     const payload = createSubmission(current.current)

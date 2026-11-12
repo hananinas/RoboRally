@@ -58,7 +58,7 @@ for (const antenna of [
   })
 }
 
-test('shows checkpoint counts from snapshots and broadcasts without disrupting queued playback', async ({ page, game }) => {
+test('shows checkpoint counts from snapshots and broadcasts once queued playback lands', async ({ page, game }) => {
   await page.clock.install()
   const state = {
     ...game.initial.state, checkpointCount: 2,
@@ -89,10 +89,15 @@ test('shows checkpoint counts from snapshots and broadcasts without disrupting q
   await game.control({ type: 'checkpoint-progress', progress: {
     gameId: GAME_ID, playerId: PLAYER_ID, lastCheckpoint: 1, checkpointCount: 2,
   } })
-  await expect(checkpoints).toContainText('1/2')
+  await expect(checkpoints).toContainText('0/2')
   await expect(page.getByRole('button', { name: /remove from register/ })).toHaveCount(5)
   await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()
   await expect(page.locator(`[data-robot-id="${ROBOT_ID}"]`).first()).toHaveAttribute('data-board-tile', '5,4')
+  for (const action of ROUND_ACTIONS) {
+    await expect(checkpoints).toContainText('0/2')
+    await page.clock.runFor(action.instruction === 'TURN_LEFT' ? 300 : 600)
+  }
+  await expect(checkpoints).toContainText('1/2')
 
   await game.control({ type: 'joined-state', state: {
     ...state, players: state.players.map((player) => ({ ...player, lastCheckpoint: 1 })),
