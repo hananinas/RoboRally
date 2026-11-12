@@ -1,16 +1,33 @@
 import { expect, test } from './game-fixture.ts'
+import { createLobby } from './browserClient.ts'
 
-test('browses real results and creation waits for explicit Start', async ({ page, game }) => {
+test('creating a lobby uses the selected map and can return to the lobby list', async ({ page, game }) => {
   await page.goto('/')
   await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeEnabled()
   await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
-  await expect(page.getByText('Waiting for players.', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Choose a map', exact: true })).toBeVisible()
+  const emptyMap = page.getByRole('button', { name: 'Empty Map', exact: true })
+  await expect(emptyMap).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.getByRole('button', { name: 'Test Map', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'Test Map', exact: true }).click()
+  await expect(page.getByText('Selected map: Test Map', { exact: true })).toBeVisible()
+  await emptyMap.click()
+  await expect(emptyMap).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'Back to lobbies', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
+  await expect(page.getByText('Selected map: Test Map', { exact: true })).toBeVisible()
+  await page.getByLabel('Lobby name').fill('Friday Night')
   await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
-  await page.getByRole('button', { name: 'Start', exact: true }).click()
-  await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()
-  const requests = (await game.snapshot()).entryRequests.map((request) => request.event)
-  expect(requests).toContain('lobby.create')
+  await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
+  await expect(page.getByText('Map: Test Map', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Friday Night', exact: true })).toBeVisible()
+  await expect(page.getByRole('img', { name: 'Test Map map preview' })).toHaveAttribute('src', /data:image\/svg\+xml;base64,/)
+  const createRequest = (await game.snapshot()).entryRequests.find((request) => request.event === 'lobby.create')
+  expect(createRequest).toMatchObject({ payload: { mapName: 'test-map', name: 'Friday Night' } })
+  await page.getByRole('button', { name: 'Leave lobby', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeVisible()
 })
 
 test('joining requires selection and enters the waiting screen', async ({ page }) => {
@@ -27,6 +44,7 @@ test('joining requires selection and enters the waiting screen', async ({ page }
   await expect(join).toBeEnabled()
   await join.click()
   await expect(page.getByRole('button', { name: 'Leave lobby', exact: true })).toBeEnabled()
+  await expect(page.getByRole('img', { name: 'Test Map map preview' })).toBeVisible()
   await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Leave lobby', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeEnabled()
@@ -35,7 +53,7 @@ test('joining requires selection and enters the waiting screen', async ({ page }
 test('a disconnected member during Start leaves the owner waiting and able to retry', async ({ page, game }) => {
   await game.control({ type: 'start', deferred: false, outcome: 'LOBBY_MEMBER_DISCONNECTED' })
   await page.goto('/')
-  await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
+  await createLobby(page)
   const start = page.getByRole('button', { name: 'Start', exact: true })
   await start.click()
   await expect(page.getByRole('alert')).toHaveText('A player disconnected before the game could start. Please try again.')
@@ -50,7 +68,7 @@ test('a disconnected member during Start leaves the owner waiting and able to re
 test('a committed start is recovered when its notification and acknowledgement are delayed', async ({ page, game }) => {
   await game.control({ type: 'start', deferred: true })
   await page.goto('/')
-  await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
+  await createLobby(page)
   await page.getByRole('button', { name: 'Start', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeDisabled()
   await expect(page.getByRole('button', { name: 'Leave lobby', exact: true })).toBeDisabled()

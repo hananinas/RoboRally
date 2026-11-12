@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import type { Page } from '@playwright/test'
 import { expect, test } from './real-game-fixture.ts'
-import { browse, reconnect, robotIds } from './browserClient.ts'
+import { browse, createLobby, reconnect, robotIds } from './browserClient.ts'
 
 async function program(page: Page, cards: readonly string[]) {
   const hand = page.getByRole('region', { name: 'Programming hand' })
@@ -37,14 +37,14 @@ for (const scenario of scenarios) {
     })
 
     test('keeps three clients synchronized through pushing and a fresh snapshot', async ({ browser, page, baseURL }) => {
-      const contexts = await Promise.all([0, 1].map(() => browser.newContext({ baseURL, reducedMotion: 'reduce' })))
+      const contexts = await Promise.all([0, 1].map(() => browser.newContext({ baseURL, ignoreHTTPSErrors: true, reducedMotion: 'reduce' })))
       try {
         const pages = [page, ...await Promise.all(contexts.map((context) => context.newPage()))]
         const playerNames = ['bence', 'dane', 'abid']
         for (const [index, client] of pages.entries()) {
           await client.clock.install()
           await browse(client, playerNames[index])
-          if (index === 0) await client.getByRole('button', { name: 'Create lobby', exact: true }).click()
+          if (index === 0) await createLobby(client)
           else {
             await client.getByRole('list', { name: 'Lobbies' }).getByRole('button', { disabled: false }).first().click()
             await client.getByRole('button', { name: 'Join game', exact: true }).click()

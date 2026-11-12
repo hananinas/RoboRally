@@ -1,4 +1,4 @@
-import type { EmptyRequest, LobbyRequest, LobbyState, LobbyListResult, LobbyJoinResult, LobbyLeaveResult, LobbyStartResult, SessionResult } from './lobby.js'
+import type { CreateLobbyRequest, EmptyRequest, LobbyRequest, LobbyState, LobbyListResult, LobbyJoinResult, LobbyLeaveResult, LobbyStartResult, SessionResult } from './lobby.js'
 import type {
   CardsDealt,
   ClockResult,
@@ -25,7 +25,7 @@ export type ProgramResultAcknowledgement = (result: ProgramResult) => void
 export interface ClientToServerEvents {
   'clock.get': (payload: EmptyRequest, acknowledge: (result: ClockResult) => void) => void
   'lobby.list': (payload: EmptyRequest, acknowledge: (result: LobbyListResult) => void) => void
-  'lobby.create': (payload: EmptyRequest, acknowledge: (result: LobbyJoinResult) => void) => void
+  'lobby.create': (payload: CreateLobbyRequest, acknowledge: (result: LobbyJoinResult) => void) => void
   'lobby.join': (payload: LobbyRequest, acknowledge: (result: LobbyJoinResult) => void) => void
   'lobby.leave': (payload: EmptyRequest, acknowledge: (result: LobbyLeaveResult) => void) => void
   'lobby.start': (payload: EmptyRequest, acknowledge: (result: LobbyStartResult) => void) => void

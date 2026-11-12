@@ -288,7 +288,21 @@ io.on('connection', (socket) => {
     assignment: { gameId: GAME_ID, playerId: PLAYER_ID, robotId: ROBOT_ID },
     state: { ...fixture.state, serverTime: Date.now() }, hand: fixture.cards, program: fixture.program, programSubmitted: fixture.programSubmitted,
   })
-  const lobbyState = (): LobbyState => ({ lobbyId: GAME_ID, name: 'Lobby 1', ownerUserId: user.userId, playerCount: 1, maxPlayers: 6, players: [user] })
+  const mapIcons: Record<string, string> = {
+    'empty-map': `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 3"><rect width="3" height="3" fill="#6b7280"/><path d="M1 0V3M2 0V3M0 1H3M0 2H3" stroke="#d1d5db" stroke-width="0.05"/></svg>').toString('base64')}`,
+    'test-map': `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><rect width="4" height="3" fill="#6b7280"/><path d="M1 0V3M2 0V3M3 0V3M0 1H4M0 2H4" stroke="#d1d5db" stroke-width="0.05"/></svg>').toString('base64')}`,
+  } as const
+  const maps = [
+    { mapName: 'empty-map', name: 'Empty Map', icon: mapIcons['empty-map'], defaultForLobbyCreation: false },
+    { mapName: 'test-map', name: 'Test Map', icon: mapIcons['test-map'], defaultForLobbyCreation: true },
+  ]
+  const lobbyState = (mapName = 'test-map', lobbyName = 'Lobby 1'): LobbyState => {
+    const map = maps.find((candidate) => candidate.mapName === mapName) ?? maps[1]!
+    return {
+    lobbyId: GAME_ID, name: lobbyName, mapName: map.mapName, mapDisplayName: map.name, mapIcon: map.icon, ownerUserId: user.userId,
+    playerCount: 1, maxPlayers: 6, players: [user],
+    }
+  }
   socket.on('clock.get', (_, acknowledge) => {
     // Capture before deferring to simulate time spent delivering the reply.
     const serverTime = fixture.clock.serverTime ?? Date.now()
@@ -301,10 +315,10 @@ io.on('connection', (socket) => {
     acknowledge(fixture.started ? { outcome: 'IN_GAME', initialization: initialization(), user }
       : lobby ? { outcome: 'IN_LOBBY', lobby, user } : { outcome: 'NO_SESSION', user })
   })
-  socket.on('lobby.list', (_, acknowledge) => acknowledge({ outcome: 'LOBBIES_FOUND', lobbies: [lobbyState()] }))
-  socket.on('lobby.create', (_, acknowledge) => {
-    fixture.entryRequests.push({ event: 'lobby.create', socketId: socket.id, payload: {} })
-    lobby = lobbyState()
+  socket.on('lobby.list', (_, acknowledge) => acknowledge({ outcome: 'LOBBIES_FOUND', lobbies: [lobbyState()], maps }))
+  socket.on('lobby.create', (payload, acknowledge) => {
+    fixture.entryRequests.push({ event: 'lobby.create', socketId: socket.id, payload })
+    lobby = lobbyState(payload.mapName, payload.name)
     acknowledge({ outcome: 'LOBBY_JOINED', lobby })
   })
   socket.on('lobby.join', (payload, acknowledge) => {

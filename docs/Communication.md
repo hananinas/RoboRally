@@ -322,11 +322,11 @@ Each player receives:
 
 through the player's [private room](#rooms).
 
-A new hand may arrive while the client is still playing animations from the previous activation. The client should store the new hand immediately but must not enable programming until all queued resolved actions have finished playing.
+A new hand may arrive while the client is still playing animations from the previous activation. The client stores the new hand immediately and enables programming after queued resolved actions have finished playing. If another player starts the shared timer first, the client finishes that playback immediately so the hand becomes available.
 
 The new hand also opens the next programming round, so the client resets every player's registers to five EMPTY slots when its own hand arrives. A player who reconnects after that point gets the reset registers from `session.get`.
 
-The service sends each private hand before broadcasting `program.timerChanged` with `IDLE` for the new round.
+The service sends each private hand before broadcasting `program.timerChanged` with `IDLE` for the new round. If the next round timer starts while a client is still playing the previous round, the client finishes queued actions immediately and makes the new hand available.
 
 ### Game sequence
 
@@ -412,6 +412,8 @@ After an unexpected connection loss, the client attempts to reconnect automatica
 If recovery succeeds and the client still retains its local game state, Socket.IO replays missed events.
 
 The client applies the recovered events in order and continues using its existing player and robot assignments.
+
+After connection recovery, a client with an unacknowledged or failed register save requests `session.get` before enabling programming. It restores the authoritative private selection or finalized program from that snapshot.
 
 ```mermaid
 sequenceDiagram
@@ -499,6 +501,3 @@ The game remains paused while any remaining player is disconnected. Once all rem
 Most commands acknowledge failures with a specific outcome string rather than throwing. See [AsyncAPI](asyncapi.yaml), with a [rendered reference](asyncapi.html), for the exact payload shapes and the full set of rejection codes per command.
 
 If an unexpected service failure makes gameplay unrecoverable, members receive `game.aborted {gameId}` through the [public room](#rooms), and the game ends permanently.
-
-
-After connection recovery, a client with an unacknowledged or failed register save requests `session.get` before enabling programming. It restores the authoritative private selection or finalized program from that snapshot.

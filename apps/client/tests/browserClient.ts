@@ -16,6 +16,12 @@ export async function browse(page: Page, username: string) {
   await authenticate(page, username)
   await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeVisible()
 }
+export async function createLobby(page: Page, name = 'Test Lobby') {
+  await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Choose a map', exact: true })).toBeVisible()
+  await page.getByLabel('Lobby name').fill(name)
+  await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
+}
 export async function login(page: Page, username: string) {
   await authenticate(page, username)
   // Returning game members are discovered automatically after login.
@@ -27,7 +33,7 @@ export async function reconnect(page: Page) {
 }
 export async function startTogether(owner: Page, other: Page, ownerName = 'bence', otherName = 'dane') {
   await browse(owner, ownerName)
-  await owner.getByRole('button', { name: 'Create lobby', exact: true }).click()
+  await createLobby(owner)
   await browse(other, otherName)
   await other.getByRole('list', { name: 'Lobbies' }).getByRole('button', { disabled: false }).first().click()
   await other.getByRole('button', { name: 'Join game', exact: true }).click()
