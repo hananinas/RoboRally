@@ -1,6 +1,6 @@
 import type { Locator } from '@playwright/test'
 import { expect, test } from './real-game-fixture.ts'
-import { browse } from './browserClient.ts'
+import { browse, createLobby } from './browserClient.ts'
 
 async function expectRobot(
   robot: Locator,
@@ -31,7 +31,7 @@ test.use({ reducedMotion: 'reduce' })
 test('plays every register of two consecutive programs through the real Game Service', async ({ page }) => {
   await page.clock.install()
   await browse(page, 'bence')
-  await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
+  await createLobby(page)
   await page.getByRole('button', { name: 'Start', exact: true }).click()
 
   await expect(page.getByRole('main', { name: 'Game board' })).toBeVisible()

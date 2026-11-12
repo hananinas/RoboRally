@@ -13,6 +13,7 @@ import type { Game } from '@/game/index'
 import { createDefaultGame } from '@/game/GameFactory'
 import { SESSION_COOKIE_NAME, type Session, type SessionStore } from '@/auth/sessionStore'
 import { createAuthGatedAdapter } from '@/socket/authGatedAdapter'
+import type { BoardMapName } from '@/game/boardMaps'
 
 export type GameSocketData = { user: User; authSession: Session; sessionId: string }
 
@@ -61,7 +62,7 @@ function rejectExpiredSession(sessionStore: SessionStore, socket: GameSocket, ne
 export function createGameSocketServer(
   httpServer: HttpServer,
   sessionStore: SessionStore,
-  createGame: () => GameSession = createDefaultGame,
+  createGame: (mapName: BoardMapName) => GameSession = (mapName) => createDefaultGame(undefined, undefined, mapName),
 ): GameSocketServer {
   const io = new Server<
     ClientToServerEvents,

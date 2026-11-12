@@ -1,5 +1,6 @@
 import type {
   Card,
+  BoardMapName,
   CardsDealt,
   PlayerCheckpointProgress,
   PlayerConnectionChanged,
@@ -85,7 +86,8 @@ export type FixtureSnapshot = {
   state: PublicGameState
   submissions: readonly SubmitProgram[]
   entryRequests: readonly (
-    | { event: 'session.get' | 'lobby.create' | 'lobby.start'; socketId: string; payload: Record<string, never> }
+    | { event: 'session.get' | 'lobby.start'; socketId: string; payload: Record<string, never> }
+    | { event: 'lobby.create'; socketId: string; payload: { mapName?: BoardMapName } }
     | { event: 'lobby.join'; socketId: string; payload: { lobbyId: string } }
   )[]
   pendingStarts: number

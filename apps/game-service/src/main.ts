@@ -31,8 +31,8 @@ httpServer.on('request', (req, res) => {
 
 const random = config.startTileOrder === 'ordered' ? () => 0 : Math.random
 const { cardSeed } = config
-const io = createGameSocketServer(httpServer, sessionStore, () =>
-  createDefaultGame(random, cardSeed === undefined ? undefined : seededRandom(cardSeed)))
+const io = createGameSocketServer(httpServer, sessionStore, (mapName) =>
+  createDefaultGame(random, cardSeed === undefined ? undefined : seededRandom(cardSeed), mapName))
 
 httpServer.listen(config.port, host, () => {
   console.log(`Game Service listening at http://${host}:${config.port}`)
