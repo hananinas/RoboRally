@@ -22,7 +22,7 @@ function errorMessage(code: string): string {
 function App() {
   const {
     connection, game, session, busy, lobbies, maps, mapsLoaded, listError,
-    createLobby, joinLobby, startLobby, leaveSession, refreshLobbies, retrySession,
+    createLobby, joinLobby, startLobby, leaveSession, refreshLobbies, retrySession, selectRobot,
   } = useSessionConnection()
 
   useEffect(() => {
@@ -63,15 +63,19 @@ function App() {
     </>
   }
   return (
-  <EntryScreen
-    onLogout={connection.status === 'connected' || session.user ? logout : undefined}
-    onSettings={openSettings}
-    aside={session.status === 'waiting' ? <RobotPicker /> : undefined}
-  >
+    <EntryScreen
+      onLogout={connection.status === 'connected' || session.user ? logout : undefined}
+      onSettings={openSettings}
+      aside={session.status === 'waiting' ? <RobotPicker
+        selectedRobotId={session.lobby.players.find((player) => player.userId === session.user.userId)?.robotSpriteId ?? 'tank'}
+        disabled={busy || connection.status !== 'connected'}
+        onSelect={selectRobot}
+      /> : undefined}
+    >
     {error && (session.status === 'waiting' || session.status === 'resyncing' || session.status === 'sync-failed') &&
       <p role="alert" className="entry-validation entry-validation--error">{error}</p>}
     {content}
-  </EntryScreen>  
+    </EntryScreen>
   )
 }
 export default App

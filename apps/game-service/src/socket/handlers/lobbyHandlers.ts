@@ -7,7 +7,9 @@ import { ROBOT_COLOURS } from '@/game/Robot'
 import { boardMaps, type BoardMapName } from '@/game/boardMaps'
 import {
   emptyRequestSchema, lobbyRequestSchema, createLobbyRequestSchema,
-  type EmptyRequest, type LobbyRequest, type CreateLobbyRequest, type GameInitialization, type LobbyState, type User,
+  robotSelectionRequestSchema,
+  ROBOT_SPRITE_IDS,
+  type EmptyRequest, type LobbyRequest, type RobotSelectionRequest, type RobotSelectionResult, type CreateLobbyRequest, type GameInitialization, type LobbyState, type User,
   type LobbyListResult, type LobbyJoinResult, type LobbyLeaveResult, type LobbyStartResult,
 } from '@robo-rally/game-events'
 import { createGameContext } from '@/socket/gameContext'
@@ -21,7 +23,9 @@ export function presentLobby(lobby: Lobby): LobbyState {
   return { lobbyId: lobby.lobbyId, name: lobby.name, mapName: lobby.mapName, mapDisplayName: map.name, mapIcon: map.icon,
     ownerUserId: lobby.members.keys().next().value!,
     playerCount: lobby.members.size, maxPlayers: MAX_PLAYERS,
-    players: [...lobby.members.values()].map(({ user }) => ({ userId: user.userId, username: user.username })) }
+    players: [...lobby.members.values()].map(({ user, robotSpriteId }) => ({
+      userId: user.userId, username: user.username, robotSpriteId,
+    })) }
 }
 
 function isBoardMapName(mapName: string): mapName is BoardMapName {
@@ -95,7 +99,7 @@ export function handleCreateLobby(
     }
     const lobbyId = randomUUID()
     const lobby: Lobby = { lobbyId, name: payload.name ?? `Lobby ${lobbyId.slice(0, 8)}`, mapName,
-      members: new Map([[user.userId, { user, connectionId: socket.id }]]) }
+      members: new Map([[user.userId, { user, connectionId: socket.id, robotSpriteId: ROBOT_SPRITE_IDS[0] }]]) }
     void socket.join(lobbyRoom(lobbyId))
     context.lobbies.set(lobbyId, lobby)
     context.sessionsByUser.set(user.userId, { kind: 'lobby', lobbyId })
@@ -121,10 +125,28 @@ export function handleJoinLobby(
     }
     if (lobby.members.size >= MAX_PLAYERS) return ack({ outcome: 'LOBBY_FULL' })
     void socket.join(lobbyRoom(lobby.lobbyId))
-    lobby.members.set(user.userId, { user, connectionId: socket.id })
+    lobby.members.set(user.userId, { user, connectionId: socket.id, robotSpriteId: ROBOT_SPRITE_IDS[0] })
     context.sessionsByUser.set(user.userId, { kind: 'lobby', lobbyId: lobby.lobbyId })
     ack({ outcome: 'LOBBY_JOINED', lobby: presentLobby(lobby) })
     socket.to(lobbyRoom(lobby.lobbyId)).emit('lobby.updated', { lobby: presentLobby(lobby) })
+  })
+}
+
+export function handleSelectRobot(
+  context: SessionContext,
+  socket: GameSocket,
+  payload: RobotSelectionRequest,
+  acknowledge: (result: RobotSelectionResult) => void,
+): void {
+  withSessionRequest(socket, 'lobby.selectRobot', robotSelectionRequestSchema, payload, acknowledge, (user, ack) => {
+    const session = context.sessionsByUser.get(user.userId)
+    const lobby = session?.kind === 'lobby' ? context.lobbies.get(session.lobbyId) : undefined
+    const member = lobby?.members.get(user.userId)
+    if (!lobby || member?.connectionId !== socket.id) return ack({ outcome: 'NOT_LOBBY_MEMBER' })
+    member.robotSpriteId = payload.robotSpriteId
+    const state = presentLobby(lobby)
+    ack({ outcome: 'ROBOT_SELECTED', lobby: state })
+    context.io.to(lobbyRoom(lobby.lobbyId)).emit('lobby.updated', { lobby: state })
   })
 }
 

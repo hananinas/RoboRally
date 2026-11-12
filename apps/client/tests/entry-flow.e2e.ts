@@ -63,6 +63,7 @@ test('selects a robot in the waiting lobby', async ({ page }) => {
   await expect(scout).toHaveAttribute('aria-pressed', 'true')
   await expect(tank).toHaveAttribute('aria-pressed', 'false')
   await expect(page.getByRole('heading', { name: 'Scout', exact: true })).toBeVisible()
+  await expect(page.getByRole('list', { name: 'Connected players' }).getByLabel('Scout robot')).toBeVisible()
 })
 
 test('a disconnected member during Start leaves the owner waiting and able to retry', async ({ page, game }) => {

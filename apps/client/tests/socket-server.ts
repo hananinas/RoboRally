@@ -300,7 +300,7 @@ io.on('connection', (socket) => {
     const map = maps.find((candidate) => candidate.mapName === mapName) ?? maps[1]!
     return {
     lobbyId: GAME_ID, name: lobbyName, mapName: map.mapName, mapDisplayName: map.name, mapIcon: map.icon, ownerUserId: user.userId,
-    playerCount: 1, maxPlayers: 6, players: [user],
+    playerCount: 1, maxPlayers: 6, players: [{ ...user, robotSpriteId: 'tank' }],
     }
   }
   socket.on('clock.get', (_, acknowledge) => {
@@ -325,6 +325,16 @@ io.on('connection', (socket) => {
     fixture.entryRequests.push({ event: 'lobby.join', socketId: socket.id, payload })
     lobby = lobbyState()
     acknowledge({ outcome: 'LOBBY_JOINED', lobby })
+  })
+  socket.on('lobby.selectRobot', (payload, acknowledge) => {
+    if (!lobby) return acknowledge({ outcome: 'NOT_LOBBY_MEMBER' })
+    lobby = {
+      ...lobby,
+      players: lobby.players.map((player) => player.userId === user.userId
+        ? { ...player, robotSpriteId: payload.robotSpriteId } : player),
+    }
+    acknowledge({ outcome: 'ROBOT_SELECTED', lobby })
+    socket.emit('lobby.updated', { lobby })
   })
   socket.on('lobby.leave', (_, acknowledge) => {
     lobby = undefined
