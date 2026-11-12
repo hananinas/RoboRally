@@ -201,6 +201,12 @@
   color: #9d2525;
 }
 
+.game-status .programming-countdown {
+  margin-top: 0.25rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 .player-panel__header {
   display: flex;
   align-items: center;

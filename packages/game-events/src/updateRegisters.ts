@@ -1,14 +1,22 @@
 import { z } from 'zod'
 
-const registerOccupancySchema = z
-  .tuple([z.boolean(), z.boolean(), z.boolean(), z.boolean(), z.boolean()])
+const registerCardIdSchema = z.uuid().nullable()
+
+const registerCardIdsSchema = z
+  .tuple([
+    registerCardIdSchema,
+    registerCardIdSchema,
+    registerCardIdSchema,
+    registerCardIdSchema,
+    registerCardIdSchema,
+  ])
   .readonly()
 
 export const updateRegistersSchema = z
   .strictObject({
-    occupied: registerOccupancySchema,
+    cardIds: registerCardIdsSchema,
   })
   .readonly()
 
-export type RegisterOccupancy = z.infer<typeof registerOccupancySchema>
+export type RegisterCardIds = z.infer<typeof registerCardIdsSchema>
 export type UpdateRegisters = z.infer<typeof updateRegistersSchema>

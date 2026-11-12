@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { err, ok, type Result } from 'neverthrow'
 import type { Board } from '@/game/Board'
-import { effects, type PublicRegisters, type RegisterOccupancy, type ResolvedInstruction } from '@robo-rally/game-events'
+import { effects, type PrivateProgram, type PublicRegisters, type ResolvedInstruction } from '@robo-rally/game-events'
 import { Card } from '@/game/Card'
 import { Deck } from '@/game/Deck'
 import type { CardId, PlayerId, RobotId } from '@/game/ids'
@@ -49,7 +49,12 @@ export type SubmitProgramError =
   | 'ALREADY_SUBMITTED'
   | 'INVALID_PROGRAM'
 
-export type UpdateRegistersError = Exclude<SubmitProgramError, 'INVALID_PROGRAM'>
+export type UpdateRegistersError = SubmitProgramError
+
+export type CompletedProgram = Readonly<{
+  playerId: PlayerId
+  cards: readonly Card[]
+}>
 
 export const DEFAULT_GAME_NAME = 'Game'
 
@@ -244,20 +249,57 @@ export class Game {
 
   submitProgram(playerId: PlayerId, cardIds: readonly CardId[]): Result<void, SubmitProgramError> {
     return this.checkCanSubmitProgram(playerId).andThen((player) =>
-      this.checkProgram(player, cardIds).map((program) => {
-        player.robot.setProgram(program)
-        // Programmed cards stay out of both piles until the round ends.
-        player.discard(player.hand.filter((card) => !program.includes(card)))
-        player.clearHand()
-        this.submittedPlayerIds.add(playerId)
-        this.recheckProgrammingPhase()
-      }),
+      this.checkProgram(player, cardIds).map((program) => this.applyProgram(player, program)),
     )
   }
 
-  updateRegisters(playerId: PlayerId, occupied: RegisterOccupancy): Result<void, UpdateRegistersError> {
-    return this.checkCanSubmitProgram(playerId).map((player) => {
-      player.updateRegisters(occupied)
+  private applyProgram(player: Player, program: readonly Card[]): void {
+    player.robot.setProgram(program)
+    player.updateRegisters(program as PrivateProgram)
+    // Programmed cards stay out of both piles until the round ends.
+    player.discard(player.hand.filter((card) => !program.includes(card)))
+    player.clearHand()
+    this.submittedPlayerIds.add(player.id)
+    this.recheckProgrammingPhase()
+  }
+
+  completePrograms(): Result<readonly CompletedProgram[], SubmitProgramError> {
+    const phase = this.requirePhase('programming')
+    if (phase.isErr() && (phase.error !== 'GAME_PAUSED' || this.lastActivePhase !== 'programming')) {
+      return err(phase.error)
+    }
+
+    // The deadline can finalize programs while gameplay remains paused.
+    const validatedPrograms: { player: Player; cards: readonly Card[] }[] = []
+    for (const player of this.players) {
+      if (this.submittedPlayerIds.has(player.id)) continue
+      const selectedIds = new Set(player.program.map((card) => card?.id))
+      const available = player.hand.filter((card) => !selectedIds.has(card.id))
+      const cards = player.program.map((card) => card ?? available.shift())
+      if (!cards.every((card): card is Card => card !== undefined)) return err('INVALID_PROGRAM')
+      const checked = this.checkProgram(player, cards.map((card) => card.id))
+      if (checked.isErr()) return err(checked.error)
+      validatedPrograms.push({ player, cards: checked.value })
+    }
+
+    // Validate every completion before submitting any of them.
+    for (const { player, cards } of validatedPrograms) {
+      this.applyProgram(player, cards)
+    }
+    return ok(validatedPrograms.map(({ player, cards }) => ({ playerId: player.id, cards })))
+  }
+
+  updateRegisters(playerId: PlayerId, cardIds: readonly (CardId | null)[]): Result<void, UpdateRegistersError> {
+    return this.checkCanSubmitProgram(playerId).andThen((player) => {
+      const selectedIds = cardIds.filter((id) => id !== null)
+      const hand = new Map(player.hand.map((card) => [card.id, card]))
+      if (cardIds.length !== 5 || new Set(selectedIds).size !== selectedIds.length ||
+          selectedIds.some((id) => !hand.has(id))) {
+        return err('INVALID_PROGRAM')
+      }
+      const program: readonly (Card | null)[] = cardIds.map((id) => id === null ? null : hand.get(id)!)
+      player.updateRegisters(program as PrivateProgram)
+      return ok(undefined)
     })
   }
 

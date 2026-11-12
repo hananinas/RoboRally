@@ -190,7 +190,23 @@ The first accepted `program.submit` starts a shared 30-second countdown. The ser
 
 `program.timerChanged {gameId, serverTime, timer}`
 
-`serverTime` and `deadline` are Unix timestamps in milliseconds. Clients use them to display the countdown. `PublicGameState.programmingTimer` contains the same timer state.
+`serverTime` and `deadline` are Unix timestamps in milliseconds. `PublicGameState.programmingTimer` contains the same timer state.
+
+An authenticated connection can send `clock.get {}` to obtain `CLOCK {serverTime}`
+through its acknowledgement. The service reads the timestamp immediately before
+sending the reply, allowing clients to measure a round trip and estimate the
+server clock. No lobby or game membership is required. Invalid payloads receive
+`INVALID_REQUEST`; the request does not change game state or broadcast events.
+
+When a RUNNING timer arrives or a connection resumes, the client samples `clock.get`,
+recording `sentAt` and `receivedAt` with `performance.now()`. In the reply callback,
+it estimates `midpoint = sentAt + (receivedAt - sentAt) / 2` and anchors
+`localDeadline = midpoint + (deadline - serverTime)` using the reply's timestamp.
+The display counts down from `localDeadline - performance.now()`, independently of
+timer-event delivery, rendering delays and the browser's wall clock. The midpoint
+assumes similar travel times in both directions; the server enforces the deadline.
+Old connection or timer replies are ignored. A failed sample keeps an existing
+estimate; without one, the numeric countdown stays hidden until a sample succeeds.
 
 | State | Payload | Meaning |
 |---|---|---|
@@ -203,6 +219,8 @@ When all players submit or the deadline expires, the service finalizes the progr
 For both submission and timeout, the public room receives `game.registersChanged` with five HIDDEN slots and `program.submitted`. The service sends finalization events before the CLOSED timer event, followed by activation events. Further programming requests receive `WRONG_PHASE`.
 
 On reconnect, the service sends the current timer with a fresh `serverTime`; `session.get` includes the timer and the player's private program. The existing [reconnection flow](#game-membership) applies.
+
+A disconnect pauses gameplay without extending the programming deadline. At expiry, the service finalizes programs and sends CLOSED; activation waits until all remaining members are connected.
 
 #### Timer sequence
 
@@ -304,11 +322,11 @@ Each player receives:
 
 through the player's [private room](#rooms).
 
-A new hand may arrive while the client is still playing animations from the previous activation. The client should store the new hand immediately but must not enable programming until all queued resolved actions have finished playing.
+A new hand may arrive while the client is still playing animations from the previous activation. The client stores the new hand immediately and enables programming after queued resolved actions have finished playing. If another player starts the shared timer first, the client finishes that playback immediately so the hand becomes available.
 
 The new hand also opens the next programming round, so the client resets every player's registers to five EMPTY slots when its own hand arrives. A player who reconnects after that point gets the reset registers from `session.get`.
 
-The service sends each private hand before broadcasting `program.timerChanged` with `IDLE` for the new round.
+The service sends each private hand before broadcasting `program.timerChanged` with `IDLE` for the new round. If the next round timer starts while a client is still playing the previous round, the client finishes queued actions immediately and makes the new hand available.
 
 ### Game sequence
 
@@ -394,6 +412,8 @@ After an unexpected connection loss, the client attempts to reconnect automatica
 If recovery succeeds and the client still retains its local game state, Socket.IO replays missed events.
 
 The client applies the recovered events in order and continues using its existing player and robot assignments.
+
+After connection recovery, a client with an unacknowledged or failed register save requests `session.get` before enabling programming. It restores the authoritative private selection or finalized program from that snapshot.
 
 ```mermaid
 sequenceDiagram
@@ -481,4 +501,3 @@ The game remains paused while any remaining player is disconnected. Once all rem
 Most commands acknowledge failures with a specific outcome string rather than throwing. See [AsyncAPI](asyncapi.yaml), with a [rendered reference](asyncapi.html), for the exact payload shapes and the full set of rejection codes per command.
 
 If an unexpected service failure makes gameplay unrecoverable, members receive `game.aborted {gameId}` through the [public room](#rooms), and the game ends permanently.
-

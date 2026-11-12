@@ -127,7 +127,7 @@ describe('Game multiplayer activation', () => {
         expect(player.hand).toHaveLength(deck.length)
         expect(player.hand).toEqual(expect.arrayContaining([...deck]))
         expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
-        expect(game.updateRegisters(player.id, [true, true, true, true, true])._unsafeUnwrap()).toBeUndefined()
+        expect(game.updateRegisters(player.id, programs[index].map((card) => card.id))._unsafeUnwrap()).toBeUndefined()
         game.submitProgram(player.id, programs[index].map((card) => card.id))
         expect(game.lastActivePhase).toBe(index === players.length - 1 ? 'activation' : 'programming')
       })

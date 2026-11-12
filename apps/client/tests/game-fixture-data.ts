@@ -6,10 +6,13 @@ import type {
   PlayerConnectionChanged,
   ProgramResultOutcome,
   ProgramSubmitted,
+  ProgramFinalized,
+  ProgrammingTimer,
   PublicGameState,
   RegistersChanged,
   RobotActionResolved,
   SubmitProgram,
+  UpdateRegisters,
 } from '@robo-rally/game-events'
 
 export const GAME_SERVICE_URL = 'http://127.0.0.1:4174'
@@ -22,6 +25,8 @@ export const OTHER_ROBOT_ID = '33333333-3333-4333-8333-333333333334'
 export function createPublicState(): PublicGameState {
   return {
     gameId: GAME_ID,
+    serverTime: 0,
+    programmingTimer: { status: 'IDLE' },
     players: [{ playerId: PLAYER_ID, lastCheckpoint: 0, username: 'Player 1', programSubmitted: false, connected: true, registers: [{ status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }] }],
     phase: 'PROGRAMMING',
     paused: false,
@@ -71,10 +76,15 @@ export type FixtureControl =
   | { type: 'submission'; outcome: ProgramResultOutcome; deferred: boolean }
   | { type: 'acknowledge'; outcome: ProgramResultOutcome }
   | { type: 'disconnect' }
+  | { type: 'register-delivery'; mode: 'normal' | 'drop' | 'save-without-ack' }
   | { type: 'round'; actions: readonly RobotActionResolved[]; deferHand?: boolean }
   | { type: 'deal' }
   | { type: 'hand'; hand: CardsDealt }
   | { type: 'submitted'; submission: ProgramSubmitted }
+  | { type: 'finalized'; program: ProgramFinalized }
+  | { type: 'timer'; timer: ProgrammingTimer; serverTime?: number }
+  | { type: 'clock'; serverTime?: number; deferred: boolean }
+  | { type: 'respond-clock' }
   | { type: 'early-hand'; cards: readonly Card[] }
   | { type: 'start'; deferred: boolean; outcome?: 'STARTED' | 'LOBBY_MEMBER_DISCONNECTED' }
   | { type: 'respond-start' }
@@ -85,10 +95,12 @@ export type FixtureSnapshot = {
   cards: readonly Card[]
   state: PublicGameState
   submissions: readonly SubmitProgram[]
+  registerUpdates: readonly UpdateRegisters[]
   entryRequests: readonly (
     | { event: 'session.get' | 'lobby.start'; socketId: string; payload: Record<string, never> }
     | { event: 'lobby.create'; socketId: string; payload: { mapName?: BoardMapName } }
     | { event: 'lobby.join'; socketId: string; payload: { lobbyId: string } }
   )[]
   pendingStarts: number
+  pendingClocks: number
 }

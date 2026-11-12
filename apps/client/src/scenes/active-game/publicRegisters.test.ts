@@ -11,7 +11,8 @@ function joined(executing = false) {
     type: 'joined',
     result: {
       outcome: 'JOINED', assignment: { gameId: GAME_ID, playerId: PLAYER_ID, robotId: ROBOT_ID },
-      state: createRegisterState(executing), hand: [{ id: 'private-card', instruction: 'MOVE_3' }], programSubmitted: false,
+      state: createRegisterState(executing), hand: [{ id: 'private-card', instruction: 'MOVE_3' }],
+      program: [null, null, null, null, null], programSubmitted: false,
     },
   })
 }
@@ -116,6 +117,27 @@ describe('public registers', () => {
     expect(canProgram(state)).toBe(true)
   })
 
+  it('keeps both programs and public faces aligned when timeout queues another round', () => {
+    let state = gameStateReducer(joined(true), { type: 'action', action: { ...action, registerIndex: 4 } })
+    const cards = Array.from({ length: 5 }, (_, index) => ({ id: `next-${index}`, instruction: 'TURN_LEFT' as const }))
+    state = gameStateReducer(state, { type: 'dealt', hand: { gameId: GAME_ID, playerId: PLAYER_ID, cards } })
+    state = gameStateReducer(state, { type: 'program-finalized', payload: {
+      gameId: GAME_ID, playerId: PLAYER_ID, reason: 'TIMEOUT', cards: [cards[0], cards[1], cards[2], cards[3], cards[4]],
+    } })
+    state = gameStateReducer(state, { type: 'registers-changed', payload: {
+      gameId: GAME_ID, playerId: ADA_ID, registers: MIKKEL_OCCUPANCY,
+    } })
+    state = gameStateReducer(state, { type: 'action', action: { ...action, registerIndex: 0 } })
+    state = gameStateReducer(state, { type: 'complete' })
+
+    expect(state.playbackProgram).toEqual(cards)
+    expect(getOtherPlayers(state)[0].registers).toEqual([
+      { status: 'REVEALED', instruction: 'MOVE_2' },
+      { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' },
+    ])
+    expect(canProgram(state)).toBe(false)
+  })
+
   it('resets every player’s registers when the local hand arrives and lets new occupancy stick', () => {
     let state = joined(true)
     expect(getOtherPlayers(state)[0].registers[0].status).toBe('REVEALED')
@@ -134,7 +156,8 @@ describe('public registers', () => {
     const executing = joined(true)
     const next = gameStateReducer(executing, {
       type: 'joined', result: {
-        outcome: 'JOINED', assignment: executing.assignment!, state: createRegisterState(), hand: [], programSubmitted: false,
+        outcome: 'JOINED', assignment: executing.assignment!, state: createRegisterState(), hand: [],
+        program: [null, null, null, null, null], programSubmitted: false,
       },
     })
     expect(getOtherPlayers(executing)[0].registers[0].status).toBe('REVEALED')

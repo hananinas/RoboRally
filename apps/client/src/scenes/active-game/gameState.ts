@@ -12,6 +12,9 @@ import type {
   PlayerState,
   PlayerLeft,
   ProgramResult,
+  ProgramFinalized,
+  ProgrammingTimer,
+  ProgramTimerChanged,
   ProgramSubmitted,
   PublicRegisters,
   RegistersChanged,
@@ -49,6 +52,7 @@ export type ClientGameState = {
   connected: boolean
   assignment: PlayerAssignment | null
   phase: GamePhase | null
+  programmingTimer: ProgrammingTimer
   paused: boolean
   players: readonly Player[]
   checkpointCount: number
@@ -63,7 +67,7 @@ export type ClientGameState = {
   playbackProgram: Registers | null
   handVersion: number
   handReady: boolean
-  pendingHand: CardsDealt | null
+  pendingHand: (CardsDealt & { program?: ProgramFinalized['cards'] }) | null
   submission: 'idle' | 'pending' | 'accepted' | 'uncertain'
   aborted: boolean
   winner: Winner | null
@@ -96,6 +100,8 @@ export type GameStateEvent =
   | { type: 'submit' }
   | { type: 'result'; result: ProgramResult; handVersion: number }
   | { type: 'submission-unknown'; handVersion: number }
+  | { type: 'program-finalized'; payload: ProgramFinalized }
+  | { type: 'timer-changed'; payload: ProgramTimerChanged }
 
 export const USER_ALREADY_IN_GAME_MESSAGE =
   'This username is already participating from another connection.'
@@ -115,6 +121,7 @@ export function createClientGameState(): ClientGameState {
     connected: false,
     assignment: null,
     phase: null,
+    programmingTimer: { status: 'IDLE' },
     paused: false,
     players: [],
     checkpointCount: 0,
@@ -143,6 +150,7 @@ export function canProgram(state: ClientGameState): boolean {
     state.winner === null &&
     state.assignment !== null &&
     state.phase === 'PROGRAMMING' &&
+    state.programmingTimer.status !== 'CLOSED' &&
     state.handReady &&
     state.hand.length > 0 &&
     !state.playback.active &&
@@ -173,6 +181,20 @@ function isHandEligible(state: ClientGameState, hand: CardsDealt): boolean {
     hand.playerId === state.assignment.playerId
 }
 
+function adoptPendingHand(state: ClientGameState): ClientGameState {
+  const hand = state.pendingHand
+  if (!hand) return state
+  return {
+    ...state,
+    hand: hand.cards,
+    handVersion: state.handVersion + 1,
+    pendingHand: null,
+    registers: hand.program ?? emptyRegisters(),
+    registersPast: [],
+    registersFuture: [],
+  }
+}
+
 // Keep the next hand pending until the previous round has finished playing.
 function activateHand(state: ClientGameState): ClientGameState {
   const hand = state.pendingHand
@@ -182,37 +204,44 @@ function activateHand(state: ClientGameState): ClientGameState {
     return state
   }
   return {
-    ...state,
-    hand: hand.cards,
+    ...adoptPendingHand(state),
     handReady: true,
-    handVersion: state.handVersion + 1,
-    pendingHand: null,
-    registers: emptyRegisters(),
-    registersPast: [],
-    registersFuture: [],
     playbackProgram: null,
-    submission: 'idle',
+    submission: hand.program ? 'accepted' : 'idle',
     error: state.connected ? null : state.error,
   }
 }
 
-function registersForPlayback(
-  state: ClientGameState,
-  playback: RobotPlaybackState,
-): ReadonlyMap<PlayerId, PublicRegisters> | null {
-  const action = playback.active
-  if (!action) return null
-  if (action === state.playback.active) return state.playbackRegisters
-  const registers = new Map(state.playbackRegisters ?? state.players.flatMap((player) =>
-    [[player.playerId, player.registers] as const]))
-  const player = state.players.find((candidate) => candidate.robotId === action.robotId)
-  const slots = player && registers.get(player.playerId)
-  if (player && slots) {
-    const revealed: [...PublicRegisters] = [...slots]
-    revealed[action.registerIndex] = { status: 'REVEALED', instruction: action.instruction }
-    registers.set(player.playerId, revealed)
+function updatePlayback(state: ClientGameState, playback: RobotPlaybackState): ClientGameState {
+  return {
+    ...state,
+    playback,
+    playbackRegisters: registersForPlayback(state, playback),
+    playbackProgram: playback.active?.program ?? state.playbackProgram,
   }
-  return registers
+}
+
+function finishPlayback(state: ClientGameState): ClientGameState {
+  if (state.playback.active || state.phase !== 'PROGRAMMING') return state
+  return activateHand({
+    ...state,
+    playbackProgram: null,
+    registers: state.playbackProgram ? emptyRegisters() : state.registers,
+  })
+}
+
+// A timer started by another client must make the new hand available immediately.
+function finishPreviousRound(state: ClientGameState): ClientGameState {
+  if (state.phase !== 'PROGRAMMING' || !state.pendingHand || state.programmingTimer.status !== 'RUNNING') return state
+  let playback = state.playback
+  while (playback.active) playback = robotPlaybackReducer(playback, { type: 'complete' })
+  return finishPlayback(updatePlayback(state, playback))
+}
+
+function registersForPlayback(state: ClientGameState, playback: RobotPlaybackState): ReadonlyMap<PlayerId, PublicRegisters> | null {
+  return playback.active === state.playback.active
+    ? state.playbackRegisters
+    : playback.active?.publicRegisters ?? null
 }
 
 export function gameStateReducer(
@@ -244,13 +273,10 @@ export function gameStateReducer(
       const { gameId, playerId, robotId } = event.payload
       if (gameId !== state.assignment?.gameId ||
         !state.players.some((player) => player.playerId === playerId)) return state
-      const playback = robotPlaybackReducer(state.playback, { type: 'remove', robotId })
-      return {
+      return finishPlayback(updatePlayback({
         ...state,
         players: state.players.filter((player) => player.playerId !== playerId),
-        playback,
-        playbackRegisters: registersForPlayback(state, playback),
-      }
+      }, robotPlaybackReducer(state.playback, { type: 'remove', robotId })))
     }
     case 'checkpoint-progress': {
       const { gameId, playerId, lastCheckpoint, checkpointCount } = event.payload
@@ -291,6 +317,7 @@ export function gameStateReducer(
       return {
         ...state,
         aborted: true,
+        programmingTimer: { status: 'CLOSED' },
         error: 'This game has encountered an error and cannot continue.',
       }
     case 'won':
@@ -298,6 +325,7 @@ export function gameStateReducer(
               return {
         ...state,
         winner: { playerId: event.payload.playerId, username: event.payload.username },
+        programmingTimer: { status: 'CLOSED' },
       }
 
     case 'reset':
@@ -310,11 +338,14 @@ export function gameStateReducer(
         connected: true,
         assignment: result.assignment,
         hand: result.hand,
+        registers: result.program,
+        playbackProgram: snapshot.phase === 'EXECUTING' ? result.program : null,
         handVersion: result.hand.length > 0 ? 1 : 0,
         // After submitting, the hand is empty until the next round is dealt.
         handReady: snapshot.phase === 'PROGRAMMING' && (result.hand.length > 0 || result.programSubmitted),
         submission: result.programSubmitted ? 'accepted' : 'idle',
         phase: snapshot.phase,
+        programmingTimer: snapshot.programmingTimer,
         paused: snapshot.paused,
         aborted: snapshot.aborted,
         winner: snapshot.winner,
@@ -342,7 +373,7 @@ export function gameStateReducer(
               sprite: tile.sprite,
               direction: tile.direction,
             }] : []),
-            
+
             checkpoints: snapshot.board.tiles.flatMap((tile) => tile.checkpointNumber === undefined
               ? [] : [{ ...tile.position, checkpointNumber: tile.checkpointNumber }]),
             walls: snapshot.board.tiles.map((tile) => ({
@@ -360,7 +391,7 @@ export function gameStateReducer(
       const hand = event.hand
       if (!isHandEligible(state, hand) ||
         (state.phase === 'PROGRAMMING' && (state.handReady || state.pendingHand))) return state
-      return activateHand({
+      return finishPreviousRound(activateHand({
         ...state,
         phase: 'PROGRAMMING',
         handReady: false,
@@ -370,7 +401,7 @@ export function gameStateReducer(
           programSubmitted: false,
           registers: [{ status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }],
         })),
-      })
+      }))
     }
     case 'action': {
       const actionPlayerId = event.action.playerId
@@ -384,33 +415,23 @@ export function gameStateReducer(
             event.action.pushedRobots.some((pushed) => pushed.robotId === robot.robotId))) return state
       const registers: [...PublicRegisters] | null = player ? [...player.registers] : null
       if (registers) registers[event.action.registerIndex] = { status: 'REVEALED', instruction: event.action.instruction }
-      const playback = robotPlaybackReducer(state.playback, { type: 'enqueue', action: event.action })
-      return {
-        ...state,
+      const next = adoptPendingHand(state)
+      const players = player && registers ? next.players.map((candidate) => candidate.playerId === player.playerId
+        ? { ...candidate, registers } : candidate) : next.players
+      const action = {
+        ...event.action,
+        program: next.registers,
+        publicRegisters: new Map(players.map((candidate) => [candidate.playerId, candidate.registers])),
+      }
+      return updatePlayback({
+        ...next,
         phase: 'EXECUTING',
         handReady: false,
-        pendingHand: null,
-        players: player && registers ? state.players.map((candidate) => candidate.playerId === player.playerId
-          ? { ...candidate, registers } : candidate) : state.players,
-        playbackProgram: state.playbackProgram ??
-          (state.registers.some((card) => card !== null) ? state.registers : null),
-        playback,
-        playbackRegisters: registersForPlayback(state, playback),
-      }
+        players,
+      }, robotPlaybackReducer(next.playback, { type: 'enqueue', action }))
     }
-    case 'complete': {
-      const playback = robotPlaybackReducer(state.playback, { type: 'complete' })
-      const playbackRegisters = registersForPlayback(state, playback)
-      if (playback.active) return { ...state, playback, playbackRegisters }
-      if (state.phase !== 'PROGRAMMING') return { ...state, playback, playbackRegisters }
-      return activateHand({
-        ...state,
-        playback,
-        playbackRegisters,
-        playbackProgram: null,
-        registers: state.playbackProgram ? emptyRegisters() : state.registers,
-      })
-    }
+    case 'complete':
+      return finishPlayback(updatePlayback(state, robotPlaybackReducer(state.playback, { type: 'complete' })))
     case 'place': {
       if (!canProgram(state)) return state
       const card = state.hand.find((candidate) => candidate.id === event.cardId)
@@ -474,6 +495,21 @@ export function gameStateReducer(
     }
     case 'submit':
       return createSubmission(state) ? { ...state, submission: 'pending', error: null } : state
+    case 'program-finalized': {
+      const { gameId, playerId, cards } = event.payload
+      if (gameId !== state.assignment?.gameId || playerId !== state.assignment.playerId) return state
+      return {
+        ...state,
+        ...(state.pendingHand ? { pendingHand: { ...state.pendingHand, program: cards } } : { registers: cards }),
+        registersPast: [],
+        registersFuture: [],
+        submission: 'accepted',
+        error: null,
+      }
+    }
+    case 'timer-changed':
+      if (event.payload.gameId !== state.assignment?.gameId) return state
+      return finishPreviousRound({ ...state, programmingTimer: event.payload.timer })
     case 'result': {
       if (event.handVersion !== state.handVersion || state.submission !== 'pending') return state
       if (event.result.outcome === 'ACCEPTED' || event.result.outcome === 'ALREADY_SUBMITTED') {

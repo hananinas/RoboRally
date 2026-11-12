@@ -48,8 +48,10 @@ for (const scenario of scenarios) {
           else {
             await client.getByRole('list', { name: 'Lobbies' }).getByRole('button', { disabled: false }).first().click()
             await client.getByRole('button', { name: 'Join game', exact: true }).click()
+            await expect(client.getByText('Waiting for the owner to start.', { exact: true })).toBeVisible()
           }
         }
+        await expect(page.getByText('3/6 connected', { exact: true })).toBeVisible()
         await page.getByRole('button', { name: 'Start', exact: true }).click()
         await expect.poll(() => robotIds(page)).toHaveLength(3)
         const ids = await robotIds(page)

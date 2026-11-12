@@ -8,7 +8,7 @@ export default function useSessionConnection() {
   const connection = useGameSocket()
   const { socket } = connection
   const game = useGameConnection(socket)
-  const { initialize, dispatch: dispatchGame } = game
+  const { initialize, dispatch: dispatchGame, needsReconciliation } = game
   const [session, setSession] = useState(createSessionState)
   const current = useRef(session)
   const generation = useRef(0)
@@ -60,7 +60,7 @@ export default function useSessionConnection() {
       dispatch({ type: 'disconnected' })
     }
     const connected = () => {
-      if (!(current.current.status === 'joined' && socket.recovered)) dispatch({ type: 'sync-requested' })
+      if (!(current.current.status === 'joined' && socket.recovered && !needsReconciliation())) dispatch({ type: 'sync-requested' })
     }
     const started: ServerToClientEvents['game.started'] = (payload) => {
       if (socket.connected) dispatch({ type: 'game-started', ...payload })
@@ -79,7 +79,7 @@ export default function useSessionConnection() {
       socket.off('lobby.updated', updated)
       generation.current += 1
     }
-  }, [socket, dispatch])
+  }, [socket, dispatch, needsReconciliation])
 
   useEffect(() => {
     if (session.status !== 'resyncing' || !socket.connected || busy) return
