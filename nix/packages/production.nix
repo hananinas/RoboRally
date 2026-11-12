@@ -115,10 +115,10 @@ let
               '{
                 client_id: "game-service",
                 client_secret: $secret,
-                grant_types: ["authorization_code"],
+                grant_types: ["authorization_code", "refresh_token"],
                 response_types: ["code"],
                 token_endpoint_auth_method: "client_secret_post",
-                scope: "openid profile",
+                scope: "openid profile offline_access",
                 redirect_uris: [$redirect],
                 post_logout_redirect_uris: [$postLogout],
                 skip_consent: true,
