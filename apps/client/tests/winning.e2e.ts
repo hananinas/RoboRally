@@ -13,7 +13,7 @@ async function program(page: Page, cards: readonly string[]) {
 }
 
 test('announces the winner to every player and lets them leave', async ({ browser, page, baseURL }) => {
-  const context = await browser.newContext({ baseURL, reducedMotion: 'reduce' })
+  const context = await browser.newContext({ baseURL, ignoreHTTPSErrors: true, reducedMotion: 'reduce' })
   const other = await context.newPage()
   try {
     await startTogether(page, other, 'bence', 'dane')

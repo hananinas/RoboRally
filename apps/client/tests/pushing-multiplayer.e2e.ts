@@ -37,7 +37,7 @@ for (const scenario of scenarios) {
     })
 
     test('keeps three clients synchronized through pushing and a fresh snapshot', async ({ browser, page, baseURL }) => {
-      const contexts = await Promise.all([0, 1].map(() => browser.newContext({ baseURL, reducedMotion: 'reduce' })))
+      const contexts = await Promise.all([0, 1].map(() => browser.newContext({ baseURL, ignoreHTTPSErrors: true, reducedMotion: 'reduce' })))
       try {
         const pages = [page, ...await Promise.all(contexts.map((context) => context.newPage()))]
         const playerNames = ['bence', 'dane', 'abid']

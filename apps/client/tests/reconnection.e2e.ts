@@ -2,7 +2,7 @@ import { expect, test } from './real-game-fixture.ts'
 import { browse, gameStatus, login, robotIds, startTogether } from './browserClient.ts'
 
 test('recovers the existing game after a temporary disconnect', async ({ browser, page, baseURL }) => {
-  const contextB = await browser.newContext({ baseURL })
+  const contextB = await browser.newContext({ baseURL, ignoreHTTPSErrors: true })
   const pageB = await contextB.newPage()
   try {
     await startTogether(page, pageB, 'bence', 'dane')
@@ -42,8 +42,8 @@ test('recovers the existing game after a temporary disconnect', async ({ browser
 })
 
 test('rejects a stale recovered connection once a second login has taken over the membership', async ({ browser, page: stalePage, baseURL }) => {
-  const witnessContext = await browser.newContext({ baseURL })
-  const newContext = await browser.newContext({ baseURL })
+  const witnessContext = await browser.newContext({ baseURL, ignoreHTTPSErrors: true })
+  const newContext = await browser.newContext({ baseURL, ignoreHTTPSErrors: true })
   const witnessPage = await witnessContext.newPage()
   const newPage = await newContext.newPage()
   try {
@@ -67,7 +67,7 @@ test('rejects a stale recovered connection once a second login has taken over th
 })
 
 test('leaves a paused game through the disconnect overlay and returns to lobby selection', async ({ browser, page, baseURL }) => {
-  const otherContext = await browser.newContext({ baseURL })
+  const otherContext = await browser.newContext({ baseURL, ignoreHTTPSErrors: true })
   const other = await otherContext.newPage()
   try {
     await startTogether(page, other, 'bence', 'dane')
@@ -91,7 +91,7 @@ test('leaves a paused game through the disconnect overlay and returns to lobby s
 })
 
 test('a disconnected waiting owner returns to browsing while the remaining member becomes owner', async ({ browser, page, baseURL }) => {
-  const context = await browser.newContext({ baseURL })
+  const context = await browser.newContext({ baseURL, ignoreHTTPSErrors: true })
   const other = await context.newPage()
   try {
     for (const [client, username] of [[page, 'bence'], [other, 'dane']] as const) {
