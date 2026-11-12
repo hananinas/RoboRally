@@ -9,6 +9,7 @@ import { Board, Card, Direction, EmptyTile, PitTile, Game, type Tile } from '@/g
 import { createGame } from '@/game/GameFactory'
 import { HAND_SIZE } from '@/game/Deck'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
+import * as gameContext from '@/socket/gameContext'
 import { createSessionStore, type SessionStore } from '@/auth/sessionStore'
 import { authCookieHeader } from './authTestHelper.ts'
 
@@ -34,6 +35,7 @@ describe('started game membership over Socket.IO', () => {
   afterEach(async () => {
     for (const client of clients) client.disconnect()
     await new Promise<void>((resolve) => server.close(() => resolve()))
+    vi.restoreAllMocks()
   })
   async function connect(username: string): Promise<Client> {
     const client: Client = io(url, {
@@ -170,16 +172,28 @@ describe('started game membership over Socket.IO', () => {
     expect(changed.map((event) => [event.connected, event.paused])).toEqual([[false, true], [false, true], [true, true], [true, false]])
     expect(await witness.emitWithAck('program.submit', submission(observer))).toEqual({ outcome: 'ACCEPTED' })
   })
-  it('resumes mid-activation after reattaching the last disconnected member', async () => {
+  it('skips an action queued before disconnect and executes it once after reconnect', async () => {
+    const contexts = vi.spyOn(gameContext, 'createGameContext')
     const { members: [first, second] } = await startGame(['First', 'Second'])
+    const ctx = contexts.mock.results[0].value as ReturnType<typeof gameContext.createGameContext>
     for (const player of shared.game.players) shared.game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
     for (let action = 0; action < 9; action++) shared.game.executeNextAction()
-    await disconnect(first)
+    const execute = vi.spyOn(shared.game, 'executeNextAction')
     const actions: unknown[] = []
     second.on('robot.actionResolved', (payload) => actions.push(payload))
+
+    ctx.actionScheduler.scheduleNextAction()
+    // Disconnect synchronously so the game pauses before the queued callback runs.
+    server.sockets.sockets.get(first.id!)!.disconnect(true)
+    expect(shared.game.paused).toBe(true)
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    expect(execute).not.toHaveBeenCalled()
+    expect(shared.game.aborted).toBe(false)
+
     const hand = new Promise((resolve) => second.once('cards.dealt', resolve))
     await getSnapshot(await connect('First'))
     await hand
+    expect(execute).toHaveBeenCalledOnce()
     expect(actions).toHaveLength(1)
     expect(shared.game.lastActivePhase).toBe('programming')
     expect(shared.game.paused).toBe(false)
