@@ -38,9 +38,10 @@ export default function useGameSocket() {
       setStatus('connection-error')
       setError('Could not connect to the Game Service.')
     }
-    const handleDisconnect = () => {
+    const handleDisconnect = (reason: Socket.DisconnectReason) => {
       setStatus('disconnected')
       setError('Connection lost. Reconnecting…')
+      if (reason === 'io server disconnect') socket.connect()
     }
 
     socket.on('connect', handleConnect)

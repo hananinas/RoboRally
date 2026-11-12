@@ -24,6 +24,12 @@ export function createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl, ref
   const app = express()
 
   app.get('/auth/login', async (req, res) => {
+    const { session } = readSession(req, sessionStore)
+    if (session) {
+      res.redirect('/')
+      return
+    }
+
     const codeVerifier = randomPKCECodeVerifier()
     const codeChallenge = await calculatePKCECodeChallenge(codeVerifier)
     const state = randomState()
@@ -33,6 +39,7 @@ export function createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl, ref
       code_challenge: codeChallenge,
       code_challenge_method: 'S256',
       state,
+      prompt: 'login',
     })
 
     res.setHeader('Set-Cookie', [

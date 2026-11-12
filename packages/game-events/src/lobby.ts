@@ -3,12 +3,27 @@ import type { GameInitialization, User } from './payloads.js'
 
 export const emptyRequestSchema = z.strictObject({}).readonly()
 export const lobbyRequestSchema = z.strictObject({ lobbyId: z.uuid() }).readonly()
+export const createLobbyRequestSchema = z.strictObject({
+  mapName: z.string().min(1).optional(),
+  name: z.string().trim().min(1).max(50).optional(),
+}).readonly()
 export type EmptyRequest = z.infer<typeof emptyRequestSchema>
 export type LobbyRequest = z.infer<typeof lobbyRequestSchema>
+export type BoardMapName = string
+export type CreateLobbyRequest = z.infer<typeof createLobbyRequestSchema>
 
+export type BoardMapSummary = Readonly<{
+  mapName: BoardMapName
+  name: string
+  icon: string
+  defaultForLobbyCreation: boolean
+}>
 export type LobbySummary = Readonly<{
   lobbyId: string
   name: string
+  mapName: BoardMapName
+  mapDisplayName: string
+  mapIcon: string
   playerCount: number
   maxPlayers: number
 }>
@@ -18,7 +33,11 @@ export type LobbyFailure = Readonly<{
     | 'LOBBY_NOT_FOUND' | 'NOT_LOBBY_MEMBER' | 'NOT_LOBBY_OWNER'
     | 'LOBBY_FULL' | 'USER_ALREADY_IN_SESSION'
 }>
-export type LobbyListResult = Readonly<{ outcome: 'LOBBIES_FOUND'; lobbies: readonly LobbySummary[] }> | LobbyFailure
+export type LobbyListResult = Readonly<{
+  outcome: 'LOBBIES_FOUND'
+  lobbies: readonly LobbySummary[]
+  maps: readonly BoardMapSummary[]
+}> | LobbyFailure
 export type LobbyJoinResult = Readonly<{ outcome: 'LOBBY_JOINED'; lobby: LobbyState }> | LobbyFailure
 export type LobbyLeaveResult = Readonly<{ outcome: 'LEFT' }> | LobbyFailure
 export type LobbyStartResult =

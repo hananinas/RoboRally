@@ -1,9 +1,9 @@
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from './real-game-fixture.ts'
-import { browse, gameStatus, reconnect, robotIds, startTogether } from './browserClient.ts'
+import { browse, createLobby, gameStatus, reconnect, robotIds, startTogether } from './browserClient.ts'
 
 test('two players wait for owner Start, play a round, and leave for the lobby browser', async ({ browser, page, baseURL }) => {
-  const context = await browser.newContext({ baseURL, reducedMotion: 'reduce' })
+  const context = await browser.newContext({ baseURL, ignoreHTTPSErrors: true, reducedMotion: 'reduce' })
   const other = await context.newPage()
   try {
     await startTogether(page, other, 'bence', 'dane')
@@ -23,7 +23,7 @@ test('two players wait for owner Start, play a round, and leave for the lobby br
     await expect(other.getByRole('button', { name: 'Create lobby', exact: true })).toBeVisible()
     await expect.poll(() => robotIds(page)).toHaveLength(1)
     await expect(page.locator('.disconnect-overlay')).toHaveCount(0)
-    await other.getByRole('button', { name: 'Create lobby', exact: true }).click()
+    await createLobby(other)
     await other.getByRole('button', { name: 'Start', exact: true }).click()
     await expect.poll(() => robotIds(other)).toHaveLength(1)
     expect(await robotIds(other)).not.toEqual(await robotIds(page))
@@ -44,11 +44,11 @@ async function expectRoster(roster: Locator, names: string[], owner: string, sel
 
 for (const departure of ['leaves', 'disconnects'] as const) {
   test(`the roster updates and the next member becomes owner when the creator ${departure}`, async ({ browser, page, baseURL }) => {
-    const context = await browser.newContext({ baseURL })
+    const context = await browser.newContext({ baseURL, ignoreHTTPSErrors: true })
     const other = await context.newPage()
     try {
       await browse(page, 'bence')
-      await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
+      await createLobby(page)
       const ownerRoster = page.getByRole('list', { name: 'Connected players' })
       await expectRoster(ownerRoster, ['bence'], 'bence', 'bence')
       await expect(page.getByText('1/6 connected', { exact: true })).toBeVisible()
@@ -74,7 +74,7 @@ for (const departure of ['leaves', 'disconnects'] as const) {
 }
 
 test('robot colours agree between clients and survive a departure followed by a reload', async ({ browser, page, baseURL }) => {
-  const context = await browser.newContext({ baseURL })
+  const context = await browser.newContext({ baseURL, ignoreHTTPSErrors: true })
   const other = await context.newPage()
   const colours = (client: Page) => client.locator('[data-robot-id]').evaluateAll((elements) =>
     Object.fromEntries(elements.map((element) => [element.getAttribute('data-robot-id'),

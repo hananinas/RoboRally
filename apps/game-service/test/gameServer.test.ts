@@ -9,6 +9,7 @@ import { Board, Card, Direction, EmptyTile, PitTile, Game, type Tile } from '@/g
 import { createGame } from '@/game/GameFactory'
 import { HAND_SIZE } from '@/game/Deck'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
+import * as gameContext from '@/socket/gameContext'
 import { createSessionStore, type SessionStore } from '@/auth/sessionStore'
 import { authCookieHeader } from './authTestHelper.ts'
 
@@ -34,6 +35,7 @@ describe('started game membership over Socket.IO', () => {
   afterEach(async () => {
     for (const client of clients) client.disconnect()
     await new Promise<void>((resolve) => server.close(() => resolve()))
+    vi.restoreAllMocks()
   })
   async function connect(username: string): Promise<Client> {
     const client: Client = io(url, {
@@ -86,6 +88,20 @@ describe('started game membership over Socket.IO', () => {
     return (client.emitWithAck as (event: string, payload: unknown) => Promise<unknown>)(event, payload)
   }
 
+  it('acknowledges fresh clock samples without game membership or broadcasts', async () => {
+    const client = await connect('Dane')
+    const broadcasts: string[] = []
+    client.onAny((name) => broadcasts.push(name))
+    expect(await raw(client, 'clock.get', { extra: true })).toEqual({ outcome: 'INVALID_REQUEST' })
+    const now = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
+    expect(await client.emitWithAck('clock.get', {})).toEqual({ outcome: 'CLOCK', serverTime: now })
+    clock.mockReturnValue(now + 100)
+    expect(await client.emitWithAck('clock.get', {})).toEqual({ outcome: 'CLOCK', serverTime: now + 100 })
+    expect((await client.emitWithAck('session.get', {})).outcome).toBe('NO_SESSION')
+    expect(broadcasts).toEqual([])
+  })
+
   it('rejects malformed session requests and starts with no session', async () => {
     const client = await connect('Dane')
     expect(await raw(client, 'session.get', { gameId: shared.gameId })).toEqual({ outcome: 'INVALID_REQUEST' })
@@ -95,7 +111,7 @@ describe('started game membership over Socket.IO', () => {
   it('returns the same assignment and hand on repeated session discovery', async () => {
     const { members: [first], initializations: [initial] } = await startGame(['First', 'Second'])
     const repeated = await getSnapshot(first)
-    expect(repeated).toEqual(initial)
+    expect(repeated).toEqual({ ...initial, state: { ...initial.state, serverTime: expect.any(Number) } })
     expect(shared.game.players).toHaveLength(2)
   })
   it('rejects nonmember and foreign-hand submissions', async () => {
@@ -126,9 +142,9 @@ describe('started game membership over Socket.IO', () => {
     const dealt = await hand
     expect(dealt).toMatchObject({ gameId: shared.gameId, playerId: initial.assignment.playerId })
     expect(dealt.cards).toHaveLength(HAND_SIZE)
-    expect(shared.game.phase).toBe('programming')
+    expect(shared.game.lastActivePhase).toBe('programming')
   })
-  it('preserves assignments, hands and checkpoint progress while pausing for disconnected members', async () => {
+  it('preserves assignments, hands and checkpoint progress while waiting for every disconnected member', async () => {
     const { members: [first, second, witness], initializations: [initial, other, observer] } = await startGame(['First', 'Second', 'Witness'])
     shared.game.players[0].completeCheckpoint(1)
     const changed: PlayerConnectionChanged[] = []
@@ -143,25 +159,39 @@ describe('started game membership over Socket.IO', () => {
     expect(restoredFirst.hand).toEqual(initial.hand)
     expect(restoredFirst.state.players[0].lastCheckpoint).toBe(1)
     expect(restoredFirst.state.paused).toBe(true)
+    expect(await witness.emitWithAck('program.submit', submission(observer))).toEqual({ outcome: 'GAME_PAUSED' })
     const returnedSecond = await connect('Second')
     const restoredSecond = await getSnapshot(returnedSecond)
     expect(restoredSecond.assignment).toEqual(other.assignment)
     expect(restoredSecond.state.paused).toBe(false)
     await witness.emitWithAck('session.get', {})
     expect(changed.map((event) => [event.connected, event.paused])).toEqual([[false, true], [false, true], [true, true], [true, false]])
+    expect(await witness.emitWithAck('program.submit', submission(observer))).toEqual({ outcome: 'ACCEPTED' })
   })
-  it('resumes mid-activation after reattaching the last disconnected member', async () => {
+  it('skips an action queued before disconnect and executes it once after reconnect', async () => {
+    const contexts = vi.spyOn(gameContext, 'createGameContext')
     const { members: [first, second] } = await startGame(['First', 'Second'])
+    const ctx = contexts.mock.results[0].value as ReturnType<typeof gameContext.createGameContext>
     for (const player of shared.game.players) shared.game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
     for (let action = 0; action < 9; action++) shared.game.executeNextAction()
-    await disconnect(first)
+    const execute = vi.spyOn(shared.game, 'executeNextAction')
     const actions: unknown[] = []
     second.on('robot.actionResolved', (payload) => actions.push(payload))
+
+    ctx.actionScheduler.scheduleNextAction()
+    // Disconnect synchronously so the game pauses before the queued callback runs.
+    server.sockets.sockets.get(first.id!)!.disconnect(true)
+    expect(shared.game.paused).toBe(true)
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    expect(execute).not.toHaveBeenCalled()
+    expect(shared.game.aborted).toBe(false)
+
     const hand = new Promise((resolve) => second.once('cards.dealt', resolve))
     await getSnapshot(await connect('First'))
     await hand
+    expect(execute).toHaveBeenCalledOnce()
     expect(actions).toHaveLength(1)
-    expect(shared.game.phase).toBe('programming')
+    expect(shared.game.lastActivePhase).toBe('programming')
     expect(shared.game.paused).toBe(false)
   })
   it('recovers a game socket and resumes without client session discovery', async () => {
@@ -262,6 +292,7 @@ describe('started game membership over Socket.IO', () => {
   })
   it('keeps the game paused when a reconnect snapshot fails and permits retry', async () => {
     const { members: [first], initializations: [initial] } = await startGame(['First'])
+    shared.game.submitProgram(initial.assignment.playerId, submission(initial).cardIds)._unsafeUnwrap()
     await disconnect(first)
     const replacement = await connect('First')
     vi.spyOn(shared.game.board, 'getTile').mockImplementationOnce(() => { throw new Error('Snapshot failed') })
@@ -296,16 +327,19 @@ describe('started game membership over Socket.IO', () => {
     player.completeCheckpoint(1)
     shared.game.board.relocateRobot(player.robot.id, { x: Integer(8), y: Integer(10) })
     const events: string[] = []
-    client.onAny((name) => events.push(name))
+    client.onAny((name) => { if (name !== 'program.timerChanged') events.push(name) })
     const won = new Promise<GameWon>((resolve) => client.once('game.won', resolve))
 
     expect(await client.emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'ACCEPTED' })
 
     expect(await won).toEqual({ gameId: shared.gameId, playerId: player.id, username: 'First' })
     const snapshot = await getSnapshot(client)
-    expect(events).toEqual(['robot.actionResolved', 'player.checkpointProgress', 'game.won'])
+    expect(events).toEqual([
+      'program.finalized', 'game.registersChanged', 'program.submitted',
+      'robot.actionResolved', 'player.checkpointProgress', 'game.won',
+    ])
     expect(snapshot.state.winner).toEqual({ playerId: player.id, username: 'First' })
-    expect(snapshot.state.phase).toBe('PROGRAMMING')
+    expect(snapshot.state.phase).toBe('EXECUTING')
     expect(await client.emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'GAME_FINISHED' })
   })
 
@@ -418,7 +452,7 @@ describe('started game membership over Socket.IO', () => {
       const actions: RobotActionResolved[] = []
       const progress: PlayerCheckpointProgress[] = []
       const events: string[] = []
-      client.onAny((name) => events.push(name))
+      client.onAny((name) => { if (name !== 'program.timerChanged') events.push(name) })
       client.on('robot.actionResolved', (action) => actions.push(action))
       client.on('player.checkpointProgress', (payload) => progress.push(payload))
       const hand = new Promise<CardsDealt>((resolve) => client.once('cards.dealt', resolve))
@@ -447,6 +481,7 @@ describe('started game membership over Socket.IO', () => {
         gameId: shared.gameId, playerId: initial.assignment.playerId, lastCheckpoint: 1, checkpointCount: 2,
       }])
       expect(events).toEqual([
+        'program.finalized', 'game.registersChanged', 'program.submitted',
         'robot.actionResolved', 'player.checkpointProgress',
         ...Array.from({ length: 4 }, () => 'robot.actionResolved'), 'cards.dealt',
       ])
@@ -457,7 +492,6 @@ describe('started game membership over Socket.IO', () => {
         robotId: initial.assignment.robotId, playerId: initial.assignment.playerId,
         colour: initial.state.robots[0].colour,
         position: actions[4].position,
-        startPosition: initial.state.robots[0].startPosition,
       }])
       expect(snapshot.state.players[0].lastCheckpoint).toBe(1)
       expect(shared.game.board.occupantAt({ x: Integer(2), y: Integer(1) })).toBeUndefined()
@@ -513,7 +547,6 @@ describe('started game membership over Socket.IO', () => {
           robotId: joined.assignment.robotId, playerId: joined.assignment.playerId,
           colour: initializations[0].state.robots.find((robot) => robot.robotId === joined.assignment.robotId)!.colour,
           position: actions[0].findLast((action) => action.robotId === joined.assignment.robotId)!.position,
-          startPosition: initializations[0].state.robots.find((robot) => robot.robotId === joined.assignment.robotId)!.startPosition,
         })))
         expect(new Set(snapshot.state.robots.map(({ position }) =>
           `${position.coordinate.x},${position.coordinate.y}`)).size).toBe(3)

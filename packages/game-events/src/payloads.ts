@@ -13,6 +13,10 @@ export type User = Readonly<{
   username: string
 }>
 
+export type ClockResult =
+  | Readonly<{ outcome: 'CLOCK'; serverTime: number }>
+  | Readonly<{ outcome: 'INVALID_REQUEST' }>
+
 export type PlayerAssignment = Readonly<{
   gameId: GameId
   playerId: PlayerId
@@ -23,6 +27,8 @@ export type Card = Readonly<{
   id: CardId
   instruction: Instruction
 }>
+
+export type PrivateProgram = readonly [Card | null, Card | null, Card | null, Card | null, Card | null]
 
 export type Orientation = 'NORTH' | 'EAST' | 'SOUTH' | 'WEST'
 
@@ -41,7 +47,6 @@ export type Robot = Readonly<{
   playerId: PlayerId
   colour: string
   position: Position
-  startPosition: Coordinate
 }>
 
 export type Tile = Readonly<{
@@ -69,8 +74,20 @@ export type GamePhase = 'PROGRAMMING' | 'EXECUTING'
 
 export type Antenna = Readonly<Coordinate & { angle: number }>
 
+export type ProgrammingTimer =
+  | Readonly<{ status: 'IDLE' | 'CLOSED' }>
+  | Readonly<{ status: 'RUNNING'; deadline: number }>
+
+export type ProgramTimerChanged = Readonly<{
+  gameId: GameId
+  serverTime: number
+  timer: ProgrammingTimer
+}>
+
 export type PublicGameState = Readonly<{
   gameId: GameId
+  serverTime: number
+  programmingTimer: ProgrammingTimer
   checkpointCount: number
   antenna: Antenna
   board: Board
@@ -143,6 +160,13 @@ export type ProgramSubmitted = Readonly<{
   playerId: PlayerId
 }>
 
+export type ProgramFinalized = Readonly<{
+  gameId: GameId
+  playerId: PlayerId
+  reason: 'SUBMITTED' | 'TIMEOUT'
+  cards: readonly [Card, Card, Card, Card, Card]
+}>
+
 export type RobotActionResolved = Readonly<{
   gameId: GameId
   registerIndex: number
@@ -174,6 +198,7 @@ export type UpdateRegistersResult = Readonly<{
   outcome:
     | 'ACCEPTED'
     | 'INVALID_REQUEST'
+    | 'INVALID_PROGRAM'
     | 'NOT_A_MEMBER'
     | 'GAME_PAUSED'
     | 'GAME_ABORTED'
@@ -203,5 +228,6 @@ export type GameInitialization = Readonly<{
   assignment: PlayerAssignment
   state: PublicGameState
   hand: readonly Card[]
+  program: PrivateProgram
   programSubmitted: boolean
 }>

@@ -1,8 +1,10 @@
 import { effects } from '@robo-rally/game-events'
 import type {
+  Card,
   Coordinate,
   Orientation,
   PlayerId,
+  PublicRegisters,
   Position,
   RobotActionResolved,
 } from '@robo-rally/game-events'
@@ -16,9 +18,12 @@ export type Robot = Readonly<{
   colour: string
   position: RobotPosition
   playerId?: PlayerId
-  startPosition: Coordinate
 }>
-export type ResolvedRobotAction = RobotActionResolved
+export type ResolvedRobotAction = RobotActionResolved & Readonly<{
+  // Program snapshot captured locally when this action is queued.
+  program?: readonly (Card | null)[]
+  publicRegisters?: ReadonlyMap<PlayerId, PublicRegisters>
+}>
 // A step the acting robot shows before its action completes. Producers own the kinds.
 export type PlaybackPhase = Readonly<{ kind: string; durationMs: number; position: Position }>
 export type DisplayRobot = Robot & Readonly<{ angle: number; phase?: string }>

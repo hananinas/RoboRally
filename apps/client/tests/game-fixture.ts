@@ -4,6 +4,7 @@ import {
   type FixtureControl,
   type FixtureSnapshot,
 } from './game-fixture-data.ts'
+import { createLobby } from './browserClient.ts'
 
 type GameFixture = {
   initial: FixtureSnapshot
@@ -45,7 +46,7 @@ export async function openGame(page: Page, width?: number, height?: number) {
   const create = page.getByRole('button', { name: 'Create lobby', exact: true })
   await expect(create.or(page.getByRole('main', { name: 'Game board' }))).toBeVisible()
   if (await create.isVisible()) {
-    await create.click()
+    await createLobby(page)
     await page.getByRole('button', { name: 'Start', exact: true }).click()
   }
   await expect(page.getByRole('heading', { name: 'Player 1', exact: true })).toBeVisible()

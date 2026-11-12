@@ -10,7 +10,9 @@ import type {
   PublicRegisterSlot,
   PublicRegisterStatus,
   PublicRegisters,
-  RegisterOccupancy,
+  RegisterCardIds,
+  PrivateProgram,
+  GameInitialization,
   RegistersChanged,
   RobotActionResolved,
   ServerToClientEvents,
@@ -39,6 +41,8 @@ describe('game event payload types', () => {
   it('constructs a public game state', () => {
     const state = {
       gameId: 'game',
+      serverTime: 0,
+      programmingTimer: { status: 'IDLE' },
       antenna: { x: 0, y: 0, angle: 0 },
       board: { width: 1, height: 1, tiles: [] },
       robots: [],
@@ -72,8 +76,10 @@ describe('game event payload types', () => {
 
     expectTypeOf<OccupancySlot>().toEqualTypeOf<Readonly<{ status: 'EMPTY' | 'HIDDEN' }>>()
     expectTypeOf<RegistersChanged['registers']['length']>().toEqualTypeOf<5>()
-    expectTypeOf<RegisterOccupancy>().toEqualTypeOf<readonly [boolean, boolean, boolean, boolean, boolean]>()
-    expectTypeOf<UpdateRegisters['occupied']>().toEqualTypeOf<RegisterOccupancy>()
+    expectTypeOf<RegisterCardIds['length']>().toEqualTypeOf<5>()
+    expectTypeOf<UpdateRegisters['cardIds']>().toEqualTypeOf<RegisterCardIds>()
+    expectTypeOf<GameInitialization['program']>().toEqualTypeOf<PrivateProgram>()
+    expectTypeOf<PrivateProgram['length']>().toEqualTypeOf<5>()
   })
 
   it('types register commands, acknowledgements, and public events', () => {
@@ -86,6 +92,7 @@ describe('game event payload types', () => {
     expectTypeOf<UpdateRegistersResult['outcome']>().toEqualTypeOf<
       | 'ACCEPTED'
       | 'INVALID_REQUEST'
+      | 'INVALID_PROGRAM'
       | 'NOT_A_MEMBER'
       | 'GAME_PAUSED'
       | 'GAME_ABORTED'

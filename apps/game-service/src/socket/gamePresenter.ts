@@ -1,6 +1,9 @@
 import type {
   Card as CardPayload,
   CardsDealt,
+  ProgramFinalized,
+  ProgrammingTimer,
+  ProgramTimerChanged,
   GamePhase as GamePhasePayload,
   Orientation,
   PublicGameState,
@@ -12,6 +15,7 @@ import type {
 import {
   Direction,
   type Card,
+  type CompletedProgram,
   type Game,
   type GameId,
   type GamePhase,
@@ -44,7 +48,7 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
   }
 
   const walls = [...tile.walls].map((direction) => orientations[direction])
-  
+
   const common = {
     position: { x, y },
     ...(walls.length === 0 ? {} : { walls }),
@@ -75,6 +79,7 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
 export function presentPublicGameState(
   gameId: GameId,
   game: Game,
+  programmingTimer: ProgrammingTimer,
   players: readonly PlayerState[] = [],
   winner: Winner | null = null,
 ): PublicGameState {
@@ -84,6 +89,8 @@ export function presentPublicGameState(
 
   return {
     gameId,
+    serverTime: Date.now(),
+    programmingTimer,
     checkpointCount: game.board.checkpointCount,
     players,
     antenna: game.board.antenna,
@@ -100,13 +107,16 @@ export function presentPublicGameState(
         coordinate: game.board.positionOf(player.robot.id),
         orientation: orientations[player.robot.direction],
       },
-      startPosition: game.startPositionOf(player.robot.id),
     })),
-    phase: phases[game.phase],
+    phase: phases[game.lastActivePhase],
     paused: game.paused,
     aborted: game.aborted,
     winner,
   }
+}
+
+export function presentProgrammingTimer(gameId: GameId, timer: ProgrammingTimer): ProgramTimerChanged {
+  return { gameId, serverTime: Date.now(), timer }
 }
 
 export function presentCardsDealt(
@@ -114,6 +124,15 @@ export function presentCardsDealt(
   player: Player,
 ): CardsDealt {
   return { gameId, playerId: player.id, cards: player.hand.map(presentCard) }
+}
+
+export function presentProgramFinalized(
+  gameId: GameId,
+  program: CompletedProgram,
+  reason: ProgramFinalized['reason'],
+): ProgramFinalized {
+  const cards: readonly CardPayload[] = program.cards.map(presentCard)
+  return { gameId, playerId: program.playerId, reason, cards: cards as ProgramFinalized['cards'] }
 }
 
 export function presentRobotActionResolved(

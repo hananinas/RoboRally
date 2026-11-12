@@ -232,7 +232,7 @@ test('drags a card into a register and ignores outside drops', async ({
 
   await expect(registeredCards).toHaveCount(1)
 })
-test('swaps two register cards by dragging one onto the other', async ({ page }) => {
+test('swaps two register cards by dragging one onto the other', async ({ page, game }) => {
   await openGame(page)
   await fillProgram(page)
 
@@ -253,6 +253,9 @@ test('swaps two register cards by dragging one onto the other', async ({ page })
   await expect(page.getByRole('button', { name: 'Move 1, remove from register 5' })).toBeVisible()
   await expect(page.getByRole('button', { name: /remove from register/ })).toHaveCount(5)
   await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeEnabled()
+  await expect.poll(async () => (await game.snapshot()).registerUpdates.at(-1)).toEqual({
+    cardIds: [4, 1, 2, 3, 0].map((index) => game.initial.cards[index].id),
+  })
 })
 
 test('drags a card out of a register to remove it', async ({ page }) => {
@@ -320,7 +323,7 @@ test('navigates the hand with h/l, wrapping around and skipping registered cards
   await expect(handCards.nth(8)).toBeFocused()
 })
 
-test('d then a digit removes one register, and dd clears all of them', async ({ page }) => {
+test('d then a digit removes one register, and dd clears all of them', async ({ page, game }) => {
   await openGame(page)
   await fillProgram(page)
   const registerCards = page.getByRole('complementary', { name: 'Game controls' })
@@ -337,6 +340,16 @@ test('d then a digit removes one register, and dd clears all of them', async ({ 
 
   await page.keyboard.press('u')
   await expect(registerCards).toHaveCount(4)
+  await page.keyboard.press('Control+r')
+  await expect(registerCards).toHaveCount(0)
+  const ids = game.initial.cards.slice(0, 5).map((card) => card.id)
+  await expect.poll(async () => (await game.snapshot()).registerUpdates.map((update) => update.cardIds)).toEqual([
+    ...ids.map((_, index) => ids.map((id, slot) => slot <= index ? id : null)),
+    [null, ...ids.slice(1)],
+    [null, null, null, null, null],
+    [null, ...ids.slice(1)],
+    [null, null, null, null, null],
+  ])
 })
 
 test('clears a dangling "d" instead of letting it bleed into the next round', async ({ page, game }) => {
@@ -564,6 +577,8 @@ test('plays every burst result and starts the next program without refreshing st
   const robot = page.locator(`[data-robot-id="${ROBOT_ID}"]`).first()
   const original = await robot.elementHandle()
   if (!original) throw new Error('Robot sprite is unavailable')
+  // Establish the initial computed position before the burst changes the target.
+  await robot.evaluate((element) => getComputedStyle(element).top)
   const nextRound = await game.control({ type: 'round', actions: ROUND_ACTIONS })
   const hand = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
   const registered = page.getByRole('button', { name: /remove from register/ })
@@ -580,11 +595,20 @@ test('plays every burst result and starts the next program without refreshing st
     await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()
     await expect(page.getByText('Executing', { exact: true })).toBeVisible()
     if (index === 0) {
-      await page.clock.runFor(300)
-      const top = await robot.evaluate((element) => Number.parseFloat(getComputedStyle(element).top))
+      // CSS transitions use the document timeline, not the mocked JS timer clock.
+      const top = await robot.evaluate((element) => {
+        const movement = element.getAnimations().find((animation) =>
+          animation instanceof CSSTransition && animation.transitionProperty === 'top')
+        if (!movement) throw new Error('Robot movement transition is unavailable')
+        movement.pause()
+        movement.currentTime = 300
+        const position = Number.parseFloat(getComputedStyle(element).top)
+        movement.finish()
+        return position
+      })
       expect(top).toBeLessThan(0)
       expect(top).toBeGreaterThan(-78)
-      await page.clock.runFor(300)
+      await page.clock.runFor(600)
     } else {
       await page.clock.runFor(action.instruction === 'TURN_LEFT' ? 300 : 600)
     }
@@ -702,10 +726,11 @@ test('does not resend a program after its acknowledgement times out', async ({ p
     cardIds: game.initial.cards.slice(0, 5).map((card) => card.id),
   }])
 
-  // Socket.IO discards acknowledgements after timeout. A late acceptance cannot
-  // make an uncertain program resendable; the next hand still waits for playback.
+  // Socket.IO discards the late acknowledgement, but the private finalization
+  // confirms the program. Editing stays locked until the next hand and playback.
   await game.control({ type: 'acknowledge', outcome: 'ACCEPTED' })
-  await expect(page.getByRole('button', { name: 'Awaiting server' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()
+  await expect(page.getByRole('alert')).toHaveCount(0)
   await expect(registered).toHaveCount(5)
   const nextRound = await game.control({ type: 'round', actions: ROUND_ACTIONS })
   const hand = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')

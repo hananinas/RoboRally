@@ -53,8 +53,24 @@
   overflow: visible;
 }
 
+.game-overlay > .other-players {
+  z-index: 1;
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
+  min-height: 0;
+  width: min(394px, 100vw);
+  max-width: none;
+  max-height: 100%;
+  margin-left: calc(0px - var(--ui-gap));
+  padding-block: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 /* Game options: the popover uses the browser's top layer. */
 .game-menu {
+  --ui-menu-trigger-size: 2.75rem;
   flex: none;
 }
 
@@ -81,19 +97,23 @@
   background: #e2e2e2;
 }
 
+.entry-panel .game-menu__trigger {
+  color: #fff;
+}
+
 .game-menu__popover {
   position: fixed;
   position-anchor: --game-menu-trigger;
   inset: auto;
   top: anchor(bottom);
   right: anchor(right);
-  width: min(16rem, calc(100vw - 2 * var(--ui-gap)));
-  max-height: calc(100dvh - anchor(bottom) - 2 * var(--ui-gap));
+  width: min(16rem, calc(100vw - 2 * var(--ui-gap, 1.25rem)));
+  max-height: calc(100dvh - anchor(bottom) - 2 * var(--ui-gap, 1.25rem));
   margin: 0.5rem 0 0;
   padding: 0.5rem;
   overflow-y: auto;
   border: 0;
-  border-radius: var(--ui-panel-radius);
+  border-radius: var(--ui-panel-radius, 1rem);
   background: #fff;
   color: #333;
   box-shadow: 0 0.5rem 1.5rem #0002;
@@ -101,9 +121,29 @@
 
 .game-menu__heading {
   margin: 0;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.95rem;
+  gap: 0.5rem;
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.game-menu__heading span {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.game-menu__group {
+  padding: 0.75rem 0;
+  border-top: 1px solid #eee;
+}
+
+.game-menu__section-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
   font-weight: 600;
+  color: #666;
 }
 
 .game-menu__options {
@@ -112,28 +152,60 @@
   list-style: none;
 }
 
-.game-menu__option {
-  padding: 0.25rem 0.75rem;
-}
-
+.game-menu__option,
 .game-menu__option-summary {
-  min-height: var(--ui-menu-trigger-size);
   display: flex;
   align-items: center;
-  margin: 0 -0.75rem;
-  padding: 0.75rem;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: var(--ui-menu-trigger-size, 2.75rem);
+  box-sizing: border-box;
+  margin: 0.25rem 0;
+  padding: 0.5rem 0.75rem;
+  border: 0;
   border-radius: 0.5rem;
-  color: #666;
+  background: #eee;
+  color: #333;
+  font: inherit;
   font-size: 0.875rem;
+  text-align: left;
   cursor: pointer;
 }
 
+.game-menu__option:hover,
 .game-menu__option-summary:hover {
   background: #e9e9e9;
 }
 
+.game-menu__option:active,
 .game-menu__option-summary:active {
   background: #e2e2e2;
+}
+
+.game-menu__option:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.game-menu__option-summary::after {
+  content: '⌄';
+  margin-left: auto;
+  font-size: 1.25rem;
+}
+
+.game-menu__details[open] .game-menu__option-summary::after {
+  transform: rotate(180deg);
+}
+
+.game-menu__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .game-menu__keybinds {
@@ -184,6 +256,12 @@
 .game-status [role='alert'] {
   margin-top: 0.5rem;
   color: #9d2525;
+}
+
+.game-status .programming-countdown {
+  margin-top: 0.25rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .player-panel__header {
@@ -418,6 +496,7 @@
 }
 
 .game-menu__trigger:focus-visible,
+.game-menu__option:focus-visible,
 .game-menu__option-summary:focus-visible,
 .player-panel__toggle:focus-visible,
 .register-panel__done:focus-visible {
@@ -567,6 +646,8 @@
     grid-row: 1;
     max-height: 45dvh;
   }
+
+  .game-overlay > .other-players { grid-row: 2; }
 
   .panel {
     padding: 1rem;
