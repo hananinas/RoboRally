@@ -1,14 +1,10 @@
-import type { BoardMapName, LobbySummary } from '@robo-rally/game-events'
+import type { BoardMapName, BoardMapSummary, LobbySummary } from '@robo-rally/game-events'
 import { useState } from 'react'
-
-const availableMaps: readonly { name: string; mapName: BoardMapName }[] = [
-  { name: 'Empty Map', mapName: 'empty-map' },
-  { name: 'Test Map', mapName: 'test-map' },
-]
 
 type LobbyScreenProps = {
   username: string
   lobbies: readonly LobbySummary[]
+  maps: readonly BoardMapSummary[]
   pending: boolean
   connected: boolean
   error: string | null
@@ -17,34 +13,38 @@ type LobbyScreenProps = {
   onRefresh: () => void
 }
 
-export default function LobbyScreen({ username, lobbies, pending, connected, error, onJoin, onCreate, onRefresh }: LobbyScreenProps) {
+export default function LobbyScreen({ username, lobbies, maps, pending, connected, error, onJoin, onCreate, onRefresh }: LobbyScreenProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [creatingLobby, setCreatingLobby] = useState(false)
-  const [selectedMap, setSelectedMap] = useState<BoardMapName>('test-map')
+  const [selectedMap, setSelectedMap] = useState<BoardMapName | null>(null)
   const selected = lobbies.find((lobby) => lobby.lobbyId === selectedId)
   const firstJoinable = lobbies.find((lobby) => lobby.playerCount < lobby.maxPlayers)
+  const selectedMapInfo = maps.find((map) => map.mapName === selectedMap)
 
   if (creatingLobby) {
     return (
       <section aria-labelledby="map-selection-title">
         <h2 id="map-selection-title">Choose a map</h2>
         <div className="map-options" role="group" aria-label="Available maps">
-          {availableMaps.map((map) => (
+          {maps.map((map) => (
             <button
               className={map.mapName === selectedMap ? 'map-option map-option--selected' : 'map-option'}
               type="button"
               key={map.mapName}
               aria-pressed={map.mapName === selectedMap}
+              aria-label={map.name}
               disabled={pending || !connected}
               onClick={() => setSelectedMap(map.mapName)}
             >
+              <img src={map.icon} alt="" />
               {map.name}
             </button>
           ))}
         </div>
-        <p>Selected map: {availableMaps.find((map) => map.mapName === selectedMap)?.name}</p>
+        {maps.length === 0 && <p role="status">No maps are available.</p>}
+        {selectedMapInfo && <p>Selected map: {selectedMapInfo.name}</p>}
         {error && <p className="entry-validation entry-validation--error" role="alert">{error}</p>}
-        <button className="entry-primary-button" type="button" disabled={pending || !connected} onClick={() => onCreate(selectedMap)}>
+        <button className="entry-primary-button" type="button" disabled={pending || !connected || !selectedMap} onClick={() => selectedMap && onCreate(selectedMap)}>
           {pending ? 'Creating lobby…' : 'Create lobby'}
         </button>
         <button className="entry-secondary-button" type="button" disabled={pending} onClick={() => setCreatingLobby(false)}>
@@ -84,7 +84,10 @@ export default function LobbyScreen({ username, lobbies, pending, connected, err
           </li>
         ))}
       </ul>
-      <button className="entry-secondary-button" type="button" disabled={pending || !connected} onClick={() => setCreatingLobby(true)}>Create lobby</button>
+      <button className="entry-secondary-button" type="button" disabled={pending || !connected} onClick={() => {
+        setSelectedMap(maps[0]?.mapName ?? null)
+        setCreatingLobby(true)
+      }}>Create lobby</button>
       <button className="entry-secondary-button" type="button" disabled={pending || !connected} onClick={onRefresh}>Refresh</button>
       {error && <p className="entry-validation entry-validation--error" role="alert">{error}</p>}
       <button

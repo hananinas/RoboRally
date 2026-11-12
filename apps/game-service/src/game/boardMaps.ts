@@ -1,7 +1,6 @@
 import type { Antenna, BoardMap } from '@/game/Board'
 import { Direction, type Position } from '@/game/spatial'
 import { Integer } from '@/numbers'
-import type { BoardMapName } from '@robo-rally/game-events'
 
 const { NORTH: N, WEST: W, SOUTH: S, EAST: E } = Direction
 
@@ -130,4 +129,6 @@ export const boardMaps = {
       { at: [3, 12], directions: [W, S] },
     ],
   },
-} as const satisfies Record<BoardMapName, MapSpec>
+} as const satisfies Record<string, MapSpec>
+
+export type BoardMapName = keyof typeof boardMaps

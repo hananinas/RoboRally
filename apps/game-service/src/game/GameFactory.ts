@@ -7,7 +7,7 @@ import type { GameId } from '@/game/ids'
 import { Player } from '@/game/Player'
 import { Robot } from '@/game/Robot'
 import { Direction } from '@/game/spatial'
-import type { BoardMapName } from '@robo-rally/game-events'
+import type { BoardMapName } from '@/game/boardMaps'
 
 const GAME_ID: GameId = '00000000-0000-4000-8000-000000000001'
 const SHARED_GAME_NAME = 'Shared game'

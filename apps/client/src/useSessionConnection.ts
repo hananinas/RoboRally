@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { BoardMapName, LobbySummary, ServerToClientEvents } from '@robo-rally/game-events'
+import type { BoardMapName, BoardMapSummary, LobbySummary, ServerToClientEvents } from '@robo-rally/game-events'
 import useGameConnection from './scenes/active-game/useGameConnection.ts'
 import { createSessionState, sessionReducer, type SessionEvent } from './sessionState.ts'
 import useGameSocket, { ACKNOWLEDGEMENT_TIMEOUT_MS } from './useGameSocket.ts'
@@ -15,6 +15,7 @@ export default function useSessionConnection() {
   const pending = useRef(false)
   const [busy, setBusy] = useState(false)
   const [lobbies, setLobbies] = useState<readonly LobbySummary[]>([])
+  const [maps, setMaps] = useState<readonly BoardMapSummary[]>([])
   const [listError, setListError] = useState<string | null>(null)
   const listAttempt = useRef(0)
 
@@ -96,6 +97,7 @@ export default function useSessionConnection() {
       else if (result.outcome === 'LOBBIES_FOUND') {
         setListError(null)
         setLobbies(result.lobbies)
+        setMaps(result.maps)
       }
       else setListError(result.outcome)
     })
@@ -138,7 +140,7 @@ export default function useSessionConnection() {
   }
 
   return {
-    connection, game, session, busy, lobbies, listError,
+    connection, game, session, busy, lobbies, maps, listError,
     joinLobby, startLobby, leaveSession, refreshLobbies,
     createLobby,
     retrySession: () => socket.connected ? dispatch({ type: 'sync-requested' }) : connection.connect(),

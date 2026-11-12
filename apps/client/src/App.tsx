@@ -21,7 +21,7 @@ function errorMessage(code: string): string {
 
 function App() {
   const {
-    connection, game, session, busy, lobbies, listError,
+    connection, game, session, busy, lobbies, maps, listError,
     createLobby, joinLobby, startLobby, leaveSession, refreshLobbies, retrySession,
   } = useSessionConnection()
 
@@ -47,7 +47,7 @@ function App() {
   let content: ReactNode
   if (session.status === 'browsing' || session.status === 'joining') {
     content = <LobbyScreen
-      username={session.user.username} error={error} lobbies={lobbies}
+      username={session.user.username} error={error} lobbies={lobbies} maps={maps}
       pending={busy || session.status === 'joining'} connected={connection.status === 'connected'}
       onCreate={createLobby} onJoin={joinLobby} onRefresh={refreshLobbies}
     />

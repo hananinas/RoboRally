@@ -1,4 +1,5 @@
-import type { BoardMapName, User } from '@robo-rally/game-events'
+import type { User } from '@robo-rally/game-events'
+import type { BoardMapName } from '@/game/boardMaps'
 import type { GameSession, GameSocket, GameSocketServer } from '@/socket/gameServer'
 import type { MembershipContext } from '@/socket/handlers/membershipHandlers'
 

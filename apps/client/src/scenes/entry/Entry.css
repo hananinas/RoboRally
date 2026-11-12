@@ -137,6 +137,9 @@
 }
 
 .map-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 12px;
   border: 1px solid var(--entry-border);
   border-radius: 8px;
@@ -145,6 +148,13 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.map-option img {
+  width: 96px;
+  height: 64px;
+  border-radius: 4px;
+  object-fit: cover;
 }
 
 .map-option--selected {

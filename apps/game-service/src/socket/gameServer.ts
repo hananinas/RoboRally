@@ -3,7 +3,6 @@ import { handleGetSession, handleLeaveGame, handleDisconnectSession, handleSessi
 import type { SessionContext } from '@/socket/sessionContext'
 import type { Server as HttpServer } from 'node:http'
 import type {
-  BoardMapName,
   ClientToServerEvents,
   ServerToClientEvents,
   User,
@@ -14,6 +13,7 @@ import type { Game } from '@/game/index'
 import { createDefaultGame } from '@/game/GameFactory'
 import { SESSION_COOKIE_NAME, type Session, type SessionStore } from '@/auth/sessionStore'
 import { createAuthGatedAdapter } from '@/socket/authGatedAdapter'
+import type { BoardMapName } from '@/game/boardMaps'
 
 export type GameSocketData = { user: User; authSession: Session; sessionId: string }
 

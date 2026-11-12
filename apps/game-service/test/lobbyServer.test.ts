@@ -1,10 +1,11 @@
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import type { BoardMapName, ClientToServerEvents, GameInitialization, LobbyState, ServerToClientEvents } from '@robo-rally/game-events'
+import type { ClientToServerEvents, GameInitialization, LobbyState, ServerToClientEvents } from '@robo-rally/game-events'
 import { io, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDefaultGame } from '@/game/GameFactory'
 import { boardMaps } from '@/game/boardMaps'
+import type { BoardMapName } from '@/game/boardMaps'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
 import { createSessionStore, type SessionStore } from '@/auth/sessionStore'
 import { authCookieHeader } from './authTestHelper.ts'
@@ -59,7 +60,12 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(await raw('lobby.create', { name: 'Custom' })).toEqual({ outcome: 'INVALID_REQUEST' })
     expect(await raw('lobby.create', { mapName: 'not-a-map' })).toEqual({ outcome: 'INVALID_REQUEST' })
     expect(await raw('lobby.join', { lobbyId: 'invalid' })).toEqual({ outcome: 'INVALID_REQUEST' })
-    expect(await client.emitWithAck('lobby.list', {})).toEqual({ outcome: 'LOBBIES_FOUND', lobbies: [] })
+    const listed = await client.emitWithAck('lobby.list', {})
+    if (listed.outcome !== 'LOBBIES_FOUND') throw new Error(listed.outcome)
+    expect(listed.lobbies).toEqual([])
+    expect(listed.maps).toEqual(Object.entries(boardMaps).map(([mapName, map]) => ({
+      mapName, name: map.name, icon: map.icon,
+    })))
     expect(factory).not.toHaveBeenCalled()
     expect(server.sockets.sockets.get(client.id!)!.rooms).toEqual(new Set([client.id]))
   })
@@ -101,7 +107,8 @@ describe('lobby lifecycle over Socket.IO', () => {
     const listed = await outsider.emitWithAck('lobby.list', {})
     if (listed.outcome !== 'LOBBIES_FOUND') throw new Error(listed.outcome)
     expect(listed.lobbies.find(({ lobbyId }) => lobbyId === lobby.lobbyId)).toEqual({
-      lobbyId: lobby.lobbyId, name: lobby.name, mapName: lobby.mapName, mapIcon: boardMaps[lobby.mapName].icon,
+      lobbyId: lobby.lobbyId, name: lobby.name, mapName: lobby.mapName,
+      mapDisplayName: boardMaps[lobby.mapName as BoardMapName].name, mapIcon: boardMaps[lobby.mapName as BoardMapName].icon,
       playerCount: 2, maxPlayers: 6,
     })
 
@@ -148,7 +155,9 @@ describe('lobby lifecycle over Socket.IO', () => {
       ]))
     }
     expect(server.sockets.adapter.rooms.has(`lobby:${lobby.lobbyId}`)).toBe(false)
-    expect(await owner.emitWithAck('lobby.list', {})).toEqual({ outcome: 'LOBBIES_FOUND', lobbies: [] })
+    expect(await owner.emitWithAck('lobby.list', {})).toMatchObject({
+      outcome: 'LOBBIES_FOUND', lobbies: [], maps: expect.any(Array),
+    })
     expect(await owner.emitWithAck('lobby.start', {})).toEqual({ outcome: 'NOT_LOBBY_MEMBER' })
     const outsider = await connect('Outsider')
     expect(await outsider.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION', user: { userId: 'Outsider', username: 'Outsider' } })
@@ -162,6 +171,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     const owner = await connect('Map Owner')
     const lobby = await create(owner, 'empty-map')
     expect(lobby.mapName).toBe('empty-map')
+    expect(lobby.mapDisplayName).toBe(boardMaps['empty-map'].name)
     expect(lobby.mapIcon).toBe(boardMaps['empty-map'].icon)
 
     const ready = started(owner)
@@ -204,7 +214,9 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(await owner.emitWithAck('lobby.leave', {})).toEqual({ outcome: 'LEFT' })
     expect((await updated).ownerUserId).toBe('Other')
     await disconnect(other)
-    expect(await owner.emitWithAck('lobby.list', {})).toEqual({ outcome: 'LOBBIES_FOUND', lobbies: [] })
+    expect(await owner.emitWithAck('lobby.list', {})).toMatchObject({
+      outcome: 'LOBBIES_FOUND', lobbies: [], maps: expect.any(Array),
+    })
     expect(server.sockets.adapter.rooms.has(`lobby:${lobby.lobbyId}`)).toBe(false)
   })
   it('keeps the lobby usable if game preparation fails', async () => {
@@ -315,7 +327,9 @@ describe('lobby lifecycle over Socket.IO', () => {
     vi.spyOn(connection, 'join').mockImplementationOnce(() => { throw new Error('Room failure') })
     expect(await owner.emitWithAck('lobby.create', {})).toEqual({ outcome: 'INTERNAL_ERROR' })
     expect(await owner.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION', user: { userId: 'Owner', username: 'Owner' } })
-    expect(await owner.emitWithAck('lobby.list', {})).toEqual({ outcome: 'LOBBIES_FOUND', lobbies: [] })
+    expect(await owner.emitWithAck('lobby.list', {})).toMatchObject({
+      outcome: 'LOBBIES_FOUND', lobbies: [], maps: expect.any(Array),
+    })
     expect(connection.rooms).toEqual(new Set([owner.id]))
     expect((await create(owner)).playerCount).toBe(1)
   })

@@ -1,10 +1,9 @@
 import { Board } from '@/game/Board'
-import { boardMaps, type MapSpec } from '@/game/boardMaps'
+import { boardMaps, type BoardMapName, type MapSpec } from '@/game/boardMaps'
 import type { Direction } from '@/game/spatial'
 import { EmptyTile, PitTile, ConveyorTile, type Tile } from '@/game/Tile'
 import { Integer } from '@/numbers'
-import type { BoardMapName } from '@robo-rally/game-events'
-export type { BoardMapName } from '@robo-rally/game-events'
+export type { BoardMapName } from '@/game/boardMaps'
 
 const MAPS: Readonly<Record<BoardMapName, MapSpec>> = boardMaps
 

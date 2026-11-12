@@ -4,7 +4,7 @@ import type { Player } from '@/game/Player'
 import type { Lobby, SessionContext } from '@/socket/sessionContext'
 import { withSessionRequest } from '@/socket/utilities/withSessionRequest'
 import { ROBOT_COLOURS } from '@/game/Robot'
-import { boardMaps } from '@/game/boardMaps'
+import { boardMaps, type BoardMapName } from '@/game/boardMaps'
 import {
   emptyRequestSchema, lobbyRequestSchema, createLobbyRequestSchema,
   type EmptyRequest, type LobbyRequest, type CreateLobbyRequest, type GameInitialization, type LobbyState, type User,
@@ -17,10 +17,23 @@ import type { GameSocket } from '@/socket/gameServer'
 const MAX_PLAYERS = 6
 const lobbyRoom = (id: string) => `lobby:${id}`
 export function presentLobby(lobby: Lobby): LobbyState {
-  return { lobbyId: lobby.lobbyId, name: lobby.name, mapName: lobby.mapName, mapIcon: boardMaps[lobby.mapName].icon,
+  const map = boardMaps[lobby.mapName]
+  return { lobbyId: lobby.lobbyId, name: lobby.name, mapName: lobby.mapName, mapDisplayName: map.name, mapIcon: map.icon,
     ownerUserId: lobby.members.keys().next().value!,
     playerCount: lobby.members.size, maxPlayers: MAX_PLAYERS,
     players: [...lobby.members.values()].map(({ user }) => ({ userId: user.userId, username: user.username })) }
+}
+
+function isBoardMapName(mapName: string): mapName is BoardMapName {
+  return Object.hasOwn(boardMaps, mapName)
+}
+
+function presentBoardMaps() {
+  return Object.entries(boardMaps).map(([mapName, map]) => ({
+    mapName,
+    name: map.name,
+    icon: map.icon,
+  }))
 }
 
 export function leaveLobby(context: SessionContext, socket: GameSocket): void {
@@ -45,10 +58,14 @@ export function handleListLobbies(
   acknowledge: (result: LobbyListResult) => void,
 ): void {
   withSessionRequest(socket, 'lobby.list', emptyRequestSchema, payload, acknowledge, (_user, ack) => {
-    ack({ outcome: 'LOBBIES_FOUND', lobbies: [...context.lobbies.values()].map((lobby) => {
-      const { lobbyId, name, mapName, mapIcon, playerCount, maxPlayers } = presentLobby(lobby)
-      return { lobbyId, name, mapName, mapIcon, playerCount, maxPlayers }
-    }) })
+    ack({
+      outcome: 'LOBBIES_FOUND',
+      maps: presentBoardMaps(),
+      lobbies: [...context.lobbies.values()].map((lobby) => {
+        const { lobbyId, name, mapName, mapDisplayName, mapIcon, playerCount, maxPlayers } = presentLobby(lobby)
+        return { lobbyId, name, mapName, mapDisplayName, mapIcon, playerCount, maxPlayers }
+      }),
+    })
   })
 }
 
@@ -59,6 +76,8 @@ export function handleCreateLobby(
   acknowledge: (result: LobbyJoinResult) => void,
 ): void {
   withSessionRequest(socket, 'lobby.create', createLobbyRequestSchema, payload, acknowledge, (user, ack) => {
+    const mapName = payload.mapName ?? 'test-map'
+    if (!isBoardMapName(mapName)) return ack({ outcome: 'INVALID_REQUEST' })
     const session = context.sessionsByUser.get(user.userId)
     if (session) {
       const existing = session.kind === 'lobby' ? context.lobbies.get(session.lobbyId) : undefined
@@ -67,7 +86,7 @@ export function handleCreateLobby(
         : { outcome: 'USER_ALREADY_IN_SESSION' })
     }
     const lobbyId = randomUUID()
-    const lobby: Lobby = { lobbyId, name: `Lobby ${lobbyId.slice(0, 8)}`, mapName: payload.mapName ?? 'test-map',
+    const lobby: Lobby = { lobbyId, name: `Lobby ${lobbyId.slice(0, 8)}`, mapName,
       members: new Map([[user.userId, { user, connectionId: socket.id }]]) }
     void socket.join(lobbyRoom(lobbyId))
     context.lobbies.set(lobbyId, lobby)

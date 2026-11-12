@@ -8,7 +8,7 @@ test('creating a lobby uses the selected map and can return to the lobby list', 
   await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Choose a map', exact: true })).toBeVisible()
   const emptyMap = page.getByRole('button', { name: 'Empty Map', exact: true })
-  await expect(emptyMap).toHaveAttribute('aria-pressed', 'false')
+  await expect(emptyMap).toHaveAttribute('aria-pressed', 'true')
   await page.getByRole('button', { name: 'Test Map', exact: true }).click()
   await expect(page.getByText('Selected map: Test Map', { exact: true })).toBeVisible()
   await emptyMap.click()
