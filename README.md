@@ -11,6 +11,8 @@ Building a web-based multiplayer version of the board game `Robo Rally`.
 ## Production
 RoboRally is available at: https://se2-c.compute.dtu.dk
 
+### Trusting the certificate
+
 We are using a self signed certificate. This means we have to trust the server public root certificate to be able to use https. This becomes especially relevant when we implement authentication features. The app will not work with plain http at that point.
 
 ### NixOS
