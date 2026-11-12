@@ -13,6 +13,10 @@ export type User = Readonly<{
   username: string
 }>
 
+export type ClockResult =
+  | Readonly<{ outcome: 'CLOCK'; serverTime: number }>
+  | Readonly<{ outcome: 'INVALID_REQUEST' }>
+
 export type PlayerAssignment = Readonly<{
   gameId: GameId
   playerId: PlayerId

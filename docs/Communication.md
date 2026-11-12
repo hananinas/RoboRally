@@ -192,6 +192,12 @@ The first accepted `program.submit` starts a shared 30-second countdown. The ser
 
 `serverTime` and `deadline` are Unix timestamps in milliseconds. Clients use them to display the countdown. `PublicGameState.programmingTimer` contains the same timer state.
 
+An authenticated connection can send `clock.get {}` to obtain `CLOCK {serverTime}`
+through its acknowledgement. The service reads the timestamp immediately before
+sending the reply, allowing clients to measure a round trip and estimate the
+server clock. No lobby or game membership is required. Invalid payloads receive
+`INVALID_REQUEST`; the request does not change game state or broadcast events.
+
 | State | Payload | Meaning |
 |---|---|---|
 | Idle | `{status: IDLE}` | Waiting for the first submission. |

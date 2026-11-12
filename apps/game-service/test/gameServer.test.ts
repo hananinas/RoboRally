@@ -86,6 +86,24 @@ describe('started game membership over Socket.IO', () => {
     return (client.emitWithAck as (event: string, payload: unknown) => Promise<unknown>)(event, payload)
   }
 
+  it('acknowledges fresh clock samples without game membership or broadcasts', async () => {
+    const client = await connect('Dane')
+    const broadcasts: string[] = []
+    client.onAny((name) => broadcasts.push(name))
+    expect(await raw(client, 'clock.get', { extra: true })).toEqual({ outcome: 'INVALID_REQUEST' })
+    const now = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
+    try {
+      expect(await client.emitWithAck('clock.get', {})).toEqual({ outcome: 'CLOCK', serverTime: now })
+      clock.mockReturnValue(now + 100)
+      expect(await client.emitWithAck('clock.get', {})).toEqual({ outcome: 'CLOCK', serverTime: now + 100 })
+      expect((await client.emitWithAck('session.get', {})).outcome).toBe('NO_SESSION')
+      expect(broadcasts).toEqual([])
+    } finally {
+      clock.mockRestore()
+    }
+  })
+
   it('rejects malformed session requests and starts with no session', async () => {
     const client = await connect('Dane')
     expect(await raw(client, 'session.get', { gameId: shared.gameId })).toEqual({ outcome: 'INVALID_REQUEST' })

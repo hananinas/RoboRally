@@ -9,6 +9,7 @@ export type {
   Card,
   CardId,
   CardsDealt,
+  ClockResult,
   Coordinate,
   GameAborted,
   GameWon,
