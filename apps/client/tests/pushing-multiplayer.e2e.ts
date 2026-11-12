@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import type { Page } from '@playwright/test'
 import { expect, test } from './real-game-fixture.ts'
-import { browse, reconnect, robotIds } from './browserClient.ts'
+import { browse, createLobby, reconnect, robotIds } from './browserClient.ts'
 
 async function program(page: Page, cards: readonly string[]) {
   const hand = page.getByRole('region', { name: 'Programming hand' })
@@ -44,7 +44,7 @@ for (const scenario of scenarios) {
         for (const [index, client] of pages.entries()) {
           await client.clock.install()
           await browse(client, playerNames[index])
-          if (index === 0) await client.getByRole('button', { name: 'Create lobby', exact: true }).click()
+          if (index === 0) await createLobby(client)
           else {
             await client.getByRole('list', { name: 'Lobbies' }).getByRole('button', { disabled: false }).first().click()
             await client.getByRole('button', { name: 'Join game', exact: true }).click()

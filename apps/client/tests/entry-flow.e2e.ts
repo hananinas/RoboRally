@@ -1,4 +1,5 @@
 import { expect, test } from './game-fixture.ts'
+import { createLobby } from './browserClient.ts'
 
 test('creating a lobby uses the selected map and can return to the lobby list', async ({ page, game }) => {
   await page.goto('/')
@@ -49,7 +50,7 @@ test('joining requires selection and enters the waiting screen', async ({ page }
 test('a disconnected member during Start leaves the owner waiting and able to retry', async ({ page, game }) => {
   await game.control({ type: 'start', deferred: false, outcome: 'LOBBY_MEMBER_DISCONNECTED' })
   await page.goto('/')
-  await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
+  await createLobby(page)
   const start = page.getByRole('button', { name: 'Start', exact: true })
   await start.click()
   await expect(page.getByRole('alert')).toHaveText('A player disconnected before the game could start. Please try again.')
@@ -64,7 +65,7 @@ test('a disconnected member during Start leaves the owner waiting and able to re
 test('a committed start is recovered when its notification and acknowledgement are delayed', async ({ page, game }) => {
   await game.control({ type: 'start', deferred: true })
   await page.goto('/')
-  await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
+  await createLobby(page)
   await page.getByRole('button', { name: 'Start', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeDisabled()
   await expect(page.getByRole('button', { name: 'Leave lobby', exact: true })).toBeDisabled()

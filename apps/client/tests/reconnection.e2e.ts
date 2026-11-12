@@ -1,5 +1,5 @@
 import { expect, test } from './real-game-fixture.ts'
-import { browse, gameStatus, login, robotIds, startTogether } from './browserClient.ts'
+import { browse, createLobby, gameStatus, login, robotIds, startTogether } from './browserClient.ts'
 
 test('recovers the existing game after a temporary disconnect', async ({ browser, page, baseURL }) => {
   const contextB = await browser.newContext({ baseURL, ignoreHTTPSErrors: true })
@@ -96,7 +96,7 @@ test('a disconnected waiting owner returns to browsing while the remaining membe
   try {
     for (const [client, username] of [[page, 'bence'], [other, 'dane']] as const) {
       await browse(client, username)
-      if (client === page) await client.getByRole('button', { name: 'Create lobby', exact: true }).click()
+      if (client === page) await createLobby(client)
       else {
         await client.getByRole('list', { name: 'Lobbies' }).getByRole('button', { disabled: false }).first().click()
         await client.getByRole('button', { name: 'Join game', exact: true }).click()
