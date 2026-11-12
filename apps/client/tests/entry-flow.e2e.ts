@@ -50,6 +50,21 @@ test('joining requires selection and enters the waiting screen', async ({ page }
   await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeEnabled()
 })
 
+test('selects a robot in the waiting lobby', async ({ page }) => {
+  await page.goto('/')
+  await createLobby(page)
+
+  const picker = page.getByRole('group', { name: 'Choose a robot' })
+  const tank = picker.getByRole('button', { name: 'Tank robot' })
+  const scout = picker.getByRole('button', { name: 'Scout robot' })
+  await expect(tank).toHaveAttribute('aria-pressed', 'true')
+  await expect(scout).toHaveAttribute('aria-pressed', 'false')
+  await scout.click()
+  await expect(scout).toHaveAttribute('aria-pressed', 'true')
+  await expect(tank).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.getByRole('heading', { name: 'Scout', exact: true })).toBeVisible()
+})
+
 test('a disconnected member during Start leaves the owner waiting and able to retry', async ({ page, game }) => {
   await game.control({ type: 'start', deferred: false, outcome: 'LOBBY_MEMBER_DISCONNECTED' })
   await page.goto('/')
