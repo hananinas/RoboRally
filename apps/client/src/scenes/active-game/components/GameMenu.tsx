@@ -39,11 +39,17 @@ function GameMenu({ onLeave, leaveDisabled, onLogout, onSettings }: {
           setOpen(event.newState === 'open')
         }}
       >
-        <h2 className="game-menu__heading">Settings</h2>
+        <h2 className="game-menu__heading">
+          <span aria-hidden="true">⚙</span>
+          Settings
+          </h2>
         <div className="game-menu__group">
           <h3 className="game-menu__section-title">Account</h3>
           <button className="game-menu__option" type="button" onClick={onSettings}>
-            <span className="game-menu__icon" aria-hidden="true">⚙</span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="8" r="5" />
+              <path d="M20 21a8 8 0 0 0-16 0" />
+            </svg>
             Account Settings
           </button>
           <button className="game-menu__option" type="button" onClick={onLogout}>
