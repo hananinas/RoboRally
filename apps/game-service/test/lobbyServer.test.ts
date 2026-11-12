@@ -121,6 +121,13 @@ describe('lobby lifecycle over Socket.IO', () => {
       lobby: { players: [{ robotSpriteId: 'tank' }, { robotSpriteId: 'scout' }] },
     })
 
+    const ownerStarted = started(owner)
+    const otherStarted = started(other)
+    expect(await owner.emitWithAck('lobby.start', {})).toMatchObject({ outcome: 'STARTED' })
+    const [ownerGame, otherGame] = await Promise.all([ownerStarted, otherStarted])
+    expect(ownerGame.state.robots.find(({ robotId }) => robotId === ownerGame.assignment.robotId)?.robotSpriteId).toBe('tank')
+    expect(otherGame.state.robots.find(({ robotId }) => robotId === otherGame.assignment.robotId)?.robotSpriteId).toBe('scout')
+
     const raw = other.emitWithAck.bind(other) as (event: string, payload: unknown) => Promise<unknown>
     expect(await raw('lobby.selectRobot', { robotSpriteId: 'unknown-robot' })).toEqual({ outcome: 'INVALID_REQUEST' })
   })

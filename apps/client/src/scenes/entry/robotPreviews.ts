@@ -23,12 +23,12 @@ export const tankPreview: RobotPreviewDefinition = {
 }
 
 const placeholderShapes = [
-  '<path d="M50 8 88 30v40L50 92 12 70V30z" fill="var(--robot-colour)"/><path d="M31 38h38v25H31z" fill="var(--entry-side)"/><circle cx="50" cy="50" r="11" fill="var(--entry-accent)"/>',
-  '<path d="M50 6 90 50 50 94 10 50z" fill="var(--robot-colour)"/><path d="m50 23 24 27-24 27-24-27z" fill="var(--entry-side)"/><path d="M50 35 64 50 50 65 36 50z" fill="var(--entry-accent)"/>',
-  '<rect x="14" y="24" width="72" height="52" rx="22" fill="var(--robot-colour)"/><circle cx="28" cy="77" r="9" fill="var(--entry-side)"/><circle cx="72" cy="77" r="9" fill="var(--entry-side)"/><path d="M50 32 68 50 50 68 32 50z" fill="var(--entry-accent)"/>',
-  '<path d="M20 20h60v60H20z" fill="var(--robot-colour)"/><path d="M32 32h36v36H32z" fill="var(--entry-side)"/><path d="M50 20v60M20 50h60" stroke="var(--entry-accent)" stroke-width="8"/>',
-  '<path d="M50 7 82 25v38L50 92 18 74V36z" fill="var(--robot-colour)"/><path d="M50 22 69 33v24L50 68 31 57V33z" fill="var(--entry-side)"/><path d="m50 33 12 17-12 17-12-17z" fill="var(--entry-accent)"/>',
-  '<path d="M15 35 50 12l35 23v39L50 88 15 74z" fill="var(--robot-colour)"/><path d="M29 40h42v23H29z" fill="var(--entry-side)"/><circle cx="50" cy="51" r="8" fill="var(--entry-accent)"/><path d="M23 76h54" stroke="var(--entry-side)" stroke-width="7"/>',
+  '<path d="M50 8 88 30v40L50 92 12 70V30z" fill="var(--robot-colour)"/><path d="M31 38h38v25H31z" fill="color-mix(in srgb, var(--robot-colour) 35%, black)"/><circle cx="50" cy="50" r="11" fill="color-mix(in srgb, var(--robot-colour) 35%, white)"/>',
+  '<path d="M50 6 90 50 50 94 10 50z" fill="var(--robot-colour)"/><path d="m50 23 24 27-24 27-24-27z" fill="color-mix(in srgb, var(--robot-colour) 35%, black)"/><path d="M50 35 64 50 50 65 36 50z" fill="color-mix(in srgb, var(--robot-colour) 35%, white)"/>',
+  '<rect x="14" y="24" width="72" height="52" rx="22" fill="var(--robot-colour)"/><circle cx="28" cy="77" r="9" fill="color-mix(in srgb, var(--robot-colour) 35%, black)"/><circle cx="72" cy="77" r="9" fill="color-mix(in srgb, var(--robot-colour) 35%, black)"/><path d="M50 32 68 50 50 68 32 50z" fill="color-mix(in srgb, var(--robot-colour) 35%, white)"/>',
+  '<path d="M20 20h60v60H20z" fill="var(--robot-colour)"/><path d="M32 32h36v36H32z" fill="color-mix(in srgb, var(--robot-colour) 35%, black)"/><path d="M50 20v60M20 50h60" stroke="color-mix(in srgb, var(--robot-colour) 35%, white)" stroke-width="8"/>',
+  '<path d="M50 7 82 25v38L50 92 18 74V36z" fill="var(--robot-colour)"/><path d="M50 22 69 33v24L50 68 31 57V33z" fill="color-mix(in srgb, var(--robot-colour) 35%, black)"/><path d="m50 33 12 17-12 17-12-17z" fill="color-mix(in srgb, var(--robot-colour) 35%, white)"/>',
+  '<path d="M15 35 50 12l35 23v39L50 88 15 74z" fill="var(--robot-colour)"/><path d="M29 40h42v23H29z" fill="color-mix(in srgb, var(--robot-colour) 35%, black)"/><circle cx="50" cy="51" r="8" fill="color-mix(in srgb, var(--robot-colour) 35%, white)"/><path d="M23 76h54" stroke="color-mix(in srgb, var(--robot-colour) 35%, black)" stroke-width="7"/>',
 ] as const
 
 const placeholderColors = ['#4d8deb', '#e55f5f', '#4caf70', '#a67de0', '#db79a8', '#e0bb1f'] as const

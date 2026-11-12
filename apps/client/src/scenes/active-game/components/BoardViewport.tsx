@@ -2,6 +2,7 @@ import { useMemo, useRef, type CSSProperties } from 'react'
 import antennaSprites from '../board/assets/antenna.hbls?raw'
 import laserSprites from '../board/assets/lasers.hbls?raw'
 import tankSprites from '../board/assets/tanks.hbls?raw'
+import { robotOptionFor } from '../../entry/robotPreviews.ts'
 import conveyorSprites from '../board/assets/conveyors.hbls?raw'
 import {
   BOARD_COMPONENTS,
@@ -36,6 +37,7 @@ type PieceStyle = CSSProperties &
     '--board-piece-x'?: string
     '--board-piece-y'?: string
     '--tank-colour'?: string
+    '--robot-colour'?: string
     '--tank-move-duration'?: string
     '--tank-turn-duration'?: string
   }>
@@ -159,6 +161,10 @@ function RobotPiece({
 }>) {
   const component = BOARD_COMPONENTS[componentName]
   if (!component.asset) throw new Error(`Missing robot sprite ${componentName}`)
+  const componentIndex = ROBOT_COMPONENTS.indexOf(componentName)
+  const sprite = robotOptionFor(robot.robotSpriteId).sprite
+  const spriteLayer = sprite.layers[componentIndex]
+  if (spriteLayer === undefined) return null
   const centre = tileCentre(robot.position.coordinate, board, BOARD_CONFIG)
   const height = layer / BOARD_CONFIG.parallaxReferenceLayer
   const style: PieceStyle = {
@@ -168,12 +174,13 @@ function RobotPiece({
     zIndex: layer === 3 ? 1 : 0,
     '--board-piece-angle': `${robot.angle}deg`,
     '--tank-colour': robot.colour,
+    '--robot-colour': robot.colour,
   }
 
   return (
     <svg
       aria-hidden="true"
-      className={`board-piece ${component.className} board-piece--test-tank`}
+      className={`board-piece ${component.className} board-piece--test-tank${robot.robotSpriteId === 'tank' ? '' : ' board-piece--selected-robot'}`}
       data-board-component={componentName}
       data-board-height={height}
       data-board-lift-height={Math.min(
@@ -182,11 +189,14 @@ function RobotPiece({
       )}
       data-board-tile={`${robot.position.coordinate.x},${robot.position.coordinate.y}`}
       data-robot-id={robot.robotId}
+      data-robot-sprite-id={robot.robotSpriteId}
       preserveAspectRatio="xMidYMid meet"
       style={style}
-      viewBox={component.asset.viewBox}
+      viewBox={robot.robotSpriteId === 'tank' ? component.asset.viewBox : sprite.viewBox}
     >
-      <use href={`#${component.asset.symbol}`} />
+      {robot.robotSpriteId === 'tank'
+        ? <use href={`#${component.asset.symbol}`} />
+        : <g dangerouslySetInnerHTML={{ __html: spriteLayer }} />}
     </svg>
   )
 }

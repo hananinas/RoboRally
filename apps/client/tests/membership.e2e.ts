@@ -32,6 +32,28 @@ test('two players wait for owner Start, play a round, and leave for the lobby br
   }
 })
 
+test('a lobby robot selection is used by every client during gameplay', async ({ browser, page, baseURL }) => {
+  const context = await browser.newContext({ baseURL, ignoreHTTPSErrors: true })
+  const other = await context.newPage()
+  try {
+    await browse(page, 'bence')
+    await createLobby(page)
+    await browse(other, 'dane')
+    await other.getByRole('list', { name: 'Lobbies' }).getByRole('button', { disabled: false }).first().click()
+    await other.getByRole('button', { name: 'Join game', exact: true }).click()
+    await other.getByRole('group', { name: 'Choose a robot' }).getByRole('button', { name: 'Scout robot' }).click()
+    await expect(page.getByRole('list', { name: 'Connected players' }).getByRole('img', { name: 'Scout robot' })).toBeVisible()
+    await page.getByRole('button', { name: 'Start', exact: true }).click()
+
+    for (const client of [page, other]) {
+      await expect(client.getByRole('main', { name: 'Game board' })).toBeVisible()
+      await expect(client.locator('svg[data-robot-sprite-id="scout"]')).toHaveCount(1)
+    }
+  } finally {
+    await context.close()
+  }
+})
+
 
 async function expectRoster(roster: Locator, names: string[], owner: string, self: string) {
   const players = roster.locator('.waiting-lobby__seat:not(.waiting-lobby__seat--empty)')

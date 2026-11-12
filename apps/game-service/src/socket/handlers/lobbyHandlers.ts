@@ -9,6 +9,7 @@ import {
   emptyRequestSchema, lobbyRequestSchema, createLobbyRequestSchema,
   robotSelectionRequestSchema,
   ROBOT_SPRITE_IDS,
+  type RobotSpriteId,
   type EmptyRequest, type LobbyRequest, type RobotSelectionRequest, type RobotSelectionResult, type CreateLobbyRequest, type GameInitialization, type LobbyState, type User,
   type LobbyListResult, type LobbyJoinResult, type LobbyLeaveResult, type LobbyStartResult,
 } from '@robo-rally/game-events'
@@ -168,7 +169,12 @@ export function handleLeaveLobby(
   })
 }
 
-type ConnectedLobbyMember = { user: User; connectionId: string; socket: GameSocket }
+type ConnectedLobbyMember = {
+  user: User
+  connectionId: string
+  robotSpriteId: RobotSpriteId
+  socket: GameSocket
+}
 
 function getConnectedMembers(context: SessionContext, lobby: Lobby): Result<ConnectedLobbyMember[], 'LOBBY_MEMBER_DISCONNECTED'> {
   const members: ConnectedLobbyMember[] = []
@@ -204,7 +210,7 @@ export function handleStartLobby(
       const preparedContext = createGameContext(io, context.createGame(lobby.mapName))
       gameContext = preparedContext
       const members = connected.value.map(({ socket: connection, ...member }) => {
-        const result = preparedContext.game.addPlayer(ROBOT_COLOURS[preparedContext.memberships.size])
+        const result = preparedContext.game.addPlayer(ROBOT_COLOURS[preparedContext.memberships.size], member.robotSpriteId)
         if (result.isErr()) throw new Error(result.error)
         const membership = { ...member, player: result.value }
         preparedContext.memberships.set(member.user.userId, membership)
