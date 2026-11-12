@@ -1,4 +1,5 @@
 import type { Card } from '@/game/Card'
+import type { RobotSpriteId } from '@robo-rally/game-events'
 import type { RobotId } from '@/game/ids'
 import { Direction, rotateDirection } from '@/game/spatial'
 import type { UnsignedInteger } from '@/numbers'
@@ -20,7 +21,12 @@ export class Robot {
   private currentDirection: Direction
   private programmedCards: readonly Card[] = []
 
-  constructor(readonly id: RobotId, direction: Direction, readonly colour: string = ROBOT_COLOURS[0]) {
+  constructor(
+    readonly id: RobotId,
+    direction: Direction,
+    readonly colour: string = ROBOT_COLOURS[0],
+    readonly robotSpriteId: RobotSpriteId = 'tank',
+  ) {
     this.currentDirection = direction
   }
 

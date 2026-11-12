@@ -44,11 +44,13 @@ export function createPublicState(): PublicGameState {
     },
     robots: [{
       robotId: ROBOT_ID,
+      robotSpriteId: 'tank',
       colour: '#c74f4f',
       playerId: PLAYER_ID,
       position: { coordinate: { x: 5, y: 5 }, orientation: 'NORTH' },
     }, {
       robotId: OTHER_ROBOT_ID,
+      robotSpriteId: 'tank',
       colour: '#4D8DEB',
       playerId: OTHER_PLAYER_ID,
       position: { coordinate: { x: 7, y: 5 }, orientation: 'NORTH' },

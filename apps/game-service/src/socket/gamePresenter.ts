@@ -102,6 +102,7 @@ export function presentPublicGameState(
     robots: game.players.map((player) => ({
       robotId: player.robot.id,
       playerId: player.id,
+      robotSpriteId: player.robot.robotSpriteId,
       colour: player.robot.colour,
       position: {
         coordinate: game.board.positionOf(player.robot.id),

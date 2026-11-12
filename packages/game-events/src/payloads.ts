@@ -1,4 +1,5 @@
 import type { Instruction, ResolvedInstruction } from './instructions.js'
+import type { RobotSpriteId } from './lobby.js'
 
 export type { UpdateRegisters } from './updateRegisters.js'
 
@@ -45,6 +46,7 @@ export type Position = Readonly<{
 export type Robot = Readonly<{
   robotId: RobotId
   playerId: PlayerId
+  robotSpriteId: RobotSpriteId
   colour: string
   position: Position
 }>
