@@ -239,10 +239,10 @@ io.on('connection', (socket) => {
     { mapName: 'empty-map', name: 'Empty Map', icon: mapIcons['empty-map'] },
     { mapName: 'test-map', name: 'Test Map', icon: mapIcons['test-map'] },
   ]
-  const lobbyState = (mapName = 'test-map'): LobbyState => {
+  const lobbyState = (mapName = 'test-map', lobbyName = 'Lobby 1'): LobbyState => {
     const map = maps.find((candidate) => candidate.mapName === mapName) ?? maps[1]!
     return {
-    lobbyId: GAME_ID, name: 'Lobby 1', mapName: map.mapName, mapDisplayName: map.name, mapIcon: map.icon, ownerUserId: user.userId,
+    lobbyId: GAME_ID, name: lobbyName, mapName: map.mapName, mapDisplayName: map.name, mapIcon: map.icon, ownerUserId: user.userId,
     playerCount: 1, maxPlayers: 6, players: [user],
     }
   }
@@ -254,7 +254,7 @@ io.on('connection', (socket) => {
   socket.on('lobby.list', (_, acknowledge) => acknowledge({ outcome: 'LOBBIES_FOUND', lobbies: [lobbyState()], maps }))
   socket.on('lobby.create', (payload, acknowledge) => {
     fixture.entryRequests.push({ event: 'lobby.create', socketId: socket.id, payload })
-    lobby = lobbyState(payload.mapName)
+    lobby = lobbyState(payload.mapName, payload.name)
     acknowledge({ outcome: 'LOBBY_JOINED', lobby })
   })
   socket.on('lobby.join', (payload, acknowledge) => {

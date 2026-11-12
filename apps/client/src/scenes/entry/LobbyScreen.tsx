@@ -5,18 +5,20 @@ type LobbyScreenProps = {
   username: string
   lobbies: readonly LobbySummary[]
   maps: readonly BoardMapSummary[]
+  mapsLoaded: boolean
   pending: boolean
   connected: boolean
   error: string | null
   onJoin: (lobbyId: string) => void
-  onCreate: (mapName: BoardMapName) => void
+  onCreate: (mapName: BoardMapName, name: string) => void
   onRefresh: () => void
 }
 
-export default function LobbyScreen({ username, lobbies, maps, pending, connected, error, onJoin, onCreate, onRefresh }: LobbyScreenProps) {
+export default function LobbyScreen({ username, lobbies, maps, mapsLoaded, pending, connected, error, onJoin, onCreate, onRefresh }: LobbyScreenProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [creatingLobby, setCreatingLobby] = useState(false)
   const [selectedMap, setSelectedMap] = useState<BoardMapName | null>(null)
+  const [lobbyName, setLobbyName] = useState('')
   const selected = lobbies.find((lobby) => lobby.lobbyId === selectedId)
   const firstJoinable = lobbies.find((lobby) => lobby.playerCount < lobby.maxPlayers)
   const selectedMapInfo = maps.find((map) => map.mapName === selectedMap)
@@ -43,8 +45,18 @@ export default function LobbyScreen({ username, lobbies, maps, pending, connecte
         </div>
         {maps.length === 0 && <p role="status">No maps are available.</p>}
         {selectedMapInfo && <p>Selected map: {selectedMapInfo.name}</p>}
+        <label htmlFor="lobby-name">Lobby name</label>
+        <input
+          id="lobby-name"
+          name="lobbyName"
+          type="text"
+          maxLength={50}
+          required
+          value={lobbyName}
+          onChange={(event) => setLobbyName(event.target.value)}
+        />
         {error && <p className="entry-validation entry-validation--error" role="alert">{error}</p>}
-        <button className="entry-primary-button" type="button" disabled={pending || !connected || !selectedMap} onClick={() => selectedMap && onCreate(selectedMap)}>
+        <button className="entry-primary-button" type="button" disabled={pending || !connected || !selectedMap || !lobbyName.trim()} onClick={() => selectedMap && onCreate(selectedMap, lobbyName.trim())}>
           {pending ? 'Creating lobby…' : 'Create lobby'}
         </button>
         <button className="entry-secondary-button" type="button" disabled={pending} onClick={() => setCreatingLobby(false)}>
@@ -84,7 +96,9 @@ export default function LobbyScreen({ username, lobbies, maps, pending, connecte
           </li>
         ))}
       </ul>
-      <button className="entry-secondary-button" type="button" disabled={pending || !connected} onClick={() => {
+      {!mapsLoaded && <p role="status">Loading maps…</p>}
+      {mapsLoaded && maps.length === 0 && <p role="status">No maps are available.</p>}
+      <button className="entry-secondary-button" type="button" disabled={pending || !connected || !mapsLoaded || maps.length === 0} onClick={() => {
         setSelectedMap(maps[0]?.mapName ?? null)
         setCreatingLobby(true)
       }}>Create lobby</button>

@@ -57,8 +57,10 @@ describe('lobby lifecycle over Socket.IO', () => {
   it('validates requests without allocating games or rooms', async () => {
     const client = await connect('Bence')
     const raw = client.emitWithAck.bind(client) as (event: string, payload: unknown) => Promise<unknown>
-    expect(await raw('lobby.create', { name: 'Custom' })).toEqual({ outcome: 'INVALID_REQUEST' })
+    expect(await raw('lobby.create', { unexpected: 'Custom' })).toEqual({ outcome: 'INVALID_REQUEST' })
     expect(await raw('lobby.create', { mapName: 'not-a-map' })).toEqual({ outcome: 'INVALID_REQUEST' })
+    expect(await raw('lobby.create', { name: '   ' })).toEqual({ outcome: 'INVALID_REQUEST' })
+    expect(await raw('lobby.create', { name: 'x'.repeat(51) })).toEqual({ outcome: 'INVALID_REQUEST' })
     expect(await raw('lobby.join', { lobbyId: 'invalid' })).toEqual({ outcome: 'INVALID_REQUEST' })
     const listed = await client.emitWithAck('lobby.list', {})
     if (listed.outcome !== 'LOBBIES_FOUND') throw new Error(listed.outcome)
@@ -82,6 +84,14 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(await duplicate.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'USER_ALREADY_IN_SESSION' })
     expect(await duplicate.emitWithAck('lobby.start', {})).toEqual({ outcome: 'NOT_LOBBY_MEMBER' })
     expect(factory).not.toHaveBeenCalled()
+  })
+  it('uses the creator-provided lobby name', async () => {
+    const owner = await connect('Owner')
+    const result = await owner.emitWithAck('lobby.create', { mapName: 'empty-map', name: 'Friday Night' })
+    if (result.outcome !== 'LOBBY_JOINED') throw new Error(result.outcome)
+    expect(result.lobby.name).toBe('Friday Night')
+    expect(result.lobby.mapName).toBe('empty-map')
+    expect(result.lobby.mapDisplayName).toBe(boardMaps['empty-map'].name)
   })
   it.each(['leave', 'disconnect'] as const)('updates the roster and owner on %s without notifying other lobbies', async (departure) => {
     const owner = await connect('Owner')

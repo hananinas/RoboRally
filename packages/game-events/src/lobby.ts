@@ -5,6 +5,7 @@ export const emptyRequestSchema = z.strictObject({}).readonly()
 export const lobbyRequestSchema = z.strictObject({ lobbyId: z.uuid() }).readonly()
 export const createLobbyRequestSchema = z.strictObject({
   mapName: z.string().min(1).optional(),
+  name: z.string().trim().min(1).max(50).optional(),
 }).readonly()
 export type EmptyRequest = z.infer<typeof emptyRequestSchema>
 export type LobbyRequest = z.infer<typeof lobbyRequestSchema>

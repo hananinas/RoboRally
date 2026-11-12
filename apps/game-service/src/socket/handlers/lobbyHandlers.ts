@@ -86,7 +86,7 @@ export function handleCreateLobby(
         : { outcome: 'USER_ALREADY_IN_SESSION' })
     }
     const lobbyId = randomUUID()
-    const lobby: Lobby = { lobbyId, name: `Lobby ${lobbyId.slice(0, 8)}`, mapName,
+    const lobby: Lobby = { lobbyId, name: payload.name ?? `Lobby ${lobbyId.slice(0, 8)}`, mapName,
       members: new Map([[user.userId, { user, connectionId: socket.id }]]) }
     void socket.join(lobbyRoom(lobbyId))
     context.lobbies.set(lobbyId, lobby)

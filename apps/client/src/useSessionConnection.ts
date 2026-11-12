@@ -16,6 +16,7 @@ export default function useSessionConnection() {
   const [busy, setBusy] = useState(false)
   const [lobbies, setLobbies] = useState<readonly LobbySummary[]>([])
   const [maps, setMaps] = useState<readonly BoardMapSummary[]>([])
+  const [mapsLoaded, setMapsLoaded] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
   const listAttempt = useRef(0)
 
@@ -98,6 +99,7 @@ export default function useSessionConnection() {
         setListError(null)
         setLobbies(result.lobbies)
         setMaps(result.maps)
+        setMapsLoaded(true)
       }
       else setListError(result.outcome)
     })
@@ -111,12 +113,12 @@ export default function useSessionConnection() {
     dispatch({ type: 'lobby-requested', lobbyId })
     void run(async () => ({ type: 'lobby-result', result: await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.join', { lobbyId }) }))
   }
-  function createLobby(mapName: BoardMapName) {
+  function createLobby(mapName: BoardMapName, name: string) {
     if (pending.current || !socket.connected) return
     dispatch({ type: 'lobby-requested', lobbyId: null })
     void run(async () => ({
       type: 'lobby-result',
-      result: await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.create', { mapName }),
+      result: await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.create', { mapName, name }),
     }))
   }
   function startLobby() {
@@ -140,7 +142,7 @@ export default function useSessionConnection() {
   }
 
   return {
-    connection, game, session, busy, lobbies, maps, listError,
+    connection, game, session, busy, lobbies, maps, mapsLoaded, listError,
     joinLobby, startLobby, leaveSession, refreshLobbies,
     createLobby,
     retrySession: () => socket.connected ? dispatch({ type: 'sync-requested' }) : connection.connect(),
