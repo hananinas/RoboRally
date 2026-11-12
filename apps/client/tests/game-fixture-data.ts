@@ -2,7 +2,6 @@ import type {
   Card,
   CardsDealt,
   PlayerCheckpointProgress,
-  PrivateProgram,
   PlayerConnectionChanged,
   ProgramResultOutcome,
   ProgramSubmitted,
@@ -87,7 +86,7 @@ export type FixtureControl =
   | { type: 'early-hand'; cards: readonly Card[] }
   | { type: 'start'; deferred: boolean; outcome?: 'STARTED' | 'LOBBY_MEMBER_DISCONNECTED' }
   | { type: 'respond-start' }
-  | { type: 'joined-state'; state: PublicGameState; hand: readonly Card[]; programSubmitted: boolean; program?: PrivateProgram }
+  | { type: 'joined-state'; state: PublicGameState; hand: readonly Card[]; programSubmitted: boolean }
 
 export type FixtureSnapshot = {
   id: string
