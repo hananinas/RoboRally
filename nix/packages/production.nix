@@ -199,6 +199,7 @@ let
           depends_on = {
             hydra.condition = "process_healthy";
             web.condition = "process_healthy";
+            register-game-service-client.condition = "process_completed_successfully";
           };
 
           availability = {
