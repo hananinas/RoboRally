@@ -234,17 +234,11 @@ let
           };
           readiness_probe = {
             exec.command = ''
-              if [ "$WEB_SCHEME" = https ]; then
-                exec ${pkgs.curl}/bin/curl --fail --silent --show-error \
-                  --max-time 3 --noproxy '*' \
-                  --cacert "$CADDY_DATA_DIR/pki/authorities/local/root.crt" \
-                  --resolve "$WEB_HOST:$WEB_PORT:127.0.0.1" \
-                  "https://$WEB_HOST:$WEB_PORT/" > /dev/null
-              else
-                exec ${pkgs.curl}/bin/curl --fail --silent --show-error \
-                  --max-time 3 --noproxy '*' \
-                  "http://127.0.0.1:$WEB_PORT/" > /dev/null
-              fi
+              exec ${pkgs.curl}/bin/curl --fail --silent --show-error \
+                --max-time 3 --noproxy '*' \
+                --cacert "$CADDY_DATA_DIR/pki/authorities/local/root.crt" \
+                --resolve "$WEB_HOST:$WEB_PORT:127.0.0.1" \
+                "https://$WEB_HOST:$WEB_PORT/" > /dev/null
             '';
             initial_delay_seconds = 1;
             period_seconds = 10;
@@ -270,10 +264,9 @@ pkgs.writeShellApplication {
     export PC_PORT="''${PC_PORT:-18080}"
     export CADDY_DATA_DIR="''${CADDY_DATA_DIR:-$HOME/.local/share/caddy}"
     export WEB_BIND="''${WEB_BIND:-127.0.0.1}"
-    export WEB_SCHEME="''${WEB_SCHEME:-http}"
     export WEB_HOST="''${WEB_HOST:-}"
-    webOrigin="$WEB_SCHEME://''${WEB_HOST:-127.0.0.1}"
-    if [ "$WEB_SCHEME:$WEB_PORT" != "https:443" ]; then
+    webOrigin="https://''${WEB_HOST:-127.0.0.1}"
+    if [ "$WEB_PORT" != "443" ]; then
       webOrigin="$webOrigin:$WEB_PORT"
     fi
     export PUBLIC_ORIGIN="''${PUBLIC_ORIGIN:-$webOrigin}"

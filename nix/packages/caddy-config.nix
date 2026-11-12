@@ -6,7 +6,7 @@ pkgs.writeText "robo-rally.Caddyfile" ''
     persist_config off
   }
 
-  {$WEB_SCHEME}://{$WEB_HOST}:{$WEB_PORT} {
+  https://{$WEB_HOST}:{$WEB_PORT} {
     bind {$WEB_BIND}
     tls {$CADDY_DATA_DIR}/self-signed/cert.pem {$CADDY_DATA_DIR}/self-signed/key.pem
 
