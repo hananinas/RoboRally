@@ -101,32 +101,10 @@
     translate: 0 0;
   }
 }
-/* The starting tile takes the robot's colour as the robot lands, and keeps it all game. */
-.board-piece--start-tile {
-  border-radius: var(--board-radius);
-  background: var(--start-tile-colour);
-  pointer-events: none;
-  animation: start-tile-light-up 0.35s ease-out 0.7s both;
-}
-
-@keyframes start-tile-light-up {
-  from {
-    opacity: 0;
-    scale: 0.6;
-  }
-  to {
-    opacity: 1;
-    scale: 1;
-  }
-}
 
 @media (prefers-reduced-motion: reduce) {
   .board-piece--test-tank {
     transition-duration: 0s;
-    animation: none;
-  }
-
-  .board-piece--start-tile {
     animation: none;
   }
 }

@@ -3,10 +3,12 @@ import BoardViewport from './components/BoardViewport.tsx'
 import PlayerPanel from './components/PlayerPanel.tsx'
 import ProgrammingHand from './components/ProgrammingHand.tsx'
 import RegisterPanel from './components/RegisterPanel.tsx'
+import OtherPlayersPanel from './components/OtherPlayersPanel.tsx'
 import useGameKeybinds from './components/useGameKeybinds.ts'
 import { 
   canProgram, 
   registersAreFilled, 
+  getOtherPlayers,
   type ClientGameState , 
   type ProgramCard 
 } from './gameState.ts'
@@ -112,6 +114,16 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
             />
           </div>
         </aside>
+        {state.phase && (
+          <OtherPlayersPanel
+            players={getOtherPlayers(state)}
+            checkpointCount={state.checkpointCount}
+            phase={state.playback.active ? 'EXECUTING' : state.phase}
+            activeAction={state.playback.active}
+            queuedActions={state.playback.pending}
+            paused={state.paused || !state.connected}
+          />
+        )}
         {hasHand && (
           <ProgrammingHand
             key={state.handVersion}

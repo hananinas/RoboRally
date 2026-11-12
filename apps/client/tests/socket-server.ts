@@ -10,6 +10,7 @@ import type {
   ProgramFinalized,
   ProgrammingTimer,
   PublicGameState,
+  RegistersChanged,
   ServerToClientEvents,
   SubmitProgram,
   UpdateRegisters,
@@ -106,6 +107,12 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
     case 'checkpoint-progress':
       for (const socket of fixture.sockets) socket.emit('player.checkpointProgress', control.progress)
       break
+    case 'connection-changed':
+      for (const socket of fixture.sockets) socket.emit('game.playerConnectionChanged', control.payload)
+      break
+    case 'registers-changed':
+      for (const socket of fixture.sockets) socket.emit('game.registersChanged', control.payload)
+      break
     case 'hand':
       for (const socket of fixture.sockets) socket.emit('cards.dealt', control.hand)
       if (control.hand.gameId === GAME_ID && control.hand.playerId === PLAYER_ID) timerChanged(fixture, { status: 'IDLE' })
@@ -136,7 +143,7 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
       })
       break
     case 'disconnect':
-      for (const socket of fixture.sockets) socket.disconnect(true)
+      for (const socket of fixture.sockets) socket.conn.close()
       break
     case 'start':
       fixture.startOutcome = control.outcome ?? 'STARTED'
@@ -317,7 +324,21 @@ io.on('connection', (socket) => {
       id === null ? null : fixture.cards.find((card) => card.id === id)!,
     )
     fixture.program = program as PrivateProgram
+    const registers: RegistersChanged['registers'] = [
+      { status: parsed.data.cardIds[0] === null ? 'EMPTY' : 'HIDDEN' },
+      { status: parsed.data.cardIds[1] === null ? 'EMPTY' : 'HIDDEN' },
+      { status: parsed.data.cardIds[2] === null ? 'EMPTY' : 'HIDDEN' },
+      { status: parsed.data.cardIds[3] === null ? 'EMPTY' : 'HIDDEN' },
+      { status: parsed.data.cardIds[4] === null ? 'EMPTY' : 'HIDDEN' },
+    ]
+    fixture.state = {
+      ...fixture.state,
+      players: fixture.state.players.map((player) => player.playerId === PLAYER_ID ? { ...player, registers } : player),
+    }
     acknowledge({ outcome: 'ACCEPTED' })
+    for (const observer of fixture.sockets) observer.emit('game.registersChanged', {
+      gameId: GAME_ID, playerId: PLAYER_ID, registers,
+    })
   })
 
   socket.on('program.submit', (payload, acknowledge) => {

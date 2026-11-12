@@ -74,7 +74,7 @@ export function handleSubmitProgram(
     const player = result.value
     publishProgramFinalized(ctx, { playerId: player.id, cards: player.robot.program }, 'SUBMITTED')
     ctx.programmingTimer.start()
-    if (ctx.game.phase === 'activation') ctx.programmingTimer.close()
+    if (ctx.game.requirePhase('activation').isOk()) ctx.programmingTimer.close()
   }, (error) => {
     logError('Failed to process program submission', error, { command: 'program.submit', gameId: ctx.gameId, playerId, payload })
     return { outcome: 'INTERNAL_ERROR' } as const

@@ -40,7 +40,7 @@ export function createGameContext(io: GameSocketServer, session: GameSession): M
     },
     onChange: (timer) => {
       io.to(publicRoom).emit('program.timerChanged', presentProgrammingTimer(gameId, timer))
-      if (timer.status !== 'CLOSED' || game.phase !== 'activation') return
+      if (timer.status !== 'CLOSED' || game.requirePhase('activation').isErr()) return
       actionScheduler.scheduleNextAction()
     },
   })

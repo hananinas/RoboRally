@@ -48,6 +48,7 @@ describe('game presenter', () => {
         { robotId: 'pushed', position: { x: Integer(3), y: Integer(3) }, direction: Direction.NORTH },
         { robotId: 'rebooted', position: { x: Integer(0), y: Integer(0) }, direction: Direction.WEST },
       ],
+      roundConcluded: false,
     })
 
     expect(resolved.pushedRobots).toEqual([
@@ -100,7 +101,6 @@ describe('game presenter', () => {
             coordinate: { x: 10, y: 7 },
             orientation: 'NORTH',
           },
-          startPosition: { x: 10, y: 7 },
         },
       ],
     })
@@ -203,7 +203,7 @@ describe('game presenter', () => {
       direction: Direction.SOUTH,
     }
 
-    const resolved = presentRobotActionResolved('game', game, { registerIndex: 4, action, pushedRobots: [], registers: player.registers })
+    const resolved = presentRobotActionResolved('game', game, { registerIndex: 4, action, pushedRobots: [], registers: player.registers, roundConcluded: false })
 
     expectTypeOf(resolved).toEqualTypeOf<RobotActionResolved>()
     expect(resolved).toEqual({

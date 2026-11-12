@@ -10,8 +10,16 @@ import { ROBOT_COLOURS, Robot } from '@/game/Robot'
 import { tileDefinitions } from '@/game/Tile'
 import { Direction, opposite, type Position } from '@/game/spatial'
 import { Integer, PositiveInteger, UnsignedInteger } from '@/numbers'
+import {
+  GameLifecycle,
+  type AbortError,
+  type GamePhase,
+  type PauseError,
+  type PhaseError,
+  type ResumeError,
+} from '@/game/GameLifecycle'
 
-export type GamePhase = 'programming' | 'activation'
+export type { GamePhase, PauseError, ResumeError, AbortError, PhaseError }
 
 export type RobotActionResult = Readonly<{
   robotId: RobotId
@@ -30,15 +38,13 @@ export type NextActionResult = Readonly<{
     position: Position
     direction: Direction
   }>[]
+  roundConcluded: boolean
 }>
 
-export type AddPlayerError = 'GAME_ALREADY_STARTED' | 'NO_SPAWN_AVAILABLE'
+export type AddPlayerError = 'NO_SPAWN_AVAILABLE'
 
 export type SubmitProgramError =
-  | 'GAME_ABORTED'
-  | 'GAME_FINISHED'
-  | 'GAME_PAUSED'
-  | 'WRONG_PHASE'
+  | PhaseError
   | 'PLAYER_NOT_IN_GAME'
   | 'ALREADY_SUBMITTED'
   | 'INVALID_PROGRAM'
@@ -51,6 +57,8 @@ export type CompletedProgram = Readonly<{
 }>
 
 export const DEFAULT_GAME_NAME = 'Game'
+
+const REGISTERS_PER_ROUND = 5
 
 export type GameOptions = Readonly<{
   board: Board
@@ -71,15 +79,10 @@ export class Game {
   private readonly roster: Player[]
   readonly rebootTile: Position
   private readonly deck: readonly Card[]
-  private currentPhase: GamePhase = 'programming'
+  private readonly lifecycle = new GameLifecycle('programming')
   private registerIndex = 0
   private readonly submittedPlayerIds = new Set<PlayerId>()
   private readonly activatedRobotIds = new Set<RobotId>()
-  private started = false
-  private isPaused = false
-  private isAborted = false
-  private winnerId: PlayerId | undefined
-  private readonly startPositions = new Map<RobotId, Position>()
   private readonly random: () => number
   private readonly drawRandom: () => number
   // What each robot's registers resolved to this round, so Again repeats the real action.
@@ -94,7 +97,7 @@ export class Game {
     random = Math.random,
     drawRandom = random,
   }: GameOptions) {
-    if (deck.length < 5 || new Set(deck.map((card) => card.id)).size !== deck.length) {
+    if (deck.length < REGISTERS_PER_ROUND || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')
     }
     if (rebootTile === undefined) {
@@ -115,7 +118,6 @@ export class Game {
       }
       playerIds.add(player.id)
       robotIds.add(player.robot.id)
-      this.startPositions.set(player.robot.id, board.positionOf(player.robot.id))
     }
 
     this.board = board
@@ -128,8 +130,8 @@ export class Game {
     this.dealInitialHands()
   }
 
-  get phase(): GamePhase {
-    return this.currentPhase
+  get lastActivePhase(): GamePhase {
+    return this.lifecycle.lastPhase
   }
 
   get currentRegister(): number {
@@ -140,47 +142,39 @@ export class Game {
     return Object.freeze([...this.roster])
   }
 
-  get hasStarted(): boolean {
-    return this.started
+  requirePhase(phase: GamePhase): Result<void, PhaseError> {
+    return this.lifecycle.requirePhase(phase)
   }
 
   get paused(): boolean {
-    return this.isPaused
+    return this.lifecycle.isPaused
   }
 
   get aborted(): boolean {
-    return this.isAborted
+    return this.lifecycle.isAborted
   }
 
   get winner(): PlayerId | undefined {
-    return this.winnerId
+    return this.lifecycle.winnerId
   }
 
-  pause(): void {
-    this.isPaused = true
+  pause(): Result<void, PauseError> {
+    return this.lifecycle.pause()
   }
 
-  resume(): void {
-    this.isPaused = false
+  resume(): Result<{ roundConcluded: boolean }, ResumeError> {
+    return this.lifecycle.resume().map(() => {
+      this.recheckProgrammingPhase()
+      return this.recheckActivationPhase()
+    })
   }
 
-  abort(): void {
-    this.isAborted = true
+  abort(): Result<void, AbortError> {
+    return this.lifecycle.abort()
   }
 
   hasSubmittedProgram(playerId: PlayerId): boolean {
     return this.submittedPlayerIds.has(playerId)
-  }
-
-  private checkCanAddPlayer(): Result<void, 'GAME_ALREADY_STARTED'> {
-    if (this.started) return err('GAME_ALREADY_STARTED')
-    return ok(undefined)
-  }
-
-  startPositionOf(robotId: RobotId): Position {
-    const position = this.startPositions.get(robotId)
-    if (!position) throw new Error(`Robot ${robotId} is not in this game`)
-    return { ...position }
   }
 
   private findSpawn(): Result<Position, 'NO_SPAWN_AVAILABLE'> {
@@ -206,56 +200,43 @@ export class Game {
   }
 
   addPlayer(colour: string = ROBOT_COLOURS[0]): Result<Player, AddPlayerError> {
-    return this.checkCanAddPlayer().andThen(() =>
-      this.findSpawn().map((position) => {
-        const robot = new Robot(randomUUID(), Direction.NORTH, colour)
-        const player = new Player(randomUUID(), robot, Deck.fromTemplate(this.deck))
-        player.drawHand(this.drawRandom)
-        this.board.placeRobot(robot.id, position)
-        this.startPositions.set(robot.id, position)
-        this.roster.push(player)
-        return player
-      }),
-    )
+    return this.findSpawn().map((position) => {
+      const robot = new Robot(randomUUID(), Direction.NORTH, colour)
+      const player = new Player(randomUUID(), robot, Deck.fromTemplate(this.deck))
+      player.drawHand(this.drawRandom)
+      this.board.placeRobot(robot.id, position)
+      this.roster.push(player)
+      return player
+    })
   }
 
-  removePlayer(playerId: PlayerId): void {
+  removePlayer(playerId: PlayerId): { roundConcluded: boolean } {
     const index = this.roster.findIndex((player) => player.id === playerId)
-    if (index < 0) return
+    if (index < 0) return { roundConcluded: false }
     const [player] = this.roster.splice(index, 1)
     this.board.removeRobot(player.robot.id)
-    this.startPositions.delete(player.robot.id)
     player.robot.clearProgram()
     this.submittedPlayerIds.delete(playerId)
     this.activatedRobotIds.delete(player.robot.id)
-    if (this.currentPhase === 'activation') {
-      if (this.roster.length === 0) {
-        this.finishRound()
-      } else if (this.activatedRobotIds.size === this.roster.length) {
-        this.activateBoardElements()
-        this.finishRegister()
-      }
-    }
+    const { roundConcluded } = this.recheckActivationPhase()
     this.recheckProgrammingPhase()
+    return { roundConcluded }
   }
 
   private checkCanSubmitProgram(
     playerId: PlayerId,
   ): Result<Player, Exclude<SubmitProgramError, 'INVALID_PROGRAM'>> {
-    if (this.isAborted) return err('GAME_ABORTED')
-    if (this.winnerId !== undefined) return err('GAME_FINISHED')
-    if (this.isPaused) return err('GAME_PAUSED')
-    if (this.currentPhase !== 'programming') return err('WRONG_PHASE')
+    return this.requirePhase('programming').andThen(() => {
+      const player = this.players.find((candidate) => candidate.id === playerId)
+      if (!player) return err('PLAYER_NOT_IN_GAME')
+      if (this.submittedPlayerIds.has(playerId)) return err('ALREADY_SUBMITTED')
 
-    const player = this.players.find((candidate) => candidate.id === playerId)
-    if (!player) return err('PLAYER_NOT_IN_GAME')
-    if (this.submittedPlayerIds.has(playerId)) return err('ALREADY_SUBMITTED')
-
-    return ok(player)
+      return ok(player)
+    })
   }
 
   private checkProgram(player: Player, cardIds: readonly CardId[]): Result<readonly Card[], 'INVALID_PROGRAM'> {
-    if (cardIds.length !== 5 || new Set(cardIds).size !== 5) {
+    if (cardIds.length !== REGISTERS_PER_ROUND || new Set(cardIds).size !== REGISTERS_PER_ROUND) {
       return err('INVALID_PROGRAM')
     }
     const hand = new Map(player.hand.map((card) => [card.id, card]))
@@ -278,15 +259,15 @@ export class Game {
     // Programmed cards stay out of both piles until the round ends.
     player.discard(player.hand.filter((card) => !program.includes(card)))
     player.clearHand()
-    this.started = true
     this.submittedPlayerIds.add(player.id)
     this.recheckProgrammingPhase()
   }
 
   completePrograms(): Result<readonly CompletedProgram[], SubmitProgramError> {
-    if (this.isAborted) return err('GAME_ABORTED')
-    if (this.winnerId !== undefined) return err('GAME_FINISHED')
-    if (this.currentPhase !== 'programming') return err('WRONG_PHASE')
+    const phase = this.requirePhase('programming')
+    if (phase.isErr() && (phase.error !== 'GAME_PAUSED' || this.lastActivePhase !== 'programming')) {
+      return err(phase.error)
+    }
 
     // The deadline can finalize programs while gameplay remains paused.
     const validatedPrograms: { player: Player; cards: readonly Card[] }[] = []
@@ -324,12 +305,43 @@ export class Game {
 
   recheckProgrammingPhase(): void {
     if (
-      this.currentPhase === 'programming' &&
+      this.requirePhase('programming').isOk() &&
       this.players.length > 0 &&
       this.players.every((player) => this.submittedPlayerIds.has(player.id))
     ) {
       this.startActivationPhase()
     }
+  }
+
+  private checkRegisterComplete(): Result<void, 'NOT_COMPLETE'> {
+    return this.roster.length === 0 || this.activatedRobotIds.size === this.roster.length
+      ? ok(undefined)
+      : err('NOT_COMPLETE')
+  }
+
+  private recheckActivationPhase(): { roundConcluded: boolean } {
+    return this.requirePhase('activation')
+      .andThen(() => this.checkRegisterComplete())
+      .map(() => this.concludeRegister())
+      .unwrapOr({ roundConcluded: false })
+  }
+
+  private concludeRegister(): { roundConcluded: boolean } {
+    if (this.roster.length === 0) {
+      this.finishRound()
+      return { roundConcluded: true }
+    }
+    this.activateBoardElements()
+    this.finishRegister()
+    if (this.winner !== undefined) {
+      this.clearRound()
+      return { roundConcluded: false }
+    }
+    if (this.registerIndex === REGISTERS_PER_ROUND) {
+      this.finishRound()
+      return { roundConcluded: true }
+    }
+    return { roundConcluded: false }
   }
 
   // Gameplay movement resolves entry effects; Board movement only changes positions.
@@ -348,7 +360,7 @@ export class Game {
   }
 
   executeNextAction(): NextActionResult {
-    if (this.currentPhase !== 'activation') {
+    if (this.requirePhase('activation').isErr()) {
       throw new Error('Robot actions can only execute during activation')
     }
 
@@ -377,11 +389,8 @@ export class Game {
       return [{ robotId: other.id, position, direction: other.direction }]
     })
 
-    if (this.activatedRobotIds.size === this.players.length) {
-      this.activateBoardElements()
-      this.finishRegister()
-    }
-    return { registerIndex, action, registers, pushedRobots }
+    const { roundConcluded } = this.recheckActivationPhase()
+    return { registerIndex, action, registers, pushedRobots, roundConcluded }
   }
 
   private dealInitialHands(): void {
@@ -399,7 +408,7 @@ export class Game {
   }
 
   private startActivationPhase(): void {
-    this.currentPhase = 'activation'
+    this.lifecycle.enterActivation()
     this.registerIndex = 0
     this.activatedRobotIds.clear()
     this.resolvedInstructions.clear()
@@ -482,7 +491,7 @@ export class Game {
       const checkpoint = this.board.getTile(position)?.checkpointNumber
       if (checkpoint === undefined || !player.completeCheckpoint(checkpoint)) continue
       if (checkpoint === this.board.checkpointCount) {
-        this.winnerId = player.id
+        this.lifecycle.finish(player.id)
         break
       }
     }
@@ -491,17 +500,20 @@ export class Game {
   private finishRegister(): void {
     this.activatedRobotIds.clear()
     this.registerIndex++
-    if (this.registerIndex === 5 || this.winnerId !== undefined) this.finishRound()
   }
 
-  private finishRound(): void {
+  private clearRound(): void {
     for (const player of this.players) {
       player.discard(player.robot.program)
       player.robot.clearProgram()
     }
     this.submittedPlayerIds.clear()
     this.registerIndex = 0
+  }
+
+  private finishRound(): void {
+    this.clearRound()
     this.dealNewHands()
-    this.currentPhase = 'programming'
+    this.lifecycle.enterProgramming()
   }
 }

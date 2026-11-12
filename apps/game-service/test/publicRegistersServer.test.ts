@@ -124,13 +124,14 @@ describe('public registers over Socket.IO', () => {
     expect(ctx.programmingTimer.expireIfDue()).toBe(true)
     now -= 30_000
     const closed = await snapshot(first)
-    expect(closed.state).toMatchObject({ paused: true, phase: 'EXECUTING', programmingTimer: { status: 'CLOSED' } })
+    expect(closed.state).toMatchObject({ paused: true, phase: 'PROGRAMMING', programmingTimer: { status: 'CLOSED' } })
     expect(events).toEqual(['game.registersChanged', 'program.submitted', 'program.timerChanged'])
 
     const restored = await snapshot(await connect('Second'))
     expect(restored.program).toEqual([b.hand[1], b.hand[8], b.hand[2], b.hand[0], b.hand[3]])
     expect(restored.programSubmitted).toBe(true)
     expect(restored.state.paused).toBe(false)
+    expect(restored.state.phase).toBe('EXECUTING')
     expect(restored.state.serverTime).toBe(now)
     expect(ctx.game.players.every((player) => player.hand.length === 0)).toBe(true)
     expect(await first.emitWithAck('program.submit', program(a))).toEqual({ outcome: 'WRONG_PHASE' })
@@ -302,13 +303,13 @@ describe('public registers over Socket.IO', () => {
     const execute = game.executeNextAction.bind(game)
     vi.spyOn(game, 'executeNextAction').mockImplementation(() => {
       const result = execute()
-      if (game.phase === 'activation') game.pause()
+      if (game.lastActivePhase === 'activation') game.pause()
       return result
     })
     const submit = game.submitProgram.bind(game)
     vi.spyOn(game, 'submitProgram').mockImplementation((...args) => {
       const result = submit(...args)
-      if (game.phase === 'activation') game.pause()
+      if (game.lastActivePhase === 'activation') game.pause()
       return result
     })
     const actions: RobotActionResolved[] = []
@@ -482,7 +483,7 @@ describe('public registers over Socket.IO', () => {
       .toEqual(executedPlayer.registers)
   })
 
-  it('resets registers before dealing the next hand when a departure completes the final register', async () => {
+  it('resets registers once resumed after a departure completes the final register', async () => {
     const first = await connect('A')
     const second = await connect('B')
     const joined = await start([first, second])
@@ -508,18 +509,10 @@ describe('public registers over Socket.IO', () => {
     const remainingIndex = joined.findIndex((player) => player.assignment.playerId === lastActor)
     const remaining = [first, second][remainingIndex]
     const departing = [first, second][1 - remainingIndex]
-    // Flush the ninth action on the remaining connection before observing departure events.
-    await snapshot(remaining)
-    const events: string[] = []
-    remaining.onAny((name) => { if (name !== 'program.timerChanged') events.push(name) })
-    const dealt = new Promise<void>((resolve) => remaining.once('cards.dealt', () => resolve()))
     expect(await departing.timeout(1000).emitWithAck('game.leave', {})).toEqual({ outcome: 'LEFT' })
-    await dealt
+    game.resume()
     const restored = await snapshot(remaining)
     expect(restored.state.players.map((player) => player.registers)).toEqual([empty])
-    expect(events.indexOf('game.playerLeft')).toBeLessThan(events.indexOf('cards.dealt'))
-    expect(events.filter((name) => name !== 'player.checkpointProgress'))
-      .toEqual(['game.playerLeft', 'cards.dealt'])
     expect(count).toBe(9)
   })
 

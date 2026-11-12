@@ -126,7 +126,7 @@ describe('started game membership over Socket.IO', () => {
     const dealt = await hand
     expect(dealt).toMatchObject({ gameId: shared.gameId, playerId: initial.assignment.playerId })
     expect(dealt.cards).toHaveLength(HAND_SIZE)
-    expect(shared.game.phase).toBe('programming')
+    expect(shared.game.lastActivePhase).toBe('programming')
   })
   it('preserves assignments, hands and checkpoint progress while waiting for every disconnected member', async () => {
     const { members: [first, second, witness], initializations: [initial, other, observer] } = await startGame(['First', 'Second', 'Witness'])
@@ -163,7 +163,7 @@ describe('started game membership over Socket.IO', () => {
     await getSnapshot(await connect('First'))
     await hand
     expect(actions).toHaveLength(1)
-    expect(shared.game.phase).toBe('programming')
+    expect(shared.game.lastActivePhase).toBe('programming')
     expect(shared.game.paused).toBe(false)
   })
   it('recovers a game socket and resumes without client session discovery', async () => {
@@ -311,7 +311,7 @@ describe('started game membership over Socket.IO', () => {
       'robot.actionResolved', 'player.checkpointProgress', 'game.won',
     ])
     expect(snapshot.state.winner).toEqual({ playerId: player.id, username: 'First' })
-    expect(snapshot.state.phase).toBe('PROGRAMMING')
+    expect(snapshot.state.phase).toBe('EXECUTING')
     expect(await client.emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'GAME_FINISHED' })
   })
 
@@ -464,7 +464,6 @@ describe('started game membership over Socket.IO', () => {
         robotId: initial.assignment.robotId, playerId: initial.assignment.playerId,
         colour: initial.state.robots[0].colour,
         position: actions[4].position,
-        startPosition: initial.state.robots[0].startPosition,
       }])
       expect(snapshot.state.players[0].lastCheckpoint).toBe(1)
       expect(shared.game.board.occupantAt({ x: Integer(2), y: Integer(1) })).toBeUndefined()
@@ -520,7 +519,6 @@ describe('started game membership over Socket.IO', () => {
           robotId: joined.assignment.robotId, playerId: joined.assignment.playerId,
           colour: initializations[0].state.robots.find((robot) => robot.robotId === joined.assignment.robotId)!.colour,
           position: actions[0].findLast((action) => action.robotId === joined.assignment.robotId)!.position,
-          startPosition: initializations[0].state.robots.find((robot) => robot.robotId === joined.assignment.robotId)!.startPosition,
         })))
         expect(new Set(snapshot.state.robots.map(({ position }) =>
           `${position.coordinate.x},${position.coordinate.y}`)).size).toBe(3)

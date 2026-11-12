@@ -30,7 +30,7 @@ describe('Game fixed-roster programming', () => {
     const secondProgramIds = secondProgram.map((card) => card.id)
     game.submitProgram(players[0].id, firstProgramIds)
 
-    expect(game.phase).toBe('programming')
+    expect(game.lastActivePhase).toBe('programming')
     expect(game.hasSubmittedProgram(players[0].id)).toBe(true)
     expect(game.hasSubmittedProgram(players[1].id)).toBe(false)
     expect(game.hasSubmittedProgram('unknown')).toBe(false)
@@ -44,10 +44,10 @@ describe('Game fixed-roster programming', () => {
     expect(players[0].robot.program).toEqual(firstProgram)
     expect(players[1].robot.program).toEqual([])
     expect(game.hasSubmittedProgram(players[1].id)).toBe(false)
-    expect(game.phase).toBe('programming')
+    expect(game.lastActivePhase).toBe('programming')
 
     game.submitProgram(players[1].id, secondProgramIds)
-    expect(game.phase).toBe('activation')
+    expect(game.lastActivePhase).toBe('activation')
     expect(players[1].robot.program).toEqual(secondProgram)
     game.executeNextAction()
     game.recheckProgrammingPhase()
@@ -61,11 +61,11 @@ describe('Game fixed-roster programming', () => {
     expect(game.players).toEqual([player])
     expect(() => Object.assign(game.players, { 1: player })).toThrow()
     game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
-    expect(game.phase).toBe('activation')
+    expect(game.lastActivePhase).toBe('activation')
 
     const empty = new Game({ board, players: [], deck, rebootTile: game.rebootTile })
     empty.recheckProgrammingPhase()
-    expect(empty.phase).toBe('programming')
+    expect(empty.lastActivePhase).toBe('programming')
     expect(empty.currentRegister).toBe(0)
     expect(() => empty.executeNextAction()).toThrow()
     expect(empty.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))._unsafeUnwrapErr()).toBe('PLAYER_NOT_IN_GAME')
@@ -92,8 +92,9 @@ describe('Game multiplayer activation', () => {
     for (const player of players) game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
     expect(game.executeNextAction().action.robotId).toBe(players[0].robot.id)
 
-    game.removePlayer(players[1].id)
+    const { roundConcluded } = game.removePlayer(players[1].id)
 
+    expect(roundConcluded).toBe(false)
     expect(game.currentRegister).toBe(1)
     expect(game.executeNextAction().action.robotId).toBe(players[0].robot.id)
     expect(game.currentRegister).toBe(2)
@@ -103,12 +104,12 @@ describe('Game multiplayer activation', () => {
     const { players, deck, game } = createMultiplayerGame([{ x: Integer(4), y: Integer(5) }])
     game.submitProgram(players[0].id, deck.slice(0, 5).map((card) => card.id))
 
-    game.removePlayer(players[0].id)
+    const { roundConcluded } = game.removePlayer(players[0].id)
 
-    expect(game.phase).toBe('programming')
+    expect(roundConcluded).toBe(true)
+    expect(game.lastActivePhase).toBe('programming')
     expect(game.currentRegister).toBe(0)
     expect(game.players).toEqual([])
-    expect(game.hasStarted).toBe(true)
   })
 
   it('executes every robot in register-major order and resets every hand and barrier for two rounds', () => {
@@ -128,7 +129,7 @@ describe('Game multiplayer activation', () => {
         expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
         expect(game.updateRegisters(player.id, programs[index].map((card) => card.id))._unsafeUnwrap()).toBeUndefined()
         game.submitProgram(player.id, programs[index].map((card) => card.id))
-        expect(game.phase).toBe(index === players.length - 1 ? 'activation' : 'programming')
+        expect(game.lastActivePhase).toBe(index === players.length - 1 ? 'activation' : 'programming')
       })
 
       for (let registerIndex = 0; registerIndex < 5; registerIndex++) {
@@ -143,7 +144,7 @@ describe('Game multiplayer activation', () => {
             : { status: 'HIDDEN' }))
           const registerFinished = robotIndex === expectedOrder.length - 1
           expect(game.currentRegister).toBe(registerFinished ? (registerIndex + 1) % 5 : registerIndex)
-          expect(game.phase).toBe(registerFinished && registerIndex === 4 ? 'programming' : 'activation')
+          expect(game.lastActivePhase).toBe(registerFinished && registerIndex === 4 ? 'programming' : 'activation')
         }
       }
 
@@ -155,7 +156,7 @@ describe('Game multiplayer activation', () => {
         expect(game.hasSubmittedProgram(player.id)).toBe(false)
       }
       game.recheckProgrammingPhase()
-      expect(game.phase).toBe('programming')
+      expect(game.lastActivePhase).toBe('programming')
       expect(() => game.executeNextAction()).toThrow()
     }
   })

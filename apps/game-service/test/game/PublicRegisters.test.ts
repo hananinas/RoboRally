@@ -10,9 +10,8 @@ function expectRejectedWithoutMutation(game: Game, playerId: string, error: Upda
   const players = game.players
   const registers = players.map((player) => player.registers)
   const state = () => ({
-    phase: game.phase,
+    phase: game.lastActivePhase,
     currentRegister: game.currentRegister,
-    hasStarted: game.hasStarted,
     paused: game.paused,
     aborted: game.aborted,
     winner: game.winner,
@@ -57,9 +56,8 @@ describe('public register lifecycle', () => {
     expect(first.program).toEqual([hand[0], null, hand[2], null, hand[4]])
     expect(first.robot.program).toEqual([])
     expect(first.hand).toEqual(hand)
-    expect(game.phase).toBe('programming')
+    expect(game.lastActivePhase).toBe('programming')
     expect(game.currentRegister).toBe(0)
-    expect(game.hasStarted).toBe(false)
     expect(game.hasSubmittedProgram(first.id)).toBe(false)
     expect(game.updateRegisters(first.id, [null, null, null, null, null])._unsafeUnwrap()).toBeUndefined()
     expect(snapshot[0]).toEqual({ status: 'HIDDEN' })
@@ -95,7 +93,7 @@ describe('public register lifecycle', () => {
     const snapshot = player.registers
     game.abort()
 
-    expect(game.phase).toBe('programming')
+    expect(game.lastActivePhase).toBe('programming')
     expectRejectedWithoutMutation(game, player.id, 'GAME_ABORTED')
     expect(player.registers).toBe(snapshot)
   })
@@ -115,14 +113,14 @@ describe('public register lifecycle', () => {
     game.resume()
     game.submitProgram(second.id, second.hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
 
-    expect(game.phase).toBe('activation')
+    expect(game.lastActivePhase).toBe('activation')
     expectRejectedWithoutMutation(game, first.id, 'WRONG_PHASE')
     expectRejectedWithoutMutation(game, 'missing-player', 'WRONG_PHASE')
     game.pause()
     expectRejectedWithoutMutation(game, first.id, 'GAME_PAUSED')
     expectRejectedWithoutMutation(game, 'missing-player', 'GAME_PAUSED')
     game.abort()
-    expect(game.paused).toBe(true)
+    expect(game.paused).toBe(false)
     expect(game.aborted).toBe(true)
     expectRejectedWithoutMutation(game, first.id, 'GAME_ABORTED')
     expectRejectedWithoutMutation(game, 'missing-player', 'GAME_ABORTED')
@@ -142,23 +140,22 @@ describe('public register lifecycle', () => {
         : { status: 'HIDDEN' }))
       expect(result.registers[index]).not.toHaveProperty('id')
       expect(player.registers).toEqual(index === 4 ? empty : result.registers)
-      expect(game.phase).toBe(index === 4 ? 'programming' : 'activation')
+      expect(game.lastActivePhase).toBe(index === 4 ? 'programming' : 'activation')
     }
-    expect(game.phase).toBe('programming')
+    expect(game.lastActivePhase).toBe('programming')
     expect(player.registers).toEqual(empty)
     expect(game.hasSubmittedProgram(player.id)).toBe(false)
     expect(player.program).toEqual([null, null, null, null, null])
     expect(game.updateRegisters(player.id, selection(player))._unsafeUnwrap()).toBeUndefined()
   })
 
-  it('locks the roster after program submission and preserves colours across departure', () => {
+  it('preserves colours across departure', () => {
     const { game } = createGame('empty-map')
     const first = game.addPlayer()._unsafeUnwrap()
     const second = game.addPlayer('#4d8deb')._unsafeUnwrap()
     expect(first.robot.colour).not.toBe(second.robot.colour)
     const colour = second.robot.colour
     game.submitProgram(first.id, first.hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
-    expect(game.addPlayer()._unsafeUnwrapErr()).toBe('GAME_ALREADY_STARTED')
     game.removePlayer(first.id)
     expect(game.players).toEqual([second])
     expect(second.robot.colour).toBe(colour)

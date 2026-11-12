@@ -14,8 +14,6 @@ Will update with a more conceptual domain diagram which will be used for present
         -winner: PlayerId?
         -activatedRobotIds: RobotId[] set
         -deck: Card[] unordered
-        -startPositions: Map
-        +startPositionOf(RobotId robotId) Position
         -dealCards()
         +submitProgram(PlayerId playerId, CardId[5] cardIds)
         +moveRobot(Robot robot, Direction direction, PositiveInteger steps)

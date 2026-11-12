@@ -70,7 +70,6 @@ describe('robot pushing', () => {
     expect(ends.map((end) => board.occupantAt(end))).toEqual(robots.map((robot) => robot.id))
     expect(board.occupantAt(starts[0])).toBeUndefined()
     expect(robots.map((robot) => robot.direction)).toEqual(facing)
-    expect(game.hasStarted).toBe(false)
   })
 
   it.each([0, 1, 2, 3])('rejects the entire chain when boundary %s has a wall on either side', (boundary) => {

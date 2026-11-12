@@ -5,11 +5,13 @@ import type {
   GameWon,
   PlayerConnectionChanged,
   PlayerCheckpointProgress,
+  RegistersChanged,
   RobotActionResolved,
   PlayerLeft,
   RegisterCardIds,
   ProgramFinalized,
   ProgramTimerChanged,
+  ProgramSubmitted,
 } from '@robo-rally/game-events'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -93,6 +95,8 @@ export default function useGameConnection(socket: GameSocket) {
     const handleWon = (payload: GameWon) => receive({ type: 'won', payload })
     const handleCheckpointProgress = (payload: PlayerCheckpointProgress) =>
       receive({ type: 'checkpoint-progress', payload })
+    const handleRegistersChanged = (payload: RegistersChanged) => receive({ type: 'registers-changed', payload })
+    const handleProgramSubmitted = (payload: ProgramSubmitted) => receive({ type: 'program-submitted', payload })
 
     socket.on('disconnect', handleDisconnect)
     socket.on('connect', handleConnect)
@@ -106,6 +110,8 @@ export default function useGameConnection(socket: GameSocket) {
     socket.on('game.aborted', handleAborted)
     socket.on('game.won', handleWon)
     socket.on('player.checkpointProgress', handleCheckpointProgress)
+    socket.on('game.registersChanged', handleRegistersChanged)
+    socket.on('program.submitted', handleProgramSubmitted)
     return () => {
       generation.current += 1
       socket.off('disconnect', handleDisconnect)
@@ -120,6 +126,8 @@ export default function useGameConnection(socket: GameSocket) {
       socket.off('game.aborted', handleAborted)
       socket.off('game.won', handleWon)
       socket.off('player.checkpointProgress', handleCheckpointProgress)
+      socket.off('game.registersChanged', handleRegistersChanged)
+      socket.off('program.submitted', handleProgramSubmitted)
     }
   }, [dispatch, socket])
 

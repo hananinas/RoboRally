@@ -43,7 +43,6 @@ export type Robot = Readonly<{
   playerId: PlayerId
   colour: string
   position: Position
-  startPosition: Coordinate
 }>
 
 export type Tile = Readonly<{
