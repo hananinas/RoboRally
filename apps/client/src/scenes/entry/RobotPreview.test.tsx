@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import tankSprites from '../active-game/board/assets/tanks.hbls?raw'
 import RobotPreview from './RobotPreview.tsx'
-import { tankPreview, type RobotPreviewDefinition } from './robotPreviews.ts'
+import { robotOptions, tankPreview, type RobotPreviewDefinition } from './robotPreviews.ts'
 
 describe('RobotPreview', () => {
   it.each([2, 8])('renders a supplied %i-layer sprite without a model-specific branch', (count) => {
@@ -29,5 +29,16 @@ describe('RobotPreview', () => {
     expect(markup).not.toContain('id="testTank')
     expect(markup).not.toContain('<use')
     expect(markup).toContain('<rect')
+  })
+
+  it('provides six complete placeholder previews in addition to the tank', () => {
+    expect(robotOptions).toHaveLength(7)
+    expect(robotOptions.slice(1).map(({ name }) => name)).toEqual([
+      'Scout', 'Guardian', 'Rover', 'Striker', 'Sentinel', 'Hauler',
+    ])
+    for (const option of robotOptions.slice(1)) {
+      expect(option.sprite.layers).toHaveLength(1)
+      expect(option.sprite.layers[0]).toContain('var(--robot-colour)')
+    }
   })
 })

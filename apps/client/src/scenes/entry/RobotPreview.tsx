@@ -4,10 +4,9 @@ import './RobotPreview.css'
 
 type Props = { sprite?: RobotPreviewDefinition }
 
-/** Decorative preview only; model selection is separate feature work. */
-export default function RobotPreview({ sprite = placeholderPreview }: Props) {
+export default function RobotPreview({ sprite = placeholderPreview, color }: Props & { color?: string }) {
   return (
-    <span className="robot-preview" style={{ '--robot-preview-size': `${sprite.previewSize}px` } as CSSProperties} aria-hidden="true">
+    <span className="robot-preview" style={{ '--robot-preview-size': `${sprite.previewSize}px`, ...(color ? { '--robot-colour': color } : {}) } as CSSProperties} aria-hidden="true">
       {sprite.layers.map((layer, index) => (
         <svg
           className="robot-preview__layer"
