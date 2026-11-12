@@ -20,7 +20,7 @@ test('corrects delivery delay, ignores stale clock replies and waits for server 
   await page.clock.runFor(2000)
   await game.control({ type: 'timer', serverTime, timer: { status: 'RUNNING', deadline } })
   await expect.poll(async () => (await game.snapshot()).pendingClocks).toBe(1)
-  await expect(countdown).toHaveCount(0)
+  await expect(countdown).toHaveText('Time remaining: 30s')
   await page.clock.runFor(2000)
   await game.control({ type: 'respond-clock' })
   await expect(countdown).toHaveText('Time remaining: 26s')
@@ -74,4 +74,24 @@ test('corrects delivery delay, ignores stale clock replies and waits for server 
   await page.clock.runFor(5000)
   await expect(countdown).toHaveText('Time remaining: 24s')
   await game.control({ type: 'respond-clock' })
+})
+
+
+test('shows an estimate after the initial clock timeout and retries the sample', async ({ page, game }) => {
+  await page.clock.install()
+  await openGame(page)
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
+  const serverTime = 1_900_000_000_000
+  await game.control({ type: 'clock', serverTime, deferred: true })
+  await game.control({ type: 'timer', serverTime, timer: { status: 'RUNNING', deadline: serverTime + 30_000 } })
+  const countdown = page.getByRole('timer')
+  await expect(countdown).toHaveText('Time remaining: 30s')
+  await page.clock.runFor(4999)
+  await game.control({ type: 'clock', serverTime: serverTime + 7000, deferred: true })
+  await page.clock.runFor(1)
+  await expect(countdown).toHaveText('Time remaining: 25s')
+  await expect.poll(async () => (await game.snapshot()).pendingClocks).toBe(2)
+  // Deliver both the stale reply and the retry; only the retry corrects the estimate.
+  await game.control({ type: 'respond-clock' })
+  await expect(countdown).toHaveText('Time remaining: 23s')
 })

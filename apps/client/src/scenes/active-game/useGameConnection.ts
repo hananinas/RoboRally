@@ -38,16 +38,21 @@ export default function useGameConnection(socket: GameSocket) {
   const generation = useRef(0)
   const clockRequest = useRef(0)
 
-  const sampleClock = useCallback((deadline: number) => {
+  const sampleClock = useCallback(function sampleClock(deadline: number, attempt = 0) {
     const request = ++clockRequest.current
     const requestGeneration = generation.current
     const sentAt = performance.now()
     socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit('clock.get', {}, (error, result) => {
       const receivedAt = performance.now()
       const timer = current.current.programmingTimer
-      if (error || result.outcome !== 'CLOCK' || !socket.connected ||
+      if (!socket.connected ||
           generation.current !== requestGeneration || clockRequest.current !== request ||
           timer.status !== 'RUNNING' || timer.deadline !== deadline) return
+
+      if (error || result.outcome !== 'CLOCK') {
+        if (attempt < 2) sampleClock(deadline, attempt + 1)
+        return
+      }
 
       // Estimate the server timestamp at the midpoint of the round trip.
       const midpoint = sentAt + (receivedAt - sentAt) / 2
@@ -65,7 +70,12 @@ export default function useGameConnection(socket: GameSocket) {
     const timer = next.programmingTimer
     if (timer.status !== 'RUNNING' || previous.programmingTimer.status !== 'RUNNING' ||
         timer.deadline !== previous.programmingTimer.deadline ||
-        next.assignment?.gameId !== previous.assignment?.gameId) setLocalDeadline(null)
+        next.assignment?.gameId !== previous.assignment?.gameId) {
+      const serverTime = event.type === 'timer-changed' ? event.payload.serverTime
+        : event.type === 'joined' ? event.result.state.serverTime : null
+      setLocalDeadline(timer.status === 'RUNNING' && serverTime !== null
+        ? performance.now() + (timer.deadline - serverTime) : null)
+    }
     if (socket.connected && timer.status === 'RUNNING' && next !== previous &&
         (event.type === 'joined' || event.type === 'reconnected' || event.type === 'timer-changed')) {
       sampleClock(timer.deadline)
