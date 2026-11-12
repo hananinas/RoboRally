@@ -3,6 +3,15 @@ import { createLobby } from './browserClient.ts'
 
 test('creating a lobby uses the selected map and can return to the lobby list', async ({ page, game }) => {
   await page.goto('/')
+  await page.getByRole('button', { name: 'Game options', exact: true }).click()
+  const settings = page.getByRole('region', { name: 'Game options' })
+  await expect(settings.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible()
+  await expect(settings.getByRole('button', { name: 'Account Settings' })).toBeEnabled()
+  await expect(settings.getByRole('button', { name: 'Leave game' })).toHaveCount(0)
+  await expect(settings.getByText('Keybindings', { exact: true })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(settings).toBeHidden()
+
   await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeEnabled()
   await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Create lobby', exact: true }).click()

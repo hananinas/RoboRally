@@ -7,6 +7,10 @@
   --entry-selected: #3e4854;
   --entry-border: #4c5560;
   --entry-border-strong: #657181;
+  --entry-selection: #dcbd05;
+  --entry-selection-fill: color-mix(in srgb, var(--entry-selection) 12%, transparent);
+  --entry-input-surface: #fff;
+  --entry-input-text: #17202a;
   --entry-text: #eef1f4;
   --entry-muted: #9aa4b0;
   --entry-accent: #e0bb1f;

@@ -1,11 +1,10 @@
-import { useEffect, useRef, type Ref } from 'react'
+import { useEffect, useRef } from 'react'
 import type { ProgramCard as Card } from '../gameState.ts'
 import DraggedCard from './DraggedCard.tsx'
 import ProgramCard from './ProgramCard.tsx'
 import useCardDrag from './useCardDrag.ts'
 
 type ProgrammingHandProps = {
-  containerRef: Ref<HTMLElement>
   cards: readonly Card[]
   registeredCardIds: ReadonlySet<string>
   disabled: boolean
@@ -17,7 +16,6 @@ type ProgrammingHandProps = {
 
 // Renders and manages the draggable hand.
 function ProgrammingHand({
-  containerRef,
   cards,
   registeredCardIds,
   disabled,
@@ -43,7 +41,6 @@ function ProgrammingHand({
 
   return (
     <section
-      ref={containerRef}
       className="programming-hand"
       aria-label="Programming hand"
     >
