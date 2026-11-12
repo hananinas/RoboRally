@@ -500,3 +500,5 @@ Most commands acknowledge failures with a specific outcome string rather than th
 
 If an unexpected service failure makes gameplay unrecoverable, members receive `game.aborted {gameId}` through the [public room](#rooms), and the game ends permanently.
 
+
+After connection recovery, a client with an unacknowledged or failed register save requests `session.get` before enabling programming. It restores the authoritative private selection or finalized program from that snapshot.

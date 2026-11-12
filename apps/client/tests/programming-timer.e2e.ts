@@ -95,3 +95,36 @@ test('shows an estimate after the initial clock timeout and retries the sample',
   await game.control({ type: 'respond-clock' })
   await expect(countdown).toHaveText('Time remaining: 23s')
 })
+
+
+for (const mode of ['drop', 'save-without-ack'] as const) {
+  for (const finalize of [false, true]) {
+    test(`reconciles ${mode} register edits after recovery${finalize ? ' with timeout finalization' : ''}`, async ({ page, game }) => {
+      await openGame(page)
+      // Establish a recovery offset before interrupting the transport.
+      await game.control({ type: 'timer', timer: { status: 'IDLE' } })
+      await game.control({ type: 'register-delivery', mode })
+      await page.getByRole('region', { name: 'Programming hand' }).getByRole('button').first().click()
+      await expect.poll(async () => (await game.snapshot()).registerUpdates.length).toBe(1)
+      const before = (await game.snapshot()).entryRequests
+      const socketId = before.at(-1)!.socketId
+      const entries = before.filter((entry) => entry.event === 'session.get').length
+      await page.context().setOffline(true)
+      await expect(page.getByRole('status').filter({ hasText: 'Not connected' })).toBeVisible()
+      if (finalize) {
+        const cards = game.initial.cards
+        await game.control({ type: 'finalized', program: {
+          gameId: GAME_ID, playerId: PLAYER_ID, reason: 'TIMEOUT',
+          cards: [cards[4], cards[3], cards[2], cards[1], cards[0]],
+        } })
+        await game.control({ type: 'timer', timer: { status: 'CLOSED' } })
+      }
+      await page.context().setOffline(false)
+      await expect.poll(async () => (await game.snapshot()).entryRequests.filter((entry) => entry.event === 'session.get').length).toBe(entries + 1)
+      expect((await game.snapshot()).entryRequests.at(-1)!.socketId).toBe(socketId)
+      const selected = page.locator('.registers').getByRole('button', { name: /remove from register/ })
+      await expect(selected).toHaveCount(finalize ? 5 : mode === 'drop' ? 0 : 1)
+      if (finalize) await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()
+    })
+  }
+}

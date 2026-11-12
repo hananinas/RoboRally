@@ -75,6 +75,7 @@ export type FixtureControl =
   | { type: 'submission'; outcome: ProgramResultOutcome; deferred: boolean }
   | { type: 'acknowledge'; outcome: ProgramResultOutcome }
   | { type: 'disconnect' }
+  | { type: 'register-delivery'; mode: 'normal' | 'drop' | 'save-without-ack' }
   | { type: 'round'; actions: readonly RobotActionResolved[]; deferHand?: boolean }
   | { type: 'deal' }
   | { type: 'hand'; hand: CardsDealt }

@@ -37,6 +37,9 @@ export default function useGameConnection(socket: GameSocket) {
   const current = useRef(state)
   const generation = useRef(0)
   const clockRequest = useRef(0)
+  const uncertainRegisters = useRef(false)
+  const registerRequest = useRef(0)
+  const needsReconciliation = useCallback(() => uncertainRegisters.current, [])
 
   const sampleClock = useCallback(function sampleClock(deadline: number, attempt = 0) {
     const request = ++clockRequest.current
@@ -85,11 +88,15 @@ export default function useGameConnection(socket: GameSocket) {
         next.registers === previous.registers) return
     const requestGeneration = generation.current
     const handVersion = next.handVersion
+    const request = ++registerRequest.current
+    uncertainRegisters.current = true
     const [first, second, third, fourth, fifth] = next.registers
     const cardIds: RegisterCardIds = [
       first?.id ?? null, second?.id ?? null, third?.id ?? null, fourth?.id ?? null, fifth?.id ?? null,
     ]
     socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit('game.updateRegisters', { cardIds }, (error, result) => {
+      if (generation.current === requestGeneration && registerRequest.current === request &&
+          !error && result.outcome === 'ACCEPTED') uncertainRegisters.current = false
       if (!socket.connected || generation.current !== requestGeneration ||
           current.current.handVersion !== handVersion || current.current.registers !== next.registers ||
           !canProgram(current.current)) return
@@ -101,6 +108,7 @@ export default function useGameConnection(socket: GameSocket) {
 
   const initialize = useCallback((result: GameInitialization) => {
     generation.current += 1
+    uncertainRegisters.current = false
     dispatch({ type: 'joined', result })
   }, [dispatch])
 
@@ -115,7 +123,7 @@ export default function useGameConnection(socket: GameSocket) {
       dispatch({ type: 'disconnected' })
     }
     const handleConnect = () => {
-      if (socket.recovered) dispatch({ type: 'reconnected' })
+      if (socket.recovered && !needsReconciliation()) dispatch({ type: 'reconnected' })
     }
     const handleConnectError = (error: Error) => {
       if (current.current.assignment === null) return
@@ -167,7 +175,7 @@ export default function useGameConnection(socket: GameSocket) {
       socket.off('game.registersChanged', handleRegistersChanged)
       socket.off('program.submitted', handleProgramSubmitted)
     }
-  }, [dispatch, socket])
+  }, [dispatch, socket, needsReconciliation])
 
   useRobotPlaybackTimer(state.playback.active, dispatch)
 
@@ -186,5 +194,5 @@ export default function useGameConnection(socket: GameSocket) {
     })
   }, [dispatch, socket])
 
-  return { state, localDeadline, dispatch, submit, initialize }
+  return { state, localDeadline, dispatch, submit, initialize, needsReconciliation }
 }

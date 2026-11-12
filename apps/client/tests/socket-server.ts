@@ -32,6 +32,7 @@ type Fixture = {
   cards: readonly Card[]
   state: PublicGameState
   submissions: SubmitProgram[]
+  registerDelivery?: 'normal' | 'drop' | 'save-without-ack'
   registerUpdates: UpdateRegisters[]
   program: PrivateProgram
   sockets: Set<GameSocket>
@@ -149,6 +150,9 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
         gameId: GAME_ID, playerId: PLAYER_ID, cards: control.cards,
       })
       break
+    case 'register-delivery':
+      fixture.registerDelivery = control.mode
+      break
     case 'disconnect':
       for (const socket of fixture.sockets) socket.conn.close()
       break
@@ -262,6 +266,7 @@ const httpServer = createServer(async (request, response) => {
 })
 
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
+  connectionStateRecovery: {},
   cors: { origin: 'http://127.0.0.1:4173', allowedHeaders: ['x-fixture-id', 'x-fixture-user'] },
 })
 
@@ -330,10 +335,12 @@ io.on('connection', (socket) => {
 
   socket.on('game.updateRegisters', (payload, acknowledge) => {
     fixture.registerUpdates.push(payload)
+    if (fixture.registerDelivery === 'drop') return
     const program: readonly (Card | null)[] = payload.cardIds.map((id) =>
       id === null ? null : fixture.cards.find((card) => card.id === id)!,
     )
     fixture.program = program as PrivateProgram
+    if (fixture.registerDelivery === 'save-without-ack') return
     acknowledge({ outcome: 'ACCEPTED' })
   })
 
