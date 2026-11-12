@@ -95,15 +95,11 @@ describe('started game membership over Socket.IO', () => {
     expect(await raw(client, 'clock.get', { extra: true })).toEqual({ outcome: 'INVALID_REQUEST' })
     const now = Date.now()
     const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
-    try {
-      expect(await client.emitWithAck('clock.get', {})).toEqual({ outcome: 'CLOCK', serverTime: now })
-      clock.mockReturnValue(now + 100)
-      expect(await client.emitWithAck('clock.get', {})).toEqual({ outcome: 'CLOCK', serverTime: now + 100 })
-      expect((await client.emitWithAck('session.get', {})).outcome).toBe('NO_SESSION')
-      expect(broadcasts).toEqual([])
-    } finally {
-      clock.mockRestore()
-    }
+    expect(await client.emitWithAck('clock.get', {})).toEqual({ outcome: 'CLOCK', serverTime: now })
+    clock.mockReturnValue(now + 100)
+    expect(await client.emitWithAck('clock.get', {})).toEqual({ outcome: 'CLOCK', serverTime: now + 100 })
+    expect((await client.emitWithAck('session.get', {})).outcome).toBe('NO_SESSION')
+    expect(broadcasts).toEqual([])
   })
 
   it('rejects malformed session requests and starts with no session', async () => {
