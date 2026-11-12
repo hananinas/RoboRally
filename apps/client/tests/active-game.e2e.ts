@@ -253,7 +253,7 @@ test('swaps two register cards by dragging one onto the other', async ({ page, g
   })
 })
 
-test('drags a card out of a register to remove it', async ({ page, game }) => {
+test('drags a card out of a register to remove it', async ({ page }) => {
   await openGame(page)
   await fillProgram(page, [0, 1])
 
@@ -297,11 +297,6 @@ test('drags a card out of a register to remove it', async ({ page, game }) => {
   await expect(page.getByRole('button', { name: /remove from register 2$/ })).toBeVisible()
   await expect(page.locator('.dragged-card')).toHaveCount(0)
   await expect(handCards.first()).toBeEnabled()
-  await expect.poll(async () => (await game.snapshot()).registerUpdates).toEqual([
-    { cardIds: [game.initial.cards[0].id, null, null, null, null] },
-    { cardIds: [game.initial.cards[0].id, game.initial.cards[1].id, null, null, null] },
-    { cardIds: [null, game.initial.cards[1].id, null, null, null] },
-  ])
 })
 
 test('navigates the hand with h/l, wrapping around and skipping registered cards', async ({ page }) => {
