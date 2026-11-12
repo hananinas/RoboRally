@@ -111,7 +111,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
           .toEqual([hands[index]])
         events[index] = []
       }
-      expect(game.phase).toBe('programming')
+      expect(game.lastActivePhase).toBe('programming')
       expect(players.map((player) => player.robot.program)).toEqual([[], []])
     }
   } finally {

@@ -101,7 +101,7 @@ export function presentPublicGameState(
         orientation: orientations[player.robot.direction],
       },
     })),
-    phase: phases[game.phase],
+    phase: phases[game.lastActivePhase],
     paused: game.paused,
     aborted: game.aborted,
     winner,

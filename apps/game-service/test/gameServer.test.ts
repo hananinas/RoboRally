@@ -126,7 +126,7 @@ describe('started game membership over Socket.IO', () => {
     const dealt = await hand
     expect(dealt).toMatchObject({ gameId: shared.gameId, playerId: initial.assignment.playerId })
     expect(dealt.cards).toHaveLength(HAND_SIZE)
-    expect(shared.game.phase).toBe('programming')
+    expect(shared.game.lastActivePhase).toBe('programming')
   })
   it('preserves assignments, hands and checkpoint progress while pausing for disconnected members', async () => {
     const { members: [first, second, witness], initializations: [initial, other, observer] } = await startGame(['First', 'Second', 'Witness'])
@@ -161,7 +161,7 @@ describe('started game membership over Socket.IO', () => {
     await getSnapshot(await connect('First'))
     await hand
     expect(actions).toHaveLength(1)
-    expect(shared.game.phase).toBe('programming')
+    expect(shared.game.lastActivePhase).toBe('programming')
     expect(shared.game.paused).toBe(false)
   })
   it('recovers a game socket and resumes without client session discovery', async () => {
@@ -305,7 +305,7 @@ describe('started game membership over Socket.IO', () => {
     const snapshot = await getSnapshot(client)
     expect(events).toEqual(['robot.actionResolved', 'player.checkpointProgress', 'game.won'])
     expect(snapshot.state.winner).toEqual({ playerId: player.id, username: 'First' })
-    expect(snapshot.state.phase).toBe('PROGRAMMING')
+    expect(snapshot.state.phase).toBe('EXECUTING')
     expect(await client.emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'GAME_FINISHED' })
   })
 
