@@ -18,7 +18,7 @@ Authentication and game logic are independent domains and could be split into se
 
 `kratos-hydra-ui` hosts the login and registration screens the player is redirected to during authentication. It is currently vendored from Ory's reference implementation and is expected to be replaced with a customized application over time to fit the project's visual design.
 
-`robo-rally-db` is a SQLite database that persists session, game, and player state, so that progress survives a service restart.
+`robo-rally-db` is a SQLite database that persists game and player state, so that progress survives a service restart.
 
 `Kratos` and `Hydra` are external, self-hosted systems from the Ory ecosystem. Kratos manages user identities and credentials. Hydra is the OAuth2/OIDC provider that issues and validates tokens. Neither is built or maintained by us.
 
@@ -36,7 +36,7 @@ Source: [component-combined.puml](figures/component-combined.puml)
 
 The **Auth HTTP Routes** component exposes the service's three authentication endpoints: login, callback, and logout. It delegates the actual OIDC protocol work to the **OIDC Client**, which builds authorization and end-session URLs and exchanges authorization codes for tokens with Hydra.
 
-On a successful login, a session is created in the **Session Store**. The Session Store owns the session's validity logic: generating session IDs, checking expiry, and silently renewing a session via the **OIDC Client** shortly before it expires. It uses the **Session Repository** to persist and retrieve sessions from the `robo-rally-db`.
+On a successful login, a session is created in the **Session Store**. The Session Store owns the session's validity logic: generating session IDs, checking expiry, and silently renewing a session via the **OIDC Client** shortly before it expires.
 
 ### Game Management
 
@@ -47,6 +47,28 @@ Socket.IO connections are accepted by the **Game Socket Server**, which authenti
 **Game Handlers** implement the actions available once a game has started: reattaching after a reconnect, leaving, and submitting a program. A started lobby is converted into a **Game Session**, which holds the live state of one running game (e.g. connected players and Socket.IO rooms). Game state is persisted through the **Game Repository** to `robo-rally-db` so players can reload a game. Game Handlers resolve which game a user currently belongs to via the Game Repository.
 
 Turn resolution is delegated to the **Action Scheduler**, which resolves programmed robot actions against the **Domain Model**. The Domain Model is the RoboRally rules engine, comprising the board, robots, players, and cards. The **Game Presenter** reads from the Domain Model and serializes game state into the wire-format payloads sent back to clients.
+
+## Persistence
+
+V3 Plan:
+
+`game-service` persists what's expensive to lose and leaves everything else in memory.
+
+### Persisted
+
+Game state is split across three tables in `robo-rally-db`, all owned by the **Game Repository**:
+
+- **`games`** — one row per game: id, status (`in_progress` / `finished` / `aborted`) - possible players as well
+- **`game_snapshots`** — one row per completed round per game, holding the full state: board positions, each player's hand, deck, and checkpoint progress.
+- **user** - we probably want to save additional user information other than username and id. Tbd what kind of information 
+
+Writes to game_snapshots happen at the beginning of the game and after a finished round. Active games stay in memory, while inactive games get removed (when is tbd). Reloading to a game with rebuilds one from its latest `game_snapshots` row through the same construction path used for a new game.
+
+### Not persisted
+
+**Lobbies** — tracked only by the in-memory **Lobby Registry**. 
+
+**Sessions** — tracked only by the in-memory **Session Store**. Session have to be validated on every request and event emission. Storing them in a database would make this operation significantly more expensive. 
 
 ## Component View: `client`
 
