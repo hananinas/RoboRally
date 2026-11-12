@@ -8,6 +8,9 @@ import type {
   RegistersChanged,
   RobotActionResolved,
   PlayerLeft,
+  RegisterCardIds,
+  ProgramFinalized,
+  ProgramTimerChanged,
   ProgramSubmitted,
 } from '@robo-rally/game-events'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -19,14 +22,46 @@ import { useRobotPlaybackTimer } from './board/robotPlayback.ts'
 import {
   createClientGameState,
   createSubmission,
+  canProgram,
   gameStateReducer,
   type GameStateEvent,
 } from './gameState.ts'
 
+const registerEditEvents = new Set<GameStateEvent['type']>([
+  'place', 'remove', 'move', 'clear', 'undo', 'redo',
+])
+
 export default function useGameConnection(socket: GameSocket) {
   const [state, setState] = useState(createClientGameState)
+  const [localDeadline, setLocalDeadline] = useState<number | null>(null)
   const current = useRef(state)
   const generation = useRef(0)
+  const clockRequest = useRef(0)
+  const uncertainRegisters = useRef(false)
+  const registerRequest = useRef(0)
+  const needsReconciliation = useCallback(() => uncertainRegisters.current, [])
+
+  const sampleClock = useCallback(function sampleClock(deadline: number, attempt = 0) {
+    const request = ++clockRequest.current
+    const requestGeneration = generation.current
+    const sentAt = performance.now()
+    socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit('clock.get', {}, (error, result) => {
+      const receivedAt = performance.now()
+      const timer = current.current.programmingTimer
+      if (!socket.connected ||
+          generation.current !== requestGeneration || clockRequest.current !== request ||
+          timer.status !== 'RUNNING' || timer.deadline !== deadline) return
+
+      if (error || result.outcome !== 'CLOCK') {
+        if (attempt < 2) sampleClock(deadline, attempt + 1)
+        return
+      }
+
+      // Estimate the server timestamp at the midpoint of the round trip.
+      const midpoint = sentAt + (receivedAt - sentAt) / 2
+      setLocalDeadline(midpoint + (deadline - result.serverTime))
+    })
+  }, [socket])
 
   // Keep event-time state current so submission checks see updates before React renders.
   const dispatch = useCallback(function dispatch(event: GameStateEvent): void {
@@ -34,29 +69,46 @@ export default function useGameConnection(socket: GameSocket) {
     const next = gameStateReducer(previous, event)
     current.current = next
     setState(next)
-    if (!socket.connected || !next.assignment || previous.registers === next.registers ||
-        !(event.type === 'place' || event.type === 'remove' || event.type === 'move' ||
-          event.type === 'clear' || event.type === 'undo' || event.type === 'redo') ||
-        !next.registers.some((card, index) => Boolean(card) !== Boolean(previous.registers[index]))) return
+
+    const timer = next.programmingTimer
+    if (timer.status !== 'RUNNING' || previous.programmingTimer.status !== 'RUNNING' ||
+        timer.deadline !== previous.programmingTimer.deadline ||
+        next.assignment?.gameId !== previous.assignment?.gameId) {
+      const serverTime = event.type === 'timer-changed' ? event.payload.serverTime
+        : event.type === 'joined' ? event.result.state.serverTime : null
+      setLocalDeadline(timer.status === 'RUNNING' && serverTime !== null
+        ? performance.now() + (timer.deadline - serverTime) : null)
+    }
+    if (socket.connected && timer.status === 'RUNNING' && next !== previous &&
+        (event.type === 'joined' || event.type === 'reconnected' || event.type === 'timer-changed')) {
+      sampleClock(timer.deadline)
+    }
+
+    if (!socket.connected || !registerEditEvents.has(event.type) ||
+        next.registers === previous.registers) return
     const requestGeneration = generation.current
     const handVersion = next.handVersion
-    socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit('game.updateRegisters', {
-      occupied: [
-        !!next.registers[0], !!next.registers[1], !!next.registers[2],
-        !!next.registers[3], !!next.registers[4],
-      ],
-    }, (error, result) => {
+    const request = ++registerRequest.current
+    uncertainRegisters.current = true
+    const [first, second, third, fourth, fifth] = next.registers
+    const cardIds: RegisterCardIds = [
+      first?.id ?? null, second?.id ?? null, third?.id ?? null, fourth?.id ?? null, fifth?.id ?? null,
+    ]
+    socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit('game.updateRegisters', { cardIds }, (error, result) => {
+      if (generation.current === requestGeneration && registerRequest.current === request &&
+          !error && result.outcome === 'ACCEPTED') uncertainRegisters.current = false
       if (!socket.connected || generation.current !== requestGeneration ||
-          current.current.handVersion !== handVersion || current.current.submission !== 'idle' ||
-          current.current.phase !== 'PROGRAMMING') return
+          current.current.handVersion !== handVersion || current.current.registers !== next.registers ||
+          !canProgram(current.current)) return
       if (error || result.outcome !== 'ACCEPTED') {
-        dispatch({ type: 'error', message: 'Could not share register progress with other players.' })
+        dispatch({ type: 'error', message: 'Could not save your register selection. Change it again or reconnect to restore the saved selection.' })
       }
     })
-  }, [socket])
+  }, [socket, sampleClock])
 
   const initialize = useCallback((result: GameInitialization) => {
     generation.current += 1
+    uncertainRegisters.current = false
     dispatch({ type: 'joined', result })
   }, [dispatch])
 
@@ -71,7 +123,7 @@ export default function useGameConnection(socket: GameSocket) {
       dispatch({ type: 'disconnected' })
     }
     const handleConnect = () => {
-      if (socket.recovered) dispatch({ type: 'reconnected' })
+      if (socket.recovered && !needsReconciliation()) dispatch({ type: 'reconnected' })
     }
     const handleConnectError = (error: Error) => {
       if (current.current.assignment === null) return
@@ -79,6 +131,8 @@ export default function useGameConnection(socket: GameSocket) {
       if (error.message === 'USER_ALREADY_IN_GAME') socket.disconnect()
     }
     const handleCardsDealt = (hand: CardsDealt) => receive({ type: 'dealt', hand })
+    const handleProgramFinalized = (payload: ProgramFinalized) => receive({ type: 'program-finalized', payload })
+    const handleTimerChanged = (payload: ProgramTimerChanged) => receive({ type: 'timer-changed', payload })
     const handleActionResolved = (action: RobotActionResolved) => receive({ type: 'action', action })
     const handlePlayerLeft = (payload: PlayerLeft) => receive({ type: 'player-left', payload })
     const handlePlayerConnectionChanged = (payload: PlayerConnectionChanged) =>
@@ -94,6 +148,8 @@ export default function useGameConnection(socket: GameSocket) {
     socket.on('connect', handleConnect)
     socket.on('connect_error', handleConnectError)
     socket.on('cards.dealt', handleCardsDealt)
+    socket.on('program.finalized', handleProgramFinalized)
+    socket.on('program.timerChanged', handleTimerChanged)
     socket.on('robot.actionResolved', handleActionResolved)
     socket.on('game.playerLeft', handlePlayerLeft)
     socket.on('game.playerConnectionChanged', handlePlayerConnectionChanged)
@@ -108,6 +164,8 @@ export default function useGameConnection(socket: GameSocket) {
       socket.off('connect', handleConnect)
       socket.off('connect_error', handleConnectError)
       socket.off('cards.dealt', handleCardsDealt)
+      socket.off('program.finalized', handleProgramFinalized)
+      socket.off('program.timerChanged', handleTimerChanged)
       socket.off('robot.actionResolved', handleActionResolved)
       socket.off('game.playerLeft', handlePlayerLeft)
       socket.off('game.playerConnectionChanged', handlePlayerConnectionChanged)
@@ -117,7 +175,7 @@ export default function useGameConnection(socket: GameSocket) {
       socket.off('game.registersChanged', handleRegistersChanged)
       socket.off('program.submitted', handleProgramSubmitted)
     }
-  }, [dispatch, socket])
+  }, [dispatch, socket, needsReconciliation])
 
   useRobotPlaybackTimer(state.playback.active, dispatch)
 
@@ -136,5 +194,5 @@ export default function useGameConnection(socket: GameSocket) {
     })
   }, [dispatch, socket])
 
-  return { state, dispatch, submit, initialize }
+  return { state, localDeadline, dispatch, submit, initialize, needsReconciliation }
 }

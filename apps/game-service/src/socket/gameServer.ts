@@ -2,6 +2,7 @@ import { handleListLobbies, handleCreateLobby, handleJoinLobby, handleSelectRobo
 import { handleGetSession, handleLeaveGame, handleDisconnectSession, handleSessionProgram, handleSessionRegisters, recoverSession, validateRecoveredSession } from '@/socket/handlers/sessionHandlers'
 import type { SessionContext } from '@/socket/sessionContext'
 import type { Server as HttpServer } from 'node:http'
+import { emptyRequestSchema } from '@robo-rally/game-events'
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -88,6 +89,12 @@ export function createGameSocketServer(
     socket.use((_event, next) => rejectExpiredSession(sessionStore, socket, next))
 
     recoverSession(context, socket)
+
+    socket.on('clock.get', (payload, ack) => {
+      if (typeof ack !== 'function') return
+      if (!emptyRequestSchema.safeParse(payload).success) return ack({ outcome: 'INVALID_REQUEST' })
+      ack({ outcome: 'CLOCK', serverTime: Date.now() })
+    })
 
     socket.on('lobby.list', (payload, ack) => handleListLobbies(context, socket, payload, ack))
     socket.on('lobby.create', (payload, ack) => handleCreateLobby(context, socket, payload, ack))

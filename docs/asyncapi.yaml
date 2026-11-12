@@ -34,6 +34,8 @@ channels:
         $ref: '#/components/messages/SubmitProgram'
       updateRegisters:
         $ref: '#/components/messages/UpdateRegisters'
+      getClock:
+        $ref: '#/components/messages/ClockGet'
 
   lobbyListReplies:
     address: null
@@ -152,6 +154,13 @@ channels:
         $ref: '#/components/messages/GameAborted'
       gameWon:
         $ref: '#/components/messages/GameWon'
+
+  clockReplies:
+    address: null
+    description: Socket.IO acknowledgement of clock.get.
+    messages:
+      result:
+        $ref: '#/components/messages/ClockResult'
 
 operations:
   handleLeaveGame:
@@ -294,6 +303,20 @@ operations:
     action: send
     channel:
       $ref: '#/channels/lobby'
+
+  handleClockGet:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/getClock'
+    reply:
+      channel:
+        $ref: '#/channels/clockReplies'
+      messages:
+        - $ref: '#/channels/clockReplies/messages/result'
+      x-socketio:
+        acknowledgement: true
 
 components:
   messages:
@@ -927,6 +950,41 @@ components:
             gameId: 00000000-0000-4000-8000-000000000001
             playerId: 00000000-0000-4000-8000-000000000002
             username: dane
+
+    ClockGet:
+      name: clock.get
+      description: >-
+        Requests a server clock sample over an authenticated connection.
+        No lobby or game membership is required. Does not mutate game state or broadcast events.
+      payload:
+        $ref: '#/components/schemas/EmptyRequest'
+    ClockResult:
+      name: clock.result
+      description: >-
+        Delivered only through the request acknowledgement. CLOCK includes the
+        server Unix timestamp in milliseconds, read immediately before sending
+        the reply. INVALID_REQUEST rejects a payload other than an empty object.
+      payload:
+        oneOf:
+          - type: object
+            additionalProperties: false
+            required: [ outcome, serverTime ]
+            properties:
+              outcome:
+                const: CLOCK
+              serverTime:
+                $ref: '#/components/schemas/ServerTime'
+          - type: object
+            additionalProperties: false
+            required: [ outcome ]
+            properties:
+              outcome:
+                const: INVALID_REQUEST
+      examples:
+        - name: sampled
+          payload:
+            outcome: CLOCK
+            serverTime: 1794052800000
 
   schemas:
     EmptyRequest:

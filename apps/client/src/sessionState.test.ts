@@ -16,6 +16,8 @@ const joined: GameInitialization = {
   },
   state: {
     gameId: '00000000-0000-4000-8000-000000000002',
+    serverTime: 0,
+    programmingTimer: { status: 'IDLE' },
     antenna: { x: 0, y: 0, angle: Math.PI / 2 },
     board: { width: 1, height: 1, tiles: [] },
     robots: [],
@@ -27,6 +29,7 @@ const joined: GameInitialization = {
     winner: null,
   },
   hand: [],
+  program: [null, null, null, null, null],
   programSubmitted: false,
 }
 

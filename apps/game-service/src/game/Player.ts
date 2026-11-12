@@ -1,4 +1,4 @@
-import type { Instruction, PublicRegisters, RegisterOccupancy } from '@robo-rally/game-events'
+import type { Instruction, PrivateProgram, PublicRegisters } from '@robo-rally/game-events'
 import type { Card } from '@/game/Card'
 import { Deck, HAND_SIZE } from '@/game/Deck'
 import type { PlayerId } from '@/game/ids'
@@ -8,6 +8,7 @@ export class Player {
   private currentHand: readonly Card[] = []
   private completedCheckpoint = 0
   private publicRegisters: PublicRegisters = emptyRegisters()
+  private currentProgram: PrivateProgram = Object.freeze([null, null, null, null, null])
 
   constructor(
     readonly id: PlayerId,
@@ -43,9 +44,14 @@ export class Player {
     return this.publicRegisters
   }
 
-  updateRegisters(occupied: RegisterOccupancy): void {
-    this.publicRegisters = Object.freeze(occupied.map((filled) =>
-      Object.freeze({ status: filled ? 'HIDDEN' : 'EMPTY' } as const),
+  get program(): PrivateProgram {
+    return this.currentProgram
+  }
+
+  updateRegisters(program: PrivateProgram): void {
+    this.currentProgram = Object.freeze([...program]) as PrivateProgram
+    this.publicRegisters = Object.freeze(program.map((card) =>
+      Object.freeze({ status: card === null ? 'EMPTY' : 'HIDDEN' } as const),
     )) as PublicRegisters
   }
 
@@ -57,6 +63,7 @@ export class Player {
   }
 
   resetRegisters(): void {
+    this.currentProgram = Object.freeze([null, null, null, null, null])
     this.publicRegisters = emptyRegisters()
   }
 

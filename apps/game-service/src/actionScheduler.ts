@@ -11,6 +11,8 @@ export type ActionSchedulerDeps = {
   publicRoom: string
   playerRoom: (playerId: string) => string
   usernameOf: (playerId: string) => string | undefined
+  onProgrammingStarted: () => void
+  onStop: () => void
 }
 
 export type ActionScheduler = {
@@ -21,7 +23,7 @@ export type ActionScheduler = {
 }
 
 export function createActionScheduler(
-  { io, game, gameId, publicRoom, playerRoom, usernameOf  }: ActionSchedulerDeps,
+  { io, game, gameId, publicRoom, playerRoom, usernameOf, onProgrammingStarted, onStop }: ActionSchedulerDeps,
 ): ActionScheduler {
   let scheduledAction: NodeJS.Immediate | undefined
   let closed = false
@@ -62,6 +64,7 @@ export function createActionScheduler(
     for (const player of game.players) {
       io.to(playerRoom(player.id)).emit('cards.dealt', presentCardsDealt(gameId, player))
     }
+    onProgrammingStarted()
   }
 
   function announceProgress(result: { roundConcluded: boolean }): void {
@@ -100,6 +103,7 @@ export function createActionScheduler(
   function stop(): void {
     closed = true
     clearImmediate(scheduledAction)
+    onStop()
   }
 
   return { scheduleNextAction, announceProgress, winner, stop }

@@ -1,11 +1,14 @@
 import type { CreateLobbyRequest, EmptyRequest, LobbyRequest, RobotSelectionRequest, LobbyState, LobbyListResult, LobbyJoinResult, LobbyLeaveResult, LobbyStartResult, RobotSelectionResult, SessionResult } from './lobby.js'
 import type {
   CardsDealt,
+  ClockResult,
   GameAborted,
   GameWon,
   GameInitialization,
   ProgramResult,
   ProgramSubmitted,
+  ProgramFinalized,
+  ProgramTimerChanged,
   RobotActionResolved,
   PlayerLeft,
   PlayerConnectionChanged,
@@ -20,6 +23,7 @@ import type { SubmitProgram } from './submitProgram.js'
 export type ProgramResultAcknowledgement = (result: ProgramResult) => void
 
 export interface ClientToServerEvents {
+  'clock.get': (payload: EmptyRequest, acknowledge: (result: ClockResult) => void) => void
   'lobby.list': (payload: EmptyRequest, acknowledge: (result: LobbyListResult) => void) => void
   'lobby.create': (payload: CreateLobbyRequest, acknowledge: (result: LobbyJoinResult) => void) => void
   'lobby.join': (payload: LobbyRequest, acknowledge: (result: LobbyJoinResult) => void) => void
@@ -44,6 +48,8 @@ export interface ServerToClientEvents {
   'game.playerConnectionChanged': (payload: PlayerConnectionChanged) => void
   'cards.dealt': (payload: CardsDealt) => void
   'program.submitted': (payload: ProgramSubmitted) => void
+  'program.finalized': (payload: ProgramFinalized) => void
+  'program.timerChanged': (payload: ProgramTimerChanged) => void
   'robot.actionResolved': (payload: RobotActionResolved) => void
   'game.aborted': (payload: GameAborted) => void
   'game.won': (payload: GameWon) => void
