@@ -1,3 +1,4 @@
+import { ROBOT_SPRITE_IDS, type RobotSpriteId } from '@robo-rally/game-events'
 import tankSprites from '../active-game/board/assets/tanks.hbls?raw'
 
 export type RobotPreviewDefinition = Readonly<{
@@ -32,11 +33,18 @@ const placeholderShapes = [
 
 const placeholderColors = ['#4d8deb', '#e55f5f', '#4caf70', '#a67de0', '#db79a8', '#e0bb1f'] as const
 
+const placeholderNames = ['Scout', 'Guardian', 'Rover', 'Striker', 'Sentinel', 'Hauler'] as const
+
 export const robotOptions = [
-  { name: 'Tank', sprite: tankPreview, color: '#4d8deb' },
+  { id: ROBOT_SPRITE_IDS[0], name: 'Tank', sprite: tankPreview, color: '#4d8deb' },
   ...placeholderShapes.map((shape, index) => ({
-    name: ['Scout', 'Guardian', 'Rover', 'Striker', 'Sentinel', 'Hauler'][index],
+    id: ROBOT_SPRITE_IDS[index + 1]!,
+    name: placeholderNames[index]!,
     sprite: { viewBox: '0 0 100 100', previewSize: 150, layers: [shape] },
-    color: placeholderColors[index],
+    color: placeholderColors[index]!,
   })),
-] as const
+] as const satisfies readonly { id: RobotSpriteId; name: string; sprite: RobotPreviewDefinition; color: string }[]
+
+export function robotOptionFor(id: RobotSpriteId) {
+  return robotOptions.find((option) => option.id === id) ?? robotOptions[0]!
+}

@@ -94,11 +94,41 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(result.lobby.mapName).toBe('empty-map')
     expect(result.lobby.mapDisplayName).toBe(boardMaps['empty-map'].name)
   })
+  it('stores the selected robot in the member data and broadcasts it to the lobby', async () => {
+    const owner = await connect('Owner')
+    const lobby = await create(owner)
+    const other = await connect('Other')
+    await other.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })
+
+    const updated = new Promise<LobbyState>((resolve) => {
+      const receiveUpdate = ({ lobby: state }: { lobby: LobbyState }) => {
+        if (state.players.some((player) => player.robotSpriteId === 'scout')) {
+          owner.off('lobby.updated', receiveUpdate)
+          resolve(state)
+        }
+      }
+      owner.on('lobby.updated', receiveUpdate)
+    })
+    const result = await other.emitWithAck('lobby.selectRobot', { robotSpriteId: 'scout' })
+    expect(result).toMatchObject({ outcome: 'ROBOT_SELECTED', lobby: { players: [
+      { userId: lobby.ownerUserId, robotSpriteId: 'tank' },
+      { userId: expect.any(String), robotSpriteId: 'scout' },
+    ] } })
+    if (result.outcome !== 'ROBOT_SELECTED') throw new Error(result.outcome)
+    expect(await updated).toEqual(result.lobby)
+    expect(await other.emitWithAck('session.get', {})).toMatchObject({
+      outcome: 'IN_LOBBY',
+      lobby: { players: [{ robotSpriteId: 'tank' }, { robotSpriteId: 'scout' }] },
+    })
+
+    const raw = other.emitWithAck.bind(other) as (event: string, payload: unknown) => Promise<unknown>
+    expect(await raw('lobby.selectRobot', { robotSpriteId: 'unknown-robot' })).toEqual({ outcome: 'INVALID_REQUEST' })
+  })
   it.each(['leave', 'disconnect'] as const)('updates the roster and owner on %s without notifying other lobbies', async (departure) => {
     const owner = await connect('Owner')
     const lobby = await create(owner)
     const first = lobby.players[0]!
-    expect(first).toEqual({ userId: lobby.ownerUserId, username: 'Owner' })
+    expect(first).toEqual({ userId: lobby.ownerUserId, username: 'Owner', robotSpriteId: 'tank' })
     expect(lobby.players).toHaveLength(lobby.playerCount)
     const outsider = await connect('Outsider')
     await create(outsider)
@@ -111,7 +141,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     if (result.outcome !== 'LOBBY_JOINED') throw new Error(result.outcome)
     const roster = result.lobby
     expect(await joined).toEqual(roster)
-    expect(roster.players).toEqual([first, { userId: expect.any(String), username: 'Other' }])
+    expect(roster.players).toEqual([first, { userId: expect.any(String), username: 'Other', robotSpriteId: 'tank' }])
     expect(roster.playerCount).toBe(2)
     expect(await other.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })).toEqual(result)
     expect(await other.emitWithAck('session.get', {})).toEqual({ outcome: 'IN_LOBBY', lobby: roster, user: { userId: 'Other', username: 'Other' } })

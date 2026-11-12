@@ -1,11 +1,26 @@
 import { useState } from 'react'
+import type { RobotSpriteId } from '@robo-rally/game-events'
 import RobotPreview from './RobotPreview.tsx'
-import { robotOptions } from './robotPreviews.ts'
+import { robotOptionFor, robotOptions } from './robotPreviews.ts'
 import './RobotPicker.css'
 
-export default function RobotPicker() {
-  const [selected, setSelected] = useState(0)
-  const robot = robotOptions[selected]
+type Props = {
+  selectedRobotId: RobotSpriteId
+  disabled: boolean
+  onSelect: (robotSpriteId: RobotSpriteId) => Promise<boolean>
+}
+
+export default function RobotPicker({ selectedRobotId, disabled, onSelect }: Props) {
+  const [optimisticSelection, setOptimisticSelection] = useState<RobotSpriteId | null>(null)
+  const selected = optimisticSelection ?? selectedRobotId
+  const robot = robotOptionFor(selected)
+
+  function chooseRobot(robotSpriteId: RobotSpriteId) {
+    setOptimisticSelection(robotSpriteId)
+    void onSelect(robotSpriteId).then((saved) => {
+      if (!saved) setOptimisticSelection(null)
+    })
+  }
 
   return (
     <div className="robot-picker">
@@ -31,14 +46,15 @@ export default function RobotPicker() {
         <p>Choose your robot</p>
       </div>
       <div className="robot-picker__choices" role="group" aria-label="Choose a robot">
-        {robotOptions.map((option, index) => (
+        {robotOptions.map((option) => (
           <button
             className="robot-picker__choice"
             type="button"
-            key={option.name}
+            key={option.id}
             aria-label={`${option.name} robot`}
-            aria-pressed={index === selected}
-            onClick={() => setSelected(index)}
+            aria-pressed={option.id === selected}
+            disabled={disabled}
+            onClick={() => chooseRobot(option.id)}
           >
             <RobotPreview sprite={option.sprite} color={option.color} />
             <span>{option.name}</span>
