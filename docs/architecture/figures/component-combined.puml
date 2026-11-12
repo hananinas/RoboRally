@@ -1,0 +1,52 @@
+@startuml component-combined
+!include C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+Container_Ext(client, "client", "React, TypeScript", "Renders the game board and UI")
+System_Ext(hydra, "Hydra", "OAuth2 / OIDC provider (Ory Hydra)")
+ContainerDb_Ext(gameDb, "robo-rally-db", "SQLite", "Persists game and player state")
+
+Container_Boundary(gameService, "game-service") {
+    Component(authRoutes, "Auth HTTP Routes", "Express", "Handles /auth/login, /auth/callback, /auth/logout")
+    Component(oidcClient, "OIDC Client", "openid-client", "Builds authorization/end-session URLs; exchanges auth code for tokens; refreshes access tokens")
+    Component(sessionStore, "Session Store", "TypeScript", "Issues, validates, and silently renews session IDs")
+
+    Component(gameSocketServer, "Game Socket Server", "Socket.IO", "Authenticates connections; routes events to handlers; disconnects sockets with an expired session")
+    Component(lobbyHandlers, "Lobby Handlers", "TypeScript", "list / create / join / leave / start lobby")
+    Component(gameHandlers, "Game Handlers", "TypeScript", "Session, membership and gameplay actions for an active game")
+    Component(lobbyRegistry, "Lobby Registry", "TypeScript", "Tracks active lobbies and their membership")
+    Component(gameSession, "Game Session", "TypeScript", "Live state of one active game: connected players, rooms, and turn scheduling")
+    Component(gameRepo, "Game Repository", "SQLite", "Persists game and player records")
+    Component(actionScheduler, "Action Scheduler", "TypeScript", "Resolves programmed robot actions over time")
+    Component(gamePresenter, "Game Presenter", "TypeScript", "Serializes game state into wire-format payloads")
+    Component(gameDomain, "Game Domain Model", "TypeScript", "Core RoboRally rules engine: board, robots, players, cards")
+}
+
+Rel(client, authRoutes, "Initiates login / logout", "HTTPS")
+Rel(client, gameSocketServer, "Sends game actions, receives state updates", "Socket.IO")
+
+Rel(authRoutes, oidcClient, "Builds auth URLs, exchanges code")
+Rel(authRoutes, sessionStore, "Creates / destroys sessions")
+Rel(oidcClient, hydra, "Discovery, token exchange", "OIDC / HTTPS")
+Rel(sessionStore, oidcClient, "Refreshes near-expiry sessions")
+
+Rel(gameSocketServer, sessionStore, "Authenticates connections")
+Rel(gameSocketServer, lobbyHandlers, "Dispatches lobby.* events")
+Rel(gameSocketServer, gameHandlers, "Dispatches game/session events")
+
+Rel(lobbyHandlers, lobbyRegistry, "Reads / writes lobby membership")
+Rel(lobbyHandlers, gameSession, "Creates on lobby start")
+
+Rel(gameHandlers, gameRepo, "Looks up which game a user belongs to")
+Rel(gameHandlers, gameSession, "Reads / writes membership; submits programs, mutates game state")
+Rel(gameSession, gameRepo, "Reads / writes game & player records")
+Rel(gameRepo, gameDb, "Reads and writes", "SQL")
+
+Rel(gameSession, actionScheduler, "Starts turn resolution")
+Rel(actionScheduler, gameDomain, "Resolves robot actions")
+Rel(gameSession, gamePresenter, "Builds public state for broadcast")
+Rel(gamePresenter, gameDomain, "Reads board/robot/player state")
+
+SHOW_LEGEND()
+@enduml

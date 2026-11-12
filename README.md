@@ -8,23 +8,14 @@
 
 Building a web-based multiplayer version of the board game `Robo Rally`.
 
-## Current state
-
-The client and Game Service implement the v0 single-player loop using shared
-Socket.IO game events. Browser tests use an isolated contract fixture rather
-than starting the production service.
-
-The Game Service keeps users in memory, keyed by their exact username. User IDs
-last only as long as that service instance: a restart creates a new ID for the
-same username. A new connection must log in again, but receives the existing
-ID while the service runs.
-
+## Production
 RoboRally is available at: https://se2-c.compute.dtu.dk
 
-### Trusting the SSL certificate
+### Trusting the certificate
+
 We are using a self signed certificate. This means we have to trust the server public root certificate to be able to use https. This becomes especially relevant when we implement authentication features. The app will not work with plain http at that point.
 
-#### NixOS
+### NixOS
 
 Place `infra/robo-rally-root.crt` beside the NixOS configuration module containing:
 
@@ -41,7 +32,7 @@ programs.firefox = {
 };
 ```
 
-#### Other Distros
+### Other Distros
 
 ```sh
 sudo install -m 0644 infra/robo-rally-root.crt \
