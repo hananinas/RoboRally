@@ -72,9 +72,9 @@ function App() {
         onSelect={selectRobot}
       /> : undefined}
     >
-    {error && (session.status === 'waiting' || session.status === 'resyncing' || session.status === 'sync-failed') &&
-      <p role="alert" className="entry-validation entry-validation--error">{error}</p>}
-    {content}
+      {error && (session.status === 'waiting' || session.status === 'resyncing' || session.status === 'sync-failed') &&
+        <p role="alert" className="entry-validation entry-validation--error">{error}</p>}
+      {content}
     </EntryScreen>
   )
 }

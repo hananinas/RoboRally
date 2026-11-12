@@ -94,22 +94,6 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(result.lobby.mapName).toBe('empty-map')
     expect(result.lobby.mapDisplayName).toBe(boardMaps['empty-map'].name)
   })
-  it('associates the chosen sprite with members as they create or join a lobby', async () => {
-    const owner = await connect('Owner')
-    const created = await owner.emitWithAck('lobby.create', { robotSpriteId: 'guardian' })
-    if (created.outcome !== 'LOBBY_JOINED') throw new Error(created.outcome)
-    expect(created.lobby.players[0]).toMatchObject({ username: 'Owner', robotSpriteId: 'guardian' })
-
-    const joining = await connect('Joining')
-    const joined = await joining.emitWithAck('lobby.join', {
-      lobbyId: created.lobby.lobbyId, robotSpriteId: 'scout',
-    })
-    if (joined.outcome !== 'LOBBY_JOINED') throw new Error(joined.outcome)
-    expect(joined.lobby.players.map(({ username, robotSpriteId }) => ({ username, robotSpriteId }))).toEqual([
-      { username: 'Owner', robotSpriteId: 'guardian' },
-      { username: 'Joining', robotSpriteId: 'scout' },
-    ])
-  })
   it('stores the selected robot in the member data and broadcasts it to the lobby', async () => {
     const owner = await connect('Owner')
     const lobby = await create(owner)

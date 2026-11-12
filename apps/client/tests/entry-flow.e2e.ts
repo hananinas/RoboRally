@@ -66,28 +66,22 @@ test('selects a robot in the waiting lobby', async ({ page }) => {
   await expect(page.getByRole('list', { name: 'Connected players' }).getByLabel('Scout robot')).toBeVisible()
 })
 
-test('keeps a robot selected before creating a lobby', async ({ page, game }) => {
+test('shows robot selection only after entering the waiting lobby', async ({ page }) => {
   await page.goto('/')
-  const picker = page.getByRole('group', { name: 'Choose a robot' })
-  await picker.getByRole('button', { name: 'Guardian robot' }).click()
-  await expect(page.getByRole('heading', { name: 'Guardian', exact: true })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Choose a robot' })).toHaveCount(0)
   await createLobby(page)
-
-  await expect(page.getByRole('list', { name: 'Connected players' }).getByLabel('Guardian robot')).toBeVisible()
-  const createdLobby = (await game.snapshot()).entryRequests.find((request) => request.event === 'lobby.create')
-  expect(createdLobby).toMatchObject({ payload: { robotSpriteId: 'guardian' } })
+  await expect(page.getByRole('group', { name: 'Choose a robot' })).toBeVisible()
+  await expect(page.getByRole('list', { name: 'Connected players' }).getByLabel('Tank robot')).toBeVisible()
 })
 
-test('keeps a robot selected before joining a lobby', async ({ page, game }) => {
+test('shows robot selection after joining an existing lobby', async ({ page }) => {
   await page.goto('/')
-  const picker = page.getByRole('group', { name: 'Choose a robot' })
-  await picker.getByRole('button', { name: 'Sentinel robot' }).click()
+  await expect(page.getByRole('group', { name: 'Choose a robot' })).toHaveCount(0)
   await page.getByRole('list', { name: 'Lobbies' }).getByRole('button', { name: /Lobby 1/ }).click()
   await page.getByRole('button', { name: 'Join game', exact: true }).click()
 
-  await expect(page.getByRole('list', { name: 'Connected players' }).getByLabel('Sentinel robot')).toBeVisible()
-  const joinedLobby = (await game.snapshot()).entryRequests.find((request) => request.event === 'lobby.join')
-  expect(joinedLobby).toMatchObject({ payload: { robotSpriteId: 'sentinel' } })
+  await expect(page.getByRole('group', { name: 'Choose a robot' })).toBeVisible()
+  await expect(page.getByRole('list', { name: 'Connected players' }).getByLabel('Tank robot')).toBeVisible()
 })
 
 test('a disconnected member during Start leaves the owner waiting and able to retry', async ({ page, game }) => {

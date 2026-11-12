@@ -490,6 +490,7 @@ describe('started game membership over Socket.IO', () => {
       expect(snapshot.state.phase).toBe('PROGRAMMING')
       expect(snapshot.state.robots).toEqual([{
         robotId: initial.assignment.robotId, playerId: initial.assignment.playerId,
+        robotSpriteId: initial.state.robots[0].robotSpriteId,
         colour: initial.state.robots[0].colour,
         position: actions[4].position,
       }])
@@ -545,6 +546,7 @@ describe('started game membership over Socket.IO', () => {
         expect(snapshot.outcome).toBe('JOINED')
         expect(snapshot.state.robots).toEqual(members.map(({ joined }) => ({
           robotId: joined.assignment.robotId, playerId: joined.assignment.playerId,
+          robotSpriteId: initializations[0].state.robots.find((robot) => robot.robotId === joined.assignment.robotId)!.robotSpriteId,
           colour: initializations[0].state.robots.find((robot) => robot.robotId === joined.assignment.robotId)!.colour,
           position: actions[0].findLast((action) => action.robotId === joined.assignment.robotId)!.position,
         })))

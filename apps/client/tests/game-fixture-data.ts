@@ -11,7 +11,6 @@ import type {
   PublicGameState,
   RegistersChanged,
   RobotActionResolved,
-  RobotSpriteId,
   SubmitProgram,
   UpdateRegisters,
 } from '@robo-rally/game-events'
@@ -101,8 +100,8 @@ export type FixtureSnapshot = {
   registerUpdates: readonly UpdateRegisters[]
   entryRequests: readonly (
     | { event: 'session.get' | 'lobby.start'; socketId: string; payload: Record<string, never> }
-    | { event: 'lobby.create'; socketId: string; payload: { mapName?: BoardMapName; robotSpriteId?: RobotSpriteId } }
-    | { event: 'lobby.join'; socketId: string; payload: { lobbyId: string; robotSpriteId?: RobotSpriteId } }
+    | { event: 'lobby.create'; socketId: string; payload: { mapName?: BoardMapName } }
+    | { event: 'lobby.join'; socketId: string; payload: { lobbyId: string } }
   )[]
   pendingStarts: number
   pendingClocks: number

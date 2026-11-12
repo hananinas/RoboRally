@@ -3,17 +3,13 @@ import type { GameInitialization, User } from './payloads.js'
 
 export const emptyRequestSchema = z.strictObject({}).readonly()
 export const ROBOT_SPRITE_IDS = ['tank', 'scout', 'guardian', 'rover', 'striker', 'sentinel', 'hauler'] as const
-export const lobbyRequestSchema = z.strictObject({
-  lobbyId: z.uuid(),
-  robotSpriteId: z.enum(ROBOT_SPRITE_IDS).optional(),
-}).readonly()
+export const lobbyRequestSchema = z.strictObject({ lobbyId: z.uuid() }).readonly()
 export const robotSelectionRequestSchema = z.strictObject({
   robotSpriteId: z.enum(ROBOT_SPRITE_IDS),
 }).readonly()
 export const createLobbyRequestSchema = z.strictObject({
   mapName: z.string().min(1).optional(),
   name: z.string().trim().min(1).max(50).optional(),
-  robotSpriteId: z.enum(ROBOT_SPRITE_IDS).optional(),
 }).readonly()
 export type EmptyRequest = z.infer<typeof emptyRequestSchema>
 export type LobbyRequest = z.infer<typeof lobbyRequestSchema>
