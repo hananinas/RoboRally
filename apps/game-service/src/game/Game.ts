@@ -56,8 +56,6 @@ export type CompletedProgram = Readonly<{
   cards: readonly Card[]
 }>
 
-export const DEFAULT_GAME_NAME = 'Game'
-
 const REGISTERS_PER_ROUND = 5
 
 export type GameOptions = Readonly<{
@@ -66,7 +64,7 @@ export type GameOptions = Readonly<{
   // Template for each private deck created by addPlayer.
   deck: readonly Card[]
   rebootTile: Position
-  name?: string
+  name: string
 }>
 
 export class Game {
@@ -88,7 +86,7 @@ export class Game {
     players,
     deck,
     rebootTile,
-    name = DEFAULT_GAME_NAME,
+    name,
   }: GameOptions) {
     if (deck.length < REGISTERS_PER_ROUND || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')
