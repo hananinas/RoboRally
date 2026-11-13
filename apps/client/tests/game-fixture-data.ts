@@ -24,6 +24,7 @@ export const OTHER_ROBOT_ID = '33333333-3333-4333-8333-333333333334'
 
 export function createPublicState(): PublicGameState {
   return {
+    execution: { lastEnvironmentSequence: 0 },
     gameId: GAME_ID,
     serverTime: 0,
     programmingTimer: { status: 'IDLE' },

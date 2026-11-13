@@ -142,6 +142,8 @@ channels:
         $ref: '#/components/messages/ProgramTimerChanged'
       robotActionResolved:
         $ref: '#/components/messages/RobotActionResolved'
+      environmentStepResolved:
+        $ref: '#/components/messages/EnvironmentStepResolved'
       registersChanged:
         $ref: '#/components/messages/RegistersChanged'
       playerCheckpointProgress:
@@ -404,6 +406,8 @@ components:
                 robotId: 00000000-0000-4000-8000-000000000003
               state:
                 gameId: 00000000-0000-4000-8000-000000000001
+                execution:
+                  lastEnvironmentSequence: 0
                 serverTime: 1794052800000
                 programmingTimer:
                   status: IDLE
@@ -824,6 +828,22 @@ components:
                 x: 10
                 y: 6
               orientation: NORTH
+
+    EnvironmentStepResolved:
+      name: environment.stepResolved
+      description: >-
+        Apply the step's changes together after the register's robot actions.
+      payload:
+        $ref: '#/components/schemas/EnvironmentStepResolved'
+      examples:
+        - name: firstCheckpointStep
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            kind: CHECKPOINTS
+            sequence: 2
+            checkpointProgress:
+              - playerId: 00000000-0000-4000-8000-000000000002
+                lastCheckpoint: 1
 
     PlayerCheckpointProgress:
       name: player.checkpointProgress
@@ -1391,6 +1411,7 @@ components:
         - players
         - robots
         - phase
+        - execution
         - paused
         - aborted
         - checkpointCount
@@ -1410,6 +1431,8 @@ components:
             $ref: "#/components/schemas/Robot"
         phase:
           $ref: "#/components/schemas/GamePhase"
+        execution:
+          $ref: '#/components/schemas/ExecutionState'
         antenna:
           $ref: "#/components/schemas/Antenna"
         players:
@@ -1486,6 +1509,73 @@ components:
       description: >-
         The player's private register selection. Each slot contains a card or
         null. A finalized program contains five cards with distinct IDs.
+
+    ExecutionState:
+      type: object
+      additionalProperties: false
+      required: [ lastEnvironmentSequence ]
+      properties:
+        lastEnvironmentSequence:
+          type: integer
+          minimum: 0
+          description: Last completed environment sequence included in the snapshot, initially 0.
+
+    EnvironmentStepResolved:
+      oneOf:
+        - $ref: '#/components/schemas/GearsResolved'
+        - $ref: '#/components/schemas/CheckpointsResolved'
+
+    GearsResolved:
+      type: object
+      additionalProperties: false
+      required: [gameId, kind, sequence, robots]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+        sequence:
+          type: integer
+          minimum: 1
+          description: Starts at 1 and increases for every step, including empty steps, across all rounds.
+        kind:
+          const: GEARS
+        robots:
+          type: array
+          description: Final positions of changed robots. Apply together; each robotId appears at most once.
+          items:
+            type: object
+            additionalProperties: false
+            required: [ robotId, position ]
+            properties:
+              robotId:
+                $ref: '#/components/schemas/RobotId'
+              position:
+                $ref: '#/components/schemas/Position'
+
+    CheckpointsResolved:
+      type: object
+      additionalProperties: false
+      required: [gameId, kind, sequence, checkpointProgress]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+        sequence:
+          type: integer
+          minimum: 1
+          description: Starts at 1 and increases for every step, including empty steps, across all rounds.
+        kind:
+          const: CHECKPOINTS
+        checkpointProgress:
+          type: array
+          description: Changed checkpoint progress. Each playerId appears at most once; checkpointCount comes from the public state.
+          items:
+            type: object
+            additionalProperties: false
+            required: [ playerId, lastCheckpoint ]
+            properties:
+              playerId:
+                $ref: '#/components/schemas/PlayerId'
+              lastCheckpoint:
+                $ref: '#/components/schemas/LastCheckpoint'
 
     LastCheckpoint:
       type: integer

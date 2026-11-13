@@ -44,6 +44,7 @@ const emptyRegisters: Registers = Object.freeze(
 const robotId = '30000000-0000-4000-8000-000000000001'
 const stationaryRobotId = '30000000-0000-4000-8000-000000000002'
 const publicState: PublicGameState = {
+  execution: { lastEnvironmentSequence: 0 },
   gameId: '40000000-0000-4000-8000-000000000001',
   serverTime: 0,
   programmingTimer: { status: 'IDLE' },

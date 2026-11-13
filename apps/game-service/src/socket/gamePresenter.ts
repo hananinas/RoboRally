@@ -89,6 +89,7 @@ export function presentPublicGameState(
 
   return {
     gameId,
+    execution: { lastEnvironmentSequence: 0 },
     serverTime: Date.now(),
     programmingTimer,
     checkpointCount: game.board.checkpointCount,

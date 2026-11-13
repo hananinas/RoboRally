@@ -15,6 +15,7 @@ const joined: GameInitialization = {
     robotId: '00000000-0000-4000-8000-000000000004',
   },
   state: {
+    execution: { lastEnvironmentSequence: 0 },
     gameId: '00000000-0000-4000-8000-000000000002',
     serverTime: 0,
     programmingTimer: { status: 'IDLE' },

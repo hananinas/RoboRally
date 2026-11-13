@@ -84,8 +84,29 @@ export type ProgramTimerChanged = Readonly<{
   timer: ProgrammingTimer
 }>
 
+export type ExecutionState = Readonly<{ lastEnvironmentSequence: number }>
+
+export type EnvironmentStepResolved = Readonly<{
+  gameId: GameId
+  sequence: number
+}> & (
+  | Readonly<{
+      kind: 'GEARS'
+      robots: readonly Pick<Robot, 'robotId' | 'position'>[]
+      checkpointProgress?: never
+    }>
+  | Readonly<{
+      kind: 'CHECKPOINTS'
+      checkpointProgress: readonly Pick<PlayerState, 'playerId' | 'lastCheckpoint'>[]
+      robots?: never
+    }>
+)
+
+export type EnvironmentStepKind = EnvironmentStepResolved['kind']
+
 export type PublicGameState = Readonly<{
   gameId: GameId
+  execution: ExecutionState
   serverTime: number
   programmingTimer: ProgrammingTimer
   checkpointCount: number

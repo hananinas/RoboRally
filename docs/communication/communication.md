@@ -347,3 +347,13 @@ An explicit `game.leave {}` removes the owning connection's player and robot, fr
 Most commands acknowledge failures with a specific outcome string rather than throwing. See [AsyncAPI](asyncapi.yaml), with a [rendered reference](asyncapi.html), for the exact payload shapes and the full set of rejection codes per command.
 
 If an unexpected service failure makes gameplay unrecoverable, members receive `game.aborted {gameId}` through the [public room](#rooms), and the game ends permanently.
+
+## Register-end environment
+
+Once environment execution is enabled, the server resolves gears together, then
+checks checkpoints before the next register or hand. Clients play
+`environment.stepResolved` in order with robot actions.
+
+The sequence starts at 1 and increases for every step, even empty ones. Socket.IO
+recovery preserves playback. A fresh snapshot replaces playback and supersedes
+results through `execution.lastEnvironmentSequence`.
