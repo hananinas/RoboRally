@@ -5,12 +5,6 @@ import { Integer } from '@/numbers'
 
 export type Antenna = Readonly<Position & { angle: number }>
 
-export type BoardMap = Readonly<{
-  name: string
-  icon: string
-  maxPlayers: number
-}>
-
 export class Board {
   private readonly tiles: readonly (readonly Tile[])[]
   private readonly robotPositions = new Map<RobotId, Position>()
@@ -19,14 +13,12 @@ export class Board {
   readonly height: number
   readonly antenna: Antenna
   readonly rebootTile: Position
-  readonly map?: BoardMap
   readonly startTiles: readonly Position[]
 
   constructor(
     tiles: readonly (readonly Tile[])[],
     antenna: Antenna,
     rebootTile: Position,
-    map?: BoardMap,
     startTiles: readonly Position[] = [],
   ) {
     const width = tiles[0]?.length ?? 0
@@ -50,7 +42,6 @@ export class Board {
       throw new RangeError('The antenna must be on the board with a finite angle')
     }
     this.antenna = Object.freeze({ ...antenna })
-    this.map = map === undefined ? undefined : Object.freeze({ ...map })
 
     if (!this.allowsPlacement(rebootTile)) {
       throw new RangeError('Reboot tile must be a non-pit tile on the board outside the priority antenna')

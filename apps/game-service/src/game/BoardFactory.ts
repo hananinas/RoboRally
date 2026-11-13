@@ -74,11 +74,6 @@ export function createBoard(mapName: BoardMapName = DEFAULT_MAP): Board {
     boardTiles,
     antenna,
     rebootTile,
-    {
-      name: MAPS[mapName].name,
-      icon: MAPS[mapName].icon,
-      maxPlayers,
-    },
     startTiles.map(([x, y]) => ({ x: Integer(x), y: Integer(y) })),
   )
 }
