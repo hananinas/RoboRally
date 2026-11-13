@@ -10,7 +10,7 @@ export default function RobotPicker() {
   return (
     <div className="robot-picker">
       <header className="robot-picker__heading">
-        <h2>Your robot</h2>
+        <h2 className="entry-panel__eyebrow">Your robot</h2>
         <span className="robot-picker__tag">Preview</span>
       </header>
       <div className="robot-picker__stage" aria-hidden="true">
