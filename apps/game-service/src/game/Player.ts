@@ -13,15 +13,15 @@ export class Player {
   constructor(
     readonly id: PlayerId,
     readonly robot: Robot,
-    readonly deck: Deck = new Deck(),
+    readonly deck: Deck,
   ) {}
 
   get hand(): readonly Card[] {
     return [...this.currentHand]
   }
 
-  drawHand(random?: () => number, size: number = HAND_SIZE): void {
-    this.currentHand = this.deck.draw(size, random)
+  drawHand(): void {
+    this.currentHand = this.deck.draw(HAND_SIZE)
   }
 
   // Moves the cards to the discard pile, removing any that are in hand.
