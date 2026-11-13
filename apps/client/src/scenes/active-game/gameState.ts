@@ -4,19 +4,28 @@ import type {
   GamePhase,
   GameInitialization,
   GameWon,
+  BoardElementActivated,
   Winner,
   PlayerAssignment,
   PlayerConnectionChanged,
   PlayerCheckpointProgress,
   PlayerId,
+  PlayerState,
   PlayerLeft,
   ProgramResult,
+  ProgramFinalized,
+  ProgrammingTimer,
+  ProgramTimerChanged,
+  ProgramSubmitted,
+  PublicRegisters,
+  RegistersChanged,
   RobotActionResolved,
   SubmitProgram,
 } from '@robo-rally/game-events'
 import { createBoardRenderModel, type BoardRenderModel } from './board/boardModel.ts'
 import {
   createRobotPlaybackState,
+  isPlaybackBusy,
   robotPlaybackReducer,
   type RobotPlaybackState,
 } from './board/robotPlayback.ts'
@@ -30,17 +39,28 @@ export type Player = {
   lastCheckpoint: number
   username: string
   connected: boolean
+  robotId: string | null
+  programSubmitted: boolean
+  registers: PublicRegisters
 }
+
+// Presentation metadata is client-only, never part of PlayerState on the wire.
+export type OpponentPlayer = PlayerState & Readonly<{
+  robotId: string
+  colour: string
+}>
 
 export type ClientGameState = {
   connected: boolean
   assignment: PlayerAssignment | null
   phase: GamePhase | null
+  programmingTimer: ProgrammingTimer
   paused: boolean
   players: readonly Player[]
   checkpointCount: number
   board: BoardRenderModel | null
   playback: RobotPlaybackState
+  playbackRegisters: ReadonlyMap<PlayerId, PublicRegisters> | null
   hand: readonly ProgramCard[]
   registers: Registers
   registersPast: readonly Registers[]
@@ -49,18 +69,27 @@ export type ClientGameState = {
   playbackProgram: Registers | null
   handVersion: number
   handReady: boolean
-  pendingHand: CardsDealt | null
+  pendingHand: (CardsDealt & { program?: ProgramFinalized['cards'] }) | null
+  // Progress held until the playback action it belongs to has finished.
+  deferredProgress: readonly DeferredProgress[]
   submission: 'idle' | 'pending' | 'accepted' | 'uncertain'
   aborted: boolean
   winner: Winner | null
   error: string | null
 }
 
+export type DeferredProgress = Readonly<{
+  sequence: number
+  payload: PlayerCheckpointProgress
+}>
+
 export type GameStateEvent =
   | { type: 'joined'; result: GameInitialization }
   | { type: 'player-left'; payload: PlayerLeft }
   | { type: 'player-connection-changed'; payload: PlayerConnectionChanged }
   | { type: 'checkpoint-progress'; payload: PlayerCheckpointProgress }
+  | { type: 'registers-changed'; payload: RegistersChanged }
+  | { type: 'program-submitted'; payload: ProgramSubmitted }
   | { type: 'disconnected' }
   | { type: 'reconnected' }
   | { type: 'connect-error'; message: string }
@@ -69,7 +98,9 @@ export type GameStateEvent =
   | { type: 'dealt'; hand: CardsDealt }
   | { type: 'reset' }
   | { type: 'error'; message: string }
-  | { type: 'action'; action: RobotActionResolved }
+  | { type: 'action'; action: RobotActionResolved; reducedMotion?: boolean }
+  | { type: 'board-element-activated'; payload: BoardElementActivated }
+  | { type: 'advance' }
   | { type: 'complete' }
   | { type: 'place'; cardId: string; registerIndex: number }
   | { type: 'remove'; registerIndex: number }
@@ -80,6 +111,8 @@ export type GameStateEvent =
   | { type: 'submit' }
   | { type: 'result'; result: ProgramResult; handVersion: number }
   | { type: 'submission-unknown'; handVersion: number }
+  | { type: 'program-finalized'; payload: ProgramFinalized }
+  | { type: 'timer-changed'; payload: ProgramTimerChanged }
 
 export const USER_ALREADY_IN_GAME_MESSAGE =
   'This username is already participating from another connection.'
@@ -99,11 +132,13 @@ export function createClientGameState(): ClientGameState {
     connected: false,
     assignment: null,
     phase: null,
+    programmingTimer: { status: 'IDLE' },
     paused: false,
     players: [],
     checkpointCount: 0,
     board: null,
     playback: createRobotPlaybackState([]),
+    playbackRegisters: null,
     hand: [],
     registers: emptyRegisters(),
     registersPast: [],
@@ -112,6 +147,7 @@ export function createClientGameState(): ClientGameState {
     handVersion: 0,
     handReady: false,
     pendingHand: null,
+    deferredProgress: [],
     submission: 'idle',
     aborted: false,
     winner:null,
@@ -126,10 +162,21 @@ export function canProgram(state: ClientGameState): boolean {
     state.winner === null &&
     state.assignment !== null &&
     state.phase === 'PROGRAMMING' &&
+    state.programmingTimer.status !== 'CLOSED' &&
     state.handReady &&
     state.hand.length > 0 &&
-    !state.playback.active &&
+    !isPlaybackBusy(state.playback) &&
     state.submission === 'idle'
+}
+
+
+export function getOtherPlayers(state: ClientGameState): readonly OpponentPlayer[] {
+  return state.players.flatMap((player) => {
+    const registers = state.playbackRegisters?.get(player.playerId) ?? player.registers
+    if (player.playerId === state.assignment?.playerId) return []
+    const robot = state.playback.robots.find((candidate) => candidate.robotId === player.robotId)
+    return robot ? [{ ...player, registers, robotId: robot.robotId, colour: robot.colour }] : []
+  })
 }
 
 export function createSubmission(state: ClientGameState): SubmitProgram | null {
@@ -146,30 +193,109 @@ function isHandEligible(state: ClientGameState, hand: CardsDealt): boolean {
     hand.playerId === state.assignment.playerId
 }
 
+function adoptPendingHand(state: ClientGameState): ClientGameState {
+  const hand = state.pendingHand
+  if (!hand) return state
+  return {
+    ...state,
+    hand: hand.cards,
+    handVersion: state.handVersion + 1,
+    pendingHand: null,
+    registers: hand.program ?? emptyRegisters(),
+    registersPast: [],
+    registersFuture: [],
+  }
+}
+
 // Keep the next hand pending until the previous round has finished playing.
 function activateHand(state: ClientGameState): ClientGameState {
   const hand = state.pendingHand
   if (!hand) return state
   if (!isHandEligible(state, hand)) return { ...state, pendingHand: null }
-  if (state.phase !== 'PROGRAMMING' || state.playback.active) {
+  if (state.phase !== 'PROGRAMMING' || isPlaybackBusy(state.playback)) {
     return state
   }
   return {
-    ...state,
-    hand: hand.cards,
+    ...adoptPendingHand(state),
     handReady: true,
-    handVersion: state.handVersion + 1,
-    pendingHand: null,
-    registers: emptyRegisters(),
-    registersPast: [],
-    registersFuture: [],
+    deferredProgress: [],
     playbackProgram: null,
-    submission: 'idle',
+    submission: hand.program ? 'accepted' : 'idle',
     error: state.connected ? null : state.error,
   }
 }
 
+function applyCheckpointProgress(
+  state: ClientGameState,
+  { gameId, playerId, lastCheckpoint, checkpointCount }: PlayerCheckpointProgress,
+): ClientGameState {
+  const player = state.players.find((candidate) => candidate.playerId === playerId)
+  if (gameId !== state.assignment?.gameId || !player ||
+      !Number.isSafeInteger(lastCheckpoint) || !Number.isSafeInteger(checkpointCount) ||
+      lastCheckpoint > checkpointCount || lastCheckpoint <= player.lastCheckpoint) return state
+  return {
+    ...state,
+    checkpointCount,
+    players: state.players.map((candidate) =>
+      candidate.playerId === playerId ? { ...candidate, lastCheckpoint } : candidate),
+  }
+}
 
+// The latest action in playback that moves the player's robot.
+function playbackSequenceFor(state: ClientGameState, playerId: PlayerId): number | null {
+  const robotId = state.playback.robots.find((robot) => robot.playerId === playerId)?.robotId
+  if (robotId === undefined) return null
+  const moves = (action: RobotActionResolved) => action.robotId === robotId ||
+    action.pushedRobots.some((pushed) => pushed.robotId === robotId)
+  const pending = state.playback.pending.findLast(({ action }) => moves(action))
+  if (pending) return pending.sequence
+  return state.playback.active && moves(state.playback.active) ? state.playback.activeSequence : null
+}
+
+// Apply progress whose action is no longer active or pending.
+function settleProgress(state: ClientGameState): ClientGameState {
+  const held = new Set([
+    state.playback.activeSequence,
+    ...state.playback.pending.map((entry) => entry.sequence),
+  ])
+  const ready = state.deferredProgress.filter((entry) => !held.has(entry.sequence))
+  if (ready.length === 0) return state
+  return ready.reduce<ClientGameState>((next, entry) => applyCheckpointProgress(next, entry.payload), {
+    ...state,
+    deferredProgress: state.deferredProgress.filter((entry) => held.has(entry.sequence)),
+  })
+}
+function updatePlayback(state: ClientGameState, playback: RobotPlaybackState): ClientGameState {
+  return {
+    ...state,
+    playback,
+    playbackRegisters: registersForPlayback(state, playback),
+    playbackProgram: playback.active?.program ?? state.playbackProgram,
+  }
+}
+
+function finishPlayback(state: ClientGameState): ClientGameState {
+  if (isPlaybackBusy(state.playback) || state.phase !== 'PROGRAMMING') return state
+  return activateHand({
+    ...state,
+    playbackProgram: null,
+    registers: state.playbackProgram ? emptyRegisters() : state.registers,
+  })
+}
+
+// A timer started by another client must make the new hand available immediately.
+function finishPreviousRound(state: ClientGameState): ClientGameState {
+  if (state.phase !== 'PROGRAMMING' || !state.pendingHand || state.programmingTimer.status !== 'RUNNING') return state
+  let playback = state.playback
+  while (isPlaybackBusy(playback)) playback = robotPlaybackReducer(playback, { type: 'complete' })
+  return finishPlayback(updatePlayback(state, playback))
+}
+
+function registersForPlayback(state: ClientGameState, playback: RobotPlaybackState): ReadonlyMap<PlayerId, PublicRegisters> | null {
+  return playback.active === state.playback.active
+    ? state.playbackRegisters
+    : playback.active?.publicRegisters ?? null
+}
 
 export function gameStateReducer(
   state: ClientGameState,
@@ -178,27 +304,41 @@ export function gameStateReducer(
   switch (event.type) {
     case 'error':
       return { ...state, error: event.message }
+    case 'registers-changed': {
+      const { gameId, playerId, registers } = event.payload
+      if (gameId !== state.assignment?.gameId ||
+          !state.players.some((player) => player.playerId === playerId)) return state
+      return {
+        ...state,
+        players: state.players.map((player) => player.playerId === playerId ? { ...player, registers } : player),
+      }
+    }
+    case 'program-submitted': {
+      const { gameId, playerId } = event.payload
+      if (gameId !== state.assignment?.gameId ||
+          !state.players.some((player) => player.playerId === playerId)) return state
+      return {
+        ...state,
+        players: state.players.map((player) => player.playerId === playerId ? { ...player, programSubmitted: true } : player),
+      }
+    }
     case 'player-left': {
       const { gameId, playerId, robotId } = event.payload
       if (gameId !== state.assignment?.gameId ||
         !state.players.some((player) => player.playerId === playerId)) return state
-      return {
+      return finishPlayback(settleProgress(updatePlayback({
         ...state,
         players: state.players.filter((player) => player.playerId !== playerId),
-        playback: robotPlaybackReducer(state.playback, { type: 'remove', robotId }),
-      }
+      }, robotPlaybackReducer(state.playback, { type: 'remove', robotId }))))
     }
     case 'checkpoint-progress': {
-      const { gameId, playerId, lastCheckpoint, checkpointCount } = event.payload
-      const player = state.players.find((candidate) => candidate.playerId === playerId)
-      if (gameId !== state.assignment?.gameId || !player ||
-          !Number.isSafeInteger(lastCheckpoint) || !Number.isSafeInteger(checkpointCount) ||
-          lastCheckpoint > checkpointCount || lastCheckpoint <= player.lastCheckpoint) return state
+      const sequence = playbackSequenceFor(state, event.payload.playerId)
+      if (sequence === null || event.payload.gameId !== state.assignment?.gameId) {
+        return applyCheckpointProgress(state, event.payload)
+      }
       return {
         ...state,
-        checkpointCount,
-        players: state.players.map((candidate) =>
-          candidate.playerId === playerId ? { ...candidate, lastCheckpoint } : candidate),
+        deferredProgress: [...state.deferredProgress, { sequence, payload: event.payload }],
       }
     }
     case 'player-connection-changed': {
@@ -227,6 +367,7 @@ export function gameStateReducer(
       return {
         ...state,
         aborted: true,
+        programmingTimer: { status: 'CLOSED' },
         error: 'This game has encountered an error and cannot continue.',
       }
     case 'won':
@@ -234,6 +375,7 @@ export function gameStateReducer(
               return {
         ...state,
         winner: { playerId: event.payload.playerId, username: event.payload.username },
+        programmingTimer: { status: 'CLOSED' },
       }
 
     case 'reset':
@@ -246,11 +388,14 @@ export function gameStateReducer(
         connected: true,
         assignment: result.assignment,
         hand: result.hand,
+        registers: result.program,
+        playbackProgram: snapshot.phase === 'EXECUTING' ? result.program : null,
         handVersion: result.hand.length > 0 ? 1 : 0,
         // After submitting, the hand is empty until the next round is dealt.
         handReady: snapshot.phase === 'PROGRAMMING' && (result.hand.length > 0 || result.programSubmitted),
         submission: result.programSubmitted ? 'accepted' : 'idle',
         phase: snapshot.phase,
+        programmingTimer: snapshot.programmingTimer,
         paused: snapshot.paused,
         aborted: snapshot.aborted,
         winner: snapshot.winner,
@@ -259,6 +404,9 @@ export function gameStateReducer(
         players: snapshot.players.map((player) => ({
           playerId: player.playerId, username: player.username, connected: player.connected,
           lastCheckpoint: player.lastCheckpoint,
+          robotId: snapshot.robots.find((robot) => robot.playerId === player.playerId)?.robotId ?? null,
+          programSubmitted: player.programSubmitted,
+          registers: player.registers,
         })),
         playback: createRobotPlaybackState(
           snapshot.robots,
@@ -270,8 +418,13 @@ export function gameStateReducer(
             antenna: snapshot.antenna,
             hole: snapshot.board.tiles.filter((tile) => tile.type === 'PIT')
               .map((tile) => [tile.position.x, tile.position.y] as const),
-            laser: snapshot.board.tiles.flatMap((tile) => tile.type === 'LASER' && tile.laserOrientation
-              ? [{ ...tile.position, orientation: tile.laserOrientation }] : []),
+            laser: snapshot.board.tiles.flatMap((tile) => tile.type === 'LASER'
+              ? [{ ...tile.position, orientation: tile.laserOrientation, strength: tile.laserStrength }] : []),
+            conveyor: snapshot.board.tiles.flatMap((tile) => tile.type === 'CONVEYOR' ? [{
+              ...tile.position,
+              sprite: tile.sprite,
+              direction: tile.direction,
+            }] : []),
             checkpoints: snapshot.board.tiles.flatMap((tile) => tile.checkpointNumber === undefined
               ? [] : [{ ...tile.position, checkpointNumber: tile.checkpointNumber }]),
             walls: snapshot.board.tiles.map((tile) => ({
@@ -289,37 +442,61 @@ export function gameStateReducer(
       const hand = event.hand
       if (!isHandEligible(state, hand) ||
         (state.phase === 'PROGRAMMING' && (state.handReady || state.pendingHand))) return state
-      return activateHand({
+      return finishPreviousRound(activateHand({
         ...state,
         phase: 'PROGRAMMING',
         handReady: false,
         pendingHand: hand,
-      })
+        players: state.players.map((player) => ({
+          ...player,
+          programSubmitted: false,
+          registers: [{ status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }],
+        })),
+      }))
     }
-    case 'action':
+    case 'action': {
+      const actionPlayerId = event.action.playerId
+      const player = state.players.find((candidate) => candidate.robotId === event.action.robotId)
+      // Keep pushes playable even if only a pushed robot is known; reveal only the actor's registers.
       if (event.action.gameId !== state.assignment?.gameId ||
-        !state.playback.robots.some((robot) => robot.robotId === event.action.robotId ||
-          event.action.pushedRobots.some((pushed) => pushed.robotId === robot.robotId))) return state
-      return {
-        ...state,
+          (player !== undefined && actionPlayerId !== player.playerId) ||
+          !Number.isInteger(event.action.registerIndex) || event.action.registerIndex < 0 ||
+          event.action.registerIndex >= REGISTER_COUNT ||
+          !state.playback.robots.some((robot) => robot.robotId === event.action.robotId ||
+            event.action.pushedRobots.some((pushed) => pushed.robotId === robot.robotId))) return state
+      const registers: [...PublicRegisters] | null = player ? [...player.registers] : null
+      if (registers) registers[event.action.registerIndex] = { status: 'REVEALED', instruction: event.action.instruction }
+      const next = adoptPendingHand(state)
+      const players = player && registers ? next.players.map((candidate) => candidate.playerId === player.playerId
+        ? { ...candidate, registers } : candidate) : next.players
+      const action = {
+        ...event.action,
+        program: next.registers,
+        publicRegisters: new Map(players.map((candidate) => [candidate.playerId, candidate.registers])),
+      }
+      return updatePlayback({
+        ...next,
         phase: 'EXECUTING',
         handReady: false,
         pendingHand: null,
         playbackProgram: state.playbackProgram ??
           (state.registers.some((card) => card !== null) ? state.registers : null),
-        playback: robotPlaybackReducer(state.playback, { type: 'enqueue', action: event.action }),
-      }
-    case 'complete': {
-      const playback = robotPlaybackReducer(state.playback, { type: 'complete' })
-      if (playback.active) return { ...state, playback }
-      if (state.phase !== 'PROGRAMMING') return { ...state, playback }
-      return activateHand({
-        ...state,
-        playback,
-        playbackProgram: null,
-        registers: state.playbackProgram ? emptyRegisters() : state.registers,
-      })
+        players,
+      }, robotPlaybackReducer(next.playback, {
+        type: 'enqueue', action, board: event.reducedMotion ? null : state.board,
+      }))
     }
+    case 'board-element-activated': {
+      const { gameId, element } = event.payload
+      if (gameId !== state.assignment?.gameId) return state
+      return updatePlayback(state, robotPlaybackReducer(state.playback, { type: 'enqueue-board-element', element }))
+    }
+    case 'advance':
+    case 'complete':
+      return finishPlayback(settleProgress(updatePlayback(
+        state,
+        robotPlaybackReducer(state.playback, { type: event.type }),
+      )))
     case 'place': {
       if (!canProgram(state)) return state
       const card = state.hand.find((candidate) => candidate.id === event.cardId)
@@ -383,6 +560,21 @@ export function gameStateReducer(
     }
     case 'submit':
       return createSubmission(state) ? { ...state, submission: 'pending', error: null } : state
+    case 'program-finalized': {
+      const { gameId, playerId, cards } = event.payload
+      if (gameId !== state.assignment?.gameId || playerId !== state.assignment.playerId) return state
+      return {
+        ...state,
+        ...(state.pendingHand ? { pendingHand: { ...state.pendingHand, program: cards } } : { registers: cards }),
+        registersPast: [],
+        registersFuture: [],
+        submission: 'accepted',
+        error: null,
+      }
+    }
+    case 'timer-changed':
+      if (event.payload.gameId !== state.assignment?.gameId) return state
+      return finishPreviousRound({ ...state, programmingTimer: event.payload.timer })
     case 'result': {
       if (event.handVersion !== state.handVersion || state.submission !== 'pending') return state
       if (event.result.outcome === 'ACCEPTED' || event.result.outcome === 'ALREADY_SUBMITTED') {

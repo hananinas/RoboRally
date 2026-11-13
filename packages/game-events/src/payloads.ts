@@ -13,6 +13,10 @@ export type User = Readonly<{
   username: string
 }>
 
+export type ClockResult =
+  | Readonly<{ outcome: 'CLOCK'; serverTime: number }>
+  | Readonly<{ outcome: 'INVALID_REQUEST' }>
+
 export type PlayerAssignment = Readonly<{
   gameId: GameId
   playerId: PlayerId
@@ -23,6 +27,8 @@ export type Card = Readonly<{
   id: CardId
   instruction: Instruction
 }>
+
+export type PrivateProgram = readonly [Card | null, Card | null, Card | null, Card | null, Card | null]
 
 export type Orientation = 'NORTH' | 'EAST' | 'SOUTH' | 'WEST'
 
@@ -41,16 +47,31 @@ export type Robot = Readonly<{
   playerId: PlayerId
   colour: string
   position: Position
-  startPosition: Coordinate
 }>
+
+// The number of beams a board laser fires.
+export type LaserStrength = 1 | 2 | 3
 
 export type Tile = Readonly<{
   position: Coordinate
-  type: 'EMPTY' | 'PIT' | 'LASER'
   walls?: readonly Orientation[]
   checkpointNumber?: number
-  laserOrientation?: Orientation
-}>
+}> & (
+  | Readonly<{
+      type: 'EMPTY' | 'PIT'
+    }>
+  | Readonly<{
+      type: 'LASER'
+      laserOrientation: Orientation
+      // How many beams the laser fires.
+      laserStrength: LaserStrength
+    }>
+  | Readonly<{
+    type: 'CONVEYOR'
+    sprite: string
+    direction: Orientation
+  }>
+)
 
 export type Board = Readonly<{
   width: number
@@ -62,8 +83,20 @@ export type GamePhase = 'PROGRAMMING' | 'EXECUTING'
 
 export type Antenna = Readonly<Coordinate & { angle: number }>
 
+export type ProgrammingTimer =
+  | Readonly<{ status: 'IDLE' | 'CLOSED' }>
+  | Readonly<{ status: 'RUNNING'; deadline: number }>
+
+export type ProgramTimerChanged = Readonly<{
+  gameId: GameId
+  serverTime: number
+  timer: ProgrammingTimer
+}>
+
 export type PublicGameState = Readonly<{
   gameId: GameId
+  serverTime: number
+  programmingTimer: ProgrammingTimer
   checkpointCount: number
   antenna: Antenna
   board: Board
@@ -136,6 +169,13 @@ export type ProgramSubmitted = Readonly<{
   playerId: PlayerId
 }>
 
+export type ProgramFinalized = Readonly<{
+  gameId: GameId
+  playerId: PlayerId
+  reason: 'SUBMITTED' | 'TIMEOUT'
+  cards: readonly [Card, Card, Card, Card, Card]
+}>
+
 export type RobotActionResolved = Readonly<{
   gameId: GameId
   registerIndex: number
@@ -146,6 +186,15 @@ export type RobotActionResolved = Readonly<{
   resolvedInstruction: ResolvedInstruction | null
   position: Position
   pushedRobots: readonly Pick<Robot, 'robotId' | 'position'>[]
+}>
+
+// Board elements activate after every robot has acted in a register, in the order the game resolves them.
+export type BoardElement = 'LASERS'
+
+export type BoardElementActivated = Readonly<{
+  gameId: GameId
+  registerIndex: number
+  element: BoardElement
 }>
 
 export type PublicRegisterStatus = 'EMPTY' | 'HIDDEN' | 'REVEALED'
@@ -167,6 +216,7 @@ export type UpdateRegistersResult = Readonly<{
   outcome:
     | 'ACCEPTED'
     | 'INVALID_REQUEST'
+    | 'INVALID_PROGRAM'
     | 'NOT_A_MEMBER'
     | 'GAME_PAUSED'
     | 'GAME_ABORTED'
@@ -196,5 +246,6 @@ export type GameInitialization = Readonly<{
   assignment: PlayerAssignment
   state: PublicGameState
   hand: readonly Card[]
+  program: PrivateProgram
   programSubmitted: boolean
 }>

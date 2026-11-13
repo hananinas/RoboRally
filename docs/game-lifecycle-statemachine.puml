@@ -1,0 +1,23 @@
+@startuml
+[*] --> active
+
+state active {
+  [*] --> programming
+  programming --> activation : all submitted
+  activation --> programming : 5 registers done\n(no winner)
+  state "History" as H <<history>>
+}
+
+active --> paused : PAUSE
+paused --> H : RESUME
+
+active --> aborted : ABORT
+paused --> aborted : ABORT
+
+activation --> finished : WIN
+
+aborted --> [*]
+finished --> [*]
+
+note right of finished : carries winnerId
+@enduml

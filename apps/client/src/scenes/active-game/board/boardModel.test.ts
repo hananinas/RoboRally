@@ -14,7 +14,7 @@ describe('createBoardRenderModel', () => {
   it('creates a complete row-major grid', () => {
     const board = createBoardRenderModel(3, 2, {
       hole: [[1, 0]],
-      laser: [{ x: 2, y: 1, orientation: 'WEST' }],
+      laser: [{ x: 2, y: 1, orientation: 'WEST', strength: 2 }],
     })
 
     expect(board.cells.map(({ x, y, tile }) => ({ x, y, tile }))).toEqual([
@@ -28,6 +28,9 @@ describe('createBoardRenderModel', () => {
     expect(board.cells.every((cell) => Object.values(cell.walls).every((wall) => !wall))).toBe(true)
     expect(board.cells.map((cell) => cell.laserOrientation)).toEqual([
       undefined, undefined, undefined, undefined, undefined, 'WEST',
+    ])
+    expect(board.cells.map((cell) => cell.laserStrength)).toEqual([
+      undefined, undefined, undefined, undefined, undefined, 2,
     ])
   })
 
@@ -49,7 +52,7 @@ describe('createBoardRenderModel', () => {
     expect(() =>
       createBoardRenderModel(2, 1, {
         hole: [[1, 0]],
-        laser: [{ x: 1, y: 0, orientation: 'EAST' }],
+        laser: [{ x: 1, y: 0, orientation: 'EAST', strength: 1 }],
       }),
     ).toThrow(/assigned twice/)
   })

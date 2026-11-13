@@ -14,8 +14,6 @@ Will update with a more conceptual domain diagram which will be used for present
         -winner: PlayerId?
         -activatedRobotIds: RobotId[] set
         -deck: Card[] unordered
-        -startPositions: Map
-        +startPositionOf(RobotId robotId) Position
         -dealCards()
         +submitProgram(PlayerId playerId, CardId[5] cardIds)
         +moveRobot(Robot robot, Direction direction, PositiveInteger steps)
@@ -193,17 +191,25 @@ while game.phase == "activation":
 
 ## Laser obstacle:
 
+A laser tile has an orientation and a strength (1, 2 or 3 beams). Currently lasers
+are visual only: `Game.startBoardElements()` queues `LASERS` after the last robot
+acts in a register, and the client draws one beam per strength, stopping it at the
+first robot, the priority antenna or wall (the antenna blocks beams like a wall
+does movement). The pseudocode below is the illustrative future damage rule.
+
 ```
-game.activateBoardElements():                     # Illustrative future laser phase; retain checkpoint checks
+game.activateNextBoardElement():                  # Currently emits board.elementActivated only
     for each (position, laser) on board:
         hit = board.firstRobotHit(position, laser.direction)
         if hit exists:
-            game.damageRobot(hit)
+            game.damageRobot(hit, laser.strength)
 
 board.firstRobotHit(position, direction):
     while board.isInBounds(position):
         if robotId = board.occupantAt(position):
             return robotId
+        if board.isAntenna(position):                  # The antenna blocks the laser
+            return none
         next = board.getNeighbour(position, direction)
         if not board.isInBounds(next):
             return none

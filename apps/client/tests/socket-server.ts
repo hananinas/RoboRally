@@ -6,9 +6,13 @@ import type {
   LobbyState,
   ProgramResultAcknowledgement,
   ProgramResultOutcome,
+  PrivateProgram,
+  ProgramFinalized,
+  ProgrammingTimer,
   PublicGameState,
   ServerToClientEvents,
   SubmitProgram,
+  UpdateRegisters,
   User,
 } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
@@ -28,6 +32,9 @@ type Fixture = {
   cards: readonly Card[]
   state: PublicGameState
   submissions: SubmitProgram[]
+  registerDelivery?: 'normal' | 'drop' | 'save-without-ack'
+  registerUpdates: UpdateRegisters[]
+  program: PrivateProgram
   sockets: Set<GameSocket>
   outcome: ProgramResultOutcome
   deferred: boolean
@@ -37,7 +44,9 @@ type Fixture = {
   programSubmitted: boolean
   started: boolean
   pendingStarts: { socket: GameSocket; respond: () => void }[]
-  pending: { socket: GameSocket; acknowledge: ProgramResultAcknowledgement }[]
+  clock: { serverTime?: number; deferred: boolean }
+  pendingClocks: { socket: GameSocket; respond: () => void }[]
+  pending: { socket: GameSocket; acknowledge: ProgramResultAcknowledgement; submission: SubmitProgram }[]
 }
 
 const fixtures = new Map<string, Fixture>()
@@ -55,9 +64,16 @@ function snapshot(fixture: Fixture): FixtureSnapshot {
     cards: fixture.cards,
     state: fixture.state,
     submissions: fixture.submissions,
+    registerUpdates: fixture.registerUpdates,
     entryRequests: fixture.entryRequests,
     pendingStarts: fixture.pendingStarts.length,
+    pendingClocks: fixture.pendingClocks.length,
   }
+}
+
+function timerChanged(fixture: Fixture, timer: ProgrammingTimer, serverTime = Date.now()) {
+  fixture.state = { ...fixture.state, serverTime, programmingTimer: timer }
+  for (const socket of fixture.sockets) socket.emit('program.timerChanged', { gameId: GAME_ID, serverTime, timer })
 }
 
 function acknowledgeProgram(
@@ -65,15 +81,26 @@ function acknowledgeProgram(
   sender: GameSocket,
   acknowledge: ProgramResultAcknowledgement,
   outcome: ProgramResultOutcome,
+  submission: SubmitProgram,
 ) {
   acknowledge({ outcome })
   if (outcome === 'ACCEPTED') {
+    const cards: readonly Card[] = submission.cardIds.map((id) => fixture.cards.find((card) => card.id === id)!)
+    fixture.program = cards as PrivateProgram
+    fixture.programSubmitted = true
+    sender.emit('program.finalized', {
+      gameId: GAME_ID, playerId: PLAYER_ID, reason: 'SUBMITTED', cards: cards as ProgramFinalized['cards'],
+    })
     for (const observer of fixture.sockets) {
-      if (observer === sender) continue
+      observer.emit('game.registersChanged', {
+        gameId: GAME_ID, playerId: PLAYER_ID,
+        registers: [{ status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' }],
+      })
       observer.emit('program.submitted', {
         gameId: GAME_ID, playerId: PLAYER_ID,
       })
     }
+    if (fixture.state.programmingTimer.status === 'IDLE') timerChanged(fixture, { status: 'RUNNING', deadline: Date.now() + 30_000 })
   }
 }
 
@@ -82,16 +109,40 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
     case 'checkpoint-progress':
       for (const socket of fixture.sockets) socket.emit('player.checkpointProgress', control.progress)
       break
+    case 'connection-changed':
+      for (const socket of fixture.sockets) socket.emit('game.playerConnectionChanged', control.payload)
+      break
+    case 'registers-changed':
+      for (const socket of fixture.sockets) socket.emit('game.registersChanged', control.payload)
+      break
     case 'hand':
       for (const socket of fixture.sockets) socket.emit('cards.dealt', control.hand)
+      if (control.hand.gameId === GAME_ID && control.hand.playerId === PLAYER_ID) timerChanged(fixture, { status: 'IDLE' })
       break
     case 'submitted':
       for (const socket of fixture.sockets) socket.emit('program.submitted', control.submission)
+      break
+    case 'finalized':
+      if (control.program.gameId === GAME_ID && control.program.playerId === PLAYER_ID) {
+        fixture.program = control.program.cards
+        fixture.programSubmitted = true
+      }
+      for (const socket of fixture.sockets) socket.emit('program.finalized', control.program)
+      break
+    case 'timer':
+      timerChanged(fixture, control.timer, control.serverTime)
+      break
+    case 'clock':
+      fixture.clock = { serverTime: control.serverTime, deferred: control.deferred }
+      break
+    case 'respond-clock':
+      for (const pending of fixture.pendingClocks.splice(0)) pending.respond()
       break
     case 'deal':
       for (const socket of fixture.sockets) socket.emit('cards.dealt', {
         gameId: GAME_ID, playerId: PLAYER_ID, cards: fixture.cards,
       })
+      timerChanged(fixture, { status: 'IDLE' })
       break
     case 'early-hand':
       // Exercise out-of-order delivery without changing the authoritative join hand.
@@ -99,8 +150,11 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
         gameId: GAME_ID, playerId: PLAYER_ID, cards: control.cards,
       })
       break
+    case 'register-delivery':
+      fixture.registerDelivery = control.mode
+      break
     case 'disconnect':
-      for (const socket of fixture.sockets) socket.disconnect(true)
+      for (const socket of fixture.sockets) socket.conn.close()
       break
     case 'start':
       fixture.startOutcome = control.outcome ?? 'STARTED'
@@ -113,6 +167,7 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
       fixture.state = control.state
       fixture.cards = control.hand
       fixture.programSubmitted = control.programSubmitted
+      fixture.program = [null, null, null, null, null]
       break
     case 'submission':
       fixture.outcome = control.outcome
@@ -120,10 +175,11 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
       break
     case 'acknowledge':
       for (const pending of fixture.pending.splice(0)) {
-        acknowledgeProgram(fixture, pending.socket, pending.acknowledge, control.outcome)
+        acknowledgeProgram(fixture, pending.socket, pending.acknowledge, control.outcome, pending.submission)
       }
       break
     case 'round': {
+      timerChanged(fixture, { status: 'CLOSED' })
       let robots = fixture.state.robots
       for (const action of control.actions) {
         robots = robots.map((robot) => {
@@ -134,12 +190,15 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
       }
       fixture.state = { ...fixture.state, phase: 'PROGRAMMING', robots }
       fixture.cards = dealCards()
+      fixture.program = [null, null, null, null, null]
+      fixture.programSubmitted = false
       for (const socket of fixture.sockets) {
         for (const action of control.actions) socket.emit('robot.actionResolved', action)
         if (!control.deferHand) socket.emit('cards.dealt', {
           gameId: GAME_ID, playerId: PLAYER_ID, cards: fixture.cards,
         })
       }
+      if (!control.deferHand) timerChanged(fixture, { status: 'IDLE' })
       break
     }
   }
@@ -162,6 +221,8 @@ const httpServer = createServer(async (request, response) => {
       cards: dealCards(),
       state: createPublicState(),
       submissions: [],
+      registerUpdates: [],
+      program: [null, null, null, null, null],
       sockets: new Set(),
       outcome: 'ACCEPTED',
       deferred: false,
@@ -172,6 +233,8 @@ const httpServer = createServer(async (request, response) => {
       programSubmitted: false,
       started: false,
       pendingStarts: [],
+      clock: { deferred: false },
+      pendingClocks: [],
     }
     fixtures.set(fixture.id, fixture)
     send(201, snapshot(fixture))
@@ -203,6 +266,7 @@ const httpServer = createServer(async (request, response) => {
 })
 
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
+  connectionStateRecovery: {},
   cors: { origin: 'http://127.0.0.1:4173', allowedHeaders: ['x-fixture-id', 'x-fixture-user'] },
 })
 
@@ -222,18 +286,39 @@ io.on('connection', (socket) => {
   const initialization = () => ({
     outcome: 'JOINED' as const,
     assignment: { gameId: GAME_ID, playerId: PLAYER_ID, robotId: ROBOT_ID },
-    state: fixture.state, hand: fixture.cards, programSubmitted: fixture.programSubmitted,
+    state: { ...fixture.state, serverTime: Date.now() }, hand: fixture.cards, program: fixture.program, programSubmitted: fixture.programSubmitted,
   })
-  const lobbyState = (): LobbyState => ({ lobbyId: GAME_ID, name: 'Lobby 1', ownerUserId: user.userId, playerCount: 1, maxPlayers: 6, players: [user] })
+  const mapIcons: Record<string, string> = {
+    'empty-map': `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 3"><rect width="3" height="3" fill="#6b7280"/><path d="M1 0V3M2 0V3M0 1H3M0 2H3" stroke="#d1d5db" stroke-width="0.05"/></svg>').toString('base64')}`,
+    'test-map': `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><rect width="4" height="3" fill="#6b7280"/><path d="M1 0V3M2 0V3M3 0V3M0 1H4M0 2H4" stroke="#d1d5db" stroke-width="0.05"/></svg>').toString('base64')}`,
+  } as const
+  const maps = [
+    { mapName: 'empty-map', name: 'Empty Map', icon: mapIcons['empty-map'], defaultForLobbyCreation: false },
+    { mapName: 'test-map', name: 'Test Map', icon: mapIcons['test-map'], defaultForLobbyCreation: true },
+  ]
+  const lobbyState = (mapName = 'test-map', lobbyName = 'Lobby 1'): LobbyState => {
+    const map = maps.find((candidate) => candidate.mapName === mapName) ?? maps[1]!
+    return {
+    lobbyId: GAME_ID, name: lobbyName, mapName: map.mapName, mapDisplayName: map.name, mapIcon: map.icon, ownerUserId: user.userId,
+    playerCount: 1, maxPlayers: 6, players: [user],
+    }
+  }
+  socket.on('clock.get', (_, acknowledge) => {
+    // Capture before deferring to simulate time spent delivering the reply.
+    const serverTime = fixture.clock.serverTime ?? Date.now()
+    const respond = () => acknowledge({ outcome: 'CLOCK', serverTime })
+    if (fixture.clock.deferred) fixture.pendingClocks.push({ socket, respond })
+    else respond()
+  })
   socket.on('session.get', (_, acknowledge) => {
     fixture.entryRequests.push({ event: 'session.get', socketId: socket.id, payload: {} })
     acknowledge(fixture.started ? { outcome: 'IN_GAME', initialization: initialization(), user }
       : lobby ? { outcome: 'IN_LOBBY', lobby, user } : { outcome: 'NO_SESSION', user })
   })
-  socket.on('lobby.list', (_, acknowledge) => acknowledge({ outcome: 'LOBBIES_FOUND', lobbies: [lobbyState()] }))
-  socket.on('lobby.create', (_, acknowledge) => {
-    fixture.entryRequests.push({ event: 'lobby.create', socketId: socket.id, payload: {} })
-    lobby = lobbyState()
+  socket.on('lobby.list', (_, acknowledge) => acknowledge({ outcome: 'LOBBIES_FOUND', lobbies: [lobbyState()], maps }))
+  socket.on('lobby.create', (payload, acknowledge) => {
+    fixture.entryRequests.push({ event: 'lobby.create', socketId: socket.id, payload })
+    lobby = lobbyState(payload.mapName, payload.name)
     acknowledge({ outcome: 'LOBBY_JOINED', lobby })
   })
   socket.on('lobby.join', (payload, acknowledge) => {
@@ -262,6 +347,17 @@ io.on('connection', (socket) => {
     acknowledge({ outcome: 'LEFT' })
   })
 
+  socket.on('game.updateRegisters', (payload, acknowledge) => {
+    fixture.registerUpdates.push(payload)
+    if (fixture.registerDelivery === 'drop') return
+    const program: readonly (Card | null)[] = payload.cardIds.map((id) =>
+      id === null ? null : fixture.cards.find((card) => card.id === id)!,
+    )
+    fixture.program = program as PrivateProgram
+    if (fixture.registerDelivery === 'save-without-ack') return
+    acknowledge({ outcome: 'ACCEPTED' })
+  })
+
   socket.on('program.submit', (payload, acknowledge) => {
     fixture.submissions.push(payload)
     const valid = payload.cardIds.length === 5
@@ -270,9 +366,9 @@ io.on('connection', (socket) => {
     if (!valid) {
       acknowledge({ outcome: 'INVALID_PROGRAM' })
     } else if (fixture.deferred) {
-      fixture.pending.push({ socket, acknowledge })
+      fixture.pending.push({ socket, acknowledge, submission: payload })
     } else {
-      acknowledgeProgram(fixture, socket, acknowledge, fixture.outcome)
+      acknowledgeProgram(fixture, socket, acknowledge, fixture.outcome, payload)
     }
   })
 
@@ -280,6 +376,7 @@ io.on('connection', (socket) => {
     fixture.sockets.delete(socket)
     fixture.pending = fixture.pending.filter((pending) => pending.socket !== socket)
     fixture.pendingStarts = fixture.pendingStarts.filter((pending) => pending.socket !== socket)
+    fixture.pendingClocks = fixture.pendingClocks.filter((pending) => pending.socket !== socket)
   })
 })
 

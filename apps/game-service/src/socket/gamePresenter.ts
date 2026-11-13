@@ -1,6 +1,9 @@
 import type {
   Card as CardPayload,
   CardsDealt,
+  ProgramFinalized,
+  ProgrammingTimer,
+  ProgramTimerChanged,
   GamePhase as GamePhasePayload,
   Orientation,
   PublicGameState,
@@ -13,6 +16,7 @@ import {
   Direction,
   LaserTile,
   type Card,
+  type CompletedProgram,
   type Game,
   type GameId,
   type GamePhase,
@@ -20,6 +24,7 @@ import {
   type Player,
 } from '@/game/index'
 import { Integer } from '@/numbers'
+import { ConveyorTile } from '@/game/Tile'
 
 const orientations: Record<Direction, Orientation> = {
   [Direction.NORTH]: 'NORTH',
@@ -44,18 +49,47 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
   }
 
   const walls = [...tile.walls].map((direction) => orientations[direction])
-  return {
-    position: { x: Integer(x), y: Integer(y) },
-    type: tile.kind,
+
+  const common = {
+    position: { x, y },
     ...(walls.length === 0 ? {} : { walls }),
-    ...(tile.checkpointNumber === undefined ? {} : { checkpointNumber: tile.checkpointNumber }),
-    ...(tile instanceof LaserTile ? { laserOrientation: orientations[tile.orientation] } : {}),
+    ...(tile.checkpointNumber === undefined
+      ? {}
+      : { checkpointNumber: tile.checkpointNumber }),
   }
+
+  if (tile instanceof LaserTile) {
+    return {
+      ...common,
+      type: tile.kind,
+      laserOrientation: orientations[tile.orientation],
+      laserStrength: tile.strength,
+    }
+  }
+
+  if (tile instanceof ConveyorTile) {
+    return {
+      ...common,
+      type: tile.kind,
+      sprite: tile.sprite,
+      direction: orientations[tile.direction],
+    }
+  }
+
+  if (tile.kind === 'EMPTY' || tile.kind === 'PIT') {
+    return {
+      ...common,
+      type: tile.kind,
+    }
+  }
+
+  throw new Error(`Unsupported tile type at ${x},${y}: ${tile.kind}`)
 }
 
 export function presentPublicGameState(
   gameId: GameId,
   game: Game,
+  programmingTimer: ProgrammingTimer,
   players: readonly PlayerState[] = [],
   winner: Winner | null = null,
 ): PublicGameState {
@@ -65,6 +99,8 @@ export function presentPublicGameState(
 
   return {
     gameId,
+    serverTime: Date.now(),
+    programmingTimer,
     checkpointCount: game.board.checkpointCount,
     players,
     antenna: game.board.antenna,
@@ -81,13 +117,16 @@ export function presentPublicGameState(
         coordinate: game.board.positionOf(player.robot.id),
         orientation: orientations[player.robot.direction],
       },
-      startPosition: game.startPositionOf(player.robot.id),
     })),
-    phase: phases[game.phase],
+    phase: phases[game.lastActivePhase],
     paused: game.paused,
     aborted: game.aborted,
     winner,
   }
+}
+
+export function presentProgrammingTimer(gameId: GameId, timer: ProgrammingTimer): ProgramTimerChanged {
+  return { gameId, serverTime: Date.now(), timer }
 }
 
 export function presentCardsDealt(
@@ -95,6 +134,15 @@ export function presentCardsDealt(
   player: Player,
 ): CardsDealt {
   return { gameId, playerId: player.id, cards: player.hand.map(presentCard) }
+}
+
+export function presentProgramFinalized(
+  gameId: GameId,
+  program: CompletedProgram,
+  reason: ProgramFinalized['reason'],
+): ProgramFinalized {
+  const cards: readonly CardPayload[] = program.cards.map(presentCard)
+  return { gameId, playerId: program.playerId, reason, cards: cards as ProgramFinalized['cards'] }
 }
 
 export function presentRobotActionResolved(

@@ -1,3 +1,4 @@
+import type { LaserStrength } from '@robo-rally/game-events'
 import type { Antenna, BoardMap } from '@/game/Board'
 import { Direction, type Position } from '@/game/spatial'
 import { Integer } from '@/numbers'
@@ -26,9 +27,16 @@ export type WallSpec = Readonly<{
 export type LaserSpec = Readonly<{
   at: readonly [x: number, y: number]
   direction: Direction
+  strength: LaserStrength
+}>
+export type ConveyorSpec = Readonly<{
+  at: readonly [x: number, y: number]
+  sprite: string
+  direction: Direction
 }>
 
 export type MapSpec = BoardMap & Readonly<{
+  defaultForLobbyCreation: boolean
   width: number
   height: number
   antenna: Antenna
@@ -36,6 +44,7 @@ export type MapSpec = BoardMap & Readonly<{
   checkpoints: readonly (readonly [x: number, y: number])[]
   pits?: readonly (readonly [x: number, y: number])[]
   lasers?: readonly LaserSpec[]
+  conveyors?: readonly ConveyorSpec[]
   startTiles: readonly (readonly [x: number, y: number])[]
   rebootTile: Position
 }>
@@ -44,6 +53,7 @@ export const boardMaps = {
   'empty-map': {
     name: 'Empty Map',
     icon: `data:image/svg+xml;base64,${Buffer.from(EMPTY_MAP_SVG).toString('base64')}`,
+    defaultForLobbyCreation: false,
     maxPlayers: 6,
     width: 21,
     height: 15,
@@ -56,23 +66,30 @@ export const boardMaps = {
   'test-map': {
     name: 'Test Map',
     icon: `data:image/svg+xml;base64,${Buffer.from(TEST_MAP_SVG).toString('base64')}`,
+    defaultForLobbyCreation: true,
     maxPlayers: 6,
     width: 16,
     height: 15,
     pits: [[3, 3], [13, 4], [12, 7], [15, 9], [5, 10], [12, 11]],
     lasers: [
-      // Beam stops at the robot starting at (3, 8)
-      { at: [0, 8], direction: E },
-      // Long beam down the centre column, ends at the robot starting at (10, 13)
-      { at: [10, 5], direction: S },
-      // Beam stops at the wall below (6, 5)
-      { at: [6, 4], direction: S },
-      // Beam stops at the robot starting at (5, 12)
-      { at: [5, 14], direction: N },
-      // Beam runs across the whole map to the east edge
-      { at: [2, 6], direction: E },
-      // Beam stops at the west wall of (12, 2)
-      { at: [15, 2], direction: W },
+      { at: [3, 8], direction: S, strength: 1 },
+      { at: [10, 5], direction: N, strength: 2 },
+      { at: [15, 10], direction: W, strength: 3 },
+      { at: [0, 7], direction: E, strength: 2 },
+    ],
+    conveyors: [
+      // Conveyor loop
+      { at: [4, 7], sprite: 'conveyor-1-from-right', direction: E },
+      { at: [5, 7], sprite: 'conveyor-1-straight', direction: E },
+      { at: [6, 7], sprite: 'conveyor-1-from-right', direction: S },
+
+      { at: [6, 8], sprite: 'conveyor-1-straight', direction: S },
+
+      { at: [6, 9], sprite: 'conveyor-1-from-right', direction: W },
+      { at: [5, 9], sprite: 'conveyor-1-straight', direction: W },
+      { at: [4, 9], sprite: 'conveyor-1-from-right', direction: N },
+
+      { at: [4, 8], sprite: 'conveyor-1-straight', direction: N },
     ],
     rebootTile: { x: Integer(10), y: Integer(7) },
     antenna: { x: Integer(10), y: Integer(0), angle: Math.PI / 2 },
@@ -129,3 +146,5 @@ export const boardMaps = {
     ],
   },
 } as const satisfies Record<string, MapSpec>
+
+export type BoardMapName = keyof typeof boardMaps

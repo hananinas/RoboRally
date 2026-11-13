@@ -66,32 +66,52 @@ describe('checkpoint activation', () => {
     game.executeNextAction()
 
     expect(game.winner).toBe(player.id)
-    expect(game.phase).toBe('programming')
+    expect(game.lastActivePhase).toBe('activation')
     expect(game.currentRegister).toBe(0)
     expect(player.robot.program).toEqual([])
     expect(game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrapErr()).toBe('GAME_FINISHED')
   })
 
-  it('rejects register updates after a checkpoint win returns the game to programming', () => {
+  it('reports roundConcluded as false when a win lands exactly on the final register', () => {
+    const { players: [player], cards: c, game } = createGame([{ x: 2, y: 1, direction: Direction.EAST }])
+    player.completeCheckpoint(1)
+    const program = [c.left, c.right, c.back, c.step, c.stepAgain]
+    game.submitProgram(player.id, program.map((card) => card.id))
+
+    for (let register = 0; register < 4; register++) {
+      expect(game.executeNextAction().roundConcluded).toBe(false)
+    }
+    expect(game.winner).toBeUndefined()
+
+    const result = game.executeNextAction()
+
+    expect(game.winner).toBe(player.id)
+    expect(result.roundConcluded).toBe(false)
+    expect(game.lastActivePhase).toBe('activation')
+  })
+
+  it('rejects register updates after a checkpoint win', () => {
     const { board, players: [player], cards: c, game } = createGame()
     const program = [c.move2, c.back, c.step, c.stepAgain, c.left]
-    game.updateRegisters(player.id, [true, true, true, true, true])._unsafeUnwrap()
+    game.updateRegisters(player.id, program.map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
     for (let register = 0; register < 4; register++) game.executeNextAction()
 
     expect(player.lastCheckpoint).toBe(2)
     expect(game.winner).toBe(player.id)
-    expect(game.phase).toBe('programming')
+    expect(game.lastActivePhase).toBe('activation')
     expect(game.currentRegister).toBe(0)
     expect(game.hasSubmittedProgram(player.id)).toBe(false)
     expect(player.robot.program).toEqual([])
-    expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
+    expect(player.registers).toEqual([
+      ...program.slice(0, 4).map((card) => ({ status: 'REVEALED', instruction: card.instruction })),
+      { status: 'HIDDEN' },
+    ])
 
     const registers = player.registers
     const state = () => ({
-      phase: game.phase,
+      phase: game.lastActivePhase,
       currentRegister: game.currentRegister,
-      hasStarted: game.hasStarted,
       paused: game.paused,
       aborted: game.aborted,
       winner: game.winner,
@@ -104,9 +124,10 @@ describe('checkpoint activation', () => {
       direction: player.robot.direction,
       position: board.positionOf(player.robot.id),
     })
-    const expectRejected = (playerId: string, error: 'GAME_FINISHED' | 'GAME_ABORTED') => {
+    const expectRejected = (playerId: string, error: 'GAME_FINISHED') => {
       const before = state()
-      expect(game.updateRegisters(playerId, [true, true, true, true, true])._unsafeUnwrapErr()).toBe(error)
+      expect(game.updateRegisters(playerId, [null, null, null, null, null])._unsafeUnwrapErr()).toBe(error)
+      expect(game.completePrograms()._unsafeUnwrapErr()).toBe(error)
       expect(player.registers).toBe(registers)
       expect(state()).toEqual(before)
     }
@@ -117,8 +138,8 @@ describe('checkpoint activation', () => {
     expectRejected(player.id, 'GAME_FINISHED')
     expectRejected('missing-player', 'GAME_FINISHED')
     game.abort()
-    expectRejected(player.id, 'GAME_ABORTED')
-    expectRejected('missing-player', 'GAME_ABORTED')
+    expectRejected(player.id, 'GAME_FINISHED')
+    expectRejected('missing-player', 'GAME_FINISHED')
   })
 
   it('does not award a later checkpoint before the next required checkpoint', () => {
@@ -172,7 +193,6 @@ describe('checkpoint activation', () => {
     expect(game.currentRegister).toBe(1)
   })
 
-
   it('declares the winner when a departure completes the register', () => {
     const { players, cards: c, game } = createGame([
       { x: 2, y: 1, direction: Direction.EAST },
@@ -186,6 +206,6 @@ describe('checkpoint activation', () => {
     game.removePlayer(players[1].id)
 
     expect(game.winner).toBe(players[0].id)
-    expect(game.phase).toBe('programming')
+    expect(game.lastActivePhase).toBe('activation')
   })
 })

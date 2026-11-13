@@ -95,13 +95,22 @@ describe('createBoardScene', () => {
     ['WEST', 180],
     ['NORTH', -90],
   ] as const)('turns laser artwork, but not the floor, to face %s', (orientation, angle) => {
-    const board = createBoardRenderModel(1, 1, { laser: [{ x: 0, y: 0, orientation }] })
+    const board = createBoardRenderModel(1, 1, { laser: [{ x: 0, y: 0, orientation, strength: 3 }] })
     const pieces = createBoardScene(board, BOARD_CONFIG, BOARD_COMPONENTS, BOARD_RECIPES)
       .planes.flat()
     expect(pieces.filter((piece) => piece.component.asset).map((piece) => piece.angle))
       .toEqual([angle, angle, angle, angle])
     expect(pieces.filter((piece) => !piece.component.asset).every((piece) => piece.angle === undefined))
       .toBe(true)
+  })
+
+  it.each([1, 2, 3] as const)('draws a strength %s laser with its own artwork', (strength) => {
+    const board = createBoardRenderModel(1, 1, { laser: [{ x: 0, y: 0, orientation: 'EAST', strength }] })
+    const symbols = createBoardScene(board, BOARD_CONFIG, BOARD_COMPONENTS, BOARD_RECIPES)
+      .planes.flat().flatMap((piece) => piece.component.asset?.symbol ?? [])
+    expect(symbols).toEqual([
+      `laser1-s${strength}`, `laser1-s${strength}`, `laser1-s${strength}`, `laser3-s${strength}`,
+    ])
   })
 
 })

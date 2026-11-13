@@ -1,19 +1,31 @@
-import type { Antenna, Orientation } from '@robo-rally/game-events'
+import type { Antenna, LaserStrength, Orientation } from '@robo-rally/game-events'
 
 export type BoardPoint = Readonly<{ x: number; y: number }>
-
-export type BoardTileType = 'empty' | 'hole' | 'laser'
-export type BoardRecipeName = BoardTileType | 'pillar' | 'antenna'
 export type BoardWallSide = 'north' | 'east' | 'south' | 'west'
 export type BoardTileWalls = Readonly<Record<BoardWallSide, boolean>>
 
+export type BoardTile =
+  | Readonly<{
+      tile: 'empty' | 'hole' | 'laser'
+    }>
+  | Readonly<{
+      tile: 'conveyor'
+      sprite: string
+      direction: Orientation
+    }>
+
+export type BoardTileType = BoardTile['tile']
+export type BoardRecipeName = BoardTileType | 'pillar' | 'antenna'
+
+
 export type BoardCell = BoardPoint &
+  BoardTile &
   Readonly<{
-    tile: BoardTileType
     walls: BoardTileWalls
     checkpointNumber?: number
-    // The direction a laser tile fires in; only set when tile is 'laser'
+    // The direction a laser tile fires in and its number of beams; only set when tile is 'laser'
     laserOrientation?: Orientation
+    laserStrength?: LaserStrength
   }>
 
 export type BoardRenderModel = Readonly<{
@@ -24,6 +36,7 @@ export type BoardRenderModel = Readonly<{
 }>
 
 export type BoardComponentName =
+  | 'conveyor'
   | `antenna${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10}`
   | 'ground'
   | 'laser1'
@@ -106,7 +119,11 @@ type BoardWallAssignment = BoardPoint & Partial<BoardTileWalls>
 type BoardAssignments = Readonly<{
   antenna?: Antenna
   hole?: readonly (readonly [number, number])[]
-  laser?: readonly (BoardPoint & Readonly<{ orientation: Orientation }>)[]
+  laser?: readonly (BoardPoint & Readonly<{ orientation: Orientation; strength: LaserStrength }>)[]
+  conveyor?: readonly (BoardPoint & Readonly<{
+    sprite: string
+    direction: Orientation
+  }>)[]
   walls?: readonly BoardWallAssignment[]
   checkpoints?: readonly (BoardPoint & { checkpointNumber: number })[]
 }>
@@ -166,21 +183,33 @@ export function createBoardRenderModel(
     }
   }
 
-  const tiles = new Map<string, BoardTileType>()
-  const laserOrientations = new Map<string, Orientation>()
-  function assignTile(key: string, tile: BoardTileType) {
+  const tiles = new Map<string, BoardTile>()
+  const lasers = new Map<string, Readonly<{ laserOrientation: Orientation; laserStrength: LaserStrength }>>()
+  function assignTile(key: string, tile: BoardTile) {
     if (tiles.has(key)) {
       throw new RangeError(`Board cell ${key} is assigned twice`)
     }
     tiles.set(key, tile)
   }
   for (const [x, y] of assignments.hole ?? []) {
-    assignTile(positionKey(x, y), 'hole')
+    assignTile(positionKey(x, y), { tile: 'hole' })
   }
-  for (const { x, y, orientation } of assignments.laser ?? []) {
+  for (const { x, y, orientation, strength } of assignments.laser ?? []) {
     const key = positionKey(x, y)
-    assignTile(key, 'laser')
-    laserOrientations.set(key, orientation)
+    assignTile(key, { tile: 'laser' })
+    lasers.set(key, { laserOrientation: orientation, laserStrength: strength })
+  }
+
+  for (const { x, y, sprite, direction } of assignments.conveyor ?? []) {
+    const key = positionKey(x, y)
+    if (tiles.has(key)) {
+      throw new RangeError(`Board cell ${key} is assigned twice`)
+    }
+    tiles.set(key, { 
+      tile: 'conveyor', 
+      sprite, 
+      direction,
+    })
   }
 
   const walls = new Map<string, BoardTileWalls>()
@@ -201,16 +230,16 @@ export function createBoardRenderModel(
     checkpoints.set(key, checkpointNumber)
   }
 
-  const cells = Object.freeze(
+  const cells: readonly BoardCell[] = Object.freeze(
     Array.from({ length: rows }, (_, y) =>
       Array.from({ length: columns }, (_, x) =>
         Object.freeze({
           x,
           y,
-          tile: tiles.get(`${x},${y}`) ?? 'empty',
+          ...(tiles.get(`${x},${y}`) ?? { tile: 'empty' as const }),
           walls: walls.get(`${x},${y}`) ?? EMPTY_WALLS,
           ...(checkpoints.has(`${x},${y}`) ? { checkpointNumber: checkpoints.get(`${x},${y}`) } : {}),
-          ...(laserOrientations.has(`${x},${y}`) ? { laserOrientation: laserOrientations.get(`${x},${y}`) } : {}),
+          ...lasers.get(`${x},${y}`),
         }),
       ),
     ).flat(),

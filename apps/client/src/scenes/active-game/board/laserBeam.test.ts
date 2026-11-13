@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { BOARD_CONFIG } from './boardConfig.ts'
+import laserSprites from './assets/lasers.hbls?raw'
+import { BOARD_CONFIG, LASER_BEAM } from './boardConfig.ts'
 import { createBoardRenderModel } from './boardModel.ts'
 import { beamReach, laserAngle, traceBeam, traceBeams } from './laserBeam.ts'
 
@@ -52,14 +53,14 @@ describe('traceBeam', () => {
   it('stops at the first robot, including one on the laser tile', () => {
     const board = createBoardRenderModel(5, 1)
     const robots = [{ x: 3, y: 0 }, { x: 2, y: 0 }]
-    expect(traceBeam(board, { x: 0, y: 0, orientation: 'EAST' }, robots)).toMatchObject({ cells: 2, end: 'robot' })
-    expect(traceBeam(board, { x: 2, y: 0, orientation: 'EAST' }, robots)).toMatchObject({ cells: 0, end: 'robot' })
+    expect(traceBeam(board, { x: 0, y: 0, orientation: 'EAST' }, robots)).toMatchObject({ cells: 2, end: 'target' })
+    expect(traceBeam(board, { x: 2, y: 0, orientation: 'EAST' }, robots)).toMatchObject({ cells: 0, end: 'target' })
   })
 
   it('prefers a robot over a wall in the same cell', () => {
     const board = createBoardRenderModel(3, 1, { walls: [{ x: 1, y: 0, east: true }] })
     expect(traceBeam(board, { x: 0, y: 0, orientation: 'EAST' }, [{ x: 1, y: 0 }])).toMatchObject({
-      cells: 1, end: 'robot',
+      cells: 1, end: 'target',
     })
   })
 
@@ -73,13 +74,39 @@ describe('traceBeam', () => {
 describe('traceBeams', () => {
   it('traces every laser tile using its own orientation', () => {
     const board = createBoardRenderModel(4, 3, {
-      laser: [{ x: 0, y: 0, orientation: 'EAST' }, { x: 3, y: 2, orientation: 'NORTH' }],
+      laser: [
+        { x: 0, y: 0, orientation: 'EAST', strength: 1 },
+        { x: 3, y: 2, orientation: 'NORTH', strength: 3 },
+      ],
     })
     expect(traceBeams(board, [{ x: 2, y: 0 }])).toEqual([
-      { x: 0, y: 0, orientation: 'EAST', cells: 2, end: 'robot' },
-      { x: 3, y: 2, orientation: 'NORTH', cells: 2, end: 'edge' },
+      { x: 0, y: 0, orientation: 'EAST', cells: 2, end: 'target', strength: 1 },
+      { x: 3, y: 2, orientation: 'NORTH', cells: 2, end: 'edge', strength: 3 },
     ])
     expect(traceBeams(createBoardRenderModel(2, 2), [])).toEqual([])
+  })
+
+  it('stops at the priority antenna', () => {
+    const board = createBoardRenderModel(5, 1, {
+      antenna: { x: 3, y: 0, angle: 0 },
+      laser: [{ x: 0, y: 0, orientation: 'EAST', strength: 2 }],
+    })
+    expect(traceBeams(board, [])).toMatchObject([{ cells: 3, end: 'target' }])
+  })
+})
+
+describe('laser artwork', () => {
+  // Each beam leaves the middle of an emitter box drawn in the sprite.
+  it.each([1, 2, 3] as const)('has an emitter box per strength %s beam', (strength) => {
+    const symbol = laserSprites.match(
+      new RegExp(`<symbol id="laser3-s${strength}"[^>]*>([\\s\\S]*?)</symbol>`),
+    )?.[1]
+    const centres = [...(symbol ?? '').matchAll(/<rect [^>]*y="([\d.]+)" [^>]*height="([\d.]+)"/g)]
+      .map(([, y, height]) => Number(y) + Number(height) / 2)
+    expect(centres).toHaveLength(strength)
+    centres.forEach((centre, index) =>
+      expect(centre).toBeCloseTo(LASER_BEAM.centres[strength][index], 3),
+    )
   })
 })
 
@@ -89,7 +116,7 @@ describe('beamReach', () => {
 
   it('ends at the robot centre or at the far edge of the last cell', () => {
     const beam = { x: 0, y: 0, orientation: 'EAST', cells: 2 } as const
-    expect(beamReach({ ...beam, end: 'robot' }, BOARD_CONFIG)).toBe(2 * pitch)
+    expect(beamReach({ ...beam, end: 'target' }, BOARD_CONFIG)).toBe(2 * pitch)
     expect(beamReach({ ...beam, end: 'wall' }, BOARD_CONFIG)).toBe(2 * pitch + tile / 2)
     expect(beamReach({ ...beam, end: 'edge' }, BOARD_CONFIG)).toBe(2 * pitch + tile / 2)
   })

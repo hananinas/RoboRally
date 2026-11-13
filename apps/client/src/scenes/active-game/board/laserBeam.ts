@@ -1,4 +1,4 @@
-import type { Orientation } from '@robo-rally/game-events'
+import type { LaserStrength, Orientation } from '@robo-rally/game-events'
 import type {
   BoardCell,
   BoardPoint,
@@ -7,9 +7,11 @@ import type {
   BoardWallSide,
 } from './boardModel.ts'
 
-export type LaserBeamEnd = 'wall' | 'robot' | 'edge'
+export type LaserBeamEnd = 'wall' | 'target' | 'edge'
 
-export type LaserBeam = BoardPoint &
+export type LaserBeam = TracedBeam & Readonly<{ strength: LaserStrength }>
+
+type TracedBeam = BoardPoint &
   Readonly<{
     orientation: Orientation
     // How many cells the beam crosses beyond the laser's own cell
@@ -37,16 +39,16 @@ export function laserAngle(orientation: Orientation): number {
   return STEPS[orientation].angle
 }
 
-// The beam leaves the laser's cell and stops at the first robot (reaching its
-// centre), the first wall on either side of a cell boundary (reaching the cell
+// The beam leaves the laser's cell and stops at the first blocker, a robot or
+// the priority antenna (reaching its centre), the first wall on either side of a cell boundary (reaching the cell
 // edge), or the edge of the board.
 export function traceBeam(
   board: Pick<BoardRenderModel, 'columns' | 'rows' | 'cells'>,
   laser: BoardPoint & Readonly<{ orientation: Orientation }>,
-  robots: readonly BoardPoint[],
-): LaserBeam {
+  blockers: readonly BoardPoint[],
+): TracedBeam {
   const { dx, dy, side, opposite } = STEPS[laser.orientation]
-  const occupied = new Set(robots.map(({ x, y }) => `${x},${y}`))
+  const occupied = new Set(blockers.map(({ x, y }) => `${x},${y}`))
   const cellAt = (x: number, y: number): BoardCell =>
     board.cells[y * board.columns + x]
   const beam = { x: laser.x, y: laser.y, orientation: laser.orientation }
@@ -54,7 +56,7 @@ export function traceBeam(
   let x = laser.x
   let y = laser.y
   for (let cells = 0; ; cells += 1) {
-    if (occupied.has(`${x},${y}`)) return { ...beam, cells, end: 'robot' }
+    if (occupied.has(`${x},${y}`)) return { ...beam, cells, end: 'target' }
     if (cellAt(x, y).walls[side]) return { ...beam, cells, end: 'wall' }
 
     const nextX = x + dx
@@ -74,18 +76,22 @@ export function traceBeams(
   board: BoardRenderModel,
   robots: readonly BoardPoint[],
 ): readonly LaserBeam[] {
+  const blockers = board.antenna ? [...robots, board.antenna] : robots
   return board.cells.flatMap((cell) =>
-    cell.laserOrientation
-      ? [traceBeam(board, { x: cell.x, y: cell.y, orientation: cell.laserOrientation }, robots)]
+    cell.laserOrientation && cell.laserStrength
+      ? [{
+          ...traceBeam(board, { x: cell.x, y: cell.y, orientation: cell.laserOrientation }, blockers),
+          strength: cell.laserStrength,
+        }]
       : [],
   )
 }
 
 // Distance in pixels from the centre of the laser's cell to the end of the beam
 export function beamReach(
-  beam: LaserBeam,
+  beam: TracedBeam,
   config: Pick<BoardRenderConfig, 'gap' | 'tile'>,
 ): number {
   const centre = beam.cells * (config.tile + config.gap)
-  return beam.end === 'robot' ? centre : centre + config.tile / 2
+  return beam.end === 'target' ? centre : centre + config.tile / 2
 }

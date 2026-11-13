@@ -1,5 +1,6 @@
 import { useId, useState } from 'react'
 import { KEYBINDS } from './useGameKeybinds.ts'
+import '../ActiveGame.css'
 
 // Uses a native popover for Escape, outside-click dismissal, and top-layer display.
 function GameMenu({ onLeave, leaveDisabled, onLogout, onSettings }: {
@@ -38,22 +39,50 @@ function GameMenu({ onLeave, leaveDisabled, onLogout, onSettings }: {
           setOpen(event.newState === 'open')
         }}
       >
-        <h2 className="game-menu__heading">Game options</h2>
-        <ul className="game-menu__options">
-          <li>
-            <button className="game-menu__option" type="button" disabled={!onLeave || leaveDisabled} onClick={onLeave}>
-              {onLeave ? 'Leave game' : 'No options available yet'}
+        <h2 className="game-menu__heading">
+          <span aria-hidden="true">⚙</span>
+          Settings
+          </h2>
+        <div className="game-menu__group">
+          <h3 className="game-menu__section-title">Account</h3>
+          <button className="game-menu__option" type="button" onClick={onSettings}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="8" r="5" />
+              <path d="M20 21a8 8 0 0 0-16 0" />
+            </svg>
+            Account Settings
+          </button>
+          <button className="game-menu__option" type="button" onClick={onLogout}>
+            <span className="game-menu__icon" aria-hidden="true">↪</span>
+            Logout
+          </button>
+        </div>
+
+        {onLeave && (
+          <div className="game-menu__group">
+            <h3 className="game-menu__section-title">Game</h3>
+            <button
+              className="game-menu__option"
+              type="button"
+              disabled={leaveDisabled}
+              onClick={onLeave}
+            >
+              <span className="game-menu__icon" aria-hidden="true">↩</span>
+              Leave game
             </button>
-          </li>
-          <li>
-            <button className="game-menu__option" type="button" onClick={onSettings}>Account Settings</button>
-          </li>
-          <li>
-            <button className="game-menu__option" type="button" onClick={onLogout}>Logout</button>
-          </li>
-          <li>
-            <details className="game-menu__option" open>
-              <summary className="game-menu__option-summary">Keybinds</summary>
+          </div>
+        )}
+
+        {onLeave && (
+          <div className="game-menu__group">
+            <h3 className="game-menu__section-title">Controls</h3>
+
+            <details className="game-menu__details">
+              <summary className="game-menu__option-summary">
+                <span className="game-menu__icon" aria-hidden="true">⌨</span>
+                Keybindings
+              </summary>
+
               <dl className="game-menu__keybinds">
                 {KEYBINDS.map(({ keys, description }) => (
                   <div className="game-menu__keybind" key={keys}>
@@ -63,8 +92,8 @@ function GameMenu({ onLeave, leaveDisabled, onLogout, onSettings }: {
                 ))}
               </dl>
             </details>
-          </li>
-        </ul>
+          </div>
+        )}
       </section>
     </div>
   )

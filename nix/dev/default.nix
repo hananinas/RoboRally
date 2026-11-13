@@ -25,6 +25,7 @@ let
     withClient ? false,
     withGameService ? false,
     withAsyncapi ? false,
+    withDiagrams ? false,
     withEditor ? false,
     withBackend ? false,
     withBrowser ? false
@@ -33,6 +34,7 @@ let
       packages = [ nodejs pnpm ]
         ++ pkgs.lib.optionals withBackend [ pkgs.process-compose pkgs.kratos pkgs.ory-hydra pkgs.mailpit pkgs.mkcert pkgs.nss.tools pkgs.caddy pkgs.xdg-utils ]
         ++ pkgs.lib.optionals withAsyncapi asyncapiPackages
+        ++ pkgs.lib.optionals withDiagrams [ pkgs.plantuml-c4 ]
         ++ pkgs.lib.optionals withEditor [ editor ]
         ++ pkgs.lib.optionals withBrowser [ pkgs.firefox ];
 
@@ -52,6 +54,7 @@ in {
     withClient = true;
     withGameService = true;
     withAsyncapi = true;
+    withDiagrams = true;
     withBackend = true;
   };
 
@@ -81,6 +84,7 @@ in {
     withClient = true;
     withGameService = true;
     withAsyncapi = true;
+    withDiagrams = true;
     withEditor = true;
     withBackend = true;
   };

@@ -54,7 +54,11 @@ describe('Player', () => {
     const initial = first.registers
     expect(initial).toEqual(empty)
 
-    first.updateRegisters([true, false, true, false, true])
+    const selection = [card, null, new Card('left-1', 'TURN_LEFT'), null, new Card('move-2', 'MOVE_1')] as const
+    first.updateRegisters(selection)
+    expect(first.program).toEqual(selection)
+    expect(first.program).not.toBe(selection)
+    expect(Object.isFrozen(first.program)).toBe(true)
     const occupied = first.registers
     expect(occupied).toEqual([
       { status: 'HIDDEN' }, { status: 'EMPTY' }, { status: 'HIDDEN' },
@@ -68,6 +72,7 @@ describe('Player', () => {
     expect(occupied.every(Object.isFrozen)).toBe(true)
 
     const revealed = first.revealRegister(2, card.instruction)
+    expect(first.program).toEqual(selection)
     expect(first.registers).toBe(revealed)
     expect(revealed).toEqual([
       { status: 'HIDDEN' }, { status: 'EMPTY' }, { status: 'REVEALED', instruction: 'MOVE_1' },
@@ -79,6 +84,7 @@ describe('Player', () => {
 
     first.resetRegisters()
     expect(first.registers).toEqual(empty)
+    expect(first.program).toEqual([null, null, null, null, null])
     expect(revealed[2]).toEqual({ status: 'REVEALED', instruction: 'MOVE_1' })
     expect(first.hand).toEqual([card])
   })
@@ -129,7 +135,7 @@ describe('Player', () => {
       game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
       for (let register = 0; register < 5; register++) game.executeNextAction()
 
-      expect(game.phase).toBe('programming')
+      expect(game.lastActivePhase).toBe('programming')
       expect(player.robot.program).toEqual([])
       expect(player.lastCheckpoint).toBe(1)
     }

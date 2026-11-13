@@ -101,7 +101,18 @@ export function createBoardScene(
               height,
               stackBaseLayer / config.parallaxReferenceLayer,
             )
-      const component = components[slice.component]
+      const baseComponent = components[slice.component]
+      // Conveyors and lasers pick their artwork from the tile they sit on.
+      const symbol = slice.component === 'conveyor' && cell.tile === 'conveyor'
+        ? cell.sprite
+        : cell.laserStrength === undefined ? undefined
+          : `${baseComponent.asset?.symbol}-s${cell.laserStrength}`
+
+      const component: BoardVisualComponent =
+        symbol !== undefined && baseComponent.asset
+          ? { ...baseComponent, asset: { ...baseComponent.asset, symbol } }
+          : baseComponent
+
       const angle = antenna && !slice.wall
         ? antenna.angle * 180 / Math.PI - 90
         : cell.laserOrientation && component.asset

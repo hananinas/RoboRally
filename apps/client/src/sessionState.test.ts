@@ -16,6 +16,8 @@ const joined: GameInitialization = {
   },
   state: {
     gameId: '00000000-0000-4000-8000-000000000002',
+    serverTime: 0,
+    programmingTimer: { status: 'IDLE' },
     antenna: { x: 0, y: 0, angle: Math.PI / 2 },
     board: { width: 1, height: 1, tiles: [] },
     robots: [],
@@ -27,10 +29,11 @@ const joined: GameInitialization = {
     winner: null,
   },
   hand: [],
+  program: [null, null, null, null, null],
   programSubmitted: false,
 }
 
-const lobby = { lobbyId: 'lobby-1', name: 'Lobby One', ownerUserId: user.userId, playerCount: 1, maxPlayers: 6, players: [user] }
+const lobby = { lobbyId: 'lobby-1', name: 'Lobby One', mapName: 'test-map' as const, mapDisplayName: 'Test Map', mapIcon: 'test-map-icon', ownerUserId: user.userId, playerCount: 1, maxPlayers: 6, players: [user] }
 const browsing: SessionState = { status: 'browsing', user, error: null }
 const waiting: SessionState = { status: 'waiting', user, lobby, error: null }
 

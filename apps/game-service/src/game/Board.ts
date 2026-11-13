@@ -64,6 +64,10 @@ export class Board {
     return this.checkpointTotal
   }
 
+  get hasLasers(): boolean {
+    return this.tiles.some((row) => row.some((tile) => tile.kind === 'LASER'))
+  }
+
   contains(position: Position): boolean {
     return (
       position.x >= 0 &&

@@ -77,10 +77,19 @@ export const BOARD_COMPONENTS: Readonly<
   testTank2: sprite('testTank2', '0 0 57 87', 0.65),
   testTank3: sprite('testTank3', '0 0 57 87', 0.65),
   testTank4: sprite('testTank4', '0 0 57 87', 0.65),
-  testTank5: sprite('testTank5', '0 0 57 87', 0.65),
+  testTank5: sprite('testTank5', '0 0 57 87', 0.65), 
   testTank6: sprite('testTank6', '0 0 57 87', 0.65),
   testTank7: sprite('testTank7', '0 0 57 87', 0.65),
   testTank8: sprite('testTank8', '0 0 57 87', 0.65),
+
+  conveyor:{
+    asset: {
+      symbol: 'conveyor-1-straight',
+      viewBox: '0 0 72 72',
+    },
+    className: 'board-piece--asset',
+    width: 1,
+  }, 
 }
 
 const EMPTY_SLICES = [
@@ -139,6 +148,12 @@ export const BOARD_RECIPES: Readonly<
       { layer: 6, component: 'laser3' },
     ],
   },
+  conveyor: {
+    slices: [
+      ...EMPTY_SLICES,
+      { layer: 3, component: 'conveyor', order: 1 },
+    ],
+  },  
 }
 
 // Laser beams are drawn in code, in the same coordinate space as the laser
@@ -148,8 +163,12 @@ export const LASER_BEAM = {
   size: 72,
   startX: 10,
   thickness: 3,
-  // One beam per mount nub
-  centres: [17.4593, 36.4593, 55.4593],
+  // One beam per emitter box on the mount; see lasers.hbls
+  centres: {
+    1: [36.4593],
+    2: [26.9593, 45.9593],
+    3: [17.4593, 36.4593, 55.4593],
+  },
   glowBlur: 5.7,
   glowInset: 5,
 } as const

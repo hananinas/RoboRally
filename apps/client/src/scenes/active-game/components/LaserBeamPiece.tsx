@@ -15,7 +15,8 @@ export default function LaserBeamPiece({ board, beam }: Readonly<{
   board: Pick<BoardRenderModel, 'columns' | 'rows'>
   beam: LaserBeam
 }>) {
-  const { size, startX, thickness, centres, glowBlur, glowInset } = LASER_BEAM
+  const { size, startX, thickness, glowBlur, glowInset } = LASER_BEAM
+  const centres = LASER_BEAM.centres[beam.strength]
   const centre = tileCentre(beam, board, BOARD_CONFIG)
   const width = BOARD_CONFIG.tile * BOARD_COMPONENTS.laser1.width
   const endX = size / 2 + beamReach(beam, BOARD_CONFIG) / (width / size)

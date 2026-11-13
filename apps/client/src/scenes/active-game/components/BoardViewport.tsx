@@ -2,8 +2,7 @@ import { useMemo, useRef, type CSSProperties } from 'react'
 import antennaSprites from '../board/assets/antenna.hbls?raw'
 import laserSprites from '../board/assets/lasers.hbls?raw'
 import tankSprites from '../board/assets/tanks.hbls?raw'
-import StartTilePiece from './StartTilePiece.tsx'
-
+import conveyorSprites from '../board/assets/conveyors.hbls?raw'
 import {
   BOARD_COMPONENTS,
   BOARD_CONFIG,
@@ -12,6 +11,9 @@ import {
 } from '../board/boardConfig.ts'
 import { tileCentre } from '../board/boardMath.ts'
 import {
+  PIT_FALL_DURATION_MS,
+  PIT_RESPAWN_DURATION_MS,
+  orientationAngle,
   ROBOT_MOVE_DURATION_MS,
   ROBOT_TURN_DURATION_MS,
   type DisplayRobot,
@@ -27,7 +29,6 @@ import { traceBeams } from '../board/laserBeam.ts'
 import CheckpointPiece from './CheckpointPiece.tsx'
 import LaserBeamPiece from './LaserBeamPiece.tsx'
 import '../board/BoardViewport.css'
-
 type BoardViewportProps = Readonly<{
   board: BoardRenderModel
   robots: readonly DisplayRobot[]
@@ -44,6 +45,8 @@ type PieceStyle = CSSProperties &
     '--tank-colour'?: string
     '--tank-move-duration'?: string
     '--tank-turn-duration'?: string
+    '--pit-fall-duration'?: string
+    '--pit-respawn-duration'?: string
   }>
 
 function holeColour(blend: number): string {
@@ -66,7 +69,10 @@ function pieceStyle(piece: BoardScenePiece): PieceStyle {
     top: piece.tileCentre.worldY,
     width: BOARD_CONFIG.tile * piece.component.width,
     zIndex: piece.slice.order ?? 0,
-    '--board-piece-angle': piece.angle === undefined ? undefined : `${piece.angle}deg`,
+    '--board-piece-angle':
+      piece.componentName === 'conveyor' && piece.cell.tile === 'conveyor'
+        ? `${orientationAngle[piece.cell.direction]}deg`
+        : `${piece.angle}deg`,
   }
 
   if (!piece.slice.wall) return style
@@ -185,6 +191,7 @@ function RobotPiece({
       )}
       data-board-tile={`${robot.position.coordinate.x},${robot.position.coordinate.y}`}
       data-robot-id={robot.robotId}
+      data-playback-phase={robot.phase}
       preserveAspectRatio="xMidYMid meet"
       style={style}
       viewBox={component.asset.viewBox}
@@ -215,6 +222,8 @@ function BoardViewport({ board, robots, lasersActive = true }: BoardViewportProp
     [board, lasersActive, robots],
   )
   const checkpointTiles = scene.tiles.filter((tile) => tile.cell.checkpointNumber !== undefined)
+  const fallingInto = new Set(robots.flatMap((robot) => robot.phase === 'pit-fall'
+    ? [`${robot.position.coordinate.x},${robot.position.coordinate.y}`] : []))
 
   return (
     <main
@@ -224,6 +233,8 @@ function BoardViewport({ board, robots, lasersActive = true }: BoardViewportProp
       style={{
         '--tank-move-duration': `${ROBOT_MOVE_DURATION_MS}ms`,
         '--tank-turn-duration': `${ROBOT_TURN_DURATION_MS}ms`,
+        '--pit-fall-duration': `${PIT_FALL_DURATION_MS}ms`,
+        '--pit-respawn-duration': `${PIT_RESPAWN_DURATION_MS}ms`,
       } as PieceStyle}
     >
       <div
@@ -234,7 +245,7 @@ function BoardViewport({ board, robots, lasersActive = true }: BoardViewportProp
       >
         <div
           aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: `${antennaSprites}${laserSprites}${tankSprites}` }}
+          dangerouslySetInnerHTML={{ __html: `${laserSprites}${antennaSprites}${tankSprites}${conveyorSprites}` }}
         />
         {scene.planes.map((pieces, layer) => {
           const robotComponent = ROBOT_COMPONENTS[layer - 3]
@@ -250,9 +261,6 @@ function BoardViewport({ board, robots, lasersActive = true }: BoardViewportProp
               ))}
               {layer === LASER_BEAM.layer && beams.map((beam) => (
                 <LaserBeamPiece board={board} beam={beam} key={`${beam.x},${beam.y}`} />
-              ))}
-              {layer === 3 && robots.map((robot) => (
-                <StartTilePiece board={board} key={`start:${robot.robotId}`} robot={robot} />
               ))}
               {checkpointTiles.map((tile) => (
                 <CheckpointPiece key={`${tile.cell.x},${tile.cell.y}`} tile={tile} layer={layer} />
@@ -273,6 +281,7 @@ function BoardViewport({ board, robots, lasersActive = true }: BoardViewportProp
                     data-board-height="0"
                     data-board-tile-type="hole"
                     data-board-tile={`${hole.cell.x},${hole.cell.y}`}
+                    data-pit-active={fallingInto.has(`${hole.cell.x},${hole.cell.y}`) || undefined}
                     key={hole.key}
                     style={{
                       background: holeColour(BOARD_CONFIG.hole.colourOffset),

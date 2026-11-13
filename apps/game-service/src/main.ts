@@ -15,9 +15,14 @@ process.on('uncaughtExceptionMonitor', (error, origin) => {
 const host = '127.0.0.1'
 const config = parseAppConfig(process.env)
 const oidcClient = await createOidcClient(config.oidc)
-const sessionStore = createSessionStore()
+const sessionStore = createSessionStore({ oidcClient, refreshBufferSeconds: config.oidc.refreshBufferSeconds })
 const httpServer = createServer()
-const authApp = createAuthApp({ oidcClient, sessionStore, kratosSettingsUrl: config.kratosSettingsUrl })
+const authApp = createAuthApp({
+  oidcClient,
+  sessionStore,
+  kratosSettingsUrl: config.kratosSettingsUrl,
+  refreshTokenTtlSeconds: config.refreshTokenTtlSeconds,
+})
 httpServer.on('request', (req, res) => {
   if (req.url?.startsWith('/auth/')) {
     authApp(req, res)
@@ -26,8 +31,8 @@ httpServer.on('request', (req, res) => {
 
 const random = config.startTileOrder === 'ordered' ? () => 0 : Math.random
 const { cardSeed } = config
-const io = createGameSocketServer(httpServer, sessionStore, () =>
-  createDefaultGame(random, cardSeed === undefined ? undefined : seededRandom(cardSeed)))
+const io = createGameSocketServer(httpServer, sessionStore, (mapName) =>
+  createDefaultGame(random, cardSeed === undefined ? undefined : seededRandom(cardSeed), mapName))
 
 httpServer.listen(config.port, host, () => {
   console.log(`Game Service listening at http://${host}:${config.port}`)

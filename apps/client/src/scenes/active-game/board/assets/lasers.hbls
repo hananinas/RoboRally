@@ -1,21 +1,48 @@
 <svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
-  <!-- laser1 -->
-  <symbol id="laser1" viewBox="0 0 72 72">
+  <!-- Mount (laser1) and emitter boxes (laser3) per beam count. Emitter centres match LASER_BEAM.centres. -->
+  <!-- laser1, strength 1 -->
+  <symbol id="laser1-s1" viewBox="0 0 72 72">
     <rect x="0" y="31" width="11.4141" height="10.9186" rx="4" fill="#7E8A98"/>
-    <rect x="0" y="50" width="11.4141" height="10.9186" rx="4" fill="#7E8A98"/>
-    <rect x="0" y="12" width="11.4141" height="10.9186" rx="4" fill="#7E8A98"/>
-    <path d="M1.18257e-05 8H4.08852C5.1442 8 6 8.89709 6 10.0037L5.99999 62.9963C5.99999 64.1029 5.14419 65 4.08851 65H0L1.18257e-05 8Z" fill="#6E7986"/>
-    <path d="M1.28186 17.4591L6.28311 12.0017V22.9166L1.28186 17.4591Z" fill="#7E8A98"/>
-    <path d="M1.28 36.4574L6.28125 31V41.9148L1.28 36.4574Z" fill="#7E8A98"/>
-    <path d="M1.28186 55.4602L6.28311 50.0028V60.9177L1.28186 55.4602Z" fill="#7E8A98"/>
-    <path d="M3.07199e-06 9.89162C3.10096e-06 9.39919 0.447718 9 1 9C2.65685 9 4 10.1976 4 11.6749L3.99999 60.3251C3.99999 61.8025 2.65685 63 0.999994 63C0.447715 63 -2.897e-08 62.6008 0 62.1084L3.07199e-06 9.89162Z" fill="#6E7986"/>
+    <path d="M0 27H4.08852C5.1442 27 6 27.8971 6 29.0037L5.99999 43.9963C5.99999 45.1029 5.14419 46 4.08851 46H0L0 27Z" fill="#6E7986"/>
+    <path d="M1.28186 36.4593L6.28311 31.0019V41.9168L1.28186 36.4593Z" fill="#7E8A98"/>
   </symbol>
 
-  <!-- laser3 -->
-  <symbol id="laser3" viewBox="0 0 72 72">
+  <!-- laser1, strength 2 -->
+  <symbol id="laser1-s2" viewBox="0 0 72 72">
+    <rect x="0" y="21.5" width="11.4141" height="10.9186" rx="4" fill="#7E8A98"/>
+    <rect x="0" y="40.5" width="11.4141" height="10.9186" rx="4" fill="#7E8A98"/>
+    <path d="M0 17.5H4.08852C5.1442 17.5 6 18.3971 6 19.5037L5.99999 53.4963C5.99999 54.6029 5.14419 55.5 4.08851 55.5H0L0 17.5Z" fill="#6E7986"/>
+    <path d="M1.28186 26.9593L6.28311 21.5019V32.4168L1.28186 26.9593Z" fill="#7E8A98"/>
+    <path d="M1.28186 45.9593L6.28311 40.5019V51.4168L1.28186 45.9593Z" fill="#7E8A98"/>
+  </symbol>
+
+  <!-- laser1, strength 3 -->
+  <symbol id="laser1-s3" viewBox="0 0 72 72">
+    <rect x="0" y="12" width="11.4141" height="10.9186" rx="4" fill="#7E8A98"/>
     <rect x="0" y="31" width="11.4141" height="10.9186" rx="4" fill="#7E8A98"/>
     <rect x="0" y="50" width="11.4141" height="10.9186" rx="4" fill="#7E8A98"/>
-    <rect x="0" y="12" width="11.4141" height="10.9186" rx="4" fill="#7E8A98"/>
+    <path d="M0 8H4.08852C5.1442 8 6 8.8971 6 10.0037L5.99999 62.9963C5.99999 64.1029 5.14419 65 4.08851 65H0L0 8Z" fill="#6E7986"/>
+    <path d="M1.28186 17.4593L6.28311 12.0019V22.9168L1.28186 17.4593Z" fill="#7E8A98"/>
+    <path d="M1.28186 36.4593L6.28311 31.0019V41.9168L1.28186 36.4593Z" fill="#7E8A98"/>
+    <path d="M1.28186 55.4593L6.28311 50.0019V60.9168L1.28186 55.4593Z" fill="#7E8A98"/>
+  </symbol>
+
+  <!-- laser3, strength 1 -->
+  <symbol id="laser3-s1" viewBox="0 0 72 72">
+    <rect x="0" y="31" width="11.4141" height="10.9186" rx="4" fill="#D25252"/>
+  </symbol>
+
+  <!-- laser3, strength 2 -->
+  <symbol id="laser3-s2" viewBox="0 0 72 72">
+    <rect x="0" y="21.5" width="11.4141" height="10.9186" rx="4" fill="#D25252"/>
+    <rect x="0" y="40.5" width="11.4141" height="10.9186" rx="4" fill="#D25252"/>
+  </symbol>
+
+  <!-- laser3, strength 3 -->
+  <symbol id="laser3-s3" viewBox="0 0 72 72">
+    <rect x="0" y="12" width="11.4141" height="10.9186" rx="4" fill="#D25252"/>
+    <rect x="0" y="31" width="11.4141" height="10.9186" rx="4" fill="#D25252"/>
+    <rect x="0" y="50" width="11.4141" height="10.9186" rx="4" fill="#D25252"/>
   </symbol>
 
 </svg>

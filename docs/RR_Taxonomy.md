@@ -40,7 +40,7 @@ This document collects the important domain nouns and verbs in Robo Rally. Highl
 | Rotating conveyor belt | Subtype             | Moves and sometimes rotates a robot             |
 | Push panel             | Subtype             | Pushes a robot in specified registers           |
 | Gear                   | Subtype             | Rotates a robot 90 degrees                      |
-| Board laser            | Subtype             | Shoots the first visible robot in its path      |
+| Board laser            | Subtype             | Shoots 1-3 beams at the first visible robot in its path |
 | Robot laser            | Robot component     | Shoots forward from a robot                     |
 | Pit                    | Subtype             | Causes a robot to fall then reboot              |
 | Energy space           | Subtype             | Supplies an energy cube under stated conditions |
@@ -83,7 +83,7 @@ This document collects the important domain nouns and verbs in Robo Rally. Highl
 | Upgrade shop      | Entity or collection     | Face-up upgrades available for purchase           |
 | Upgrade slot      | Constraint or UI concept | Location for an installed permanent upgrade       |
 | Energy reserve    | Resource collection      | Energy cubes owned by a player                    |
-| Line of sight     | Calculated value         | Unblocked path between a laser and target         |
+| Line of sight     | Calculated value         | Unblocked path between a laser and target (walls and the antenna block it) |
 | Activation order  | Ordered value            | Fixed sequence for resolving elements             |
 | Priority order    | Ordered value            | Current ordered list of players                   |
 | Course difficulty | Enum                     | Starter, beginner, intermediate or advanced level |

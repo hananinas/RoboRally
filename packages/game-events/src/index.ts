@@ -9,6 +9,7 @@ export type {
   Card,
   CardId,
   CardsDealt,
+  ClockResult,
   Coordinate,
   GameAborted,
   GameWon,
@@ -25,9 +26,13 @@ export type {
   LeaveResult,
   PlayerState,
   Position,
+  PrivateProgram,
   ProgramResult,
   ProgramResultOutcome,
   ProgramSubmitted,
+  ProgramFinalized,
+  ProgramTimerChanged,
+  ProgrammingTimer,
   PublicGameState,
   PublicRegisterStatus,
   PublicRegisterSlot,
@@ -36,6 +41,9 @@ export type {
   Robot,
   RobotId,
   RobotActionResolved,
+  BoardElementActivated,
+  BoardElement,
+  LaserStrength,
   Tile,
   UpdateRegisters,
   UpdateRegistersResult,
@@ -45,7 +53,7 @@ export type {
 export { submitProgramSchema } from './submitProgram.js'
 export type { ProgramCardIds, SubmitProgram } from './submitProgram.js'
 export { updateRegistersSchema } from './updateRegisters.js'
-export type { RegisterOccupancy } from './updateRegisters.js'
+export type { RegisterCardIds } from './updateRegisters.js'
 
 export { effects } from './instructions.js'
 export type { Instruction, ResolvedInstruction } from './instructions.js'

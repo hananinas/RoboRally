@@ -11,19 +11,19 @@ export type ActionSchedulerDeps = {
   publicRoom: string
   playerRoom: (playerId: string) => string
   usernameOf: (playerId: string) => string | undefined
+  onProgrammingStarted: () => void
+  onStop: () => void
 }
 
 export type ActionScheduler = {
   scheduleNextAction: () => void
-  broadcastCheckpointProgress: () => void
-  announceWinner: () => void
+  announceProgress: (result: { roundConcluded: boolean }) => void
   winner: () => Winner | null
-  dealHands: () => void
   stop: () => void
 }
 
 export function createActionScheduler(
-  { io, game, gameId, publicRoom, playerRoom, usernameOf  }: ActionSchedulerDeps,
+  { io, game, gameId, publicRoom, playerRoom, usernameOf, onProgrammingStarted, onStop }: ActionSchedulerDeps,
 ): ActionScheduler {
   let scheduledAction: NodeJS.Immediate | undefined
   let closed = false
@@ -55,42 +55,48 @@ export function createActionScheduler(
   }
 
   function announceWinner(): void {
-    const result = winner()
-    if (result === null || winnerAnnounced) return
+    if (winnerAnnounced) return
     winnerAnnounced = true
-    io.to(publicRoom).emit('game.won', { gameId, ...result })
+    io.to(publicRoom).emit('game.won', { gameId, ...winner()! })
   }
 
-  function dealHands(): void {
-    if (game.winner !== undefined) return
+  function announceHands(): void {
     for (const player of game.players) {
       io.to(playerRoom(player.id)).emit('cards.dealt', presentCardsDealt(gameId, player))
     }
+    onProgrammingStarted()
+  }
+
+  function announceProgress(result: { roundConcluded: boolean }): void {
+    broadcastCheckpointProgress()
+    if (game.winner !== undefined) announceWinner()
+    if (result.roundConcluded) announceHands()
   }
 
   function scheduleNextAction(): void {
-    if (closed || game.phase !== 'activation' || scheduledAction || game.paused) return
+    if (closed || scheduledAction || game.requirePhase('activation').isErr()) return
     scheduledAction = setImmediate(() => {
       scheduledAction = undefined
-      if (closed || game.phase !== 'activation') return
+      if (closed || game.requirePhase('activation').isErr()) return
       try {
-        const result = game.executeNextAction()
-        io.to(publicRoom).emit(
-          'robot.actionResolved',
-          presentRobotActionResolved(gameId, game, result),
-        )
-        broadcastCheckpointProgress()
-        announceWinner()
-        if (game.phase === 'activation') {
-          scheduleNextAction()
+        if (game.boardElementsPending) {
+          const { registerIndex, element, roundConcluded } = game.activateNextBoardElement()
+          io.to(publicRoom).emit('board.elementActivated', { gameId, registerIndex, element })
+          announceProgress({ roundConcluded })
         } else {
-          dealHands()
+          const result = game.executeNextAction()
+          io.to(publicRoom).emit(
+            'robot.actionResolved',
+            presentRobotActionResolved(gameId, game, result),
+          )
+          announceProgress(result)
         }
+        scheduleNextAction()
       } catch (error) {
         logError('Failed to execute next robot action', error, {
           source: 'actionScheduler',
           gameId,
-          phase: game.phase,
+          phase: game.lastActivePhase,
           registerIndex: game.currentRegister,
         })
         stop()
@@ -103,7 +109,8 @@ export function createActionScheduler(
   function stop(): void {
     closed = true
     clearImmediate(scheduledAction)
+    onStop()
   }
 
-  return { scheduleNextAction, broadcastCheckpointProgress, announceWinner,winner, dealHands, stop }
+  return { scheduleNextAction, announceProgress, winner, stop }
 }

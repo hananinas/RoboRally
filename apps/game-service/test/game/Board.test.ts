@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Board, Direction, EmptyTile, LaserTile, PitTile } from '@/game/index.ts'
+import { Board, Direction, EmptyTile, LaserTile, PitTile, ConveyorTile } from '@/game/index.ts'
 import type { Position, Tile, TileKind } from '@/game/index.ts'
 import { Integer } from '@/numbers'
 
@@ -155,7 +155,8 @@ describe('Board robot ownership', () => {
   const destinations: Record<TileKind, { tile: Tile; canOccupy: boolean }> = {
     EMPTY: { tile: new EmptyTile(), canOccupy: true },
     PIT: { tile: new PitTile(), canOccupy: false },
-    LASER: { tile: new LaserTile(Direction.EAST), canOccupy: true },
+    LASER: { tile: new LaserTile(Direction.EAST, 3), canOccupy: true },
+    CONVEYOR: { tile: new ConveyorTile('conveyor-1-straight', Direction.NORTH), canOccupy: true },
   }
 
   it.each(Object.entries(destinations))('uses %s rules for placement, relocation and safe destinations', (kind, { tile, canOccupy }) => {
