@@ -49,6 +49,9 @@ export type Robot = Readonly<{
   position: Position
 }>
 
+// The number of beams a board laser fires.
+export type LaserStrength = 1 | 2 | 3
+
 export type Tile = Readonly<{
   position: Coordinate
   walls?: readonly Orientation[]
@@ -56,6 +59,12 @@ export type Tile = Readonly<{
 }> & (
   | Readonly<{
       type: 'EMPTY' | 'PIT'
+    }>
+  | Readonly<{
+      type: 'LASER'
+      laserOrientation: Orientation
+      // How many beams the laser fires.
+      laserStrength: LaserStrength
     }>
   | Readonly<{
     type: 'CONVEYOR'
@@ -177,6 +186,15 @@ export type RobotActionResolved = Readonly<{
   resolvedInstruction: ResolvedInstruction | null
   position: Position
   pushedRobots: readonly Pick<Robot, 'robotId' | 'position'>[]
+}>
+
+// Board elements activate after every robot has acted in a register, in the order the game resolves them.
+export type BoardElement = 'LASERS'
+
+export type BoardElementActivated = Readonly<{
+  gameId: GameId
+  registerIndex: number
+  element: BoardElement
 }>
 
 export type PublicRegisterStatus = 'EMPTY' | 'HIDDEN' | 'REVEALED'

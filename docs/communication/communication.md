@@ -229,6 +229,14 @@ Movement resolves one square at a time. Robots entering pits or leaving the boar
 
 The event includes final positions after reboots: `position` for the acting robot and `pushedRobots` for other robots whose positions changed. Clients apply them together when the action plays.
 
+#### Board elements
+
+Once every robot has acted in a register, the board's elements activate one at a time, in a fixed order. For each the service broadcasts to the [public room](#rooms):
+
+`board.elementActivated {gameId, registerIndex, element}`
+
+Clients show the element only while playing this event back, after the register's `robot.actionResolved` events. The register then finishes: checkpoint progress and the next register or hand follow. Elements the board does not have are skipped. Currently the only element is `LASERS`, which has no gameplay effect yet. Each laser tile (see `laserOrientation` and `laserStrength` in the board snapshot) fires 1, 2 or 3 beams; the client draws them for a short time, stopping at the first robot, the priority antenna or a wall.
+
 #### Activation ordering
 
 The antenna is located at the top centre of the board and faces south.

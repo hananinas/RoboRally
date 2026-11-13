@@ -72,7 +72,6 @@ export const BOARD_COMPONENTS: Readonly<
     width: 1,
   },
   laser1: sprite('laser1', '0 0 72 72', 0.82),
-  laser2: sprite('laser2', '0 0 72 87', 0.82),
   laser3: sprite('laser3', '0 0 72 72', 0.82),
   testTank1: sprite('testTank1', '0 0 57 87', 0.65),
   testTank2: sprite('testTank2', '0 0 57 87', 0.65),
@@ -145,7 +144,7 @@ export const BOARD_RECIPES: Readonly<
       ...EMPTY_SLICES,
       { layer: 3, component: 'laser1', order: 1 },
       { layer: 4, component: 'laser1' },
-      { layer: 5, component: 'laser2' },
+      { layer: 5, component: 'laser1' },
       { layer: 6, component: 'laser3' },
     ],
   },
@@ -156,6 +155,23 @@ export const BOARD_RECIPES: Readonly<
     ],
   },  
 }
+
+// Laser beams are drawn in code, in the same coordinate space as the laser
+// mount sprite: a `size` unit square facing east, scaled by laser1's width.
+export const LASER_BEAM = {
+  layer: 5,
+  size: 72,
+  startX: 10,
+  thickness: 3,
+  // One beam per emitter box on the mount; see lasers.hbls
+  centres: {
+    1: [36.4593],
+    2: [26.9593, 45.9593],
+    3: [17.4593, 36.4593, 55.4593],
+  },
+  glowBlur: 5.7,
+  glowInset: 5,
+} as const
 
 export const BOARD_EDGE_WALL_SLICES = [
   { layer: 0, component: 'wallEdgeBlack', order: 2 },

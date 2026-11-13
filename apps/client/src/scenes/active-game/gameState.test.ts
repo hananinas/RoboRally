@@ -1166,3 +1166,32 @@ it('finishes a six-player playback queue when the next round timer starts', () =
   expect(state.registers).toEqual(program)
   expect(canProgram(state)).toBe(false)
 })
+
+describe('board element playback', () => {
+  const lasers = (gameId: string) => ({
+    type: 'board-element-activated', payload: { gameId, registerIndex: 0, element: 'LASERS' },
+  } as const)
+
+  it('shows beams only while the element plays, after the register actions', () => {
+    let state = selectProgram()
+    state = gameStateReducer(state, { type: 'submit' })
+    state = gameStateReducer(state, { type: 'action', action: actions[0] })
+    state = gameStateReducer(state, lasers(actions[0].gameId))
+
+    expect(state.playback.boardElement).toBeNull()
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(state.playback.boardElement).toBe('LASERS')
+    expect(canProgram(state)).toBe(false)
+
+    state = gameStateReducer(state, { type: 'dealt', hand })
+    expect(canProgram(state)).toBe(false)
+    state = gameStateReducer(state, { type: 'complete' })
+    expect(state.playback.boardElement).toBeNull()
+    expect(canProgram(state)).toBe(true)
+  })
+
+  it('ignores elements from another game', () => {
+    const state = programmingState()
+    expect(gameStateReducer(state, lasers('other-game'))).toBe(state)
+  })
+})

@@ -194,6 +194,24 @@ describe('started game membership over Socket.IO', () => {
     expect(shared.game.lastActivePhase).toBe('programming')
     expect(shared.game.paused).toBe(false)
   })
+  it('activates board elements after the last action of a register', async () => {
+    const contexts = vi.spyOn(gameContext, 'createGameContext')
+    const { members: [, second] } = await startGame(['First', 'Second'])
+    const ctx = contexts.mock.results[0].value as ReturnType<typeof gameContext.createGameContext>
+    vi.spyOn(shared.game.board, 'hasLasers', 'get').mockReturnValue(true)
+    for (const player of shared.game.players) shared.game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
+    const events: string[] = []
+    second.on('robot.actionResolved', () => events.push('action'))
+    second.on('board.elementActivated', (payload) => events.push(`${payload.element}:${payload.registerIndex}`))
+    const activated = new Promise((resolve) => second.once('board.elementActivated', resolve))
+
+    ctx.actionScheduler.scheduleNextAction()
+    await activated
+    await new Promise<void>((resolve) => setImmediate(resolve))
+
+    expect(events.slice(0, 3)).toEqual(['action', 'action', 'LASERS:0'])
+    expect(shared.game.currentRegister).toBeGreaterThan(0)
+  })
   it('recovers a game socket and resumes without client session discovery', async () => {
     const { members: [first, second] } = await startGame(['First', 'Second'])
     await disconnect(first, true)

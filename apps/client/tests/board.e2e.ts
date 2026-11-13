@@ -324,7 +324,7 @@ test('lifts laser artwork without stretching its item stack', async ({ page }) =
   const selectors = [
     '[data-board-layer="3"] [data-board-component="laser1"][data-board-tile="6,7"]',
     '[data-board-layer="4"] [data-board-component="laser1"][data-board-tile="6,7"]',
-    '[data-board-layer="5"] [data-board-component="laser2"][data-board-tile="6,7"]',
+    '[data-board-layer="5"] [data-board-component="laser1"][data-board-tile="6,7"]',
     '[data-board-layer="6"] [data-board-component="laser3"][data-board-tile="6,7"]',
   ]
   const pieces = selectors.map((selector) => page.locator(selector))

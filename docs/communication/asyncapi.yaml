@@ -142,6 +142,8 @@ channels:
         $ref: '#/components/messages/ProgramTimerChanged'
       robotActionResolved:
         $ref: '#/components/messages/RobotActionResolved'
+      boardElementActivated:
+        $ref: '#/components/messages/BoardElementActivated'
       registersChanged:
         $ref: '#/components/messages/RegistersChanged'
       playerCheckpointProgress:
@@ -824,6 +826,36 @@ components:
                 x: 10
                 y: 6
               orientation: NORTH
+
+    BoardElementActivated:
+      name: board.elementActivated
+      payload:
+        type: object
+        additionalProperties: false
+        required: [ gameId, registerIndex, element ]
+        properties:
+          gameId:
+            $ref: "#/components/schemas/GameId"
+          registerIndex:
+            type: integer
+            minimum: 0
+            maximum: 4
+            description: Zero-based index of the register being activated.
+          element:
+            type: string
+            enum: [ LASERS ]
+      description: >-
+        Broadcast to game:{gameId}:public when a board element activates, after
+        every robot.actionResolved of that register and in the order the game
+        activates elements. Elements the board does not have are skipped. Clients
+        show the element only while playing this event back. Checkpoint progress
+        and the next register or hand follow the last element.
+      examples:
+        - name: lasers
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            registerIndex: 0
+            element: LASERS
 
     PlayerCheckpointProgress:
       name: player.checkpointProgress
@@ -1605,15 +1637,25 @@ components:
           $ref: '#/components/schemas/Coordinate'
         type:
           type: string
-          enum: [ EMPTY, PIT ]
+          enum: [ EMPTY, PIT, LASER ]
           description: >-
             PIT triggers an immediate server-side reboot on entry during movement,
             discarding the remaining steps of that instruction. Walls can block entry.
+            LASER is a wall-mounted laser emitter on an otherwise ordinary tile; it
+            does not affect movement and always carries laserOrientation and
+            laserStrength.
         walls:
           type: array
           uniqueItems: true
           items:
             $ref: '#/components/schemas/Orientation'
+        laserOrientation:
+          $ref: '#/components/schemas/Orientation'
+          description: Firing direction of a LASER tile. Omitted for other tile types.
+        laserStrength:
+          type: integer
+          enum: [ 1, 2, 3 ]
+          description: Number of beams a LASER tile fires. Omitted for other tile types.
         checkpointNumber:
           type: integer
           minimum: 1

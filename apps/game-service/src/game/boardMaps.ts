@@ -1,3 +1,4 @@
+import type { LaserStrength } from '@robo-rally/game-events'
 import type { Antenna, BoardMap } from '@/game/Board'
 import { Direction, type Position } from '@/game/spatial'
 import { Integer } from '@/numbers'
@@ -23,6 +24,11 @@ export type WallSpec = Readonly<{
   directions: readonly Direction[]
 }>
 
+export type LaserSpec = Readonly<{
+  at: readonly [x: number, y: number]
+  direction: Direction
+  strength: LaserStrength
+}>
 export type ConveyorSpec = Readonly<{
   at: readonly [x: number, y: number]
   sprite: string
@@ -37,6 +43,7 @@ export type MapSpec = BoardMap & Readonly<{
   walls: readonly WallSpec[]
   checkpoints: readonly (readonly [x: number, y: number])[]
   pits?: readonly (readonly [x: number, y: number])[]
+  lasers?: readonly LaserSpec[]
   conveyors?: readonly ConveyorSpec[]
   startTiles: readonly (readonly [x: number, y: number])[]
   rebootTile: Position
@@ -64,6 +71,12 @@ export const boardMaps = {
     width: 16,
     height: 15,
     pits: [[3, 3], [13, 4], [12, 7], [15, 9], [5, 10], [12, 11]],
+    lasers: [
+      { at: [3, 8], direction: S, strength: 1 },
+      { at: [10, 5], direction: N, strength: 2 },
+      { at: [15, 10], direction: W, strength: 3 },
+      { at: [0, 7], direction: E, strength: 2 },
+    ],
     conveyors: [
       // Conveyor loop
       { at: [4, 7], sprite: 'conveyor-1-from-right', direction: E },

@@ -188,7 +188,8 @@
   box-shadow: var(--board-ground-shadow);
 }
 
-.board-piece--asset {
+.board-piece--asset,
+.board-piece--laser-beam {
   display: block;
   height: auto;
   max-width: none;

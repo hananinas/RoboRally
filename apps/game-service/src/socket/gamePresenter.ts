@@ -14,6 +14,7 @@ import type {
 } from '@robo-rally/game-events'
 import {
   Direction,
+  LaserTile,
   type Card,
   type CompletedProgram,
   type Game,
@@ -55,6 +56,15 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
     ...(tile.checkpointNumber === undefined
       ? {}
       : { checkpointNumber: tile.checkpointNumber }),
+  }
+
+  if (tile instanceof LaserTile) {
+    return {
+      ...common,
+      type: tile.kind,
+      laserOrientation: orientations[tile.orientation],
+      laserStrength: tile.strength,
+    }
   }
 
   if (tile instanceof ConveyorTile) {

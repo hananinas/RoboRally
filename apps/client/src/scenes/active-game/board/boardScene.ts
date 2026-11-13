@@ -11,6 +11,7 @@ import type {
   BoardVisualComponent,
 } from './boardModel.ts'
 import { BOARD_WALL_SIDES, hasAllWalls } from './boardModel.ts'
+import { laserAngle } from './laserBeam.ts'
 
 export type BoardScenePiece = Readonly<{
   cell: BoardCell
@@ -100,28 +101,29 @@ export function createBoardScene(
               height,
               stackBaseLayer / config.parallaxReferenceLayer,
             )
-      
       const baseComponent = components[slice.component]
+      // Conveyors and lasers pick their artwork from the tile they sit on.
+      const symbol = slice.component === 'conveyor' && cell.tile === 'conveyor'
+        ? cell.sprite
+        : cell.laserStrength === undefined ? undefined
+          : `${baseComponent.asset?.symbol}-s${cell.laserStrength}`
 
       const component: BoardVisualComponent =
-        slice.component === 'conveyor' &&
-        cell.tile === 'conveyor' &&
-        baseComponent.asset
-          ? {
-              ...baseComponent,
-              asset: {
-                ...baseComponent.asset,
-                symbol: cell.sprite,
-              },
-            }
+        symbol !== undefined && baseComponent.asset
+          ? { ...baseComponent, asset: { ...baseComponent.asset, symbol } }
           : baseComponent
 
+      const angle = antenna && !slice.wall
+        ? antenna.angle * 180 / Math.PI - 90
+        : cell.laserOrientation && component.asset
+          ? laserAngle(cell.laserOrientation)
+          : undefined
       planes[slice.layer].push({
         cell,
         component,
         componentName: slice.component,
         height,
-        angle: antenna && !slice.wall ? antenna.angle * 180 / Math.PI - 90 : undefined,
+        angle,
         key: `${cell.x},${cell.y},${slice.layer},${slice.component},${slice.wall ?? 'tile'},${sliceIndex}`,
         liftHeight,
         slice,

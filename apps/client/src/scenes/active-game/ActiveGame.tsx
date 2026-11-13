@@ -12,13 +12,14 @@ import {
   type ClientGameState , 
   type ProgramCard 
 } from './gameState.ts'
+import { isPlaybackBusy } from './board/robotPlayback.ts'
 import type useGameConnection from './useGameConnection.ts'
 import useOverlayLayout from './useOverlayLayout.ts'
 import WinnerPopup from './components/WinnerPopup.tsx'
 
 
 function isGameOver(state: ClientGameState): boolean {
-  return state.winner !== null && !state.playback.active
+  return state.winner !== null && !isPlaybackBusy(state.playback)
 }
 
 function getGameStatus(state: ClientGameState): string {
@@ -29,7 +30,7 @@ function getGameStatus(state: ClientGameState): string {
     const names = state.players.filter((player) => !player.connected).map((player) => player.username)
     return names.length > 0 ? `Game paused · Waiting for ${names.join(', ')}` : 'Game paused'
   }
-  if (state.playback.active || state.phase === 'EXECUTING') return 'Executing'
+  if (isPlaybackBusy(state.playback) || state.phase === 'EXECUTING') return 'Executing'
   if (state.phase === 'PROGRAMMING') {
     if (!state.handReady) return 'Waiting for cards…'
     if (state.submission === 'accepted') return 'Program accepted · Waiting for other players'
@@ -84,7 +85,13 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
 
   return (
     <div className="game">
-      {state.board && <BoardViewport board={state.board} robots={state.playback.robots} />}
+      {state.board && (
+        <BoardViewport
+          board={state.board}
+          robots={state.playback.robots}
+          lasersActive={state.playback.boardElement === 'LASERS'}
+        />
+      )}
       <div ref={overlayRef} className={overlayClassName}>
         <aside className="game-hud" aria-label="Game controls">
           <div ref={hudContentRef} className="game-hud__content">
@@ -117,7 +124,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
           <OtherPlayersPanel
             players={getOtherPlayers(state)}
             checkpointCount={state.checkpointCount}
-            phase={state.playback.active ? 'EXECUTING' : state.phase}
+            phase={isPlaybackBusy(state.playback) ? 'EXECUTING' : state.phase}
             activeAction={state.playback.active}
             queuedActions={state.playback.pending.map(({ action }) => action)}
             paused={state.paused || !state.connected}

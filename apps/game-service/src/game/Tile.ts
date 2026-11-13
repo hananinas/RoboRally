@@ -1,6 +1,7 @@
+import type { LaserStrength } from '@robo-rally/game-events'
 import type { Direction } from '@/game/spatial'
 
-export type TileKind = 'EMPTY' | 'PIT' | 'CONVEYOR'
+export type TileKind = 'EMPTY' | 'PIT' | 'CONVEYOR' | 'LASER'
 export type TileEntryEffect = 'reboot'
 
 export type TileDefinition = Readonly<{
@@ -12,6 +13,7 @@ export type TileDefinition = Readonly<{
 export const tileDefinitions: Readonly<Record<TileKind, TileDefinition>> = {
   EMPTY: { canOccupy: true },
   PIT: { canOccupy: false, entryEffect: 'reboot' },
+  LASER: { canOccupy: true },
   CONVEYOR: { canOccupy: true },
 }
 
@@ -56,6 +58,18 @@ export class PitTile extends Tile {
   readonly kind = 'PIT'
 
   constructor(walls: Iterable<Direction> = []) {
+    super(walls)
+  }
+}
+
+export class LaserTile extends Tile {
+  readonly kind = 'LASER'
+
+  constructor(
+    readonly orientation: Direction,
+    readonly strength: LaserStrength,
+    walls: Iterable<Direction> = [],
+  ) {
     super(walls)
   }
 }

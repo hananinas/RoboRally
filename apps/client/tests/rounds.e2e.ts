@@ -54,6 +54,8 @@ test('plays every register of two consecutive programs through the real Game Ser
   const hand = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
   const registered = page.getByRole('button', { name: /remove from register/ })
   const done = page.getByRole('button', { name: 'Done', exact: true })
+  const beams = page.locator('[data-board-laser-beam]')
+  await expect(beams).toHaveCount(0)
   await expect(hand).toHaveCount(9)
   for (const card of await hand.all()) await expect(card).toBeEnabled()
   await expect(page.getByRole('status')).toHaveText('Programming')
@@ -99,8 +101,13 @@ test('plays every register of two consecutive programs through the real Game Ser
         await expect(registered).toHaveCount(5)
         for (const card of await hand.all()) await expect(card).toBeDisabled()
         for (const card of await registered.all()) await expect(card).toBeDisabled()
-        // Reduced motion keeps a 200ms playback slot per register, without
-        // exercising the movement/turn animation already covered elsewhere.
+        await expect(beams).toHaveCount(0)
+        // Reduced motion keeps a 200ms playback slot per action and per board
+        // element, without exercising the animations already covered elsewhere.
+        await page.clock.runFor(200)
+        // The register's lasers show only in their own slot, after the action.
+        await expect(beams).not.toHaveCount(0)
+        await expectRobot(robot, step.x, step.y, step.angle, 16, 15)
         await page.clock.runFor(200)
       })
     }

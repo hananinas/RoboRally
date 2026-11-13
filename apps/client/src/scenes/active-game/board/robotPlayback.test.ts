@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { createBoardRenderModel } from './boardModel.ts'
 import { DEMO_ROBOTS } from './demoBoard.ts'
 import {
+  BOARD_ELEMENT_DURATION_MS,
   createRobotPlaybackState,
   findPitEntry,
+  isPlaybackBusy,
   PIT_FALL_DURATION_MS,
   PIT_RESPAWN_DURATION_MS,
   playbackPhases,
@@ -321,5 +323,56 @@ describe('pit entry', () => {
       [start, undefined], [DEMO_ROBOTS[0].position, undefined],
     ])
     expect(robotPlaybackReducer(reset, { type: 'advance' })).toBe(reset)
+  })
+})
+
+describe('board element playback', () => {
+  const enqueueLasers = (state: RobotPlaybackState) =>
+    robotPlaybackReducer(state, { type: 'enqueue-board-element', element: 'LASERS' })
+
+  it('shows at once when no action is playing, then ends', () => {
+    let state = enqueueLasers(createRobotPlaybackState(DEMO_ROBOTS))
+
+    expect(state.boardElement).toBe('LASERS')
+    expect(isPlaybackBusy(state)).toBe(true)
+    state = robotPlaybackReducer(state, { type: 'complete' })
+    expect(state.boardElement).toBeNull()
+    expect(isPlaybackBusy(state)).toBe(false)
+  })
+
+  it('waits for the actions queued before it and holds the next ones until it ends', () => {
+    let state = createRobotPlaybackState(DEMO_ROBOTS)
+    state = robotPlaybackReducer(state, { type: 'enqueue', action: steps[0] })
+    state = robotPlaybackReducer(state, { type: 'enqueue', action: steps[1] })
+    state = enqueueLasers(state)
+    state = robotPlaybackReducer(state, { type: 'enqueue', action: steps[2] })
+
+    expect(state.boardElement).toBeNull()
+    state = robotPlaybackReducer(state, { type: 'complete' })
+    expect(state.active).toBe(steps[1])
+    expect(state.boardElement).toBeNull()
+
+    state = robotPlaybackReducer(state, { type: 'complete' })
+    expect(state.active).toBeNull()
+    expect(state.boardElement).toBe('LASERS')
+    expect(state.pending.map(({ action }) => action)).toEqual([steps[2]])
+
+    state = robotPlaybackReducer(state, { type: 'enqueue', action: steps[3] })
+    expect(state.pending).toHaveLength(2)
+    expect(state.boardElement).toBe('LASERS')
+
+    state = robotPlaybackReducer(state, { type: 'complete' })
+    expect(state.boardElement).toBeNull()
+    expect(state.active).toBe(steps[2])
+  })
+
+  it('shows beams for 600 ms', () => {
+    expect(BOARD_ELEMENT_DURATION_MS.LASERS).toBe(600)
+  })
+
+  it('resets with the playback', () => {
+    const state = enqueueLasers(createRobotPlaybackState(DEMO_ROBOTS))
+
+    expect(isPlaybackBusy(robotPlaybackReducer(state, { type: 'reset', robots: DEMO_ROBOTS }))).toBe(false)
   })
 })

@@ -7,6 +7,7 @@ import {
   BOARD_COMPONENTS,
   BOARD_CONFIG,
   BOARD_RECIPES,
+  LASER_BEAM,
 } from '../board/boardConfig.ts'
 import { tileCentre } from '../board/boardMath.ts'
 import {
@@ -24,11 +25,15 @@ import type {
   BoardWallSide,
 } from '../board/boardModel.ts'
 import useBoardInteraction from '../board/useBoardInteraction.ts'
+import { traceBeams } from '../board/laserBeam.ts'
 import CheckpointPiece from './CheckpointPiece.tsx'
+import LaserBeamPiece from './LaserBeamPiece.tsx'
 import '../board/BoardViewport.css'
 type BoardViewportProps = Readonly<{
   board: BoardRenderModel
   robots: readonly DisplayRobot[]
+  // Lasers fire while on; off lasers show only their mount
+  lasersActive?: boolean
 }>
 
 type PieceStyle = CSSProperties &
@@ -196,7 +201,7 @@ function RobotPiece({
   )
 }
 
-function BoardViewport({ board, robots }: BoardViewportProps) {
+function BoardViewport({ board, robots, lasersActive = true }: BoardViewportProps) {
   const viewportRef = useRef<HTMLElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const scene = useMemo(
@@ -210,6 +215,12 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
     [board],
   )
   useBoardInteraction({ canvasRef, robots, scene, viewportRef })
+  const beams = useMemo(
+    () => lasersActive
+      ? traceBeams(board, robots.map((robot) => robot.position.coordinate))
+      : [],
+    [board, lasersActive, robots],
+  )
   const checkpointTiles = scene.tiles.filter((tile) => tile.cell.checkpointNumber !== undefined)
   const fallingInto = new Set(robots.flatMap((robot) => robot.phase === 'pit-fall'
     ? [`${robot.position.coordinate.x},${robot.position.coordinate.y}`] : []))
@@ -247,6 +258,9 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
             >
               {pieces.map((piece) => (
                 <BoardPiece key={piece.key} piece={piece} />
+              ))}
+              {layer === LASER_BEAM.layer && beams.map((beam) => (
+                <LaserBeamPiece board={board} beam={beam} key={`${beam.x},${beam.y}`} />
               ))}
               {checkpointTiles.map((tile) => (
                 <CheckpointPiece key={`${tile.cell.x},${tile.cell.y}`} tile={tile} layer={layer} />

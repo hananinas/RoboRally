@@ -79,12 +79,18 @@ export function createActionScheduler(
       scheduledAction = undefined
       if (closed || game.requirePhase('activation').isErr()) return
       try {
-        const result = game.executeNextAction()
-        io.to(publicRoom).emit(
-          'robot.actionResolved',
-          presentRobotActionResolved(gameId, game, result),
-        )
-        announceProgress(result)
+        if (game.boardElementsPending) {
+          const { registerIndex, element, roundConcluded } = game.activateNextBoardElement()
+          io.to(publicRoom).emit('board.elementActivated', { gameId, registerIndex, element })
+          announceProgress({ roundConcluded })
+        } else {
+          const result = game.executeNextAction()
+          io.to(publicRoom).emit(
+            'robot.actionResolved',
+            presentRobotActionResolved(gameId, game, result),
+          )
+          announceProgress(result)
+        }
         scheduleNextAction()
       } catch (error) {
         logError('Failed to execute next robot action', error, {

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { err, ok, type Result } from 'neverthrow'
 import type { Board } from '@/game/Board'
-import { effects, type PrivateProgram, type PublicRegisters, type ResolvedInstruction } from '@robo-rally/game-events'
+import { effects, type BoardElement, type PrivateProgram, type PublicRegisters, type ResolvedInstruction } from '@robo-rally/game-events'
 import { Card } from '@/game/Card'
 import { Deck } from '@/game/Deck'
 import type { CardId, PlayerId, RobotId } from '@/game/ids'
@@ -38,6 +38,12 @@ export type NextActionResult = Readonly<{
     position: Position
     direction: Direction
   }>[]
+  roundConcluded: boolean
+}>
+
+export type BoardElementResult = Readonly<{
+  registerIndex: number
+  element: BoardElement
   roundConcluded: boolean
 }>
 
@@ -83,6 +89,13 @@ export class Game {
   private registerIndex = 0
   private readonly submittedPlayerIds = new Set<PlayerId>()
   private readonly activatedRobotIds = new Set<RobotId>()
+  // Board elements activate in this order once every robot has acted in a register,
+  // before its checkpoints. Lasers have no gameplay effect yet.
+  private readonly boardElements: readonly Readonly<{ element: BoardElement; onBoard: () => boolean }>[] = [
+    { element: 'LASERS', onBoard: () => this.board.hasLasers },
+  ]
+  // Elements still to activate in the current register.
+  private boardElementQueue: BoardElement[] = []
   private readonly random: () => number
   private readonly drawRandom: () => number
   // What each robot's registers resolved to this round, so Again repeats the real action.
@@ -144,6 +157,10 @@ export class Game {
 
   requirePhase(phase: GamePhase): Result<void, PhaseError> {
     return this.lifecycle.requirePhase(phase)
+  }
+
+  get boardElementsPending(): boolean {
+    return this.boardElementQueue.length > 0
   }
 
   get paused(): boolean {
@@ -314,7 +331,8 @@ export class Game {
   }
 
   private checkRegisterComplete(): Result<void, 'NOT_COMPLETE'> {
-    return this.roster.length === 0 || this.activatedRobotIds.size === this.roster.length
+    return this.roster.length === 0 ||
+      (this.activatedRobotIds.size === this.roster.length && this.boardElementQueue.length === 0)
       ? ok(undefined)
       : err('NOT_COMPLETE')
   }
@@ -322,8 +340,14 @@ export class Game {
   private recheckActivationPhase(): { roundConcluded: boolean } {
     return this.requirePhase('activation')
       .andThen(() => this.checkRegisterComplete())
-      .map(() => this.concludeRegister())
+      .map(() => this.startBoardElements())
       .unwrapOr({ roundConcluded: false })
+  }
+
+  private startBoardElements(): { roundConcluded: boolean } {
+    this.boardElementQueue = this.roster.length === 0 ? []
+      : this.boardElements.filter(({ onBoard }) => onBoard()).map(({ element }) => element)
+    return this.boardElementQueue.length === 0 ? this.concludeRegister() : { roundConcluded: false }
   }
 
   private concludeRegister(): { roundConcluded: boolean } {
@@ -331,7 +355,7 @@ export class Game {
       this.finishRound()
       return { roundConcluded: true }
     }
-    this.activateBoardElements()
+    this.activateCheckpoints()
     this.finishRegister()
     if (this.winner !== undefined) {
       this.clearRound()
@@ -391,6 +415,20 @@ export class Game {
 
     const { roundConcluded } = this.recheckActivationPhase()
     return { registerIndex, action, registers, pushedRobots, roundConcluded }
+  }
+
+  // The register concludes with its last element.
+  activateNextBoardElement(): BoardElementResult {
+    if (this.requirePhase('activation').isErr()) {
+      throw new Error('Board elements can only activate during activation')
+    }
+    const element = this.boardElementQueue.shift()
+    if (element === undefined) throw new Error('No board elements remain to activate')
+
+    const registerIndex = this.registerIndex
+    const { roundConcluded } = this.boardElementQueue.length === 0
+      ? this.concludeRegister() : { roundConcluded: false }
+    return { registerIndex, element, roundConcluded }
   }
 
   private dealInitialHands(): void {
@@ -485,7 +523,7 @@ export class Game {
     // TODO: Add two SPAM cards and cancel this robot's remaining registers.
   }
 
-  private activateBoardElements(): void {
+  private activateCheckpoints(): void {
     for (const player of this.players) {
       const position = this.board.positionOf(player.robot.id)
       const checkpoint = this.board.getTile(position)?.checkpointNumber

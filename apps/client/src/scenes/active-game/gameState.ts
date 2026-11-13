@@ -4,6 +4,7 @@ import type {
   GamePhase,
   GameInitialization,
   GameWon,
+  BoardElementActivated,
   Winner,
   PlayerAssignment,
   PlayerConnectionChanged,
@@ -24,6 +25,7 @@ import type {
 import { createBoardRenderModel, type BoardRenderModel } from './board/boardModel.ts'
 import {
   createRobotPlaybackState,
+  isPlaybackBusy,
   robotPlaybackReducer,
   type RobotPlaybackState,
 } from './board/robotPlayback.ts'
@@ -97,6 +99,7 @@ export type GameStateEvent =
   | { type: 'reset' }
   | { type: 'error'; message: string }
   | { type: 'action'; action: RobotActionResolved; reducedMotion?: boolean }
+  | { type: 'board-element-activated'; payload: BoardElementActivated }
   | { type: 'advance' }
   | { type: 'complete' }
   | { type: 'place'; cardId: string; registerIndex: number }
@@ -162,7 +165,7 @@ export function canProgram(state: ClientGameState): boolean {
     state.programmingTimer.status !== 'CLOSED' &&
     state.handReady &&
     state.hand.length > 0 &&
-    !state.playback.active &&
+    !isPlaybackBusy(state.playback) &&
     state.submission === 'idle'
 }
 
@@ -209,7 +212,7 @@ function activateHand(state: ClientGameState): ClientGameState {
   const hand = state.pendingHand
   if (!hand) return state
   if (!isHandEligible(state, hand)) return { ...state, pendingHand: null }
-  if (state.phase !== 'PROGRAMMING' || state.playback.active) {
+  if (state.phase !== 'PROGRAMMING' || isPlaybackBusy(state.playback)) {
     return state
   }
   return {
@@ -272,7 +275,7 @@ function updatePlayback(state: ClientGameState, playback: RobotPlaybackState): C
 }
 
 function finishPlayback(state: ClientGameState): ClientGameState {
-  if (state.playback.active || state.phase !== 'PROGRAMMING') return state
+  if (isPlaybackBusy(state.playback) || state.phase !== 'PROGRAMMING') return state
   return activateHand({
     ...state,
     playbackProgram: null,
@@ -284,7 +287,7 @@ function finishPlayback(state: ClientGameState): ClientGameState {
 function finishPreviousRound(state: ClientGameState): ClientGameState {
   if (state.phase !== 'PROGRAMMING' || !state.pendingHand || state.programmingTimer.status !== 'RUNNING') return state
   let playback = state.playback
-  while (playback.active) playback = robotPlaybackReducer(playback, { type: 'complete' })
+  while (isPlaybackBusy(playback)) playback = robotPlaybackReducer(playback, { type: 'complete' })
   return finishPlayback(updatePlayback(state, playback))
 }
 
@@ -415,12 +418,13 @@ export function gameStateReducer(
             antenna: snapshot.antenna,
             hole: snapshot.board.tiles.filter((tile) => tile.type === 'PIT')
               .map((tile) => [tile.position.x, tile.position.y] as const),
+            laser: snapshot.board.tiles.flatMap((tile) => tile.type === 'LASER'
+              ? [{ ...tile.position, orientation: tile.laserOrientation, strength: tile.laserStrength }] : []),
             conveyor: snapshot.board.tiles.flatMap((tile) => tile.type === 'CONVEYOR' ? [{
               ...tile.position,
               sprite: tile.sprite,
               direction: tile.direction,
             }] : []),
-
             checkpoints: snapshot.board.tiles.flatMap((tile) => tile.checkpointNumber === undefined
               ? [] : [{ ...tile.position, checkpointNumber: tile.checkpointNumber }]),
             walls: snapshot.board.tiles.map((tile) => ({
@@ -481,6 +485,11 @@ export function gameStateReducer(
       }, robotPlaybackReducer(next.playback, {
         type: 'enqueue', action, board: event.reducedMotion ? null : state.board,
       }))
+    }
+    case 'board-element-activated': {
+      const { gameId, element } = event.payload
+      if (gameId !== state.assignment?.gameId) return state
+      return updatePlayback(state, robotPlaybackReducer(state.playback, { type: 'enqueue-board-element', element }))
     }
     case 'advance':
     case 'complete':

@@ -1,5 +1,6 @@
 import { effects } from '@robo-rally/game-events'
 import type {
+  BoardElement,
   Card,
   Coordinate,
   Orientation,
@@ -37,10 +38,18 @@ export const ROBOT_MOVE_DURATION_MS = 600
 export const ROBOT_TURN_DURATION_MS = 300
 export const PIT_FALL_DURATION_MS = 450
 export const PIT_RESPAWN_DURATION_MS = 300
+const REDUCED_MOTION_DURATION_MS = 200
+// How long each board element shows. Add an entry when the server announces a new element.
+export const BOARD_ELEMENT_DURATION_MS: Readonly<Record<BoardElement, number>> = {
+  LASERS: 600,
+}
 export function robotActionDuration(action: ResolvedRobotAction, reducedMotion: boolean): number {
-  return reducedMotion ? 200
+  return reducedMotion ? REDUCED_MOTION_DURATION_MS
     : action.resolvedInstruction !== null && effects[action.resolvedInstruction].kind === 'turn'
       ? ROBOT_TURN_DURATION_MS : ROBOT_MOVE_DURATION_MS
+}
+function boardElementDuration(element: BoardElement, reducedMotion: boolean): number {
+  return reducedMotion ? REDUCED_MOTION_DURATION_MS : BOARD_ELEMENT_DURATION_MS[element]
 }
 
 export type RobotPlaybackState = Readonly<{
@@ -51,11 +60,22 @@ export type RobotPlaybackState = Readonly<{
   // The active action's phases still to play; the first is showing.
   phases: readonly PlaybackPhase[]
   nextSequence: number
+  // The board element showing; it plays between robot actions, never alongside one.
+  boardElement: BoardElement | null
+  // Board elements waiting for the robot action with the given sequence (and earlier ones) to finish.
+  boardElementQueue: readonly Readonly<{ element: BoardElement; after: number }>[]
 }>
+
+export function isPlaybackBusy(
+  playback: Pick<RobotPlaybackState, 'active' | 'boardElement'>,
+): boolean {
+  return playback.active !== null || playback.boardElement !== null
+}
 
 export type RobotPlaybackEvent =
   // Without a board the action plays without phases.
   | Readonly<{ type: 'enqueue'; action: ResolvedRobotAction; board?: BoardRenderModel | null }>
+  | Readonly<{ type: 'enqueue-board-element'; element: BoardElement }>
   | Readonly<{ type: 'advance' }>
   | Readonly<{ type: 'complete' }>
   | Readonly<{ type: 'reset'; robots: readonly Robot[] }>
@@ -153,6 +173,8 @@ export function createRobotPlaybackState(robots: readonly Robot[]): RobotPlaybac
     activeSequence: null,
     phases: [],
     nextSequence: 0,
+    boardElement: null,
+    boardElementQueue: [],
   }
 }
 
@@ -203,22 +225,27 @@ function applyAction(
 
 function startNext(state: RobotPlaybackState): RobotPlaybackState {
   const [next, ...pending] = state.pending
-  if (!next) {
-    return {
-      ...state,
-      robots: state.robots.map(clearPhase),
-      active: null,
-      activeSequence: null,
-      phases: [],
-    }
+  const [step, ...boardElementQueue] = state.boardElementQueue
+  const idle = {
+    ...state,
+    robots: state.robots.map(clearPhase),
+    active: null,
+    activeSequence: null,
+    phases: [],
+    boardElement: null,
   }
+  if (step && step.after < (next?.sequence ?? Infinity)) {
+    return { ...idle, boardElement: step.element, boardElementQueue }
+  }
+  if (!next) return idle
   return {
+    ...state,
     robots: applyAction(state.robots, next),
     pending,
     active: next.action,
     activeSequence: next.sequence,
     phases: next.phases,
-    nextSequence: state.nextSequence,
+    boardElement: null,
   }
 }
 
@@ -250,6 +277,11 @@ export function robotPlaybackReducer(
   }
   if (event.type === 'complete') return startNext(state)
   if (event.type === 'advance') return advance(state)
+  if (event.type === 'enqueue-board-element') {
+    const step = { element: event.element, after: state.nextSequence - 1 }
+    const queued = { ...state, boardElementQueue: [...state.boardElementQueue, step] }
+    return isPlaybackBusy(state) ? queued : startNext(queued)
+  }
 
   const start = settledPosition(state, event.action.robotId)
   const entry: PlaybackAction = {
@@ -258,21 +290,25 @@ export function robotPlaybackReducer(
     phases: event.board && start ? playbackPhases(event.action, event.board, start) : [],
   }
   const queued = { ...state, pending: [...state.pending, entry], nextSequence: state.nextSequence + 1 }
-  return state.active ? queued : startNext(queued)
+  return isPlaybackBusy(state) ? queued : startNext(queued)
 }
 
 export function useRobotPlaybackTimer(
-  playback: Pick<RobotPlaybackState, 'active' | 'phases'>,
-  dispatch: (event: { type: 'advance' }) => void,
+  playback: Pick<RobotPlaybackState, 'active' | 'phases' | 'boardElement'>,
+  dispatch: (event: { type: 'advance' | 'complete' }) => void,
 ) {
-  const { active, phases: [phase] } = playback
+  const { active, boardElement, phases: [phase] } = playback
   useEffect(() => {
-    if (!active) return
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const duration = phase ? phase.durationMs : robotActionDuration(active, reducedMotion)
-    const timer = window.setTimeout(() => dispatch({ type: 'advance' }), duration)
+    const step = active
+      ? { type: 'advance', durationMs: phase ? phase.durationMs : robotActionDuration(active, reducedMotion) } as const
+      : boardElement
+        ? { type: 'complete', durationMs: boardElementDuration(boardElement, reducedMotion) } as const
+        : null
+    if (!step) return
+    const timer = window.setTimeout(() => dispatch({ type: step.type }), step.durationMs)
     return () => window.clearTimeout(timer)
-  }, [active, phase, dispatch])
+  }, [active, phase, boardElement, dispatch])
 }
 
 export function useRobotPlayback(initialRobots: readonly Robot[]) {
