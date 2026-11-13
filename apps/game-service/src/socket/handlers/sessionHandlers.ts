@@ -64,7 +64,7 @@ export function handleLeaveGame(
   })
   if (game.memberships.size === 0) {
     game.actionScheduler.stop()
-    context.games.delete(game.gameId)
+    context.games.delete(game.game.id)
   }
 }
 

@@ -68,10 +68,6 @@ export type GameOptions = Readonly<{
   deck: readonly Card[]
   rebootTile: Position
   name?: string
-  // Picks start tiles.
-  random?: () => number
-  // Draws cards; defaults to `random`.
-  drawRandom?: () => number
 }>
 
 export class Game {
@@ -85,8 +81,6 @@ export class Game {
   private registerIndex = 0
   private readonly submittedPlayerIds = new Set<PlayerId>()
   private readonly activatedRobotIds = new Set<RobotId>()
-  private readonly random: () => number
-  private readonly drawRandom: () => number
   // What each robot's registers resolved to this round, so Again repeats the real action.
   private readonly resolvedInstructions = new Map<RobotId, (ResolvedInstruction | undefined)[]>()
 
@@ -97,8 +91,6 @@ export class Game {
     deck,
     rebootTile,
     name = DEFAULT_GAME_NAME,
-    random = Math.random,
-    drawRandom = random,
   }: GameOptions) {
     if (deck.length < REGISTERS_PER_ROUND || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')
@@ -129,8 +121,6 @@ export class Game {
     this.roster = [...players]
     this.rebootTile = Object.freeze({ ...rebootTile })
     this.deck = [...deck]
-    this.random = random
-    this.drawRandom = drawRandom
     this.dealInitialHands()
   }
 
@@ -199,15 +189,14 @@ export class Game {
   private findFreeStartTile(): Result<Position, 'NO_SPAWN_AVAILABLE'> {
     const free = this.board.startTiles.filter((position) => this.board.occupantAt(position) === undefined)
     if (free.length === 0) return err('NO_SPAWN_AVAILABLE')
-    const index = Math.min(Math.floor(this.random() * free.length), free.length - 1)
-    return ok({ ...free[index] })
+    return ok({ ...free[0] })
   }
 
   addPlayer(colour: string = ROBOT_COLOURS[0]): Result<Player, AddPlayerError> {
     return this.findSpawn().map((position) => {
       const robot = new Robot(randomUUID(), Direction.NORTH, colour)
       const player = new Player(randomUUID(), robot, Deck.fromTemplate(this.deck))
-      player.drawHand(this.drawRandom)
+      player.drawHand()
       this.board.placeRobot(robot.id, position)
       this.roster.push(player)
       return player
@@ -399,14 +388,14 @@ export class Game {
 
   private dealInitialHands(): void {
     for (const player of this.players) {
-      if (player.hand.length === 0) player.drawHand(this.drawRandom)
+      if (player.hand.length === 0) player.drawHand()
       player.resetRegisters()
     }
   }
 
   private dealNewHands(): void {
     for (const player of this.players) {
-      player.drawHand(this.drawRandom)
+      player.drawHand()
       player.resetRegisters()
     }
   }

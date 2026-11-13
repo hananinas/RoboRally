@@ -5,6 +5,7 @@ import type { Lobby, SessionContext } from '@/socket/sessionContext'
 import { withSessionRequest } from '@/socket/utilities/withSessionRequest'
 import { ROBOT_COLOURS } from '@/game/Robot'
 import { boardMaps, type BoardMapName } from '@/game/boardMaps'
+import { createGame } from '@/game/GameFactory'
 import {
   emptyRequestSchema, lobbyRequestSchema, createLobbyRequestSchema,
   type EmptyRequest, type LobbyRequest, type CreateLobbyRequest, type GameInitialization, type LobbyState, type User,
@@ -179,7 +180,7 @@ export function handleStartLobby(
     let gameContext: MembershipContext | undefined
     let prepared: { member: { user: User; player: Player }; socket: GameSocket; initialization: GameInitialization }[] = []
     try {
-      const preparedContext = createGameContext(io, context.createGame(lobby.mapName))
+      const preparedContext = createGameContext(io, createGame(lobby.mapName, lobby.name))
       gameContext = preparedContext
       const members = connected.value.map(({ socket: connection, ...member }) => {
         const result = preparedContext.game.addPlayer(ROBOT_COLOURS[preparedContext.memberships.size])
@@ -207,9 +208,9 @@ export function handleStartLobby(
       gameContext?.actionScheduler.stop()
       throw error
     }
-    context.games.set(gameContext.gameId, gameContext)
+    context.games.set(gameContext.game.id, gameContext)
     for (const entry of prepared) {
-      context.sessionsByUser.set(entry.member.user.userId, { kind: 'game', gameId: gameContext.gameId })
+      context.sessionsByUser.set(entry.member.user.userId, { kind: 'game', gameId: gameContext.game.id })
       void entry.socket.leave(lobbyRoom(lobby.lobbyId))
     }
     context.lobbies.delete(lobby.lobbyId)
@@ -218,6 +219,6 @@ export function handleStartLobby(
         lobbyId: lobby.lobbyId, initialization: entry.initialization,
       })
     }
-    ack({ outcome: 'STARTED', gameId: gameContext.gameId })
+    ack({ outcome: 'STARTED', gameId: gameContext.game.id })
   })
 }

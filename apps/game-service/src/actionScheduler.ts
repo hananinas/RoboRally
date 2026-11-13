@@ -7,7 +7,6 @@ import type { Winner } from '@robo-rally/game-events'
 export type ActionSchedulerDeps = {
   io: GameSocketServer
   game: Game
-  gameId: string
   publicRoom: string
   playerRoom: (playerId: string) => string
   usernameOf: (playerId: string) => string | undefined
@@ -23,7 +22,7 @@ export type ActionScheduler = {
 }
 
 export function createActionScheduler(
-  { io, game, gameId, publicRoom, playerRoom, usernameOf, onProgrammingStarted, onStop }: ActionSchedulerDeps,
+  { io, game, publicRoom, playerRoom, usernameOf, onProgrammingStarted, onStop }: ActionSchedulerDeps,
 ): ActionScheduler {
   let scheduledAction: NodeJS.Immediate | undefined
   let closed = false
@@ -37,7 +36,7 @@ export function createActionScheduler(
       nextProgress.set(player.id, player.lastCheckpoint)
       if (player.lastCheckpoint === (checkpointProgress.get(player.id) ?? 0)) continue
       io.to(publicRoom).emit('player.checkpointProgress', {
-        gameId,
+        gameId: game.id,
         playerId: player.id,
         lastCheckpoint: player.lastCheckpoint,
         checkpointCount: game.board.checkpointCount,
@@ -57,12 +56,12 @@ export function createActionScheduler(
   function announceWinner(): void {
     if (winnerAnnounced) return
     winnerAnnounced = true
-    io.to(publicRoom).emit('game.won', { gameId, ...winner()! })
+    io.to(publicRoom).emit('game.won', { gameId: game.id, ...winner()! })
   }
 
   function announceHands(): void {
     for (const player of game.players) {
-      io.to(playerRoom(player.id)).emit('cards.dealt', presentCardsDealt(gameId, player))
+      io.to(playerRoom(player.id)).emit('cards.dealt', presentCardsDealt(game.id, player))
     }
     onProgrammingStarted()
   }
@@ -82,20 +81,20 @@ export function createActionScheduler(
         const result = game.executeNextAction()
         io.to(publicRoom).emit(
           'robot.actionResolved',
-          presentRobotActionResolved(gameId, game, result),
+          presentRobotActionResolved(game, result),
         )
         announceProgress(result)
         scheduleNextAction()
       } catch (error) {
         logError('Failed to execute next robot action', error, {
           source: 'actionScheduler',
-          gameId,
+          gameId: game.id,
           phase: game.lastActivePhase,
           registerIndex: game.currentRegister,
         })
         stop()
         game.abort()
-        io.to(publicRoom).emit('game.aborted', { gameId })
+        io.to(publicRoom).emit('game.aborted', { gameId: game.id })
       }
     })
   }
