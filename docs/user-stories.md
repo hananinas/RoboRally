@@ -126,9 +126,9 @@ Implemented scope: choosing a board and naming a lobby.
 
 As a user, I want to see a list of available games to join, so that I can choose which game to play.
 
-### Not implemented yet
+### Moved to V3
 
-This section includes stories that are partially implemented.
+These stories were moved to V3, including the remaining work on partially implemented stories. Their original V2 IDs are retained for reference.
 
 #### V2-02 - Board effects and push
 
