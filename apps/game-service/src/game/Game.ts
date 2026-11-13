@@ -61,7 +61,6 @@ export const DEFAULT_GAME_NAME = 'Game'
 const REGISTERS_PER_ROUND = 5
 
 export type GameOptions = Readonly<{
-  id?: GameId
   board: Board
   players: readonly Player[]
   // Template for each private deck created by addPlayer.
@@ -85,7 +84,6 @@ export class Game {
   private readonly resolvedInstructions = new Map<RobotId, (ResolvedInstruction | undefined)[]>()
 
   constructor({
-    id,
     board,
     players,
     deck,
@@ -115,7 +113,7 @@ export class Game {
       robotIds.add(player.robot.id)
     }
 
-    this.id = id ?? randomUUID()
+    this.id = randomUUID()
     this.board = board
     this.name = name
     this.roster = [...players]
