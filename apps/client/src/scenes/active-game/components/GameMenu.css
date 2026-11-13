@@ -1,17 +1,12 @@
 /* Game options: the popover uses the browser's top layer. */
 .game-menu {
-  --menu-control-size: var(--hud-control-size, 2.75rem);
-  --menu-control-radius: var(--hud-control-radius, 0.5rem);
   --menu-radius: var(--hud-radius, 1rem);
-  --menu-gap: var(--hud-space-md, 1.25rem);
-  --menu-space-xs: var(--hud-space-xs, 0.25rem);
-  --menu-space-sm: var(--hud-space-sm, 0.5rem);
-  --menu-space-md: var(--hud-space-md, 0.75rem);
+  --menu-gutter: 1.25rem;
   --menu-surface: #fff;
   --menu-text: #333;
   --menu-muted: #666;
   --menu-border: #eee;
-  --menu-option-surface: #eee;
+  --menu-option-surface: var(--menu-border);
   --menu-option-hover: #e9e9e9;
   --menu-option-active: #e2e2e2;
   --menu-shadow: 0 0.5rem 1.5rem #0002;
@@ -21,12 +16,12 @@
 .game-menu__trigger {
   anchor-name: --game-menu-trigger;
   display: grid;
-  width: var(--menu-control-size);
-  height: var(--menu-control-size);
+  width: var(--ui-control-size);
+  height: var(--ui-control-size);
   padding: 0;
   place-items: center;
   border: 0;
-  border-radius: var(--menu-space-md);
+  border-radius: var(--ui-space-md);
   background: transparent;
   color: var(--menu-text);
   cursor: pointer;
@@ -55,10 +50,10 @@
   inset: auto;
   top: anchor(bottom);
   right: anchor(right);
-  width: min(16rem, calc(100vw - 2 * var(--menu-gap)));
-  max-height: calc(100dvh - anchor(bottom) - 2 * var(--menu-gap));
-  margin: var(--menu-space-sm) 0 0;
-  padding: var(--menu-space-sm);
+  width: min(16rem, calc(100vw - 2 * var(--menu-gutter)));
+  max-height: calc(100dvh - anchor(bottom) - 2 * var(--menu-gutter));
+  margin: var(--ui-space-sm) 0 0;
+  padding: var(--ui-space-sm);
   overflow-y: auto;
   border: 0;
   border-radius: var(--menu-radius);
@@ -69,10 +64,10 @@
 
 .game-menu__heading {
   margin: 0;
-  gap: var(--menu-space-sm);
+  gap: var(--ui-space-sm);
   display: flex;
   align-items: center;
-  padding: var(--menu-space-sm) 0;
+  padding: var(--ui-space-sm) 0;
   font-size: 1.75rem;
   font-weight: 700;
 }
@@ -83,12 +78,12 @@
 }
 
 .game-menu__group {
-  padding: var(--menu-space-md) 0;
+  padding: var(--ui-space-md) 0;
   border-top: 1px solid var(--menu-border);
 }
 
 .game-menu__section-title {
-  margin: 0 0 var(--menu-space-sm);
+  margin: 0 0 var(--ui-space-sm);
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--menu-muted);
@@ -98,14 +93,14 @@
 .game-menu__option-summary {
   display: flex;
   align-items: center;
-  gap: var(--menu-space-sm);
+  gap: var(--ui-space-sm);
   width: 100%;
-  min-height: var(--menu-control-size);
+  min-height: var(--ui-control-size);
   box-sizing: border-box;
-  margin: var(--menu-space-xs) 0;
-  padding: var(--menu-space-sm) var(--menu-space-md);
+  margin: var(--ui-space-xs) 0;
+  padding: var(--ui-space-sm) var(--ui-space-md);
   border: 0;
-  border-radius: var(--menu-control-radius);
+  border-radius: var(--ui-control-radius);
   background: var(--menu-option-surface);
   color: var(--menu-text);
   font: inherit;
@@ -152,11 +147,11 @@
 
 .game-menu__keybinds {
   margin: 0;
-  padding: var(--menu-space-sm) var(--menu-space-md);
+  padding: var(--ui-space-sm) var(--ui-space-md);
   display: grid;
   grid-template-columns: auto 1fr;
-  column-gap: var(--menu-space-md);
-  row-gap: var(--menu-space-xs);
+  column-gap: var(--ui-space-md);
+  row-gap: var(--ui-space-xs);
   font-size: 0.875rem;
 }
 
@@ -177,11 +172,12 @@
 
 .game-menu__keybind:not(:last-child) dt,
 .game-menu__keybind:not(:last-child) dd {
-  padding-bottom: var(--menu-space-xs);
+  padding-bottom: var(--ui-space-xs);
   border-bottom: 1px solid var(--menu-border);
 }
 
 .game .game-menu {
+  --menu-gutter: var(--ui-space-md);
   --menu-surface: var(--hud-surface-raised);
   --menu-text: var(--hud-text);
   --menu-muted: var(--hud-text-muted);
@@ -204,8 +200,8 @@
 .game .game-menu__trigger-icon {
   width: 2rem;
   height: 2rem;
-  padding: var(--menu-space-xs);
-  border-radius: var(--menu-control-radius);
+  padding: var(--ui-space-xs);
+  border-radius: var(--ui-control-radius);
 }
 
 @media (hover: hover) {

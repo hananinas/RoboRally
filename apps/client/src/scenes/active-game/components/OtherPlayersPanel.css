@@ -2,7 +2,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   justify-items: start;
-  gap: var(--hud-space-md);
+  gap: var(--ui-space-md);
   width: min(100%, calc(var(--hud-opponent-expanded) + var(--hud-panel-shadow-gutter)));
   container-type: inline-size;
   pointer-events: none;
@@ -35,14 +35,14 @@
   gap: 2px;
   width: var(--opponent-collapsed-width);
   min-height: 4.125rem;
-  padding: var(--hud-space-xs) var(--hud-space-sm);
-  padding-inline-start: calc(var(--hud-space-lg) + var(--hud-robot-swatch-size) + var(--hud-space-md));
+  padding: var(--ui-space-xs) var(--ui-space-sm);
+  padding-inline-start: calc(var(--ui-space-lg) + var(--hud-robot-swatch-size) + var(--ui-space-md));
 }
 
 .other-player__colour {
   position: absolute;
-  top: var(--hud-space-md);
-  inset-inline-start: var(--hud-space-lg);
+  top: var(--ui-space-md);
+  inset-inline-start: var(--ui-space-lg);
 }
 
 .other-player__name,
@@ -67,7 +67,7 @@
 
 .other-player__dots {
   display: flex;
-  gap: var(--hud-space-xs);
+  gap: var(--ui-space-xs);
 }
 
 .other-player__dots > span {
@@ -104,10 +104,10 @@
   position: absolute;
   inset-block: 0;
   inset-inline-start: var(--opponent-collapsed-width);
-  width: max(0px, calc(var(--opponent-expanded-width) - var(--opponent-collapsed-width) - var(--hud-space-sm)));
+  width: max(0px, calc(var(--opponent-expanded-width) - var(--opponent-collapsed-width) - var(--ui-space-sm)));
   display: flex;
   align-items: center;
-  gap: var(--hud-space-xs);
+  gap: var(--ui-space-xs);
 }
 
 .other-player__slot {

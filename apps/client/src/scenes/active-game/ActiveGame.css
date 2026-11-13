@@ -20,8 +20,8 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--hud-panel-width);
   grid-template-rows: minmax(0, 1fr) auto;
-  gap: var(--hud-space-md);
-  padding-block: var(--hud-space-lg);
+  gap: var(--ui-space-md);
+  padding-block: var(--ui-space-lg);
   color: var(--hud-text);
   pointer-events: none;
 }
@@ -35,12 +35,12 @@
   scrollbar-width: none;
   margin-inline-start: calc(-1 * var(--hud-panel-shadow-gutter));
   padding-inline-start: var(--hud-panel-shadow-gutter);
-  padding-block: var(--hud-space-xs) var(--hud-panel-shadow-gutter);
+  padding-block: var(--ui-space-xs) var(--hud-panel-shadow-gutter);
 }
 
 .game-hud__content {
   display: grid;
-  gap: var(--hud-space-md);
+  gap: var(--ui-space-md);
   pointer-events: auto;
 }
 
@@ -52,7 +52,7 @@
   overscroll-behavior: contain;
   scrollbar-width: none;
   padding-inline-end: var(--hud-panel-shadow-gutter);
-  padding-block: var(--hud-space-xs) var(--hud-panel-shadow-gutter);
+  padding-block: var(--ui-space-xs) var(--hud-panel-shadow-gutter);
 }
 
 /* Panels */
@@ -62,7 +62,7 @@
 }
 
 .panel {
-  padding: var(--hud-space-md);
+  padding: var(--ui-space-md);
   border-radius: var(--hud-radius) 0 0 var(--hud-radius);
 }
 
@@ -78,7 +78,7 @@
 }
 
 .game-status .programming-countdown {
-  margin-top: var(--hud-space-xs);
+  margin-top: var(--ui-space-xs);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -87,7 +87,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--hud-space-md);
+  gap: var(--ui-space-md);
 }
 
 .robot-swatch {
@@ -115,7 +115,7 @@
 }
 
 .player-panel__details {
-  margin-top: var(--hud-space-sm);
+  margin-top: var(--ui-space-sm);
 }
 
 .player-panel__detail {
@@ -123,8 +123,8 @@
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: var(--hud-space-sm);
-  padding-block: var(--hud-space-sm);
+  gap: var(--ui-space-sm);
+  padding-block: var(--ui-space-sm);
   border-top: 1px solid var(--hud-border);
 }
 
@@ -143,11 +143,11 @@
 .player-panel__toggle {
   display: grid;
   place-items: center;
-  width: var(--hud-control-size);
-  height: var(--hud-control-size);
+  width: var(--ui-control-size);
+  height: var(--ui-control-size);
   padding: 0;
   border: 0;
-  border-radius: var(--hud-control-radius);
+  border-radius: var(--ui-control-radius);
   background: transparent;
   color: var(--hud-text-muted);
   cursor: pointer;
@@ -174,7 +174,7 @@
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--hud-space-xs);
+  gap: var(--ui-space-xs);
   font-variant-numeric: tabular-nums;
 }
 
@@ -208,7 +208,7 @@
 .registers {
   display: grid;
   grid-template-columns: repeat(5, var(--hud-register-width));
-  gap: var(--hud-space-xs);
+  gap: var(--ui-space-xs);
   justify-content: safe center;
   margin: 0.25rem 0 0;
   padding: 0.5rem 0.5rem 0.25rem;
@@ -228,7 +228,7 @@
   height: var(--hud-register-height);
   place-items: center;
   border: 1px solid var(--hud-border);
-  border-radius: var(--hud-control-radius);
+  border-radius: var(--ui-control-radius);
   background: var(--hud-surface-raised);
   color: var(--hud-text);
 }
@@ -255,8 +255,8 @@
 
 .register-card__number {
   position: absolute;
-  inset-block-start: var(--hud-space-xs);
-  inset-inline-start: var(--hud-space-xs);
+  inset-block-start: var(--ui-space-xs);
+  inset-inline-start: var(--ui-space-xs);
   z-index: 1;
   color: var(--hud-text-muted);
   font-size: var(--hud-font-small);
@@ -266,10 +266,10 @@
 
 .register-panel__done {
   display: block;
-  margin: var(--hud-space-sm) 0 0 auto;
-  padding: var(--hud-space-sm) var(--hud-space-lg);
+  margin: var(--ui-space-sm) 0 0 auto;
+  padding: var(--ui-space-sm) var(--ui-space-lg);
   border: 0;
-  border-radius: var(--hud-control-radius);
+  border-radius: var(--ui-control-radius);
   background: var(--hud-accent);
   color: var(--hud-accent-text);
   font: inherit;
@@ -295,11 +295,11 @@
   justify-self: center;
   width: max-content;
   max-width: 100%;
-  padding: var(--hud-space-xs) var(--hud-space-md);
+  padding: var(--ui-space-xs) var(--ui-space-md);
   display: grid;
   grid-auto-columns: var(--hud-hand-width);
   grid-auto-flow: column;
-  gap: var(--hud-space-md);
+  gap: var(--ui-space-md);
   justify-content: safe center;
   overflow-x: auto;
   overflow-y: hidden;
@@ -351,7 +351,7 @@
   width: var(--hud-hand-width);
   height: var(--hud-hand-height);
   border: 1px solid var(--hud-border);
-  box-shadow: var(--hud-shadow);
+  box-shadow: var(--hud-hand-card-shadow);
   font-size: var(--hud-font-small);
   border-radius: var(--hud-radius);
   touch-action: pan-x;
@@ -360,7 +360,7 @@
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .program-card--hand:enabled {
     position: relative;
-    transition: translate 120ms ease-out;
+    transition: translate var(--hud-card-motion-duration) ease-out;
   }
 
   .program-card--hand:enabled:hover:not(.program-card--dragging) {
@@ -377,10 +377,10 @@
 }
 
 .program-card--register {
-  padding: var(--hud-space-sm) 0 0;
+  padding: var(--ui-space-sm) 0 0;
   width: var(--hud-register-width);
   height: var(--hud-register-height);
-  border-radius: var(--hud-control-radius);
+  border-radius: var(--ui-control-radius);
 }
 
 .register-card > .program-card {
@@ -405,9 +405,9 @@
   z-index: 2;
   transform: translate(-50%, -50%);
   transition:
-    width 120ms ease,
-    height 120ms ease,
-    border-radius 120ms ease;
+    width var(--hud-card-motion-duration) ease,
+    height var(--hud-card-motion-duration) ease,
+    border-radius var(--hud-card-motion-duration) ease;
   pointer-events: none;
 }
 
@@ -434,7 +434,7 @@
 
 .disconnect-popup, .winner-popup {
   padding: 2rem;
-  max-width: calc(100% - 2 * var(--hud-space-lg));
+  max-width: calc(100% - 2 * var(--ui-space-lg));
   border-radius: var(--hud-radius);
   background: var(--hud-surface);
   color: var(--hud-text);
@@ -461,23 +461,23 @@
   }
 }
 
-.game-menu__button {
-  min-height: var(--hud-control-size);
+.game-popup__leave {
+  min-height: var(--ui-control-size);
   margin-top: 1.5rem;
-  padding: var(--hud-space-sm) var(--hud-space-md);
+  padding: var(--ui-space-sm) var(--ui-space-md);
   border: 0;
-  border-radius: var(--hud-control-radius);
+  border-radius: var(--ui-control-radius);
   background: var(--hud-surface-inset);
   color: var(--hud-text);
   font: inherit;
   cursor: pointer;
 }
 
-.game-menu__button:enabled:hover {
+.game-popup__leave:enabled:hover {
   background: var(--hud-surface-raised);
 }
 
-.game-menu__button:disabled {
+.game-popup__leave:disabled {
   opacity: 0.6;
   cursor: default;
 }
@@ -544,14 +544,14 @@
   .game-overlay {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
-    gap: var(--hud-space-sm);
-    padding-block: var(--hud-space-sm);
+    gap: var(--ui-space-sm);
+    padding-block: var(--ui-space-sm);
   }
 
   .game-hud {
     grid-area: 1 / 1;
     justify-self: end;
-    width: calc(min(100% - var(--hud-space-lg), var(--hud-panel-width)) + var(--hud-panel-shadow-gutter));
+    width: calc(min(100% - var(--ui-space-lg), var(--hud-panel-width)) + var(--hud-panel-shadow-gutter));
     max-height: 53dvh;
   }
 

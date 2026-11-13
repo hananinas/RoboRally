@@ -9,7 +9,6 @@
   overflow-y: auto;
   background: var(--entry-background);
   color: var(--entry-text);
-  font-family: system-ui, sans-serif;
 }
 
 .entry-board-background {
@@ -56,18 +55,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 24px;
-}
-
-.entry-panel__logout {
-  padding: 6px 12px;
-  border: 1px solid #4c5560;
-  border-radius: 9px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
+  margin-bottom: var(--entry-space-5);
 }
 
 .entry-validation {
@@ -78,24 +66,35 @@
 }
 
 .entry-validation--error {
-  color: #e8786e;
+  color: var(--entry-danger);
 }
 
-.entry-primary-button {
+.entry-primary-button,
+.entry-secondary-button {
   width: 100%;
   margin-top: 6px;
-  padding: 12px 0;
-  border: 0;
-  border-radius: 9px;
-  background: var(--entry-accent);
-  color: var(--entry-accent-ink);
+  padding: var(--entry-space-3) 0;
+  border-radius: var(--entry-button-radius);
   font: inherit;
   font-size: 14.5px;
   font-weight: 700;
   cursor: pointer;
 }
 
-.entry-primary-button:disabled {
+.entry-primary-button {
+  border: 0;
+  background: var(--entry-accent);
+  color: var(--entry-accent-ink);
+}
+
+.entry-secondary-button {
+  border: 1px solid var(--entry-border);
+  background: transparent;
+  color: inherit;
+}
+
+.entry-primary-button:disabled,
+.entry-secondary-button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
@@ -134,11 +133,7 @@
   cursor: pointer;
 }
 
-.lobby:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
+.lobby:disabled,
 .lobby:focus-visible {
   outline: 3px solid #fff;
   outline-offset: 2px;
@@ -178,11 +173,6 @@
   box-shadow: 0 0 0 2px var(--entry-selection);
 }
 
-.map-option:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
 .lobby__details {
   display: grid;
   flex: 1;
@@ -216,52 +206,6 @@
   margin: 0;
 }
 
-.lobby__action {
-  flex: none;
-  margin-bottom: 10px;
-  padding: 6px 12px;
-  border: 1px solid var(--entry-border);
-  border-radius: 6px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.lobby--message .lobby__action {
-  margin-bottom: 0;
-}
-
-.lobby__action:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.lobby__action:focus-visible {
-  outline: 3px solid #fff;
-  outline-offset: 2px;
-}
-
-.entry-secondary-button {
-  width: 100%;
-  margin-top: 6px;
-  padding: 12px 0;
-  border: 1px solid var(--entry-border);
-  border-radius: 9px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: 14.5px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.entry-secondary-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
 .entry-layout {
   display: grid;
   gap: var(--entry-space-4);
@@ -280,27 +224,6 @@
   display: grid;
   min-width: 0;
   gap: var(--entry-space-4);
-}
-
-.entry-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--entry-space-3);
-  margin-bottom: var(--entry-space-5);
-}
-
-.entry-header nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--entry-space-3);
-  font-size: 12px;
-}
-
-.entry-header a {
-  color: var(--entry-muted);
-  text-underline-offset: 3px;
 }
 
 .entry :is(button, a):focus-visible {

@@ -13,6 +13,7 @@ import {
   type ProgramCard 
 } from './gameState.ts'
 import type useGameConnection from './useGameConnection.ts'
+import LeaveGameButton from './components/LeaveGameButton.tsx'
 import WinnerPopup from './components/WinnerPopup.tsx'
 
 
@@ -143,14 +144,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
                     : 'A player has disconnected'}
             </h2>
             <div className="disconnect-spinner" role="status"/>
-            <button
-              className="game-menu__button game-menu__button--leave"
-              type="button"
-              onClick={onLeave}
-              disabled={leaving || !state.connected}
-            >
-              Leave game
-            </button>
+            <LeaveGameButton onLeave={onLeave} disabled={leaving || !state.connected} />
           </div>
         </div>
       )}

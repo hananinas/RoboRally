@@ -10,35 +10,33 @@
   --hud-accent-text: #221b08;
   --hud-register-locked-surface: color-mix(in srgb, var(--hud-accent) 14%, var(--hud-surface-raised));
   --hud-danger: #ffd0cb;
-  --hud-shadow: 0 3px #253746;
+  --hud-hand-card-shadow: 0 3px #253746;
   --hud-panel-shadow: 0 4px 10px rgb(12 20 30 / 50%);
-  --hud-panel-shadow-gutter: 0.875rem;
   --hud-robot-swatch-shadow: inset 1px 2px #fff6, 0 3px #0004;
   --hud-backdrop: #0005;
 
-  /* Shared rhythm and control geometry */
-  --hud-space-xs: 0.25rem;
-  --hud-space-sm: 0.5rem;
-  --hud-space-md: 0.75rem;
-  --hud-space-lg: 1rem;
+  /* HUD typography and shape */
   --hud-radius: 0.6875rem;
-  --hud-control-radius: 0.5rem;
-  --hud-control-size: 2.75rem;
   --hud-robot-swatch-size: 1.25rem;
   --hud-font-small: 0.75rem;
   --hud-font-heading: 1.25rem;
 
   /* Panel and card geometry */
+  --hud-panel-shadow-gutter: 0.875rem;
   --hud-panel-width: clamp(18rem, 29vw, 20.5rem);
   --hud-opponent-width: 9.25rem;
   --hud-opponent-expanded: 24.625rem;
-  --hud-opponent-motion-duration: 160ms;
-  --hud-opponent-motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
   --hud-register-width: 2.75rem;
   --hud-register-height: 3.5rem;
   --hud-register-icon: 1.5rem;
   --hud-hand-width: 5rem;
   --hud-hand-height: 5.75rem;
   --hud-hand-icon: 2rem;
+
+
+  /* Motion */
+  --hud-opponent-motion-duration: 160ms;
+  --hud-opponent-motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --hud-card-motion-duration: 120ms;
   --hud-hand-hover-lift: 3px;
 }
