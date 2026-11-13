@@ -478,6 +478,7 @@ describe('started game membership over Socket.IO', () => {
           playerId: initial.assignment.playerId,
           pushedRobots: [],
           instruction, resolvedInstruction: instruction, position,
+          ...(registerIndex === 0 ? { pitFall: { reason: 'FELL_IN_PIT', entry: { x: 2, y: 1 } } } : {}),
         }
       }))
       expect(progress.flatMap((step) => step.checkpointProgress ?? [])).toEqual([
@@ -538,6 +539,7 @@ describe('started game membership over Socket.IO', () => {
       expect(actions[0][0]).toEqual({
         gameId: shared.gameId, registerIndex: 0, robotId: robotIds[0], instruction: 'MOVE_3', resolvedInstruction: 'MOVE_3',
         playerId: initializations[0].assignment.playerId,
+        pitFall: { reason: 'FELL_IN_PIT', entry: { x: 2, y: 1 } },
         pushedRobots: [],
         position: { coordinate: { x: 4, y: 3 }, orientation: 'NORTH' },
       })

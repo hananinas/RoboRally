@@ -15,6 +15,7 @@ export type {
   EnvironmentStepResolved,
   ExecutionState,
   GearRotation,
+  PitFall,
   GameAborted,
   GameWon,
   Winner,

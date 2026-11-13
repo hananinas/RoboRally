@@ -788,6 +788,8 @@ components:
               - type: 'null'
           position:
             $ref: "#/components/schemas/Position"
+          pitFall:
+            $ref: "#/components/schemas/PitFall"
           pushedRobots:
             type: array
             description: Final states of other robots displaced by this instruction, after all movement steps and reboots. Empty when no other robot changed position.
@@ -799,6 +801,8 @@ components:
                   $ref: "#/components/schemas/RobotId"
                 position:
                   $ref: "#/components/schemas/Position"
+                pitFall:
+                  $ref: "#/components/schemas/PitFall"
           gameId:
             $ref: "#/components/schemas/GameId"
           registerIndex:
@@ -1655,6 +1659,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Tile'
+
+    PitFall:
+      type: object
+      required: [ reason, entry ]
+      properties:
+        reason:
+          const: FELL_IN_PIT
+        entry:
+          $ref: '#/components/schemas/Coordinate'
+      description: The server-reported pit entry before reboot. The resolved position is the final pose.
 
     Tile:
       type: object

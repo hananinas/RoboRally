@@ -9,6 +9,7 @@ const ROUND = [
   },
   {
     gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 1, robotId: ROBOT_ID, instruction: 'MOVE_2', resolvedInstruction: 'MOVE_2',
+    pitFall: { reason: 'FELL_IN_PIT', entry: { x: 5, y: 3 } },
     position: { coordinate: { x: 1, y: 9 }, orientation: 'EAST' }, pushedRobots: [],
   },
 ] as const

@@ -43,8 +43,10 @@ describe('robot pushing', () => {
 
     const result = resolveRobotAction(game)
     const expected = [
-      { robotId: robots[1].id, position: position(0, 4), direction: Direction.NORTH },
-      { robotId: robots[2].id, position: reboot, direction: Direction.WEST },
+      { robotId: robots[1].id, position: position(0, 4), direction: Direction.NORTH,
+        pitFall: { reason: 'FELL_IN_PIT', entry: position(8) } },
+      { robotId: robots[2].id, position: reboot, direction: Direction.WEST,
+        pitFall: { reason: 'FELL_IN_PIT', entry: position(8) } },
     ]
     expect(result.pushedRobots).toEqual(expected)
     expect(result.registers[0]).toEqual({ status: 'REVEALED', instruction: move.instruction })

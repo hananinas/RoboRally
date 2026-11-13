@@ -185,6 +185,8 @@ export type ProgramFinalized = Readonly<{
   cards: readonly [Card, Card, Card, Card, Card]
 }>
 
+export type PitFall = Readonly<{ reason: 'FELL_IN_PIT'; entry: Coordinate }>
+
 export type RobotActionResolved = Readonly<{
   gameId: GameId
   registerIndex: number
@@ -194,7 +196,8 @@ export type RobotActionResolved = Readonly<{
   // What the register actually did; null when Again had nothing to repeat.
   resolvedInstruction: ResolvedInstruction | null
   position: Position
-  pushedRobots: readonly Pick<Robot, 'robotId' | 'position'>[]
+  pitFall?: PitFall
+  pushedRobots: readonly (Pick<Robot, 'robotId' | 'position'> & { readonly pitFall?: PitFall })[]
 }>
 
 export type PublicRegisterStatus = 'EMPTY' | 'HIDDEN' | 'REVEALED'

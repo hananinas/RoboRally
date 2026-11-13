@@ -353,3 +353,6 @@ checks checkpoints before the next register or hand. Clients play
 The sequence starts at 1 and increases for every step, even empty ones. Socket.IO
 recovery preserves playback. A fresh snapshot replaces playback and supersedes
 results through `execution.lastEnvironmentSequence`.
+
+A robot that enters a pit reboots immediately. Its action result gives both the
+pit entry for animation and the final pose after reboot.

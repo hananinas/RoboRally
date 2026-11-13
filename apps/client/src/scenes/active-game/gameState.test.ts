@@ -820,7 +820,7 @@ describe('pit playback', () => {
     type: 'joined', result: { ...result, state: pitState },
   })
   const fall: RobotActionResolved = {
-    ...actions[0],
+    ...actions[0], pitFall: { reason: 'FELL_IN_PIT', entry: { x: 2, y: 1 } },
     instruction: 'MOVE_2', resolvedInstruction: 'MOVE_2', position: { coordinate: { x: 0, y: 4 }, orientation: 'NORTH' },
   }
 

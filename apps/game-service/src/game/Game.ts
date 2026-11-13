@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { err, ok, type Result } from 'neverthrow'
 import type { Board } from '@/game/Board'
-import { effects, type PrivateProgram, type PublicRegisters, type ResolvedInstruction } from '@robo-rally/game-events'
+import { effects, type PitFall, type PrivateProgram, type PublicRegisters, type ResolvedInstruction } from '@robo-rally/game-events'
 import { captureEnvironmentSnapshot, environmentSteps, type EnvironmentChanges } from '@/game/environment'
 import { Card } from '@/game/Card'
 import { Deck } from '@/game/Deck'
@@ -28,6 +28,7 @@ export type RobotActionResult = Readonly<{
   resolvedInstruction: ResolvedInstruction | undefined
   position: Position
   direction: Direction
+  pitFall?: PitFall
 }>
 
 export type NextActionResult = Readonly<{
@@ -38,6 +39,7 @@ export type NextActionResult = Readonly<{
     robotId: RobotId
     position: Position
     direction: Direction
+    pitFall?: PitFall
   }>[]
   roundConcluded: boolean
 }>
@@ -390,7 +392,7 @@ export class Game {
   }
 
   // Gameplay movement resolves entry effects; Board movement only changes positions.
-  moveRobot(robot: Robot, direction: Direction, steps: PositiveInteger): void {
+  moveRobot(robot: Robot, direction: Direction, steps: PositiveInteger, pitFalls?: Map<RobotId, PitFall>): void {
     for (let step = 0; step < steps; step++) {
       const movedRobotIds = this.board.pushRobot(robot.id, direction)
       if (movedRobotIds.length === 0) return
@@ -398,7 +400,7 @@ export class Game {
       for (const id of movedRobotIds) {
         const movedRobot = id === robot.id ? robot : this.roster.find((player) => player.robot.id === id)?.robot
         if (movedRobot === undefined) throw new Error(`Pushed robot ${id} is not in the game`)
-        const entry = this.resolveMovementEntry(movedRobot, this.board.positionOf(id))
+        const entry = this.resolveMovementEntry(movedRobot, this.board.positionOf(id), pitFalls)
         if (id === robot.id && entry === 'stop') return
       }
     }
@@ -415,23 +417,27 @@ export class Game {
     const registerIndex = this.registerIndex
     const card = robot.getProgramCard(UnsignedInteger(registerIndex))
     const previousPositions = this.roster.map((player) => this.board.positionOf(player.robot.id))
-    const resolvedInstruction = this.executeCard(robot, card, registerIndex)
+    const pitFalls = new Map<RobotId, PitFall>()
+    const resolvedInstruction = this.executeCard(robot, card, registerIndex, pitFalls)
     this.activatedRobotIds.add(robot.id)
     const player = this.roster.find((candidate) => candidate.robot === robot)!
     const registers = player.revealRegister(registerIndex, card.instruction)
+    const pitFall = pitFalls.get(robot.id)
     const action: RobotActionResult = {
       robotId: robot.id,
       card,
       resolvedInstruction,
       position: this.board.positionOf(robot.id),
       direction: robot.direction,
+      ...(pitFall ? { pitFall } : {}),
     }
     const pushedRobots = this.roster.flatMap(({ robot: other }, index) => {
       if (other.id === robot.id) return []
       const position = this.board.positionOf(other.id)
       const previous = previousPositions[index]
-      if (position.x === previous.x && position.y === previous.y) return []
-      return [{ robotId: other.id, position, direction: other.direction }]
+      const pitFall = pitFalls.get(other.id)
+      if (!pitFall && position.x === previous.x && position.y === previous.y) return []
+      return [{ robotId: other.id, position, direction: other.direction, ...(pitFall ? { pitFall } : {}) }]
     })
 
     const { roundConcluded } = this.recheckActivationPhase()
@@ -487,7 +493,7 @@ export class Game {
     return nextRobot
   }
 
-  private executeCard(robot: Robot, card: Card, registerIndex: number): ResolvedInstruction | undefined {
+  private executeCard(robot: Robot, card: Card, registerIndex: number, pitFalls: Map<RobotId, PitFall>): ResolvedInstruction | undefined {
     // Again repeats what the previous register resolved to (nothing in register 0).
     // TODO: With damage cards, Again after a damage card instead draws the top
     // card of the player's deck and resolves that.
@@ -500,20 +506,21 @@ export class Game {
     const effect = effects[resolved]
     if (effect.kind === 'move') {
       const direction = effect.steps < 0 ? opposite(robot.direction) : robot.direction
-      this.moveRobot(robot, direction, PositiveInteger(Math.abs(effect.steps)))
+      this.moveRobot(robot, direction, PositiveInteger(Math.abs(effect.steps)), pitFalls)
     } else {
       robot.turn(effect.quarterTurns)
     }
     return resolved
   }
 
-  private resolveMovementEntry(robot: Robot, position: Position): 'continue' | 'stop' {
+  private resolveMovementEntry(robot: Robot, position: Position, pitFalls?: Map<RobotId, PitFall>): 'continue' | 'stop' {
     const tile = this.board.getTile(position)
     const effect = tile === undefined ? 'reboot' : tileDefinitions[tile.kind].entryEffect
     switch (effect) {
       case undefined:
         return 'continue'
       case 'reboot':
+        if (tile?.kind === 'PIT') pitFalls?.set(robot.id, { reason: 'FELL_IN_PIT', entry: position })
         this.rebootRobot(robot)
         return 'stop'
       default: {

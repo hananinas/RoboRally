@@ -409,7 +409,7 @@ export function gameStateReducer(
           (state.registers.some((card) => card !== null) ? state.registers : null),
         players,
       }, robotPlaybackReducer(next.playback, {
-        type: 'enqueue', action, board: event.reducedMotion ? null : state.board,
+        type: 'enqueue', action, reducedMotion: event.reducedMotion,
       }))
     }
     case 'advance':

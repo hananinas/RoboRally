@@ -159,8 +159,10 @@ export function presentRobotActionResolved(
       coordinate: action.position,
       orientation: orientations[action.direction],
     },
+    ...(action.pitFall ? { pitFall: action.pitFall } : {}),
     pushedRobots: result.pushedRobots.map((robot) => ({
       robotId: robot.robotId,
+      ...(robot.pitFall ? { pitFall: robot.pitFall } : {}),
       position: { coordinate: robot.position, orientation: orientations[robot.direction] },
     })),
   }
