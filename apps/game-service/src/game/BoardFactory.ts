@@ -10,7 +10,7 @@ const MAPS: Readonly<Record<BoardMapName, MapSpec>> = boardMaps
 const DEFAULT_MAP: BoardMapName = 'empty-map'
 
 export function createBoard(mapName: BoardMapName = DEFAULT_MAP): Board {
-  const { width, height, walls, checkpoints, antenna, pits = [],  conveyors = [],  startTiles, maxPlayers } = MAPS[mapName]
+  const { width, height, walls, checkpoints, antenna, rebootTile, pits = [],  conveyors = [],  startTiles, maxPlayers } = MAPS[mapName]
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
     throw new RangeError(`Map "${mapName}" must have a positive integer width and height`)
   }
@@ -73,6 +73,7 @@ export function createBoard(mapName: BoardMapName = DEFAULT_MAP): Board {
   return new Board(
     boardTiles,
     antenna,
+    rebootTile,
     {
       name: MAPS[mapName].name,
       icon: MAPS[mapName].icon,

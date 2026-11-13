@@ -63,7 +63,6 @@ export type GameOptions = Readonly<{
   players: readonly Player[]
   // Template for each private deck created by addPlayer.
   deck: readonly Card[]
-  rebootTile: Position
   name: string
 }>
 
@@ -72,7 +71,6 @@ export class Game {
   readonly name: string
   readonly board: Board
   private readonly roster: Player[]
-  readonly rebootTile: Position
   private readonly deck: readonly Card[]
   private readonly lifecycle = new GameLifecycle('programming')
   private registerIndex = 0
@@ -85,17 +83,10 @@ export class Game {
     board,
     players,
     deck,
-    rebootTile,
     name,
   }: GameOptions) {
     if (deck.length < REGISTERS_PER_ROUND || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')
-    }
-    if (rebootTile === undefined) {
-      throw new RangeError('A game requires a reboot tile')
-    }
-    if (!board.allowsPlacement(rebootTile)) {
-      throw new RangeError('Reboot tile must be a non-pit tile on the board outside the priority antenna')
     }
 
     const playerIds = new Set<PlayerId>()
@@ -115,7 +106,6 @@ export class Game {
     this.board = board
     this.name = name
     this.roster = [...players]
-    this.rebootTile = Object.freeze({ ...rebootTile })
     this.deck = [...deck]
     this.dealInitialHands()
   }
@@ -468,7 +458,7 @@ export class Game {
   }
 
   private rebootRobot(robot: Robot): void {
-    const destination = this.board.nearestFreePosition(this.rebootTile)
+    const destination = this.board.nearestFreePosition(this.board.rebootTile)
     if (destination === undefined) throw new Error('No safe reboot destination is available')
     this.board.relocateRobot(robot.id, destination)
     // TODO: Add two SPAM cards and cancel this robot's remaining registers.
