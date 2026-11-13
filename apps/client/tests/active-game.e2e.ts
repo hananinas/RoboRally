@@ -1,19 +1,10 @@
 import type { Dialog, Page } from '@playwright/test'
-import { expect, openGame, test } from './game-fixture.ts'
+import { expect, openGame, pauseClock, test } from './game-fixture.ts'
 import { GAME_ID, OTHER_PLAYER_ID, OTHER_ROBOT_ID, PLAYER_ID, ROBOT_ID, ROUND_ACTIONS } from './game-fixture-data.ts'
 import { gameStatus } from './browserClient.ts'
 async function fillProgram(page: Page, indices = [0, 1, 2, 3, 4]) {
   const cards = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
   for (const index of indices) await cards.nth(index).click()
-}
-
-// The installed clock keeps ticking with real time until it is paused, so a
-// fixed pause time can already lie in the past after a slow cold-cache load
-// ("Cannot fast-forward to the past"). Pause one second past the current fake
-// time instead — still a small jump, because fast-forwarding past the
-// Socket.IO ping interval expires the heartbeat and disconnects the client.
-async function pauseClock(page: Page) {
-  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
 }
 
 test('renders the programming interface', async ({ page }) => {
@@ -84,14 +75,16 @@ test('shows checkpoint counts from snapshots and broadcasts once queued playback
   await page.getByRole('button', { name: 'Done', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()
   await pauseClock(page)
-  await game.control({ type: 'checkpoint-progress', progress: {
-    gameId: GAME_ID, playerId: OTHER_PLAYER_ID, lastCheckpoint: 1, checkpointCount: 2,
+  await game.control({ type: 'inject-environment', result: {
+    gameId: GAME_ID, kind: 'CHECKPOINTS', sequence: 1,
+    checkpointProgress: [{ playerId: OTHER_PLAYER_ID, lastCheckpoint: 1 }],
   } })
   await game.control({ type: 'round', actions: ROUND_ACTIONS, deferHand: true })
   await expect(page.getByRole('status')).toHaveText('Executing')
   await expect(checkpoints).toContainText('0/2')
-  await game.control({ type: 'checkpoint-progress', progress: {
-    gameId: GAME_ID, playerId: PLAYER_ID, lastCheckpoint: 1, checkpointCount: 2,
+  await game.control({ type: 'inject-environment', result: {
+    gameId: GAME_ID, kind: 'CHECKPOINTS', sequence: 2,
+    checkpointProgress: [{ playerId: PLAYER_ID, lastCheckpoint: 1 }],
   } })
   await expect(checkpoints).toContainText('0/2')
   await expect(page.getByRole('button', { name: /remove from register/ })).toHaveCount(5)

@@ -246,11 +246,7 @@ The priority algorithm calculates the activation order based on the game rules.
 ### Checkpoint progress
 Some tiles hold checkpoints. The demo board places checkpoint 1 at `(10, 6)` and checkpoint 2 at `(8, 9)`.
 
-At the end of each register, the service checks each robot's final position for its next checkpoint. It broadcasts progress to the [public room](#rooms):
-
-`player.checkpointProgress {gameId, playerId, lastCheckpoint, checkpointCount}`
-
-The event follows the related `robot.actionResolved`.
+The CHECKPOINTS step reports progress from each robot’s final position. The client applies it after the register’s robot actions have played.
 
 ### Winning
 A player wins when their robot completes the final checkpoint, so `lastCheckpoint` reaches `checkpointCount`. Like every checkpoint, this is checked at the end of a register. Robots cannot share a space, so only one robot can win. A board without checkpoints has no winner.
@@ -259,7 +255,7 @@ This is the `active` → `finished` transition, and it is final. The game ends a
 
 `game.won {gameId, playerId, username}`
 
-The event follows the final `player.checkpointProgress`. `PublicGameState.winner` holds the winner's `{playerId, username}`, or `null` while the game runs, so reconnecting players also see the result. The service records the username when the game is won, so it is still sent after the winner has left.
+The event follows the final `environment.stepResolved`. `PublicGameState.winner` holds the winner's `{playerId, username}`, or `null` while the game runs, so reconnecting players also see the result. The service records the username when the game is won, so it is still sent after the winner has left.
 
 After a win, `program.submit` is rejected with `GAME_FINISHED`. Players leave with `game.leave`, and the game is removed when the last member leaves.
 
@@ -350,7 +346,7 @@ If an unexpected service failure makes gameplay unrecoverable, members receive `
 
 ## Register-end environment
 
-Once environment execution is enabled, the server resolves gears together, then
+After each register's robot actions, the server resolves gears together, then
 checks checkpoints before the next register or hand. Clients play
 `environment.stepResolved` in order with robot actions.
 

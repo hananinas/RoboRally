@@ -146,8 +146,6 @@ channels:
         $ref: '#/components/messages/EnvironmentStepResolved'
       registersChanged:
         $ref: '#/components/messages/RegistersChanged'
-      playerCheckpointProgress:
-        $ref: '#/components/messages/PlayerCheckpointProgress'
       playerLeft:
         $ref: '#/components/messages/PlayerLeft'
       playerConnectionChanged:
@@ -845,35 +843,6 @@ components:
               - playerId: 00000000-0000-4000-8000-000000000002
                 lastCheckpoint: 1
 
-    PlayerCheckpointProgress:
-      name: player.checkpointProgress
-      description: >-
-        Broadcasts changed player checkpoint progress to game:{gameId}:public after the
-        related robot.actionResolved, or game.playerLeft when a departure finishes a
-        register, and before subsequent actions or private hands. Unchanged progress
-        produces no event. Clients apply progress on receipt without changing movement
-        playback or programming availability. Replayed events must not reduce progress.
-      payload:
-        type: object
-        additionalProperties: false
-        required: [ gameId, playerId, lastCheckpoint, checkpointCount ]
-        properties:
-          gameId:
-            $ref: '#/components/schemas/GameId'
-          playerId:
-            $ref: '#/components/schemas/PlayerId'
-          lastCheckpoint:
-            $ref: '#/components/schemas/LastCheckpoint'
-          checkpointCount:
-            $ref: '#/components/schemas/CheckpointCount'
-      examples:
-        - name: firstCheckpoint
-          payload:
-            gameId: 00000000-0000-4000-8000-000000000001
-            playerId: 00000000-0000-4000-8000-000000000002
-            lastCheckpoint: 1
-            checkpointCount: 2
-
     CardsDealt:
       name: cards.dealt
       payload:
@@ -959,7 +928,7 @@ components:
     GameWon:
       name: game.won
       description: >-
-        Announces the winner to game:{gameId}:public after the player.checkpointProgress
+        Announces the winner to game:{gameId}:public after the environment.stepResolved
         that completed the final checkpoint. The game ends: no further actions are resolved
         and no new hands are dealt.
       payload:
@@ -1695,7 +1664,7 @@ components:
           $ref: '#/components/schemas/Coordinate'
         type:
           type: string
-          enum: [ EMPTY, PIT ]
+          enum: [ EMPTY, PIT, CONVEYOR, GEAR ]
           description: >-
             PIT triggers an immediate server-side reboot on entry during movement,
             discarding the remaining steps of that instruction. Walls can block entry.
@@ -1711,6 +1680,28 @@ components:
             Optional checkpoint on an EMPTY tile, independent of its walls.
             Omit when absent. Numbers are unique and consecutive from 1 on a board.
             Checkpoints stay at their fixed positions and are available to every player.
+        sprite:
+          type: string
+        direction:
+          $ref: '#/components/schemas/Orientation'
+        rotation:
+          enum: [ CLOCKWISE, COUNTERCLOCKWISE ]
+      allOf:
+        - if:
+            properties:
+              type:
+                const: GEAR
+          then:
+            required: [ rotation ]
+          else:
+            not:
+              required: [ rotation ]
+        - if:
+            properties:
+              type:
+                const: CONVEYOR
+          then:
+            required: [ sprite, direction ]
     Antenna:
       type: object
       additionalProperties: false

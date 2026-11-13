@@ -49,6 +49,8 @@ export type Robot = Readonly<{
   position: Position
 }>
 
+export type GearRotation = 'CLOCKWISE' | 'COUNTERCLOCKWISE'
+
 export type Tile = Readonly<{
   position: Coordinate
   walls?: readonly Orientation[]
@@ -57,6 +59,7 @@ export type Tile = Readonly<{
   | Readonly<{
       type: 'EMPTY' | 'PIT'
     }>
+  | Readonly<{ type: 'GEAR'; rotation: GearRotation }>
   | Readonly<{
     type: 'CONVEYOR'
     sprite: string
@@ -135,12 +138,6 @@ export type GameAborted = Readonly<{ gameId: GameId }>
 export type Winner = Readonly<{ playerId: PlayerId; username: string }>
 export type GameWon = Readonly<{ gameId: GameId; playerId: PlayerId; username: string }>
 
-export type PlayerCheckpointProgress = Readonly<{
-  gameId: GameId
-  playerId: PlayerId
-  lastCheckpoint: number
-  checkpointCount: number
-}>
 
 export type PlayerConnectionChanged = Readonly<{
   gameId: GameId

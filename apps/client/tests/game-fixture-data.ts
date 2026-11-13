@@ -2,7 +2,8 @@ import type {
   Card,
   BoardMapName,
   CardsDealt,
-  PlayerCheckpointProgress,
+  EnvironmentStepResolved,
+  PlayerLeft,
   PlayerConnectionChanged,
   ProgramResultOutcome,
   ProgramSubmitted,
@@ -24,8 +25,8 @@ export const OTHER_ROBOT_ID = '33333333-3333-4333-8333-333333333334'
 
 export function createPublicState(): PublicGameState {
   return {
-    execution: { lastEnvironmentSequence: 0 },
     gameId: GAME_ID,
+    execution: { lastEnvironmentSequence: 0 },
     serverTime: 0,
     programmingTimer: { status: 'IDLE' },
     players: [{ playerId: PLAYER_ID, lastCheckpoint: 0, username: 'Player 1', programSubmitted: false, connected: true, registers: [{ status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }] }],
@@ -71,14 +72,15 @@ export const ROUND_ACTIONS: readonly RobotActionResolved[] = [
 ]
 
 export type FixtureControl =
-  | { type: 'checkpoint-progress'; progress: PlayerCheckpointProgress }
+  | { type: 'inject-environment'; result: EnvironmentStepResolved }
+  | { type: 'player-left'; player: PlayerLeft }
   | { type: 'connection-changed'; payload: PlayerConnectionChanged }
   | { type: 'registers-changed'; payload: RegistersChanged }
   | { type: 'submission'; outcome: ProgramResultOutcome; deferred: boolean }
   | { type: 'acknowledge'; outcome: ProgramResultOutcome }
   | { type: 'disconnect' }
   | { type: 'register-delivery'; mode: 'normal' | 'drop' | 'save-without-ack' }
-  | { type: 'round'; actions: readonly RobotActionResolved[]; deferHand?: boolean }
+  | { type: 'round'; actions: readonly (RobotActionResolved | EnvironmentStepResolved)[]; deferHand?: boolean }
   | { type: 'deal' }
   | { type: 'hand'; hand: CardsDealt }
   | { type: 'submitted'; submission: ProgramSubmitted }
