@@ -11,6 +11,8 @@ export type {
   CardsDealt,
   ClockResult,
   Coordinate,
+  EnvironmentStepKind,
+  EnvironmentStepResolved,
   GameAborted,
   GameWon,
   Winner,
