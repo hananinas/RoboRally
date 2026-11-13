@@ -4,7 +4,7 @@ import type { Board } from '@/game/Board'
 import { effects, type PrivateProgram, type PublicRegisters, type ResolvedInstruction } from '@robo-rally/game-events'
 import { Card } from '@/game/Card'
 import { Deck } from '@/game/Deck'
-import type { CardId, PlayerId, RobotId } from '@/game/ids'
+import type { CardId, GameId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
 import { ROBOT_COLOURS, Robot } from '@/game/Robot'
 import { tileDefinitions } from '@/game/Tile'
@@ -61,6 +61,7 @@ export const DEFAULT_GAME_NAME = 'Game'
 const REGISTERS_PER_ROUND = 5
 
 export type GameOptions = Readonly<{
+  id?: GameId
   board: Board
   players: readonly Player[]
   // Template for each private deck created by addPlayer.
@@ -74,6 +75,7 @@ export type GameOptions = Readonly<{
 }>
 
 export class Game {
+  readonly id: GameId
   readonly name: string
   readonly board: Board
   private readonly roster: Player[]
@@ -89,6 +91,7 @@ export class Game {
   private readonly resolvedInstructions = new Map<RobotId, (ResolvedInstruction | undefined)[]>()
 
   constructor({
+    id,
     board,
     players,
     deck,
@@ -120,6 +123,7 @@ export class Game {
       robotIds.add(player.robot.id)
     }
 
+    this.id = id ?? randomUUID()
     this.board = board
     this.name = name
     this.roster = [...players]
