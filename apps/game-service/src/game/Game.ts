@@ -6,7 +6,7 @@ import { Card } from '@/game/Card'
 import { Deck } from '@/game/Deck'
 import type { CardId, GameId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
-import { ROBOT_COLOURS, Robot } from '@/game/Robot'
+import { Robot } from '@/game/Robot'
 import { tileDefinitions } from '@/game/Tile'
 import { Direction, opposite, type Position } from '@/game/spatial'
 import { Integer, PositiveInteger, UnsignedInteger } from '@/numbers'
@@ -178,7 +178,7 @@ export class Game {
     return ok({ ...free[0] })
   }
 
-  addPlayer(colour: string = ROBOT_COLOURS[0]): Result<Player, AddPlayerError> {
+  addPlayer(colour: string): Result<Player, AddPlayerError> {
     return this.findSpawn().map((position) => {
       const robot = new Robot(randomUUID(), Direction.NORTH, colour)
       const player = new Player(randomUUID(), robot, Deck.fromTemplate(this.deck))

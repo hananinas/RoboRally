@@ -20,7 +20,7 @@ export class Robot {
   private currentDirection: Direction
   private programmedCards: readonly Card[] = []
 
-  constructor(readonly id: RobotId, direction: Direction, readonly colour: string = ROBOT_COLOURS[0]) {
+  constructor(readonly id: RobotId, direction: Direction, readonly colour: string) {
     this.currentDirection = direction
   }
 
