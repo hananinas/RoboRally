@@ -1,0 +1,42 @@
+.game {
+  /* Surfaces and states */
+  --hud-surface: #405769;
+  --hud-surface-raised: #4b6477;
+  --hud-surface-inset: #354b5e;
+  --hud-border: #8ca2b3;
+  --hud-text: #edf3f8;
+  --hud-text-muted: #d1dce5;
+  --hud-accent: #f3c94d;
+  --hud-accent-text: #221b08;
+  --hud-register-locked-surface: color-mix(in srgb, var(--hud-accent) 14%, var(--hud-surface-raised));
+  --hud-danger: #ffd0cb;
+  --hud-hand-card-shadow: 0 3px #253746;
+  --hud-panel-shadow: 0 4px 10px rgb(12 20 30 / 50%);
+  --hud-robot-swatch-shadow: inset 1px 2px #fff6, 0 3px #0004;
+  --hud-backdrop: #0005;
+
+  /* HUD typography and shape */
+  --hud-radius: 0.6875rem;
+  --hud-robot-swatch-size: 1.25rem;
+  --hud-font-small: 0.75rem;
+  --hud-font-heading: 1.25rem;
+
+  /* Panel and card geometry */
+  --hud-panel-shadow-gutter: 0.875rem;
+  --hud-panel-width: clamp(18rem, 29vw, 20.5rem);
+  --hud-opponent-width: 9.25rem;
+  --hud-opponent-expanded: 24.625rem;
+  --hud-register-width: 2.75rem;
+  --hud-register-height: 3.5rem;
+  --hud-register-icon: 1.5rem;
+  --hud-hand-width: 5rem;
+  --hud-hand-height: 5.75rem;
+  --hud-hand-icon: 2rem;
+
+
+  /* Motion */
+  --hud-opponent-motion-duration: 160ms;
+  --hud-opponent-motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --hud-card-motion-duration: 120ms;
+  --hud-hand-hover-lift: 3px;
+}

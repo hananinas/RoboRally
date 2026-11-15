@@ -13,6 +13,7 @@ test('toggles game options with a leave action', async ({ page }) => {
   await trigger.click()
   await expect(trigger).toHaveAttribute('aria-expanded', 'true')
   await expect(options).toBeVisible()
+  await expect(options.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible()
   await expect(options.getByRole('button', {
     name: 'Leave game',
   })).toBeEnabled()
@@ -26,6 +27,8 @@ test('supports Enter, Space, and Escape without losing trigger focus', async ({ 
   const trigger = page.getByRole('button', { name: 'Game options', exact: true })
   const options = page.getByRole('region', { name: 'Game options' })
 
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('button', { name: 'Collapse player details' })).toBeFocused()
   await page.keyboard.press('Tab')
   await expect(trigger).toBeFocused()
   for (const key of ['Enter', 'Space']) {
@@ -122,22 +125,26 @@ test('includes the leave action without trapping keyboard focus', async ({ page 
   const keybindings = options.locator('summary')
 
   await page.keyboard.press('Tab')
+  await expect(collapse).toBeFocused()
+  await page.keyboard.press('Tab')
   await expect(trigger).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(options).toBeVisible()
 
-  for (const control of [settings, logout, leave, keybindings, collapse]) {
+  for (const control of [settings, logout, leave, keybindings]) {
     await page.keyboard.press('Tab')
     await expect(control).toBeFocused()
   }
 
-  for (const control of [keybindings, leave, logout, settings, trigger]) {
+  for (const control of [leave, logout, settings, trigger]) {
     await page.keyboard.press('Shift+Tab')
     await expect(control).toBeFocused()
   }
 
   await page.keyboard.press('Escape')
   await expect(options).toBeHidden()
+  await page.keyboard.press('Shift+Tab')
+  await expect(collapse).toBeFocused()
 })
 
 test('preserves the program and allows card selection when dismissing the menu', async ({ page }) => {
@@ -179,7 +186,7 @@ test.describe('touch interaction', () => {
     await expect(options).toBeVisible()
     await expect(options.getByRole('button', { name: 'Leave game' })).toBeEnabled()
 
-    await page.getByRole('heading', { name: 'Health', exact: true }).tap()
+    await page.getByRole('main', { name: 'Game board' }).tap({ position: { x: 24, y: 300 } })
     await expect(options).toBeHidden()
     await expect(trigger).toHaveAttribute('aria-expanded', 'false')
 

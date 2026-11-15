@@ -20,7 +20,6 @@ import {
   type ProgramCard,
   type Registers,
 } from '../src/scenes/active-game/gameState.ts'
-import useOverlayLayout from '../src/scenes/active-game/useOverlayLayout.ts'
 
 export type BoardHarnessApi = {
   enqueue: (actions: readonly ResolvedRobotAction[]) => void
@@ -43,7 +42,6 @@ export default function BoardHarness() {
   const [registersPast, setRegistersPast] = useState<readonly Registers[]>([])
   const [registersFuture, setRegistersFuture] = useState<readonly Registers[]>([])
   const [confirmed, setConfirmed] = useState(false)
-  const { handBelowHud, handRef, hudContentRef, hudFits, overlayRef } = useOverlayLayout()
 
   useEffect(() => {
     window.boardFixture = { enqueue: (actions) => actions.forEach(enqueue) }
@@ -96,18 +94,12 @@ export default function BoardHarness() {
     hand, registeredCardIds, confirmed, handlePlaceCard, handleRemove,
     handleClearRegisters, handleUndo, handleRedo, handleSubmit, registersAreFilled(registers),
   )
-  const overlayClassName = [
-    'game-overlay',
-    handBelowHud && 'game-overlay--hand-below-hud',
-    hudFits && 'game-overlay--hud-fits',
-  ].filter(Boolean).join(' ')
-
   return (
     <div className="game">
       <BoardViewport board={DEMO_BOARD} robots={robots} />
-      <div ref={overlayRef} className={overlayClassName}>
+      <div className="game-overlay">
         <aside className="game-hud" aria-label="Game controls">
-          <div ref={hudContentRef} className="game-hud__content">
+          <div className="game-hud__content">
             <PlayerPanel player={{ name: 'Board fixture player', lastCheckpoint: 0 }} checkpointCount={0} onLogout={() => {}} onSettings={() => {}} />
             <RegisterPanel
               registers={registers}
@@ -116,6 +108,7 @@ export default function BoardHarness() {
               pendingDelete={pendingDelete}
               awaitingSubmitConfirm={awaitingSubmitConfirm}
               submission={confirmed ? 'accepted' : 'idle'}
+              locked={confirmed}
               status="Programming"
               localDeadline={null}
               error={null}
@@ -126,7 +119,6 @@ export default function BoardHarness() {
           </div>
         </aside>
         <ProgrammingHand
-          containerRef={handRef}
           cards={hand}
           registeredCardIds={registeredCardIds}
           disabled={confirmed}
