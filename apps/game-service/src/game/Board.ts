@@ -62,7 +62,7 @@ export class Board {
     return this.checkpointTotal
   }
 
-  contains(position: Position): boolean {
+  private contains(position: Position): boolean {
     return (
       position.x >= 0 &&
       position.x < this.width &&

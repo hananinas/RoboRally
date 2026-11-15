@@ -282,7 +282,7 @@ export class Game {
     })
   }
 
-  recheckProgrammingPhase(): void {
+  private recheckProgrammingPhase(): void {
     if (
       this.requirePhase('programming').isOk() &&
       this.players.length > 0 &&
@@ -324,7 +324,7 @@ export class Game {
   }
 
   // Gameplay movement resolves entry effects; Board movement only changes positions.
-  moveRobot(robot: Robot, direction: Direction, steps: PositiveInteger): void {
+  private moveRobot(robot: Robot, direction: Direction, steps: PositiveInteger): void {
     for (let step = 0; step < steps; step++) {
       const movedRobotIds = this.board.pushRobot(robot.id, direction)
       if (movedRobotIds.length === 0) return

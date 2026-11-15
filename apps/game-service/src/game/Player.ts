@@ -13,7 +13,7 @@ export class Player {
   constructor(
     readonly id: PlayerId,
     readonly robot: Robot,
-    readonly deck: Deck,
+    private readonly deck: Deck,
   ) {}
 
   get hand(): readonly Card[] {
