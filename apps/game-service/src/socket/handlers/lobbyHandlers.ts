@@ -144,11 +144,11 @@ export function handleSelectRobot(
   acknowledge: (result: RobotSelectionResult) => void,
 ): void {
   withSessionRequest(socket, 'lobby.selectRobot', robotSelectionRequestSchema, payload, acknowledge, (user, ack) => {
+    if (!findRobotDefinition(payload.robotSpriteId)) return ack({ outcome: 'INVALID_REQUEST' })
     const session = context.sessionsByUser.get(user.userId)
     const lobby = session?.kind === 'lobby' ? context.lobbies.get(session.lobbyId) : undefined
     const member = lobby?.members.get(user.userId)
     if (!lobby || member?.connectionId !== socket.id) return ack({ outcome: 'NOT_LOBBY_MEMBER' })
-    if (!findRobotDefinition(payload.robotSpriteId)) return ack({ outcome: 'INVALID_REQUEST' })
     member.robotSpriteId = payload.robotSpriteId
     const state = presentLobby(lobby)
     ack({ outcome: 'ROBOT_SELECTED', lobby: state })
