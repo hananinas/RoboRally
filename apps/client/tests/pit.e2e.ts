@@ -53,8 +53,10 @@ function opacity(tank: Locator) {
 }
 
 async function expectDriving(tank: Locator) {
-  const [start, midway] = await drawnAt(tank)
-  expect(midway).not.toBe(start)
+  await expect.poll(async () => {
+    const [start, midway] = await drawnAt(tank)
+    return midway !== start
+  }).toBe(true)
 }
 
 async function expectStill(tank: Locator) {
