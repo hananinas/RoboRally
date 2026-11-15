@@ -22,6 +22,8 @@ channels:
         $ref: '#/components/messages/LobbyCreate'
       joinLobby:
         $ref: '#/components/messages/LobbyJoin'
+      selectRobot:
+        $ref: '#/components/messages/LobbySelectRobot'
       leaveLobby:
         $ref: '#/components/messages/LobbyLeave'
       startLobby:
@@ -57,6 +59,13 @@ channels:
     messages:
       result:
         $ref: '#/components/messages/LobbyJoinReply'
+
+  lobbySelectRobotReplies:
+    address: null
+    description: Socket.IO acknowledgement of lobby.selectRobot.
+    messages:
+      result:
+        $ref: '#/components/messages/LobbySelectRobotReply'
 
   lobbyLeaveReplies:
     address: null
@@ -257,6 +266,20 @@ operations:
       x-socketio:
         acknowledgement: true
 
+  handleLobbySelectRobot:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/selectRobot'
+    reply:
+      channel:
+        $ref: '#/channels/lobbySelectRobotReplies'
+      messages:
+        - $ref: '#/channels/lobbySelectRobotReplies/messages/result'
+      x-socketio:
+        acknowledgement: true
+
   handleLobbyLeave:
     action: receive
     channel:
@@ -347,6 +370,20 @@ components:
       description: Delivered only through the request acknowledgement.
       payload:
         $ref: '#/components/schemas/LobbyJoinResult'
+    LobbySelectRobot:
+      name: lobby.selectRobot
+      description: Selects a robot sprite for the authenticated lobby member.
+      payload:
+        $ref: '#/components/schemas/RobotSelectionRequest'
+      examples:
+        - name: selectScout
+          payload:
+            robotSpriteId: scout
+    LobbySelectRobotReply:
+      name: lobby.selectRobotResult
+      description: Delivered only through the request acknowledgement.
+      payload:
+        $ref: '#/components/schemas/RobotSelectionResult'
     LobbyLeave:
       name: lobby.leave
       description: >-
@@ -419,6 +456,7 @@ components:
                 robots:
                   - robotId: 00000000-0000-4000-8000-000000000003
                     playerId: 00000000-0000-4000-8000-000000000002
+                    robotSpriteId: tank
                     colour: red
                     position:
                       coordinate:
@@ -1001,6 +1039,14 @@ components:
         lobbyId:
           type: string
           format: uuid
+    RobotSelectionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - robotSpriteId
+      properties:
+        robotSpriteId:
+          $ref: '#/components/schemas/RobotSpriteId'
     LobbySummary:
       type: object
       additionalProperties: false
@@ -1033,6 +1079,7 @@ components:
           players:
             - userId: 00000000-0000-4000-8000-000000000004
               username: Dane
+              robotSpriteId: tank
       required:
         - lobbyId
         - name
@@ -1057,10 +1104,10 @@ components:
           format: uuid
         players:
           type: array
-          description: Members in join order, with unique userIds. Length equals playerCount; ownerUserId identifies the first member.
+          description: Members in join order, with unique userIds and their selected robot sprites. Length equals playerCount; ownerUserId identifies the first member.
           minItems: 1
           items:
-            $ref: '#/components/schemas/User'
+            $ref: '#/components/schemas/LobbyPlayer'
     LobbyFailure:
       type: object
       additionalProperties: false
@@ -1101,6 +1148,19 @@ components:
           properties:
             outcome:
               const: LOBBY_JOINED
+            lobby:
+              $ref: '#/components/schemas/LobbyState'
+        - $ref: '#/components/schemas/LobbyFailure'
+    RobotSelectionResult:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - outcome
+            - lobby
+          properties:
+            outcome:
+              const: ROBOT_SELECTED
             lobby:
               $ref: '#/components/schemas/LobbyState'
         - $ref: '#/components/schemas/LobbyFailure'
@@ -1178,7 +1238,7 @@ components:
     LobbyUpdated:
       type: object
       additionalProperties: false
-      description: Full lobby snapshot sent to existing members after a join and to remaining members after a leave or disconnect.
+      description: Full lobby snapshot sent to lobby members after a join, robot selection, or ownership change, and to remaining members after a leave or disconnect.
       required:
         - lobby
       properties:
@@ -1214,6 +1274,18 @@ components:
           $ref: '#/components/schemas/UserId'
         username:
           $ref: '#/components/schemas/Username'
+
+    LobbyPlayer:
+      type: object
+      additionalProperties: false
+      required: [ userId, username, robotSpriteId ]
+      properties:
+        userId:
+          $ref: '#/components/schemas/UserId'
+        username:
+          $ref: '#/components/schemas/Username'
+        robotSpriteId:
+          $ref: '#/components/schemas/RobotSpriteId'
 
     # Membership
     PlayerAssignment:
@@ -1525,6 +1597,11 @@ components:
       type: string
       format: uuid
 
+    RobotSpriteId:
+      type: string
+      description: Robot sprite selected by a lobby member.
+      enum: [ tank, scout, guardian, rover, striker, sentinel, hauler ]
+
     CardId:
       type: string
       format: uuid
@@ -1570,12 +1647,14 @@ components:
 
     Robot:
       type: object
-      required: [ robotId, playerId, colour, position ]
+      required: [ robotId, playerId, robotSpriteId, colour, position ]
       properties:
         robotId:
           $ref: '#/components/schemas/RobotId'
         playerId:
           $ref: '#/components/schemas/PlayerId'
+        robotSpriteId:
+          $ref: '#/components/schemas/RobotSpriteId'
         colour:
           type: string
           description: Server-assigned colour, fixed for the lifetime of this robot.

@@ -9,7 +9,7 @@ This document describes the v1.2.0 communication flow. [AsyncAPI](asyncapi.yaml)
 
 Server side Socket.IO rooms scope event broadcasts to only the connections that should receive them. The service uses three kinds:
 
-- `lobby:{lobbyId}` — every connection currently waiting in that lobby. Carries lobby-wide updates such as `lobby.updated`, sent whenever membership or ownership changes.
+- `lobby:{lobbyId}` — every connection currently waiting in that lobby. Carries lobby-wide updates such as `lobby.updated`, sent whenever membership, ownership, or a member's robot selection changes.
 - `game:{gameId}:public` — every connection currently a member of that game. Carries events every player needs to see: resolved robot actions, checkpoint progress, connection and pause state, and the fact that another player has submitted their program for the round.
 - `game:{gameId}:player:{playerId}` — only the connection currently attached to that player. Carries anything that must stay private to that player (eg. their hand of cards).
 
@@ -69,13 +69,20 @@ The client sends `lobby.create`. As of this version there are no options and the
 ### Joining a lobby
 Alternatively, the user can join an existing lobby. Once a lobby has been selected, the clients sends `lobby.join {lobbyId}`. 
 
+### Selecting a robot
+While waiting in a lobby, a client can select its player's robot sprite with `lobby.selectRobot {robotSpriteId}`. The allowed values are `tank`, `scout`, `guardian`, `rover`, `striker`, `sentinel`, and `hauler`. New lobby members start with `tank` selected.
+
+The selection is scoped to the authenticated lobby member. The server acknowledges a successful selection with `ROBOT_SELECTED {lobby}` and broadcasts the updated full lobby snapshot through `lobby.updated {lobby}` to every lobby member. Invalid sprite IDs are rejected with `INVALID_REQUEST`; a connection that is not a member of a lobby is rejected with `NOT_LOBBY_MEMBER`.
+
+The selected sprite is included in each player's lobby roster as `robotSpriteId`. When the lobby starts, the same sprite ID is copied to that player's game robot; the robot's server-assigned colour remains a separate property.
+
 ### Starting a game
 Both `lobby.join` and `lobby.create` acknowledge with `LOBBY_JOINED {lobby}` after which the client enters the waiting screen. All non owner users, then wait for the owner to start the game via `lobby.start {}`. 
 
 Once a game has successfully started , the onber receives `STARTED {gameId}` as the command acknowledgement. How the game is initialised is described in [Initialization](#initialization).
 
 ### Lobby Membership
-`LOBBY_JOINED`, `IN_LOBBY`, and `lobby.updated` include the full `lobby.players` roster (`userId`, `username`) in join order. Clients replace their roster on each snapshot; `lobby.list` returns summaries only.
+`LOBBY_JOINED`, `IN_LOBBY`, and `lobby.updated` include the full `lobby.players` roster (`userId`, `username`, `robotSpriteId`) in join order. Clients replace their roster on each snapshot; `lobby.list` returns summaries only.
 
 While waiting, `lobby.leave {}` or disconnecting removes membership. Leaving returns `LEFT`. Ownership passes to the earliest remaining member, announced to the [lobby room](#rooms) through `lobby.updated {lobby}`. An empty lobby is deleted. A disconnected lobby member returns to browsing after reconnecting.
 
@@ -108,6 +115,8 @@ The service creates a fresh game, moves every member into its public and private
 `game.started {lobbyId, initialization: {outcome: JOINED, assignment, state, hand, programSubmitted}}`
 
 `state` includes `serverTime` and `programmingTimer`. The private `program` contains five register slots, each a card or `null`. Initialization restores the player's current selection or finalized program.
+
+Each robot in the public game state includes the `robotSpriteId` selected by its player in the lobby, alongside the server-assigned `colour`.
 
 Each map has six starting tiles. When the game starts, the service places every robot on a random free starting tile.
 
