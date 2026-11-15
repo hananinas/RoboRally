@@ -17,7 +17,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
   const deck = Array.from({ length: 5 }, (_, index) =>
     new Card(`00000000-0000-4000-8000-00000000010${index}`, 'TURN_LEFT'))
   for (const player of players) player.deck.add(deck)
-  const game = new Game({ board, players, deck, rebootTile: { x: Integer(0), y: Integer(0) }, random: () => 0 })
+  const game = new Game({ board, players, deck, rebootTiles: [{ x: Integer(0), y: Integer(0) }], random: () => 0 })
   const httpServer = createServer()
   const sessionStore = createSessionStore({
     oidcClient: { refreshToken: () => Promise.reject(new Error('not used in this test')) },

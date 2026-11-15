@@ -106,7 +106,7 @@ describe('Again card', () => {
     const cards = instructions.map((instruction, index) => new Card(`card-${index}`, instruction))
     const player = new Player('player', robot, new Deck(cards))
     player.deck.add(cards)
-    const game = new Game({ board, players: [player], deck: cards, rebootTile: { x: Integer(0), y: Integer(0) }, random: () => 0 })
+    const game = new Game({ board, players: [player], deck: cards, rebootTiles: [{ x: Integer(0), y: Integer(0) }], random: () => 0 })
     game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
     const results = cards.map(() => game.executeNextAction())
     return results.map(({ action }) => action)

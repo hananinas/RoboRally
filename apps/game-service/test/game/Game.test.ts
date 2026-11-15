@@ -19,7 +19,7 @@ function createGame() {
     new Card('left-3', 'TURN_LEFT'),
   ]
   player.deck.add(deck)
-  const game = new Game({ board, players: [player], deck, rebootTile: { x: Integer(0), y: Integer(1) }, random: () => 0 })
+  const game = new Game({ board, players: [player], deck, rebootTiles: [{ x: Integer(0), y: Integer(1) }], random: () => 0 })
   return { board, robot, player, deck, game }
 }
 
@@ -39,7 +39,7 @@ describe('Game programming', () => {
       new Card('u-turn', 'U_TURN'),
     ]
     player.deck.add(deck)
-    const game = new Game({ board, players: [player], deck, rebootTile: { x: Integer(0), y: Integer(0) } })
+    const game = new Game({ board, players: [player], deck, rebootTiles: [{ x: Integer(0), y: Integer(0) }] })
     game.submitProgram(player.id, deck.map((card) => card.id))
 
     const actions = Array.from({ length: 5 }, () => game.executeNextAction())
@@ -92,7 +92,7 @@ describe('Game programming', () => {
     })
     const snapshots = players.map((player) => player.registers)
 
-    new Game({ board, players, deck, rebootTile: { x: Integer(0), y: Integer(1) }, random: () => 0 })
+    new Game({ board, players, deck, rebootTiles: [{ x: Integer(0), y: Integer(1) }], random: () => 0 })
 
     for (const player of players) {
       expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
@@ -133,10 +133,10 @@ describe('Game programming', () => {
 
   it('accepts an empty roster but requires unique players and at least five distinct cards', () => {
     const { board, player, deck, game } = createGame()
-    expect(new Game({ board, players: [], deck, rebootTile: game.rebootTile }).players).toEqual([])
-    expect(() => new Game({ board, players: [player, player], deck, rebootTile: game.rebootTile })).toThrow(RangeError)
-    expect(() => new Game({ board, players: [player], deck: deck.slice(0, 4), rebootTile: game.rebootTile })).toThrow(RangeError)
-    expect(() => new Game({ board, players: [player], deck: [deck[0], deck[0], ...deck.slice(1, 5)], rebootTile: game.rebootTile })).toThrow(RangeError)
+    expect(new Game({ board, players: [], deck, rebootTiles: game.rebootTiles }).players).toEqual([])
+    expect(() => new Game({ board, players: [player, player], deck, rebootTiles: game.rebootTiles })).toThrow(RangeError)
+    expect(() => new Game({ board, players: [player], deck: deck.slice(0, 4), rebootTiles: game.rebootTiles })).toThrow(RangeError)
+    expect(() => new Game({ board, players: [player], deck: [deck[0], deck[0], ...deck.slice(1, 5)], rebootTiles: game.rebootTiles })).toThrow(RangeError)
   })
 
   it('starts unpaused and toggles via pause/resume', () => {
@@ -194,7 +194,7 @@ describe('Game.addPlayer', () => {
       new Card('left-2', 'TURN_LEFT'),
       new Card('move-3', 'MOVE_1'),
     ]
-    return { board, deck, game: new Game({ board, players: [], deck, rebootTile: { x: Integer(0), y: Integer(0) }, random: () => 0 }) }
+    return { board, deck, game: new Game({ board, players: [], deck, rebootTiles: [{ x: Integer(0), y: Integer(0) }], random: () => 0 }) }
   }
 
   it('creates and places a player with a private hand drawn from the deck', () => {
@@ -235,7 +235,7 @@ describe('Game.addPlayer', () => {
     const board = new Board([[new EmptyTile(), new EmptyTile(), new EmptyTile()]], {
       x: Integer(1), y: Integer(0), angle: 0,
     })
-    const game = new Game({ board, players: [], deck, rebootTile: { x: Integer(0), y: Integer(0) } })
+    const game = new Game({ board, players: [], deck, rebootTiles: [{ x: Integer(0), y: Integer(0) }] })
     const player = game.addPlayer()._unsafeUnwrap()
 
     expect(board.positionOf(player.robot.id)).toEqual({ x: 0, y: 0 })
@@ -247,7 +247,7 @@ describe('Game.addPlayer', () => {
   it('has a name, which defaults when none is given', () => {
     const { game, deck } = createGame()
     expect(game.name).toBe('Game')
-    const named = new Game({ board: new Board([[new EmptyTile(), new EmptyTile()]], { x: Integer(0), y: Integer(0), angle: Math.PI / 2 }), players: [], deck, rebootTile: { x: Integer(1), y: Integer(0) }, name: 'Shared game' })
+    const named = new Game({ board: new Board([[new EmptyTile(), new EmptyTile()]], { x: Integer(0), y: Integer(0), angle: Math.PI / 2 }), players: [], deck, rebootTiles: [{ x: Integer(1), y: Integer(0) }], name: 'Shared game' })
     expect(named.name).toBe('Shared game')
   })
 
@@ -262,21 +262,24 @@ describe('Game reboot configuration and spawning', () => {
       // @ts-expect-error Simulate an untyped caller omitting the required reboot tile.
       expect(() => new Game({ board: currentBoard, players: [], deck })).toThrow('requires a reboot tile')
     }
-    expect(() => new Game({ board, players: [], deck, rebootTile: { x: Integer(0), y: Integer(0) } })).not.toThrow()
+    expect(() => new Game({ board, players: [], deck, rebootTiles: [{ x: Integer(0), y: Integer(0) }] })).not.toThrow()
   })
 
-  it('copies and freezes a valid reboot tile, even when occupied', () => {
+  it('copies and freezes valid reboot tiles, even when occupied', () => {
     const { deck } = createGame()
     const board = new Board([[new EmptyTile(), new PitTile(), new EmptyTile()]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
     const player = new Player('player', new Robot('robot', Direction.NORTH))
     board.placeRobot(player.robot.id, { x: Integer(0), y: Integer(0) })
     const rebootTile = { x: Integer(0), y: Integer(0) }
+    const rebootTiles = [rebootTile]
     player.deck.add(deck)
-    const game = new Game({ board, players: [player], deck, rebootTile })
+    const game = new Game({ board, players: [player], deck, rebootTiles })
     rebootTile.x = Integer(1)
+    rebootTiles.push({ x: Integer(2), y: Integer(0) })
 
-    expect(game.rebootTile).toEqual({ x: 0, y: 0 })
-    expect(() => Object.assign(game.rebootTile, { x: 1 })).toThrow()
+    expect(game.rebootTiles).toEqual([{ x: 0, y: 0 }])
+    expect(() => Object.assign(game.rebootTiles[0], { x: 1 })).toThrow()
+    expect(Object.isFrozen(game.rebootTiles)).toBe(true)
     expect(board.positionOf(player.robot.id)).toEqual({ x: 0, y: 0 })
     expect(player.robot.direction).toBe(Direction.NORTH)
   })
@@ -288,7 +291,7 @@ describe('Game reboot configuration and spawning', () => {
       { x: Integer(-1), y: Integer(0) }, { x: Integer(0), y: Integer(1) },
       { x: Integer(1), y: Integer(0) }, { x: Integer(2), y: Integer(0) },
     ]) {
-      expect(() => new Game({ board, players: [], deck, rebootTile })).toThrow(RangeError)
+      expect(() => new Game({ board, players: [], deck, rebootTiles: [rebootTile] })).toThrow(RangeError)
     }
   })
 
@@ -299,14 +302,14 @@ describe('Game reboot configuration and spawning', () => {
     board.placeRobot(player.robot.id, { x: Integer(0), y: Integer(0) })
     board.pushRobot(player.robot.id, Direction.EAST)
 
-    expect(() => new Game({ board, players: [player], deck, rebootTile: { x: Integer(0), y: Integer(0) } }))
+    expect(() => new Game({ board, players: [player], deck, rebootTiles: [{ x: Integer(0), y: Integer(0) }] }))
       .toThrow('Robots cannot start on pits')
   })
 
   it('skips pits in the existing join order and reports when no safe spawn remains', () => {
     const { deck } = createGame()
     const board = new Board([[new EmptyTile(), new PitTile(), new EmptyTile()]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
-    const game = new Game({ board, players: [], deck, rebootTile: { x: Integer(0), y: Integer(0) }, random: () => 0 })
+    const game = new Game({ board, players: [], deck, rebootTiles: [{ x: Integer(0), y: Integer(0) }], random: () => 0 })
     const first = game.addPlayer()._unsafeUnwrap()
 
     expect(board.positionOf(first.robot.id)).toEqual({ x: 0, y: 0 })

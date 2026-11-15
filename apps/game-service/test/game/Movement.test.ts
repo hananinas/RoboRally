@@ -24,7 +24,7 @@ function createGame(pitWalls: readonly Direction[] = [], startWalls: readonly Di
     new Card('back', 'BACK_UP'),
   ]
   player.deck.add(program)
-  const game = new Game({ board, players: [player], deck: program, rebootTile: reboot, random: () => 0 })
+  const game = new Game({ board, players: [player], deck: program, rebootTiles: [reboot], random: () => 0 })
   return { board, robot, player, program, game, start, pit, reboot }
 }
 

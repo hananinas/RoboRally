@@ -6,24 +6,27 @@ import { boardMaps } from '@/game/boardMaps'
 import { Direction, createGame, createPlayer } from '@/game/index'
 
 describe('game factory', () => {
-  it.each(['empty-map', 'test-map'] as const)('reboots at the configured destination after falling off %s', (mapName) => {
+  it.each([
+    { mapName: 'empty-map', closest: { x: 3, y: 3 } },
+    { mapName: 'test-map', closest: { x: 2, y: 6 } },
+  ] as const)('reboots on the closest reboot tile after falling off $mapName', ({ mapName, closest }) => {
     const { game } = createGame(mapName, undefined, () => 0)
     const player = game.addPlayer()._unsafeUnwrap()
     game.board.relocateRobot(player.robot.id, { x: Integer(0), y: Integer(0) })
     game.submitProgram(player.id, [0, 1, 2, 3, 4].map((index) => player.hand[index].id))._unsafeUnwrap()
 
-    expect(game.executeNextAction().action.position).toEqual(boardMaps[mapName].rebootTile)
+    expect(game.executeNextAction().action.position).toEqual(closest)
     expect(player.robot.direction).toBe(Direction.NORTH)
     expect(game.board.occupantAt({ x: Integer(0), y: Integer(0) })).toBeUndefined()
   })
 
-  it('uses the map reboot tile when a robot enters a test pit', () => {
+  it('uses the closest map reboot tile when a robot enters a test pit', () => {
     const { game } = createDefaultGame(() => 0)
     const player = game.addPlayer()._unsafeUnwrap()
     game.board.relocateRobot(player.robot.id, { x: Integer(5), y: Integer(11) })
     game.submitProgram(player.id, [0, 1, 2, 3, 4].map((index) => player.hand[index].id))._unsafeUnwrap()
 
-    expect(game.executeNextAction().action.position).toEqual(boardMaps['test-map'].rebootTile)
+    expect(game.executeNextAction().action.position).toEqual({ x: 10, y: 10 })
     expect(player.robot.direction).toBe(Direction.NORTH)
   })
 
@@ -44,7 +47,7 @@ describe('game factory', () => {
     expect(first.gameId).not.toBe(second.gameId)
     expect(first.game.board.map?.name).toBe(boardMaps['test-map'].name)
     expect(first.game.board.antenna).toEqual(boardMaps['test-map'].antenna)
-    expect(first.game.rebootTile).toEqual(boardMaps['test-map'].rebootTile)
+    expect(first.game.rebootTiles).toEqual(boardMaps['test-map'].rebootTiles.map(([x, y]) => ({ x, y })))
     expect(first.game.players).toEqual([])
   })
 

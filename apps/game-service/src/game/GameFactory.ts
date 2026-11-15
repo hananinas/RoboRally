@@ -8,6 +8,7 @@ import { Player } from '@/game/Player'
 import { Robot } from '@/game/Robot'
 import { Direction } from '@/game/spatial'
 import type { BoardMapName } from '@/game/boardMaps'
+import { Integer } from '@/numbers'
 
 const GAME_ID: GameId = '00000000-0000-4000-8000-000000000001'
 const SHARED_GAME_NAME = 'Shared game'
@@ -33,7 +34,7 @@ export function createGame(
     board: createBoard(mapName),
     players: [],
     deck: createDeckCards(),
-    rebootTile: map.rebootTile,
+    rebootTiles: map.rebootTiles.map(([x, y]) => ({ x: Integer(x), y: Integer(y) })),
     name,
     random,
     drawRandom,

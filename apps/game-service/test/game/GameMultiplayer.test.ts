@@ -17,7 +17,7 @@ function createMultiplayerGame(
     return new Player(`player-${index}`, robot)
   })
   for (const player of players) player.deck.add(deck)
-  const game = new Game({ board, players, deck, rebootTile: { x: Integer(0), y: Integer(0) }, random: () => 0 })
+  const game = new Game({ board, players, deck, rebootTiles: [{ x: Integer(0), y: Integer(0) }], random: () => 0 })
   return { board, players, deck, game }
 }
 
@@ -63,7 +63,7 @@ describe('Game fixed-roster programming', () => {
     game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
     expect(game.lastActivePhase).toBe('activation')
 
-    const empty = new Game({ board, players: [], deck, rebootTile: game.rebootTile })
+    const empty = new Game({ board, players: [], deck, rebootTiles: game.rebootTiles })
     empty.recheckProgrammingPhase()
     expect(empty.lastActivePhase).toBe('programming')
     expect(empty.currentRegister).toBe(0)
@@ -73,9 +73,9 @@ describe('Game fixed-roster programming', () => {
 
   it('rejects duplicate player IDs, duplicate robot IDs, and unplaced robots', () => {
     const { board, players, deck, game } = createMultiplayerGame([{ x: Integer(4), y: Integer(5) }, { x: Integer(5), y: Integer(4) }])
-    expect(() => new Game({ board, players: [players[0], new Player(players[0].id, players[1].robot)], deck, rebootTile: game.rebootTile })).toThrow(RangeError)
-    expect(() => new Game({ board, players: [players[0], new Player('other', new Robot(players[0].robot.id, Direction.NORTH))], deck, rebootTile: game.rebootTile })).toThrow(RangeError)
-    expect(() => new Game({ board, players: [new Player('unplaced', new Robot('unplaced', Direction.NORTH))], deck, rebootTile: game.rebootTile })).toThrow()
+    expect(() => new Game({ board, players: [players[0], new Player(players[0].id, players[1].robot)], deck, rebootTiles: game.rebootTiles })).toThrow(RangeError)
+    expect(() => new Game({ board, players: [players[0], new Player('other', new Robot(players[0].robot.id, Direction.NORTH))], deck, rebootTiles: game.rebootTiles })).toThrow(RangeError)
+    expect(() => new Game({ board, players: [new Player('unplaced', new Robot('unplaced', Direction.NORTH))], deck, rebootTiles: game.rebootTiles })).toThrow()
   })
 
   it('exposes the antenna of its board', () => {

@@ -69,7 +69,7 @@ describe('game presenter', () => {
       new EmptyTile([Direction.SOUTH], 1),
     ]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
-    const game = new Game({ board, players: [], deck: cards, rebootTile: { x: Integer(0), y: Integer(0) }, random: () => 0 })
+    const game = new Game({ board, players: [], deck: cards, rebootTiles: [{ x: Integer(0), y: Integer(0) }], random: () => 0 })
     const state = presentPublicGameState('game', game, { status: 'IDLE' })
 
     expect(state.checkpointCount).toBe(1)
@@ -134,7 +134,7 @@ describe('game presenter', () => {
       (_, index) => new Card(`card-${index}`, 'MOVE_1'),
     )
     player.deck.add(cards)
-    const game = new Game({ board, players: [player], deck: cards, rebootTile: { x: Integer(0), y: Integer(0) } })
+    const game = new Game({ board, players: [player], deck: cards, rebootTiles: [{ x: Integer(0), y: Integer(0) }] })
     game.submitProgram(player.id, cards.map((card) => card.id))
 
     const state = presentPublicGameState('game', game, { status: 'CLOSED' })
@@ -161,7 +161,7 @@ describe('game presenter', () => {
     const player = new Player('player', robot)
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
     player.deck.add(cards)
-    const game = new Game({ board, players: [player], deck: cards, rebootTile: { x: Integer(0), y: Integer(0) } })
+    const game = new Game({ board, players: [player], deck: cards, rebootTiles: [{ x: Integer(0), y: Integer(0) }] })
     game.submitProgram(player.id, cards.map((card) => card.id))
     expect(presentPublicGameState('game', game, { status: 'CLOSED' }).winner).toBeNull()
 

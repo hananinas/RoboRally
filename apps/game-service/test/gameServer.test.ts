@@ -398,7 +398,7 @@ describe('started game membership over Socket.IO', () => {
       ].map((instruction, index) => new Card(`card-${index}`, instruction as Card['instruction']))
       shared = {
         gameId: shared.gameId,
-        game: new Game({ board: new Board(tiles, { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }), players: [], deck, rebootTile: { x: Integer(4), y: Integer(4) }, random: () => 0 }),
+        game: new Game({ board: new Board(tiles, { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }), players: [], deck, rebootTiles: [{ x: Integer(4), y: Integer(4) }], random: () => 0 }),
       }
       await start()
     })

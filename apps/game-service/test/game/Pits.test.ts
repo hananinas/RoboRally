@@ -1,11 +1,11 @@
 import { Integer } from '@/numbers'
 import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
-import { Board, Card, Direction, EmptyTile, Game, PitTile, Player, Robot, type Tile } from '@/game/index'
+import { Board, Card, Direction, EmptyTile, Game, PitTile, Player, Robot, type Position, type Tile } from '@/game/index'
 
 function createGame(
   pit = { x: Integer(1), y: Integer(1) },
-  rebootTile = { x: Integer(0), y: Integer(2) },
+  rebootTiles: readonly Position[] = [{ x: Integer(0), y: Integer(2) }],
   walls: readonly Direction[] = [],
 ) {
   const tiles: Tile[][] = Array.from({ length: 3 }, () => Array.from({ length: 5 }, () => new EmptyTile()))
@@ -24,7 +24,7 @@ function createGame(
     U_TURN: new Card('uturn', 'U_TURN'),
   }
   player.deck.add(Object.values(cards))
-  const game = new Game({ board, players: [player], deck: Object.values(cards), rebootTile, random: () => 0 })
+  const game = new Game({ board, players: [player], deck: Object.values(cards), rebootTiles, random: () => 0 })
   return { board, robot, player, cards, game }
 }
 
@@ -111,7 +111,7 @@ describe('pit entry and rebooting', () => {
   })
 
   it('supports repeated falls without canceling the program or resetting orientation', () => {
-    const { board, robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, { x: Integer(0), y: Integer(1) })
+    const { board, robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, [{ x: Integer(0), y: Integer(1) }])
     const program = [c.MOVE_1, c.MOVE_2, c.MOVE_3, c.TURN_LEFT, c.TURN_RIGHT]
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
@@ -128,7 +128,7 @@ describe('pit entry and rebooting', () => {
   })
 
   it('skips the antenna when choosing a fallback for an occupied reboot tile', () => {
-    const { board, robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, { x: Integer(2), y: Integer(1) })
+    const { board, robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, [{ x: Integer(2), y: Integer(1) }])
     const other = game.addPlayer()._unsafeUnwrap()
     other.robot.turn(1)
     game.submitProgram(player.id, [c.MOVE_3, c.MOVE_1, c.TURN_LEFT, c.TURN_RIGHT, c.BACK_UP].map((card) => card.id))._unsafeUnwrap()
@@ -160,7 +160,7 @@ describe('pit entry and rebooting', () => {
     const instructions: Instruction[] = ['MOVE_3', 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'BACK_UP']
     const program = instructions.map((instruction, index) => new Card(`card-${index}`, instruction))
     player.deck.add(program)
-    const game = new Game({ board, players: [player], deck: program, rebootTile, random: () => 0 })
+    const game = new Game({ board, players: [player], deck: program, rebootTiles: [rebootTile], random: () => 0 })
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
     expect(game.executeNextAction().action.position).toEqual(rebootTile)

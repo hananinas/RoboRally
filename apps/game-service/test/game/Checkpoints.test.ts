@@ -22,7 +22,7 @@ function createGame(starts = [{ x: 0, y: 1, direction: Direction.EAST }]) {
     uturn: new Card('uturn', 'U_TURN'),
   }
   for (const player of players) player.deck.add(Object.values(cards))
-  const game = new Game({ board, players, deck: Object.values(cards), rebootTile: { x: Integer(0), y: Integer(2) }, random: () => 0 })
+  const game = new Game({ board, players, deck: Object.values(cards), rebootTiles: [{ x: Integer(0), y: Integer(2) }], random: () => 0 })
   return { board, players, cards, game }
 }
 
