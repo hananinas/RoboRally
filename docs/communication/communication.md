@@ -59,7 +59,13 @@ The client then requets a list of existant lobbies via
 
 A successful request returns:
 
-`LOBBIES_FOUND {lobbies}`
+`LOBBIES_FOUND {lobbies, maps, robots}`
+
+The server owns the map and robot catalogs. Each catalog entry contains its ID,
+display name, icon, and whether it is the default for lobby creation. Clients use
+the returned catalog metadata rather than defining available robot names or
+icons locally. Lobby snapshots also include the robot catalog so it is available
+when restoring an existing lobby.
 
 From there the user has two options, creating a lobby or joining a lobby.
 
@@ -70,9 +76,9 @@ The client sends `lobby.create`. As of this version there are no options and the
 Alternatively, the user can join an existing lobby. Once a lobby has been selected, the clients sends `lobby.join {lobbyId}`. 
 
 ### Selecting a robot
-While waiting in a lobby, a client can select its player's robot sprite with `lobby.selectRobot {robotSpriteId}`. The allowed values are `tank`, `scout`, `guardian`, `rover`, `striker`, `sentinel`, and `hauler`. New lobby members start with `tank` selected.
+While waiting in a lobby, a client can select its player's robot with `lobby.selectRobot {robotSpriteId}`. The ID must be present in the server-provided robot catalog. New lobby members start with the entry marked `defaultForLobbyCreation`.
 
-The selection is scoped to the authenticated lobby member. The server acknowledges a successful selection with `ROBOT_SELECTED {lobby}` and broadcasts the updated full lobby snapshot through `lobby.updated {lobby}` to every lobby member. Invalid sprite IDs are rejected with `INVALID_REQUEST`; a connection that is not a member of a lobby is rejected with `NOT_LOBBY_MEMBER`.
+The selection is scoped to the authenticated lobby member. The server acknowledges a successful selection with `ROBOT_SELECTED {lobby}`. Other lobby members receive the updated full lobby snapshot through `lobby.updated {lobby}`; the selecting connection is not sent a duplicate event because it receives the snapshot in the acknowledgement. Unknown robot IDs are rejected with `INVALID_REQUEST`; a connection that is not a member of a lobby is rejected with `NOT_LOBBY_MEMBER`.
 
 The selected sprite is included in each player's lobby roster as `robotSpriteId`. When the lobby starts, the same sprite ID is copied to that player's game robot; the robot's server-assigned colour remains a separate property.
 
@@ -82,7 +88,7 @@ Both `lobby.join` and `lobby.create` acknowledge with `LOBBY_JOINED {lobby}` aft
 Once a game has successfully started , the onber receives `STARTED {gameId}` as the command acknowledgement. How the game is initialised is described in [Initialization](#initialization).
 
 ### Lobby Membership
-`LOBBY_JOINED`, `IN_LOBBY`, and `lobby.updated` include the full `lobby.players` roster (`userId`, `username`, `robotSpriteId`) in join order. Clients replace their roster on each snapshot; `lobby.list` returns summaries only.
+`LOBBY_JOINED`, `IN_LOBBY`, and `lobby.updated` include the full `lobby.players` roster (`userId`, `username`, `robotSpriteId`) in join order and the robot catalog. Clients replace their roster on each snapshot; `lobby.list` returns lobby summaries, map metadata, and the robot catalog.
 
 While waiting, `lobby.leave {}` or disconnecting removes membership. Leaving returns `LEFT`. Ownership passes to the earliest remaining member, announced to the [lobby room](#rooms) through `lobby.updated {lobby}`. An empty lobby is deleted. A disconnected lobby member returns to browsing after reconnecting.
 

@@ -1,21 +1,20 @@
 import { useState } from 'react'
-import type { RobotSpriteId } from '@robo-rally/game-events'
-import RobotPreview from './RobotPreview.tsx'
-import { robotOptionFor, robotOptions } from './robotPreviews.ts'
+import type { RobotDefinition } from '@robo-rally/game-events'
 import './RobotPicker.css'
 
 type Props = {
-  selectedRobotId: RobotSpriteId
+  robots: readonly RobotDefinition[]
+  selectedRobotId: string
   disabled: boolean
-  onSelect: (robotSpriteId: RobotSpriteId) => Promise<boolean>
+  onSelect: (robotSpriteId: string) => Promise<boolean>
 }
 
-export default function RobotPicker({ selectedRobotId, disabled, onSelect }: Props) {
-  const [optimisticSelection, setOptimisticSelection] = useState<RobotSpriteId | null>(null)
+export default function RobotPicker({ robots, selectedRobotId, disabled, onSelect }: Props) {
+  const [optimisticSelection, setOptimisticSelection] = useState<string | null>(null)
   const selected = optimisticSelection ?? selectedRobotId
-  const robot = robotOptionFor(selected)
+  const robot = robots.find((option) => option.id === selected)
 
-  function chooseRobot(robotSpriteId: RobotSpriteId) {
+  function chooseRobot(robotSpriteId: string) {
     setOptimisticSelection(robotSpriteId)
     void onSelect(robotSpriteId).then(() => {
       setOptimisticSelection(null)
@@ -39,14 +38,14 @@ export default function RobotPicker({ selectedRobotId, disabled, onSelect }: Pro
             </svg>
           </span>
         </div>
-        <RobotPreview sprite={robot.sprite} color={robot.color} />
+        {robot && <img className="robot-picker__icon" src={robot.icon} alt="" draggable={false} />}
       </div>
       <div className="robot-picker__selected">
-        <h3>{robot.name}</h3>
+        <h3>{robot?.name ?? 'No robot selected'}</h3>
         <p>Choose your robot</p>
       </div>
       <div className="robot-picker__choices" role="group" aria-label="Choose a robot">
-        {robotOptions.map((option) => (
+        {robots.map((option) => (
           <button
             className="robot-picker__choice"
             type="button"
@@ -56,12 +55,12 @@ export default function RobotPicker({ selectedRobotId, disabled, onSelect }: Pro
             disabled={disabled}
             onClick={() => chooseRobot(option.id)}
           >
-            <RobotPreview sprite={option.sprite} color={option.color} />
+            <img className="robot-picker__icon" src={option.icon} alt="" draggable={false} />
             <span>{option.name}</span>
           </button>
         ))}
       </div>
-      <p className="robot-picker__help">Six additional robot designs are placeholders.</p>
+      {robots.length === 0 && <p className="robot-picker__help">No robots are currently available.</p>}
     </div>
   )
 }

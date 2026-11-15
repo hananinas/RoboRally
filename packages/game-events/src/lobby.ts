@@ -5,7 +5,7 @@ export const emptyRequestSchema = z.strictObject({}).readonly()
 export const ROBOT_SPRITE_IDS = ['tank', 'scout', 'guardian', 'rover', 'striker', 'sentinel', 'hauler'] as const
 export const lobbyRequestSchema = z.strictObject({ lobbyId: z.uuid() }).readonly()
 export const robotSelectionRequestSchema = z.strictObject({
-  robotSpriteId: z.enum(ROBOT_SPRITE_IDS),
+  robotSpriteId: z.string().trim().min(1),
 }).readonly()
 export const createLobbyRequestSchema = z.strictObject({
   mapName: z.string().min(1).optional(),
@@ -13,13 +13,19 @@ export const createLobbyRequestSchema = z.strictObject({
 }).readonly()
 export type EmptyRequest = z.infer<typeof emptyRequestSchema>
 export type LobbyRequest = z.infer<typeof lobbyRequestSchema>
-export type RobotSpriteId = typeof ROBOT_SPRITE_IDS[number]
+export type RobotSpriteId = string
 export type RobotSelectionRequest = z.infer<typeof robotSelectionRequestSchema>
 export type BoardMapName = string
 export type CreateLobbyRequest = z.infer<typeof createLobbyRequestSchema>
 
 export type BoardMapSummary = Readonly<{
   mapName: BoardMapName
+  name: string
+  icon: string
+  defaultForLobbyCreation: boolean
+}>
+export type RobotDefinition = Readonly<{
+  id: RobotSpriteId
   name: string
   icon: string
   defaultForLobbyCreation: boolean
@@ -34,7 +40,11 @@ export type LobbySummary = Readonly<{
   maxPlayers: number
 }>
 export type LobbyPlayer = User & Readonly<{ robotSpriteId: RobotSpriteId }>
-export type LobbyState = LobbySummary & Readonly<{ ownerUserId: string; players: readonly LobbyPlayer[] }>
+export type LobbyState = LobbySummary & Readonly<{
+  ownerUserId: string
+  players: readonly LobbyPlayer[]
+  robots: readonly RobotDefinition[]
+}>
 export type LobbyFailure = Readonly<{
   outcome: 'INVALID_REQUEST' | 'INTERNAL_ERROR'
     | 'LOBBY_NOT_FOUND' | 'NOT_LOBBY_MEMBER' | 'NOT_LOBBY_OWNER'
@@ -44,6 +54,7 @@ export type LobbyListResult = Readonly<{
   outcome: 'LOBBIES_FOUND'
   lobbies: readonly LobbySummary[]
   maps: readonly BoardMapSummary[]
+  robots: readonly RobotDefinition[]
 }> | LobbyFailure
 export type LobbyJoinResult = Readonly<{ outcome: 'LOBBY_JOINED'; lobby: LobbyState }> | LobbyFailure
 export type LobbyLeaveResult = Readonly<{ outcome: 'LEFT' }> | LobbyFailure

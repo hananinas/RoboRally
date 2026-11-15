@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDefaultGame } from '@/game/GameFactory'
 import { boardMaps } from '@/game/boardMaps'
 import type { BoardMapName } from '@/game/boardMaps'
+import { robotCatalog } from '@/game/robotCatalog'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
 import { createSessionStore, type SessionStore } from '@/auth/sessionStore'
 import { authCookieHeader } from './authTestHelper.ts'
@@ -69,6 +70,9 @@ describe('lobby lifecycle over Socket.IO', () => {
       mapName, name: map.name, icon: map.icon, defaultForLobbyCreation: map.defaultForLobbyCreation,
     })))
     expect(listed.maps.filter((map) => map.defaultForLobbyCreation)).toHaveLength(1)
+    expect(listed.robots).toEqual(robotCatalog)
+    expect(new Set(listed.robots.map((robot) => robot.id)).size).toBe(listed.robots.length)
+    expect(listed.robots.filter((robot) => robot.defaultForLobbyCreation)).toHaveLength(1)
     expect(factory).not.toHaveBeenCalled()
     expect(server.sockets.sockets.get(client.id!)!.rooms).toEqual(new Set([client.id]))
   })
@@ -94,7 +98,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(result.lobby.mapName).toBe('empty-map')
     expect(result.lobby.mapDisplayName).toBe(boardMaps['empty-map'].name)
   })
-  it('stores the selected robot in the member data and broadcasts it to the lobby', async () => {
+  it('stores the selected robot and notifies other lobby members without echoing to the sender', async () => {
     const owner = await connect('Owner')
     const lobby = await create(owner)
     const other = await connect('Other')
@@ -109,6 +113,8 @@ describe('lobby lifecycle over Socket.IO', () => {
       }
       owner.on('lobby.updated', receiveUpdate)
     })
+    const senderUpdates = vi.fn()
+    other.on('lobby.updated', senderUpdates)
     const result = await other.emitWithAck('lobby.selectRobot', { robotSpriteId: 'scout' })
     expect(result).toMatchObject({ outcome: 'ROBOT_SELECTED', lobby: { players: [
       { userId: lobby.ownerUserId, robotSpriteId: 'tank' },
@@ -116,6 +122,9 @@ describe('lobby lifecycle over Socket.IO', () => {
     ] } })
     if (result.outcome !== 'ROBOT_SELECTED') throw new Error(result.outcome)
     expect(await updated).toEqual(result.lobby)
+    await new Promise((resolve) => setTimeout(resolve, 25))
+    expect(senderUpdates).not.toHaveBeenCalled()
+    other.off('lobby.updated', senderUpdates)
     expect(await other.emitWithAck('session.get', {})).toMatchObject({
       outcome: 'IN_LOBBY',
       lobby: { players: [{ robotSpriteId: 'tank' }, { robotSpriteId: 'scout' }] },
@@ -204,7 +213,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     }
     expect(server.sockets.adapter.rooms.has(`lobby:${lobby.lobbyId}`)).toBe(false)
     expect(await owner.emitWithAck('lobby.list', {})).toMatchObject({
-      outcome: 'LOBBIES_FOUND', lobbies: [], maps: expect.any(Array),
+      outcome: 'LOBBIES_FOUND', lobbies: [], maps: expect.any(Array), robots: expect.any(Array),
     })
     expect(await owner.emitWithAck('lobby.start', {})).toEqual({ outcome: 'NOT_LOBBY_MEMBER' })
     const outsider = await connect('Outsider')
@@ -263,7 +272,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect((await updated).ownerUserId).toBe('Other')
     await disconnect(other)
     expect(await owner.emitWithAck('lobby.list', {})).toMatchObject({
-      outcome: 'LOBBIES_FOUND', lobbies: [], maps: expect.any(Array),
+      outcome: 'LOBBIES_FOUND', lobbies: [], maps: expect.any(Array), robots: expect.any(Array),
     })
     expect(server.sockets.adapter.rooms.has(`lobby:${lobby.lobbyId}`)).toBe(false)
   })
@@ -376,7 +385,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(await owner.emitWithAck('lobby.create', {})).toEqual({ outcome: 'INTERNAL_ERROR' })
     expect(await owner.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION', user: { userId: 'Owner', username: 'Owner' } })
     expect(await owner.emitWithAck('lobby.list', {})).toMatchObject({
-      outcome: 'LOBBIES_FOUND', lobbies: [], maps: expect.any(Array),
+      outcome: 'LOBBIES_FOUND', lobbies: [], maps: expect.any(Array), robots: expect.any(Array),
     })
     expect(connection.rooms).toEqual(new Set([owner.id]))
     expect((await create(owner)).playerCount).toBe(1)

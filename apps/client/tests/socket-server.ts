@@ -296,11 +296,20 @@ io.on('connection', (socket) => {
     { mapName: 'empty-map', name: 'Empty Map', icon: mapIcons['empty-map'], defaultForLobbyCreation: false },
     { mapName: 'test-map', name: 'Test Map', icon: mapIcons['test-map'], defaultForLobbyCreation: true },
   ]
+  const robots = [
+    { id: 'tank', name: 'Tank', icon: mapIcons['empty-map'], defaultForLobbyCreation: true },
+    { id: 'scout', name: 'Scout', icon: mapIcons['test-map'], defaultForLobbyCreation: false },
+    { id: 'guardian', name: 'Guardian', icon: mapIcons['empty-map'], defaultForLobbyCreation: false },
+    { id: 'rover', name: 'Rover', icon: mapIcons['test-map'], defaultForLobbyCreation: false },
+    { id: 'striker', name: 'Striker', icon: mapIcons['empty-map'], defaultForLobbyCreation: false },
+    { id: 'sentinel', name: 'Sentinel', icon: mapIcons['test-map'], defaultForLobbyCreation: false },
+    { id: 'hauler', name: 'Hauler', icon: mapIcons['empty-map'], defaultForLobbyCreation: false },
+  ]
   const lobbyState = (mapName = 'test-map', lobbyName = 'Lobby 1'): LobbyState => {
     const map = maps.find((candidate) => candidate.mapName === mapName) ?? maps[1]!
     return {
     lobbyId: GAME_ID, name: lobbyName, mapName: map.mapName, mapDisplayName: map.name, mapIcon: map.icon, ownerUserId: user.userId,
-    playerCount: 1, maxPlayers: 6, players: [{ ...user, robotSpriteId: 'tank' }],
+    playerCount: 1, maxPlayers: 6, players: [{ ...user, robotSpriteId: 'tank' }], robots,
     }
   }
   socket.on('clock.get', (_, acknowledge) => {
@@ -315,7 +324,7 @@ io.on('connection', (socket) => {
     acknowledge(fixture.started ? { outcome: 'IN_GAME', initialization: initialization(), user }
       : lobby ? { outcome: 'IN_LOBBY', lobby, user } : { outcome: 'NO_SESSION', user })
   })
-  socket.on('lobby.list', (_, acknowledge) => acknowledge({ outcome: 'LOBBIES_FOUND', lobbies: [lobbyState()], maps }))
+  socket.on('lobby.list', (_, acknowledge) => acknowledge({ outcome: 'LOBBIES_FOUND', lobbies: [lobbyState()], maps, robots }))
   socket.on('lobby.create', (payload, acknowledge) => {
     fixture.entryRequests.push({ event: 'lobby.create', socketId: socket.id, payload })
     lobby = lobbyState(payload.mapName, payload.name)
@@ -334,7 +343,6 @@ io.on('connection', (socket) => {
         ? { ...player, robotSpriteId: payload.robotSpriteId } : player),
     }
     acknowledge({ outcome: 'ROBOT_SELECTED', lobby })
-    socket.emit('lobby.updated', { lobby })
   })
   socket.on('lobby.leave', (_, acknowledge) => {
     lobby = undefined

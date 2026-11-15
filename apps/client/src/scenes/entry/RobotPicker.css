@@ -93,14 +93,10 @@
   animation: platform-turn 24s linear infinite;
 }
 
-.robot-picker__stage .robot-preview {
-  --robot-layer-offset: 5px;
-  width: min(var(--robot-preview-size), 150px);
-  height: min(var(--robot-preview-size), 150px);
+.robot-picker__stage .robot-picker__icon {
+  width: min(100%, 150px);
+  height: 150px;
   margin-top: -5px;
-}
-
-.robot-picker__stage .robot-preview__layer {
   animation: robot-turn 24s linear infinite;
 }
 
@@ -149,9 +145,14 @@
   box-shadow: 0 0 0 1px var(--entry-accent);
 }
 
-.robot-picker__choice .robot-preview {
+.robot-picker__choice .robot-picker__icon {
   width: 44px;
   height: 44px;
+}
+
+.robot-picker__icon {
+  display: block;
+  object-fit: contain;
   --robot-preview-size: 44px;
 }
 
@@ -167,8 +168,8 @@
 }
 
 @keyframes robot-turn {
-  from { transform: translateY(calc(var(--layer) * var(--robot-layer-offset) * -1)) rotate(-30deg); }
-  to { transform: translateY(calc(var(--layer) * var(--robot-layer-offset) * -1)) rotate(330deg); }
+  from { transform: rotate(-30deg); }
+  to { transform: rotate(330deg); }
 }
 
 @keyframes platform-turn {
@@ -177,7 +178,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .robot-picker__stage .robot-preview__layer,
+  .robot-picker__stage .robot-picker__icon,
   .robot-picker__markings {
     animation: none;
   }

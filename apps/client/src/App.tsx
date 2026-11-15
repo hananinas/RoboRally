@@ -71,7 +71,10 @@ function App() {
         <>
           <aside className="entry-panel" aria-label="Your robot">
             <RobotPicker
-              selectedRobotId={session.lobby.players.find((player) => player.userId === session.user.userId)?.robotSpriteId ?? 'tank'}
+              robots={session.lobby.robots}
+              selectedRobotId={session.lobby.players.find((player) => player.userId === session.user.userId)?.robotSpriteId
+                ?? session.lobby.robots.find((robot) => robot.defaultForLobbyCreation)?.id
+                ?? ''}
               disabled={busy || connection.status !== 'connected'}
               onSelect={selectRobot}
             />
