@@ -107,6 +107,7 @@ describe('join initialization', () => {
   it('initializes assignment, board and hand together and accepts subsequent events', () => {
     const state = gameStateReducer(createClientGameState(), { type: 'joined', result })
     expect(state.board?.antenna).toEqual(publicState.antenna)
+    expect(state.board?.cells.filter((cell) => cell.reboot).map(({ x, y }) => ({ x, y }))).toEqual(publicState.rebootTiles)
     expect(state.assignment).toEqual(result.assignment)
     expect(state.board).not.toBeNull()
     expect(state.hand).toEqual(cards)

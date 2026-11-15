@@ -97,6 +97,21 @@ describe('createBoardRenderModel', () => {
     })).toThrow(RangeError)
   })
 
+  it('marks reboot tiles on their cells', () => {
+    const board = createBoardRenderModel(3, 1, {
+      checkpoints: [{ x: 2, y: 0, checkpointNumber: 1 }],
+      rebootTiles: [{ x: 0, y: 0 }, { x: 2, y: 0 }],
+    })
+    expect(board.cells.map((cell) => cell.reboot)).toEqual([true, undefined, true])
+    expect(board.cells[2]).toMatchObject({ tile: 'empty', checkpointNumber: 1, reboot: true })
+  })
+
+  it('rejects reboot tiles off the board, on holes or listed twice', () => {
+    expect(() => createBoardRenderModel(1, 1, { rebootTiles: [{ x: 1, y: 0 }] })).toThrow(/outside the board/)
+    expect(() => createBoardRenderModel(1, 1, { hole: [[0, 0]], rebootTiles: [{ x: 0, y: 0 }] })).toThrow(RangeError)
+    expect(() => createBoardRenderModel(1, 1, { rebootTiles: [{ x: 0, y: 0 }, { x: 0, y: 0 }] })).toThrow(RangeError)
+  })
+
   it('rejects duplicate and off-board wall assignments', () => {
     expect(() =>
       createBoardRenderModel(1, 1, {

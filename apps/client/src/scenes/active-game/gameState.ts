@@ -423,6 +423,7 @@ export function gameStateReducer(
 
             checkpoints: snapshot.board.tiles.flatMap((tile) => tile.checkpointNumber === undefined
               ? [] : [{ ...tile.position, checkpointNumber: tile.checkpointNumber }]),
+            rebootTiles: snapshot.rebootTiles,
             walls: snapshot.board.tiles.map((tile) => ({
               ...tile.position,
               north: tile.walls?.includes('NORTH'),
