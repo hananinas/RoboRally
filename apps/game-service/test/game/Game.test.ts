@@ -295,6 +295,15 @@ describe('Game reboot configuration and spawning', () => {
     }
   })
 
+  it('rejects an empty or repeated list of reboot tiles', () => {
+    const { deck } = createGame()
+    const board = new Board([[new EmptyTile(), new EmptyTile(), new EmptyTile()]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
+    const tile = { x: Integer(0), y: Integer(0) }
+
+    expect(() => new Game({ board, players: [], deck, rebootTiles: [] })).toThrow(RangeError)
+    expect(() => new Game({ board, players: [], deck, rebootTiles: [tile, { ...tile }] })).toThrow(RangeError)
+  })
+
   it('rejects a roster whose robot is already standing on a pit', () => {
     const { deck } = createGame()
     const board = new Board([[new EmptyTile(), new PitTile(), new EmptyTile()]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })

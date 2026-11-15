@@ -127,6 +127,46 @@ describe('pit entry and rebooting', () => {
     expect(game.lastActivePhase).toBe('programming')
   })
 
+  it.each([
+    { order: 'far first', rebootTiles: [{ x: Integer(4), y: Integer(2) }, { x: Integer(0), y: Integer(2) }] },
+    { order: 'near first', rebootTiles: [{ x: Integer(0), y: Integer(2) }, { x: Integer(4), y: Integer(2) }] },
+  ])('reboots on the reboot tile closest to the pit ($order)', ({ rebootTiles }) => {
+    const { board, robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, rebootTiles)
+    game.submitProgram(player.id, [c.MOVE_1, c.MOVE_2, c.TURN_LEFT, c.TURN_RIGHT, c.BACK_UP].map((card) => card.id))._unsafeUnwrap()
+
+    expect(game.executeNextAction().action.position).toEqual({ x: Integer(0), y: Integer(2) })
+    expect(board.positionOf(robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
+  })
+
+  it('keeps map order when two reboot tiles are equally close', () => {
+    const rebootTiles = [{ x: Integer(2), y: Integer(2) }, { x: Integer(0), y: Integer(2) }]
+    const { player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, rebootTiles)
+    game.submitProgram(player.id, [c.MOVE_1, c.MOVE_2, c.TURN_LEFT, c.TURN_RIGHT, c.BACK_UP].map((card) => card.id))._unsafeUnwrap()
+
+    expect(game.executeNextAction().action.position).toEqual({ x: Integer(2), y: Integer(2) })
+  })
+
+  it('uses the next closest reboot tile when the closest one is taken', () => {
+    const rebootTiles = [{ x: Integer(0), y: Integer(2) }, { x: Integer(4), y: Integer(2) }]
+    const { board, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, rebootTiles)
+    board.placeRobot('blocker', { x: Integer(0), y: Integer(2) })
+    game.submitProgram(player.id, [c.MOVE_1, c.MOVE_2, c.TURN_LEFT, c.TURN_RIGHT, c.BACK_UP].map((card) => card.id))._unsafeUnwrap()
+
+    expect(game.executeNextAction().action.position).toEqual({ x: Integer(4), y: Integer(2) })
+    expect(board.positionOf('blocker')).toEqual({ x: Integer(0), y: Integer(2) })
+  })
+
+  it('falls back to the nearest free tile when every reboot tile is taken', () => {
+    const rebootTiles = [{ x: Integer(0), y: Integer(2) }, { x: Integer(4), y: Integer(2) }]
+    const { board, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, rebootTiles)
+    board.placeRobot('blocker-1', { x: Integer(0), y: Integer(2) })
+    board.placeRobot('blocker-2', { x: Integer(4), y: Integer(2) })
+    game.submitProgram(player.id, [c.MOVE_1, c.MOVE_2, c.TURN_LEFT, c.TURN_RIGHT, c.BACK_UP].map((card) => card.id))._unsafeUnwrap()
+
+    // Nearest free tile to the closest reboot tile (0,2); (0,1) wins the tie by being higher up.
+    expect(game.executeNextAction().action.position).toEqual({ x: Integer(0), y: Integer(1) })
+  })
+
   it('skips the antenna when choosing a fallback for an occupied reboot tile', () => {
     const { board, robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, [{ x: Integer(2), y: Integer(1) }])
     const other = game.addPlayer()._unsafeUnwrap()

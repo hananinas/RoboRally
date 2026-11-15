@@ -51,6 +51,15 @@ describe('game factory', () => {
     expect(first.game.players).toEqual([])
   })
 
+  it.each(['empty-map', 'test-map'] as const)('gives %s four distinct reboot tiles away from start tiles', (mapName) => {
+    const { rebootTiles, startTiles } = boardMaps[mapName]
+    const keys = rebootTiles.map(([x, y]) => `${x},${y}`)
+
+    expect(rebootTiles).toHaveLength(4)
+    expect(new Set(keys).size).toBe(4)
+    expect(startTiles.filter(([x, y]) => keys.includes(`${x},${y}`))).toEqual([])
+  })
+
   it('uses the antenna specified by the map', () => {
     const { game } = createGame()
 
