@@ -1,3 +1,4 @@
+import { resolveRobotAction } from '../activationTestHelper.js'
 import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
 import { Card } from '@/game/Card'
@@ -86,7 +87,7 @@ describe('Game card cycle', () => {
     expect(first.deck.size).toBe(19 - HAND_SIZE)
     expect(game.submitProgram(second.id, second.hand.slice(0, 5).map((card) => card.id)).isOk()).toBe(true)
     expect(game.lastActivePhase).toBe('activation')
-    for (let i = 0; i < 10; i++) game.executeNextAction()
+    for (let i = 0; i < 10; i++) resolveRobotAction(game)
 
     expect(game.lastActivePhase).toBe('programming')
     expect(first.hand).toHaveLength(HAND_SIZE)
@@ -108,7 +109,7 @@ describe('Again card', () => {
     player.deck.add(cards)
     const game = new Game({ board, players: [player], deck: cards, rebootTile: { x: Integer(0), y: Integer(0) }, random: () => 0 })
     game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
-    const results = cards.map(() => game.executeNextAction())
+    const results = cards.map(() => resolveRobotAction(game))
     return results.map(({ action }) => action)
   }
 

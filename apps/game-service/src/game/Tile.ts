@@ -1,6 +1,7 @@
+import type { GearRotation } from '@robo-rally/game-events'
 import type { Direction } from '@/game/spatial'
 
-export type TileKind = 'EMPTY' | 'PIT' | 'CONVEYOR'
+export type TileKind = 'EMPTY' | 'PIT' | 'CONVEYOR' | 'GEAR'
 export type TileEntryEffect = 'reboot'
 
 export type TileDefinition = Readonly<{
@@ -13,6 +14,7 @@ export const tileDefinitions: Readonly<Record<TileKind, TileDefinition>> = {
   EMPTY: { canOccupy: true },
   PIT: { canOccupy: false, entryEffect: 'reboot' },
   CONVEYOR: { canOccupy: true },
+  GEAR: { canOccupy: true },
 }
 
 // Tile suitability only; Board checks robot occupancy separately.
@@ -70,5 +72,13 @@ export class ConveyorTile extends Tile {
     checkpointNumber?: number
   ) {
     super(walls, checkpointNumber)
+  }
+}
+
+export class GearTile extends Tile {
+  readonly kind = 'GEAR'
+
+  constructor(readonly rotation: GearRotation, walls: Iterable<Direction> = []) {
+    super(walls)
   }
 }

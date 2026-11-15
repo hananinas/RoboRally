@@ -1,3 +1,4 @@
+import type { GearRotation } from '@robo-rally/game-events'
 import type { Antenna, BoardMap } from '@/game/Board'
 import { Direction, type Position } from '@/game/spatial'
 import { Integer } from '@/numbers'
@@ -29,6 +30,8 @@ export type ConveyorSpec = Readonly<{
   direction: Direction
 }>
 
+export type GearSpec = Readonly<{ at: readonly [number, number]; rotation: GearRotation }>
+
 export type MapSpec = BoardMap & Readonly<{
   defaultForLobbyCreation: boolean
   width: number
@@ -37,6 +40,7 @@ export type MapSpec = BoardMap & Readonly<{
   walls: readonly WallSpec[]
   checkpoints: readonly (readonly [x: number, y: number])[]
   pits?: readonly (readonly [x: number, y: number])[]
+  gears?: readonly GearSpec[]
   conveyors?: readonly ConveyorSpec[]
   startTiles: readonly (readonly [x: number, y: number])[]
   rebootTile: Position
@@ -64,6 +68,10 @@ export const boardMaps = {
     width: 16,
     height: 15,
     pits: [[3, 3], [13, 4], [12, 7], [15, 9], [5, 10], [12, 11]],
+    gears: [
+      { at: [9, 6], rotation: 'CLOCKWISE' },
+      { at: [11, 8], rotation: 'COUNTERCLOCKWISE' },
+    ],
     conveyors: [
       // Conveyor loop
       { at: [4, 7], sprite: 'conveyor-1-from-right', direction: E },

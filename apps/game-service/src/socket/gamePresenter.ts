@@ -1,6 +1,7 @@
 import type {
   Card as CardPayload,
   CardsDealt,
+  EnvironmentStepResolved,
   ProgramFinalized,
   ProgrammingTimer,
   ProgramTimerChanged,
@@ -23,7 +24,8 @@ import {
   type Player,
 } from '@/game/index'
 import { Integer } from '@/numbers'
-import { ConveyorTile } from '@/game/Tile'
+import type { EnvironmentStepResult } from '@/game/Game'
+import { ConveyorTile, GearTile } from '@/game/Tile'
 
 const orientations: Record<Direction, Orientation> = {
   [Direction.NORTH]: 'NORTH',
@@ -65,6 +67,8 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
       direction: orientations[tile.direction],
     }
   }
+
+  if (tile instanceof GearTile) return { ...common, type: tile.kind, rotation: tile.rotation }
 
   if (tile.kind === 'EMPTY' || tile.kind === 'PIT') {
     return {
@@ -157,6 +161,18 @@ export function presentRobotActionResolved(
     pushedRobots: result.pushedRobots.map((robot) => ({
       robotId: robot.robotId,
       position: { coordinate: robot.position, orientation: orientations[robot.direction] },
+    })),
+  }
+}
+
+export function presentEnvironmentStepResolved(gameId: GameId, result: EnvironmentStepResult): EnvironmentStepResolved {
+  const { kind } = result
+  if (kind === 'CHECKPOINTS') return { gameId, kind, checkpointProgress: result.checkpointProgress }
+  return {
+    gameId, kind,
+    robots: result.robots.map(({ robotId, position, direction }) => ({
+      robotId,
+      position: { coordinate: position, orientation: orientations[direction] },
     })),
   }
 }
