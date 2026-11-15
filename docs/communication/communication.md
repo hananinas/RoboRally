@@ -7,63 +7,44 @@ This document describes the v1.2.0 communication flow. [AsyncAPI](asyncapi.yaml)
 
 ## Rooms
 
-The service broadcasts lobby and gameplay events through three kinds of Socket.IO rooms:
+Server side Socket.IO rooms scope event broadcasts to only the connections that should receive them. The service uses three kinds:
 
-- `lobby:{lobbyId}` — every connection currently waiting in that lobby.
-- `game:{gameId}:public` — every connection currently a member of that game.
-- `game:{gameId}:player:{playerId}` — only the connection currently attached to that player.
+- `lobby:{lobbyId}` — every connection currently waiting in that lobby. Carries lobby-wide updates such as `lobby.updated`, sent whenever membership, ownership, or a member's robot selection changes.
+- `game:{gameId}:public` — every connection currently a member of that game. Carries events every player needs to see: resolved robot actions, checkpoint progress, connection and pause state, and the fact that another player has submitted their program for the round.
+- `game:{gameId}:player:{playerId}` — only the connection currently attached to that player. Carries anything that must stay private to that player (eg. their hand of cards).
+
+Rooms are constructed server side. Clients never request to join a room directly — the server only calls `socket.join()` after validating a request, such as confirming a connection's game membership. This is what keeps the private player room private: there is no client-facing operation that could attach a socket to another player's room and expose private details such as their hand.
 
 ## Authentication
-Authentication is handled using OpenID Connect (OIDC) with Rauthy. The Game Service acts as the Backend for Frontend (BFF) and maintains the authenticated browser session.
+Authentication is handled using OpenID Connect (OIDC) with Hydra. The Game Service acts as the Backend for Frontend (BFF): instead of giving the browser an access token directly, it maintains the authenticated session itself. Passwords, Access and ID tokens never reach client-side JavaScript. The browser only ever holds a Secure, HttpOnly session cookie, which scripts cannot read even if an attacker manages to inject code into the page (XSS).
 
-When the user is not authenticated, the browser starts login through the Game Service. The Game Service redirects the browser to Rauthy and completes the OIDC Authorization Code flow. After successful authentication, the Game Service creates a server-side session and returns a Secure, HttpOnly session cookie to the browser.
+When the user is not authenticated, the browser starts login through the Game Service. The Game Service redirects the browser to Hydra, which redirects to Kratos for the user to authenticate, then completes the OIDC Authorization Code flow. After successful authentication, the Game Service creates a server-side session and returns a Secure, HttpOnly session cookie to the browser.
 
 When the client establishes a Socket.IO connection, the browser includes the session cookie in the connection handshake. The Game Service validates the session before accepting the connection and associates the authenticated user with the socket. Unauthenticated Socket.IO connections are rejected.
 
+An authenticated Socket.IO connection is not only checked at connect time. The Game Service re-validates the session on every command the client sends, and again before every broadcast to that socket, disconnecting it immediately if the session has since expired.
+
+To avoid triggering that disconnect during normal play, the Game Service silently renews sessions using a refresh token obtained at login, refreshing the access token shortly before it expires. Renewal only happens when activity triggers a session check; an idle session is not refreshed and simply expires. Because a long-lived Socket.IO connection cannot receive a fresh `Set-Cookie`, the session cookie's lifetime tracks the refresh token's TTL rather than the access token's — by default 24 hours — which caps how long continued activity can keep a session alive before the user must log in again.
+
+The following diagram documents session renewal:
+
+![Session renewal sequence](figures/session-renewal.svg)
+
+Source: [figures/session-renewal.mmd](figures/session-renewal.mmd)
+
 The following diagram documents authentication:
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Server as Game Service
-    participant Rauthy
+![Authentication sequence](figures/auth-login.svg)
 
-    Client->>Server: GET /auth/login
-    Server-->>Client: Redirect to Rauthy
-    Client->>Rauthy: OIDC authorization request
-    Note over Client,Rauthy: User authenticates
-    Rauthy-->>Client: Redirect /auth/callback?code=...
-    Client->>Server: GET /auth/callback?code=...
-    Server->>Rauthy: Exchange authorization code
-    Rauthy-->>Server: OIDC tokens
-    Note over Server: Validate identity and create server-side session
-    Server-->>Client: Set HttpOnly session cookie and redirect
-
-    Client->>Server: Establish Socket.IO connection with session cookie
-    alt Session valid
-        Note over Server: Associate authenticated user with socket
-    else Session invalid or missing
-        Server-->>Client: Reject Socket.IO connection
-    end
-```
+Source: [figures/auth-login.mmd](figures/auth-login.mmd)
 
 ### Logout
 
-To log out, the client sends `GET /auth/logout` to the Game Service. The Game Service destroys the server-side session and clears the session cookie, then redirects the browser to Rauthy's end-session endpoint to terminate the identity provider session as well. Rauthy redirects back to the login screen once its session has been cleared.
+To log out, the client sends `GET /auth/logout` to the Game Service. The Game Service destroys the server-side session — discarding its refresh token, so the session cannot be silently renewed afterward — and clears the session cookie, then redirects the browser to Hydra's end-session endpoint to terminate the identity provider session as well. Hydra redirects back to the login screen once its session has been cleared.
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Server as Game Service
-    participant Rauthy
+![Logout sequence](figures/auth-logout.svg)
 
-    Client->>Server: GET /auth/logout
-    Note over Server: Destroy server-side session
-    Server-->>Client: Clear session cookie and redirect to Rauthy
-    Client->>Rauthy: End-session request
-    Note over Rauthy: Clear identity provider session
-    Rauthy-->>Client: Redirect to login screen
-```
+Source: [figures/auth-logout.mmd](figures/auth-logout.mmd)
 
 ## Lobby
 After successful authentication, the client sends a `session.get` request to determine if the user has an existent session. 
@@ -88,44 +69,28 @@ The client sends `lobby.create`. As of this version there are no options and the
 ### Joining a lobby
 Alternatively, the user can join an existing lobby. Once a lobby has been selected, the clients sends `lobby.join {lobbyId}`. 
 
+### Selecting a robot
+While waiting in a lobby, a client can select its player's robot sprite with `lobby.selectRobot {robotSpriteId}`. The allowed values are `tank`, `scout`, `guardian`, `rover`, `striker`, `sentinel`, and `hauler`. New lobby members start with `tank` selected.
+
+The selection is scoped to the authenticated lobby member. The server acknowledges a successful selection with `ROBOT_SELECTED {lobby}` and broadcasts the updated full lobby snapshot through `lobby.updated {lobby}` to every lobby member. Invalid sprite IDs are rejected with `INVALID_REQUEST`; a connection that is not a member of a lobby is rejected with `NOT_LOBBY_MEMBER`.
+
+The selected sprite is included in each player's lobby roster as `robotSpriteId`. When the lobby starts, the same sprite ID is copied to that player's game robot; the robot's server-assigned colour remains a separate property.
+
 ### Starting a game
 Both `lobby.join` and `lobby.create` acknowledge with `LOBBY_JOINED {lobby}` after which the client enters the waiting screen. All non owner users, then wait for the owner to start the game via `lobby.start {}`. 
 
 Once a game has successfully started , the onber receives `STARTED {gameId}` as the command acknowledgement. How the game is initialised is described in [Initialization](#initialization).
 
 ### Lobby Membership
-`LOBBY_JOINED`, `IN_LOBBY`, and `lobby.updated` include the full `lobby.players` roster (`userId`, `username`) in join order. Clients replace their roster on each snapshot; `lobby.list` returns summaries only.
+`LOBBY_JOINED`, `IN_LOBBY`, and `lobby.updated` include the full `lobby.players` roster (`userId`, `username`, `robotSpriteId`) in join order. Clients replace their roster on each snapshot; `lobby.list` returns summaries only.
 
 While waiting, `lobby.leave {}` or disconnecting removes membership. Leaving returns `LEFT`. Ownership passes to the earliest remaining member, announced to the [lobby room](#rooms) through `lobby.updated {lobby}`. An empty lobby is deleted. A disconnected lobby member returns to browsing after reconnecting.
 
 The following diagram documents the lobby lifecycle:
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Server as Game Service
-    participant Others as Lobby members
+![Lobby lifecycle sequence](figures/lobby-lifecycle.svg)
 
-    Client->>Server: session.get {}
-    Server-->>Client: Acknowledgement: NO_SESSION {user}
-    Client->>Server: lobby.list {}
-    Server-->>Client: Acknowledgement: LOBBIES_FOUND {lobbies}
-    Note over Client: Creates a lobby or picks a lobbyId
-    Client->>Server: lobby.create {} or lobby.join {lobbyId}
-    alt Join accepted
-        Server-->>Client: Acknowledgement: LOBBY_JOINED {lobby}
-        Note over Client,Others: Wait for the owner to start
-        Client->>Server: lobby.start {} (owner only)
-        Note over Server: Move members to game rooms and remove lobby
-        Note over Server: Send through each game:{gameId}:player:{playerId} room
-        Server-->>Client: game.started {lobbyId, initialization}
-        Server-->>Others: game.started with each player's own initialization
-        Server-->>Client: Acknowledgement: STARTED {gameId}
-        Note over Client,Server: Initialize before later game events
-    else Join rejected
-        Server-->>Client: Acknowledgement: rejection outcome
-    end
-```
+Source: [figures/lobby-lifecycle.mmd](figures/lobby-lifecycle.mmd)
 
 ## Game has started
 ### Game lifecycle
@@ -147,9 +112,11 @@ The diagram below shows every state and every transition between them:
 ### Initialization
 The service creates a fresh game, moves every member into its public and private player rooms, and removes the lobby room and record. The service sends each player the following through their own `game:{gameId}:player:{playerId}` room:
 
-`game.started {lobbyId, initialization: {outcome: JOINED, assignment, state, hand, program, programSubmitted}}`
+`game.started {lobbyId, initialization: {outcome: JOINED, assignment, state, hand, programSubmitted}}`
 
 `state` includes `serverTime` and `programmingTimer`. The private `program` contains five register slots, each a card or `null`. Initialization restores the player's current selection or finalized program.
+
+Each robot in the public game state includes the `robotSpriteId` selected by its player in the lobby, alongside the server-assigned `colour`.
 
 Each map has six starting tiles. When the game starts, the service places every robot on a random free starting tile.
 
@@ -333,65 +300,16 @@ The service sends each private hand before broadcasting `program.timerChanged` w
 The following sequence shows the general game flow while connected and unpaused. Timer and private finalization messages are shown in the [timer sequence](#timer-sequence).
 
 Both players have received their initial hands through game.started or session.get.
-```mermaid
-sequenceDiagram
-    participant A as Client A
-    participant B as Client B
-    participant Server as Game Service
-    participant PrivateA as game:{gameId}:player:{A}
-    participant PrivateB as game:{gameId}:player:{B}
-    participant Public as game:{gameId}:public
+![Game round sequence](figures/game-round.svg)
 
-    loop Each round
-        A->>Server: game.updateRegisters {cardIds}
-        Server-->>A: Acknowledgement: ACCEPTED
-        Server->>Public: game.registersChanged {gameId, playerId: A, registers}
-        Public-->>B: game.registersChanged {gameId, playerId: A, registers}
-        A->>Server: program.submit {cardIds}
-        Server-->>A: Acknowledgement: ACCEPTED
-        Server->>Public: program.submitted {playerId: A}
-        Public-->>B: program.submitted
-
-        B->>Server: program.submit {cardIds}
-        Server-->>B: Acknowledgement: ACCEPTED
-        Server->>Public: program.submitted {playerId: B}
-        Public-->>A: program.submitted
-        loop Registers 1 through 5
-            loop Eligible robots in antenna order
-                Note over Server: Execute next instruction
-                Server->>Public: robot.actionResolved
-                Public-->>A: robot.actionResolved
-                Public-->>B: robot.actionResolved
-            end
-        end
-
-        Server->>PrivateA: cards.dealt {cards}
-        PrivateA-->>A: cards.dealt {cards}
-        Server->>PrivateB: cards.dealt {cards}
-        PrivateB-->>B: cards.dealt {cards}
-    end
-```
+Source: [figures/game-round.mmd](figures/game-round.mmd)
 
 
 ### Game Membership
-In case of disconnection during a game, existing members may reconnect at any time. If the tab is left open SocketIO will automatically try to reestablish the connection. In case of a closed tab, the player can reopen the webpage in another tab to reconnect. In case multiple tabs are used, the first connection to reclaim a disconnected membership becomes its owner. A later connection cannot replace that owner, even if its Socket.IO session was successfully recovered.
 
-When an existing game member sends `session.get {}`, the server attaches the new connection to the existing player and returns their current assignment and state through `IN_GAME {initialization, user}`.
+A player's game membership and their authenticated session are both independent of their Socket.IO connection to the server. Losing the connection does not mean losing the player's spot in the game. When the connection is lost, the game is paused and the server rejects further gameplay submissions it receives. The client reflects this by indicating that it is disconnected and disables gameplay until the connection and game state have been restored.
 
-If another live connection attempts to claim the same session for that user, session.get returns:
-
-`USER_ALREADY_IN_SESSION`
-
-A `session.get` rejected with `USER_ALREADY_IN_SESSION` leaves the authenticated session unaffected, and the client may call `session.get` again later.
-
-An explicit `game.leave {}` removes the owning connection's player and robot, frees the occupied tile, and revokes its public/private room access. Remaining members receive `game.playerLeft {gameId, playerId, robotId}` through the [public room](#rooms). A disconnected player remains a member. Disconnecting is not leaving.
-
-A player’s game membership is independent of their Socket.IO connection to the server. The authenticated browser session is also independent of the Socket.IO connection. When the connection is lost, the client must indicate that it is disconnected and prevent gameplay submissions until the connection and game state have been restored.
-
-There are two possible reconnection paths:
-
-1. Socket.IO connection state recovery succeeds and missed events are replayed.
-2. Connection state recovery fails, so the client establishes a new authenticated Socket.IO connection and calls `session.get` to obtain a fresh authoritative snapshot.
+A membership can only be owned by one live connection at a time: the first connection to reclaim it — whether through automatic Socket.IO recovery or an explicit `session.get {}` — becomes its owner, and a later connection attempting the same claim receives `USER_ALREADY_IN_SESSION` instead, leaving the authenticated session unaffected.
 
 #### Pausing on disconnection
 When the server detects that a player has disconnected, it pauses the game. This is the `active` → `paused` transition: no further action executes until the game resumes, including one that was already scheduled when the disconnect was detected. The current game state is preserved, including the current phase (`programming` or `activation`).
@@ -400,101 +318,38 @@ The server announces this to the [public room](#rooms):
 
 `game.playerConnectionChanged {gameId, playerId, connected: false, paused: true}`
 
-All clients must disable gameplay while the game is paused.
-
-The server must reject gameplay submissions received while the game is paused.
+Currently, the game pauses whenever any client disconnects, regardless of the circumstances. This is being evaluated for changes in a future version: pausing unconditionally on every disconnect could be exploited to stall, and a more restrictive policy for when a disconnect actually triggers a pause may be introduced to prevent this kind of abuse (see issue #221).
 
 #### Restoring the connections
 
-After an unexpected connection loss, the client attempts to reconnect automatically through Socket.IO. If the session is still valid, the Game Service associates the authenticated user with the connection. If Socket.IO can reestablish the connection, it will try to replay missed events through its [connection state recovery mechanism](https://socket.io/docs/v4/connection-state-recovery). 
+After an unexpected connection loss, the client attempts to reconnect automatically through Socket.IO. If Socket.IO can reestablish the connection, it will try to replay missed events through its [connection state recovery mechanism](https://socket.io/docs/v4/connection-state-recovery).
+
+There are two possible outcomes:
+
+1. Connection state recovery succeeds and missed events are replayed.
+2. Connection state recovery fails, so the client establishes a new authenticated Socket.IO connection and calls `session.get` to obtain a fresh authoritative snapshot.
 
 ##### Successful connection state recovery 
-If recovery succeeds and the client still retains its local game state, Socket.IO replays missed events.
+If recovery succeeds, Socket.IO replays the missed events. The client applies them in order on top of its retained local game state.
 
-The client applies the recovered events in order and continues using its existing player and robot assignments.
+![Successful connection state recovery sequence](figures/reconnect-recovery-success.svg)
 
 After connection recovery, a client with an unacknowledged or failed register save requests `session.get` before enabling programming. It restores the authoritative private selection or finalized program from that snapshot.
 
-```mermaid
-sequenceDiagram
-    participant A as Player A
-    participant S as Game Service
-    participant Public as game:{gameId}:public
-    participant PrivateA as game:{gameId}:player:{A}
-    participant B as Player B
-
-    Note over A: Connection lost
-    Note over A: Show disconnected status and disable gameplay
-    Note over S: Detect disconnect and pause after current action
-
-    S->>Public: game.playerConnectionChanged {gameId, playerId: A, connected: false, paused: true}
-    Public-->>B: game.playerConnectionChanged
-    Note over B: Show waiting for Player A and disable gameplay
-
-    A->>S: Socket.IO reconnection with session cookie
-    Note over S: Validate existing authenticated session
-    Note over A,Public: Restore public room membership
-    Note over A,PrivateA: Restore private room membership
-    S-->>A: Replay missed public and private events
-
-    S->>Public: game.playerConnectionChanged {gameId, playerId: A, connected: true, paused: false}
-    Public-->>A: game.playerConnectionChanged
-    Public-->>B: game.playerConnectionChanged
-
-    Note over S: Continue gameplay from preserved state
-    Note over A,B: Unpause clients
-```
+Source: [figures/reconnect-recovery-success.mmd](figures/reconnect-recovery-success.mmd)
 
 ##### Failed connection state recovery
-Once Socket.IO has reconnected, if state recovery was unsuccessful the client must reinitialize.
+If state recovery is unsuccessful, the client reinitializes by sending `session.get {}`, the same command used for normal game initialization. Because the user is already a game member, the server reattaches the connection to their existing player membership and returns the current authoritative state through `IN_GAME {initialization, user}`. The client replaces its local game state with this initialization before processing further game events.
 
-The client performs the normal game initialization flow by sending:
+![Failed connection state recovery sequence](figures/reconnect-recovery-failure.svg)
 
-`session.get {}`
-
-Because the user is already a game member, session.get restores the connection to the existing player and robot.
-
-The returned `IN_GAME {initialization, user}` acknowledgement contains the current authoritative state.
-
-The client replaces its local game state with the returned initialization before processing further game events.
-
-```mermaid
-sequenceDiagram
-    participant A as Player A
-    participant S as Game Service
-    participant Public as game:{gameId}:public
-    participant PrivateA as game:{gameId}:player:{A}
-    participant B as Player B
-
-    Note over A: Connection lost
-    Note over A: Show disconnected status and disable gameplay
-    Note over S: Detect disconnect and pause after current action
-
-    S->>Public: game.playerConnectionChanged {gameId, playerId: A, connected: false, paused: true}
-    Public-->>B: game.playerConnectionChanged
-    Note over B: Show waiting for Player A and disable gameplay
-
-    A->>S: Establish Socket.IO connection with session cookie
-    Note over S: Validate session and associate authenticated user
-    Note over A: socket.recovered is false
-    Note over S: Game remains paused until membership is reattached
-
-    A->>S: session.get {}
-    Note over A,Public: Restore public room membership
-    Note over A,PrivateA: Restore private room membership
-
-    S-->>A: Acknowledgement: IN_GAME {initialization, user}
-    Note over A: Clear outdated state and apply initialization
-
-    S->>Public: game.playerConnectionChanged {gameId, playerId: A, connected: true, paused: false}
-    Public-->>A: game.playerConnectionChanged
-    Public-->>B: game.playerConnectionChanged
-
-    Note over S: Continue gameplay from preserved state
-    Note over A,B: Unpause game
-```
+Source: [figures/reconnect-recovery-failure.mmd](figures/reconnect-recovery-failure.mmd)
 
 The game remains paused while any remaining player is disconnected. Once all remaining players are connected, the same `game.playerConnectionChanged` event (now with `paused: false`) announces that the game has resumed. This is the `paused` → `active` transition: the game resumes in the phase it was in before pausing, and gameplay continues from the preserved game state.
+
+#### Leaving a game
+
+An explicit `game.leave {}` removes the owning connection's player and robot, frees the occupied tile, and revokes its public/private room access. Remaining members receive `game.playerLeft {gameId, playerId, robotId}` through the [public room](#rooms). A disconnected player remains a member: disconnecting is not leaving.
 
 ## Errors and rejections
 

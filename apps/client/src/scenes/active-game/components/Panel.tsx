@@ -7,7 +7,7 @@ type PanelProps = {
 
 // Provides the shared panel surface.
 function Panel({ children, className }: PanelProps) {
-  const panelClassName = className ? `panel ${className}` : 'panel'
+  const panelClassName = ['panel', 'hud-panel-surface', className].filter(Boolean).join(' ')
 
   return <section className={panelClassName}>{children}</section>
 }

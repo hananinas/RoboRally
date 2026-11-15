@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useEffect } from 'react'
 import ActiveGame from './scenes/active-game/ActiveGame.tsx'
 import EntryScreen from './scenes/entry/EntryScreen.tsx'
+import LobbyMapPanel from './scenes/entry/LobbyMapPanel.tsx'
 import LobbyScreen from './scenes/entry/LobbyScreen.tsx'
 import WaitingLobby from './scenes/entry/WaitingLobby.tsx'
 import RobotPicker from './scenes/entry/RobotPicker.tsx'
@@ -66,11 +67,18 @@ function App() {
     <EntryScreen
       onLogout={connection.status === 'connected' || session.user ? logout : undefined}
       onSettings={openSettings}
-      aside={session.status === 'waiting' ? <RobotPicker
-        selectedRobotId={session.lobby.players.find((player) => player.userId === session.user.userId)?.robotSpriteId ?? 'tank'}
-        disabled={busy || connection.status !== 'connected'}
-        onSelect={selectRobot}
-      /> : undefined}
+      aside={session.status === 'waiting' ? (
+        <>
+          <aside className="entry-panel" aria-label="Your robot">
+            <RobotPicker
+              selectedRobotId={session.lobby.players.find((player) => player.userId === session.user.userId)?.robotSpriteId ?? 'tank'}
+              disabled={busy || connection.status !== 'connected'}
+              onSelect={selectRobot}
+            />
+          </aside>
+          <LobbyMapPanel lobby={session.lobby} />
+        </>
+      ) : undefined}
     >
       {error && (session.status === 'waiting' || session.status === 'resyncing' || session.status === 'sync-failed') &&
         <p role="alert" className="entry-validation entry-validation--error">{error}</p>}

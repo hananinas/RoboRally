@@ -4,7 +4,7 @@ import { effects } from '../src/index.js'
 
 describe('instruction contract', () => {
   it('documents every supported instruction in AsyncAPI', () => {
-    const spec = readFileSync(new URL('../../../docs/asyncapi.yaml', import.meta.url), 'utf8')
+    const spec = readFileSync(new URL('../../../docs/communication/asyncapi.yaml', import.meta.url), 'utf8')
     const enumValues = spec.match(/\n    Instruction:\n      type: string\n      enum: \[([^\]]+)\]/)?.[1]
     expect(enumValues).toBeDefined()
     expect(enumValues?.split(',').map(value => value.trim()).sort())

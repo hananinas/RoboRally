@@ -1,0 +1,37 @@
+%%{init: {'sequence': {'noteMargin': 20}}}%%
+sequenceDiagram
+    participant A as Client A
+    participant B as Client B
+    participant Server as Game Service
+    participant PrivateA as game:{gameId}:player:{A}
+    participant PrivateB as game:{gameId}:player:{B}
+    participant Public as game:{gameId}:public
+
+    loop Each round
+        A->>Server: game.updateRegisters {occupied}
+        Server-->>A: Acknowledgement: ACCEPTED
+        Server->>Public: game.registersChanged {gameId, playerId: A, registers}
+        Public-->>B: game.registersChanged {gameId, playerId: A, registers}
+        A->>Server: program.submit {cardIds}
+        Server-->>A: Acknowledgement: ACCEPTED
+        Server->>Public: program.submitted {playerId: A}
+        Public-->>B: program.submitted
+
+        B->>Server: program.submit {cardIds}
+        Server-->>B: Acknowledgement: ACCEPTED
+        Server->>Public: program.submitted {playerId: B}
+        Public-->>A: program.submitted
+        loop Registers 1 through 5
+            loop Eligible robots in antenna order
+                Note over Server: Execute next instruction
+                Server->>Public: robot.actionResolved
+                Public-->>A: robot.actionResolved
+                Public-->>B: robot.actionResolved
+            end
+        end
+
+        Server->>PrivateA: cards.dealt {cards}
+        PrivateA-->>A: cards.dealt {cards}
+        Server->>PrivateB: cards.dealt {cards}
+        PrivateB-->>B: cards.dealt {cards}
+    end

@@ -11,15 +11,6 @@
   gap: var(--entry-space-3);
 }
 
-.robot-picker__heading h2 {
-  margin: 0;
-  color: var(--entry-muted);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-}
-
 .robot-picker__tag {
   padding: var(--entry-space-1) var(--entry-space-2);
   border: 1px solid color-mix(in srgb, var(--entry-accent) 25%, transparent);

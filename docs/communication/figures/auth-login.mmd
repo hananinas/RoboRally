@@ -1,0 +1,28 @@
+%%{init: {'sequence': {'noteMargin': 20}}}%%
+sequenceDiagram
+    participant Client
+    participant Server as Game Service
+    participant Hydra
+    participant Kratos
+
+    Client->>Server: GET /auth/login
+    Server-->>Client: Redirect to Hydra
+    Client->>Hydra: OIDC authorization request
+    Hydra-->>Client: Redirect to Kratos login
+    Client->>Kratos: Login request
+    Note over Client,Kratos: User authenticates
+    Kratos-->>Client: Redirect back to Hydra
+    Client->>Hydra: Resume authorization
+    Hydra-->>Client: Redirect /auth/callback?code=...
+    Client->>Server: GET /auth/callback?code=...
+    Server->>Hydra: Exchange authorization code
+    Hydra-->>Server: OIDC tokens
+    Note over Server: Validate identity and create server-side session
+    Server-->>Client: Set HttpOnly session cookie and redirect
+
+    Client->>Server: Establish Socket.IO connection with session cookie
+    alt Session valid
+        Note over Server: Associate authenticated user with socket
+    else Session invalid or missing
+        Server-->>Client: Reject Socket.IO connection
+    end

@@ -1,0 +1,29 @@
+.lobby-map-panel {
+  display: grid;
+  grid-template-columns: clamp(6rem, 36%, 9rem) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--entry-space-4);
+  padding-block: var(--entry-space-4);
+}
+
+.lobby-map-panel__preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--entry-border);
+  border-radius: var(--entry-radius-md);
+  background: var(--entry-inset);
+  object-fit: contain;
+}
+
+.lobby-map-panel__details {
+  display: grid;
+  gap: var(--entry-space-1);
+}
+
+.lobby-map-panel__name {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 1.25rem;
+  font-weight: 700;
+}

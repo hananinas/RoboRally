@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import LeaveGameButton from './LeaveGameButton.tsx'
 
 type ConfettiStyle = CSSProperties & { '--confetti-spin': string }
 
@@ -31,14 +32,7 @@ function WinnerPopup({ winnerName, isWinner, leaving, onLeave }: {
           ? 'You reached the final checkpoint first.'
           : `${winnerName} reached the final checkpoint first.`}
         </p>
-        <button
-          className="game-menu__button game-menu__button--leave"
-          type="button"
-          onClick={onLeave}
-          disabled={leaving}
-        >
-          Leave game
-        </button>
+        <LeaveGameButton onLeave={onLeave} disabled={leaving} />
       </div>
     </div>
   )
