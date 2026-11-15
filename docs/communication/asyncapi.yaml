@@ -468,6 +468,9 @@ components:
                   x: 0
                   y: 0
                   angle: 1.5707963267948966
+                rebootTiles:
+                  - x: 0
+                    y: 0
                 players:
                   - playerId: 00000000-0000-4000-8000-000000000002
                     username: Dane
@@ -1460,6 +1463,7 @@ components:
         - programmingTimer
         - board
         - antenna
+        - rebootTiles
         - players
         - robots
         - phase
@@ -1484,6 +1488,15 @@ components:
           $ref: "#/components/schemas/GamePhase"
         antenna:
           $ref: "#/components/schemas/Antenna"
+        rebootTiles:
+          type: array
+          minItems: 1
+          description: >-
+            Tiles where robots reappear after falling into a pit or off the
+            board. A robot reboots on the free reboot tile closest to where it
+            fell.
+          items:
+            $ref: "#/components/schemas/Coordinate"
         players:
           type: array
           items:

@@ -8,7 +8,7 @@ Will update with a more conceptual domain diagram which will be used for present
         class Game {
         +board: Board
         +players: Player[]
-        +rebootTile: Position readonly
+        +rebootTiles: Position[]readonly
         -phase: GamePhase
         -currentRegister: int
         -winner: PlayerId?
@@ -112,7 +112,7 @@ Board owns the tile grid, antenna, and RobotId-to-Position map. It resolves one 
 
 `Board.pushRobot()` validates the complete chain before changing any positions. A wall on either side of any crossed boundary or the priority antenna blocks the whole step. Otherwise it moves the chain farthest first and returns the displaced robot IDs in that order. Board only changes positions; Game handles entry effects after the complete step. Gameplay displacement goes through Game's movement operation.
 
-Placement, relocation, spawning, reboot configuration, and safe-destination search use `Board.allowsPlacement()` to check bounds, tile suitability, and exclusion of the antenna. Robot occupancy is checked separately. Pits remain enterable during movement. Relocation does not trigger entry effects. Every Game requires a valid reboot tile, including on maps without pits. Reboot search uses Manhattan distance, then top-to-bottom and left-to-right tie-breaking; enclosing walls do not exclude a destination.
+Placement, relocation, spawning, reboot configuration, and safe-destination search use `Board.allowsPlacement()` to check bounds, tile suitability, and exclusion of the antenna. Robot occupancy is checked separately. Pits remain enterable during movement. Relocation does not trigger entry effects. Every Game requires at least one valid reboot tile, including on maps without pits; each map defines four. A rebooting robot goes to the free reboot tile with the smallest Manhattan distance from where it fell, with ties kept in map order. If every reboot tile is occupied, the search falls back to the nearest free tile to the closest reboot tile, using Manhattan distance, then top-to-bottom and left-to-right tie-breaking; enclosing walls do not exclude a destination.
 
 # Tile
 
