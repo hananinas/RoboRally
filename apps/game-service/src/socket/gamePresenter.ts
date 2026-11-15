@@ -94,6 +94,7 @@ export function presentPublicGameState(
     checkpointCount: game.board.checkpointCount,
     players,
     antenna: game.board.antenna,
+    rebootTiles: game.rebootTiles.map(({ x, y }) => ({ x, y })),
     board: {
       width: game.board.width,
       height: game.board.height,

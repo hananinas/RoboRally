@@ -19,6 +19,7 @@ const joined: GameInitialization = {
     serverTime: 0,
     programmingTimer: { status: 'IDLE' },
     antenna: { x: 0, y: 0, angle: Math.PI / 2 },
+    rebootTiles: [{ x: 0, y: 0 }],
     board: { width: 1, height: 1, tiles: [] },
     robots: [],
     players: [],

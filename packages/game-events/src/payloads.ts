@@ -90,6 +90,7 @@ export type PublicGameState = Readonly<{
   programmingTimer: ProgrammingTimer
   checkpointCount: number
   antenna: Antenna
+  rebootTiles: readonly Coordinate[]
   board: Board
   robots: readonly Robot[]
   phase: GamePhase

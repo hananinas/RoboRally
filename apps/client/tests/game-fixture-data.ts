@@ -34,6 +34,7 @@ export function createPublicState(): PublicGameState {
     checkpointCount: 0,
     winner: null,
     antenna: { x: 5, y: 0, angle: Math.PI / 2 },
+    rebootTiles: [{ x: 1, y: 9 }, { x: 9, y: 9 }, { x: 1, y: 2 }, { x: 9, y: 2 }],
     board: {
       width: 11,
       height: 11,

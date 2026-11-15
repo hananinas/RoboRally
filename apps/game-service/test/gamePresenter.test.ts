@@ -90,6 +90,7 @@ describe('game presenter', () => {
       gameId,
       checkpointCount: 2,
       board: { width: 21, height: 15 },
+      rebootTiles: [{ x: 3, y: 3 }, { x: 17, y: 3 }, { x: 3, y: 11 }, { x: 17, y: 11 }],
       phase: 'PROGRAMMING',
       winner: null,
       robots: [

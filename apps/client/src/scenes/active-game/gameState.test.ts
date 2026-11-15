@@ -57,6 +57,7 @@ const publicState: PublicGameState = {
     { playerId: '50000000-0000-4000-8000-000000000002', lastCheckpoint: 0, username: 'Second', connected: true, programSubmitted: false, registers: [{ status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }] },
   ],
   antenna: { x: 2, y: 0, angle: Math.PI / 2 },
+  rebootTiles: [{ x: 0, y: 0 }],
   board: {
     width: 5,
     height: 5,
