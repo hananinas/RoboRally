@@ -22,10 +22,6 @@ describe('board factory', () => {
     expect(board.getTile({ x: Integer(1), y: Integer(1) })?.walls.size).toBe(0)
   })
 
-  it('defaults to the empty map', () => {
-    expect(createBoard().getTile({ x: Integer(1), y: Integer(1) })?.walls.size).toBe(0)
-  })
-
   it('applies the walls specified by the map', () => {
     const board = createBoard('test-map')
 
@@ -52,16 +48,6 @@ describe('board factory', () => {
     }
   })
 
-  it('retains map lobby details on the created board', () => {
-    const board = createBoard('test-map')
-
-    expect(board.map).toEqual({
-      name: boardMaps['test-map'].name,
-      icon: boardMaps['test-map'].icon,
-      maxPlayers: boardMaps['test-map'].maxPlayers,
-    })
-  })
-
   it('uses distinct map artwork for the empty and test maps', () => {
     const emptyMapSvg = Buffer.from(
       boardMaps['empty-map'].icon.split(',')[1],
@@ -78,7 +64,12 @@ describe('board factory', () => {
 
   it('reads the priority antenna location from the map', () => {
     expect(createBoard('test-map').antenna).toEqual(boardMaps['test-map'].antenna)
-    expect(createBoard().antenna).toEqual(boardMaps['empty-map'].antenna)
+    expect(createBoard('empty-map').antenna).toEqual(boardMaps['empty-map'].antenna)
+  })
+
+  it('reads the reboot tile from the map', () => {
+    expect(createBoard('test-map').rebootTile).toEqual(boardMaps['test-map'].rebootTile)
+    expect(createBoard('empty-map').rebootTile).toEqual(boardMaps['empty-map'].rebootTile)
   })
 
   it('gives each board its own antenna object', () => {

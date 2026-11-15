@@ -1,17 +1,17 @@
 import type { Instruction } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'
-import { Board, Direction, EmptyTile, Game, Card, Player, Robot } from '@/game/index'
+import { Board, Direction, EmptyTile, Card } from '@/game/index'
+import { Deck } from '@/game/Deck'
 import { Integer } from '@/numbers'
+import { createEmptyTileGrid, createTestGame, placeTestPlayer } from '../fixtures.ts'
 
 function createGame(deck: Card[]) {
-  const board = new Board(Array.from({ length: 3 }, () =>
-    Array.from({ length: 3 }, () => new EmptyTile()),
-  ), { x: Integer(0), y: Integer(0), angle: Math.PI / 2 })
-  const robot = new Robot('robot-1', Direction.EAST)
-  board.placeRobot(robot.id, { x: Integer(1), y: Integer(1) })
-  const player = new Player('player-1', robot)
-  player.deck.add(deck)
-  const game = new Game({ board, players: [player], deck, rebootTile: { x: Integer(0), y: Integer(2) }, random: () => 0 })
+  const board = new Board(createEmptyTileGrid(3, 3), { x: Integer(0), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(2) })
+  const player = placeTestPlayer(board, { x: Integer(1), y: Integer(1) }, {
+    id: 'robot-1', direction: Direction.EAST, deck: new Deck(deck),
+  })
+  const robot = player.robot
+  const game = createTestGame({ board, players: [player], deck })
   return { board, robot, player, game }
 }
 
@@ -51,7 +51,8 @@ describe('Game activation loop', () => {
     }
 
     expect(robot.program).toEqual([])
-    expect(player.hand).toEqual(deck)
+    expect(player.hand).toHaveLength(deck.length)
+    expect(player.hand).toEqual(expect.arrayContaining(deck))
     expect(() => game.executeNextAction()).toThrow()
 
     game.submitProgram(player.id, deck.map((card) => card.id))
@@ -93,13 +94,10 @@ describe('Game activation loop', () => {
 })
 
 function resolveCard(instruction: Instruction, direction: Direction, tiles: EmptyTile[][]) {
-  const board = new Board(tiles, { x: Integer(3), y: Integer(0), angle: Math.PI / 2 })
-  const robot = new Robot('robot', direction)
-  board.placeRobot(robot.id, { x: Integer(3), y: Integer(3) })
-  const player = new Player('player', robot)
+  const board = new Board(tiles, { x: Integer(3), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
   const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, instruction))
-  player.deck.add(cards)
-  const game = new Game({ board, players: [player], deck: cards, rebootTile: { x: Integer(0), y: Integer(0) }, random: () => 0 })
+  const player = placeTestPlayer(board, { x: Integer(3), y: Integer(3) }, { direction, deck: new Deck(cards) })
+  const game = createTestGame({ board, players: [player], deck: cards })
   game.submitProgram(player.id, cards.map((card) => card.id))
   return game.executeNextAction().action
 }

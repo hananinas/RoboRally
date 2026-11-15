@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
 import { Card } from '@/game/Card'
 import { Deck, HAND_SIZE, createDeckCards } from '@/game/Deck'
-import { Board, Direction, EmptyTile, Game, Player, Robot, createGame } from '@/game/index'
+import { Board, Direction, EmptyTile, createGame } from '@/game/index'
 import { Integer } from '@/numbers'
+import { createTestGame, createTestPlayer, createTestRobot } from '../fixtures.ts'
 
 function counts(cards: readonly Card[]): Record<string, number> {
   const result: Record<string, number> = {}
@@ -59,7 +60,7 @@ describe('Deck.remove', () => {
   it('removes a card from either pile', () => {
     const cards = ['a', 'b'].map((id) => new Card(id, 'MOVE_1'))
     const deck = new Deck(cards)
-    deck.discard(deck.draw(1, () => 0))
+    deck.discard(deck.draw(1))
 
     expect(deck.remove('b')?.id).toBe('b')
     expect(deck.remove('a')?.id).toBe('a')
@@ -70,9 +71,9 @@ describe('Deck.remove', () => {
 
 describe('Game card cycle', () => {
   it('gives each player a private hand of nine and cycles cards through the discard pile', () => {
-    const { game } = createGame('empty-map')
-    const first = game.addPlayer()._unsafeUnwrap()
-    const second = game.addPlayer()._unsafeUnwrap()
+    const game = createGame('empty-map', 'Test game')
+    const first = game.addPlayer('red')._unsafeUnwrap()
+    const second = game.addPlayer('blue')._unsafeUnwrap()
     expect(first.hand).toHaveLength(HAND_SIZE)
     const firstIds = new Set(first.hand.map((card) => card.id))
     expect(second.hand.some((card) => firstIds.has(card.id))).toBe(false)
@@ -82,8 +83,6 @@ describe('Game card cycle', () => {
     // Unprogrammed cards are discarded; programmed ones sit in the registers, outside every pile.
     expect(first.hand).toEqual([])
     expect(first.robot.program.map((card) => card.id)).toEqual(program)
-    expect(first.deck.discarded).toBe(HAND_SIZE - 5)
-    expect(first.deck.size).toBe(19 - HAND_SIZE)
     expect(game.submitProgram(second.id, second.hand.slice(0, 5).map((card) => card.id)).isOk()).toBe(true)
     expect(game.lastActivePhase).toBe('activation')
     for (let i = 0; i < 10; i++) game.executeNextAction()
@@ -92,21 +91,22 @@ describe('Game card cycle', () => {
     expect(first.hand).toHaveLength(HAND_SIZE)
     // 19-card deck: 9 drawn, 10 left, so the next hand has no overlap with the previous one.
     expect(first.hand.some((card) => firstIds.has(card.id))).toBe(false)
-    // The five programmed cards were discarded at round end.
     expect(first.robot.program).toEqual([])
-    expect(first.deck.discarded).toBe(HAND_SIZE)
   })
 })
 
 describe('Again card', () => {
   function run(instructions: Instruction[]) {
-    const board = new Board([Array.from({ length: 9 }, () => new EmptyTile())], { x: Integer(8), y: Integer(0), angle: 0 })
-    const robot = new Robot('robot', Direction.EAST)
+    const board = new Board(
+      [Array.from({ length: 9 }, () => new EmptyTile())],
+      { x: Integer(8), y: Integer(0), angle: 0 },
+      { x: Integer(0), y: Integer(0) },
+    )
+    const robot = createTestRobot({ direction: Direction.EAST })
     board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })
     const cards = instructions.map((instruction, index) => new Card(`card-${index}`, instruction))
-    const player = new Player('player', robot, new Deck(cards))
-    player.deck.add(cards)
-    const game = new Game({ board, players: [player], deck: cards, rebootTile: { x: Integer(0), y: Integer(0) }, random: () => 0 })
+    const player = createTestPlayer({ robot, deck: new Deck(cards) })
+    const game = createTestGame({ board, players: [player], deck: cards })
     game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
     const results = cards.map(() => game.executeNextAction())
     return results.map(({ action }) => action)

@@ -6,10 +6,10 @@ import type {
   RobotActionResolved, ServerToClientEvents,
 } from '@robo-rally/game-events'
 import { io as createClient, type Socket } from 'socket.io-client'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import * as actionScheduler from '@/actionScheduler'
-import { createGame } from '@/game/GameFactory'
-import { createGameSocketServer, type GameSession, type GameSocketServer } from '@/socket/gameServer'
+import type { Game } from '@/game/Game'
+import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
 import * as gameContext from '@/socket/gameContext'
 import { handleUpdateRegisters } from '@/socket/handlers/gameplayHandlers'
 import { createSessionStore, type SessionStore } from '@/auth/sessionStore'
@@ -26,19 +26,15 @@ describe('public registers over Socket.IO', () => {
   let server: GameSocketServer
   let url: string
   let clients: Client[]
-  let sessions: GameSession[]
+  let contexts: MockInstance<typeof gameContext.createGameContext>
   let sessionStore: SessionStore
 
   beforeEach(async () => {
     clients = []
-    sessions = []
+    contexts = vi.spyOn(gameContext, 'createGameContext')
     const http = createServer()
     sessionStore = createSessionStore({ oidcClient: { refreshToken: vi.fn() }, refreshBufferSeconds: 0 })
-    server = createGameSocketServer(http, sessionStore, () => {
-      const session = { ...createGame('empty-map'), gameId: randomUUID() }
-      sessions.push(session)
-      return session
-    })
+    server = createGameSocketServer(http, sessionStore)
     await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve))
     url = `http://127.0.0.1:${(http.address() as AddressInfo).port}`
   })
@@ -48,6 +44,12 @@ describe('public registers over Socket.IO', () => {
     await new Promise<void>((resolve) => server.close(() => resolve()))
     vi.restoreAllMocks()
   })
+
+  function currentGame(index = 0): Game {
+    const result = contexts.mock.results[index]
+    if (!result) throw new Error('No game has started yet')
+    return result.value.game
+  }
 
   async function connect(username: string): Promise<Client> {
     const client: Client = createClient(url, {
@@ -104,7 +106,6 @@ describe('public registers over Socket.IO', () => {
   }
 
   it('finalizes saved selections at the deadline while paused and restores them on reconnect', async () => {
-    const contexts = vi.spyOn(gameContext, 'createGameContext')
     const first = await connect('First')
     const second = await connect('Second')
     const [a, b] = await start([first, second])
@@ -192,7 +193,6 @@ describe('public registers over Socket.IO', () => {
   })
 
   it('rejects invalid selections, extra identities, foreign memberships and player spoofing without mutation', async () => {
-    const createContext = vi.spyOn(gameContext, 'createGameContext')
     const first = await connect('Owner')
     const second = await connect('Peer')
     const outsider = await connect('Other lobby')
@@ -222,7 +222,7 @@ describe('public registers over Socket.IO', () => {
     events.length = 0
     // Session routing selects the caller's own game; exercise the foreign-context guard directly.
     const acknowledge = vi.fn()
-    handleUpdateRegisters(createContext.mock.results[0].value,
+    handleUpdateRegisters(contexts.mock.results[0].value,
       server.sockets.sockets.get(outsider.id!)!, { cardIds: [null, null, null, null, null] }, acknowledge)
     expect(acknowledge.mock.calls).toEqual([[{ outcome: 'NOT_A_MEMBER' }]])
     expect(await raw(outsider, update(other))).toEqual({ outcome: 'ACCEPTED' })
@@ -299,7 +299,7 @@ describe('public registers over Socket.IO', () => {
     }
     await snapshot(first)
     await snapshot(second)
-    const game = sessions[0].game
+    const game = currentGame()
     const execute = game.executeNextAction.bind(game)
     vi.spyOn(game, 'executeNextAction').mockImplementation(() => {
       const result = execute()
@@ -418,7 +418,7 @@ describe('public registers over Socket.IO', () => {
     expect(await raw(first, update(a, full))).toEqual({ outcome: 'ACCEPTED' })
     await snapshot(first)
     await snapshot(second)
-    const game = sessions[0].game
+    const game = currentGame()
     const before = game.players.map((player) => player.registers)
     const events: RegistersChanged[] = []
     for (const client of [first, second]) client.on('game.registersChanged', (event) => events.push(event))
@@ -449,7 +449,7 @@ describe('public registers over Socket.IO', () => {
     expect(await raw(first, update(a))).toEqual({ outcome: 'GAME_PAUSED' })
     const returning = await connect('B')
     await snapshot(returning)
-    const game = sessions[0].game
+    const game = currentGame()
     const execute = game.executeNextAction.bind(game)
     vi.spyOn(game, 'executeNextAction').mockImplementation(() => {
       const result = execute()
@@ -489,7 +489,7 @@ describe('public registers over Socket.IO', () => {
     const joined = await start([first, second])
     await raw(first, update(joined[0], full))
     await raw(second, update(joined[1], full))
-    const game = sessions[0].game
+    const game = currentGame()
     const execute = game.executeNextAction.bind(game)
     let count = 0
     let lastActor = ''

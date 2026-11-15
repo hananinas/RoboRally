@@ -39,9 +39,9 @@ function expectRejectedWithoutMutation(game: Game, playerId: string, error: Upda
 describe('public register lifecycle', () => {
 
   it('stores private selections without submitting and preserves prior public snapshots', () => {
-    const { game } = createGame('empty-map')
-    const first = game.addPlayer()._unsafeUnwrap()
-    const second = game.addPlayer()._unsafeUnwrap()
+    const game = createGame('empty-map', 'Test game')
+    const first = game.addPlayer('red')._unsafeUnwrap()
+    const second = game.addPlayer('blue')._unsafeUnwrap()
     const initial = first.registers
     const hand = first.hand
     expect(initial).toEqual(empty)
@@ -66,9 +66,9 @@ describe('public register lifecycle', () => {
   })
 
   it('rejects unavailable writes without changing slots or stored programs', () => {
-    const { game } = createGame('empty-map')
-    const first = game.addPlayer()._unsafeUnwrap()
-    const second = game.addPlayer()._unsafeUnwrap()
+    const game = createGame('empty-map', 'Test game')
+    const first = game.addPlayer('red')._unsafeUnwrap()
+    const second = game.addPlayer('blue')._unsafeUnwrap()
     game.updateRegisters(first.id, selection(first))._unsafeUnwrap()
     expectRejectedWithoutMutation(game, 'removed-player', 'PLAYER_NOT_IN_GAME')
     game.pause()
@@ -87,8 +87,8 @@ describe('public register lifecycle', () => {
   })
 
   it('rejects register updates after aborting without changing the snapshot', () => {
-    const { game } = createGame('empty-map')
-    const player = game.addPlayer()._unsafeUnwrap()
+    const game = createGame('empty-map', 'Test game')
+    const player = game.addPlayer('red')._unsafeUnwrap()
     game.updateRegisters(player.id, selection(player))._unsafeUnwrap()
     const snapshot = player.registers
     game.abort()
@@ -99,9 +99,9 @@ describe('public register lifecycle', () => {
   })
 
   it('checks lifecycle restrictions before membership and submission without mutating state', () => {
-    const { game } = createGame('empty-map')
-    const first = game.addPlayer()._unsafeUnwrap()
-    const second = game.addPlayer()._unsafeUnwrap()
+    const game = createGame('empty-map', 'Test game')
+    const first = game.addPlayer('red')._unsafeUnwrap()
+    const second = game.addPlayer('blue')._unsafeUnwrap()
     for (const player of [first, second]) game.updateRegisters(player.id, selection(player))._unsafeUnwrap()
     game.submitProgram(first.id, first.hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
 
@@ -127,8 +127,8 @@ describe('public register lifecycle', () => {
   })
 
   it('reveals only the executed instruction and clears slots when the next hand is dealt', () => {
-    const { game } = createGame('empty-map')
-    const player = game.addPlayer()._unsafeUnwrap()
+    const game = createGame('empty-map', 'Test game')
+    const player = game.addPlayer('red')._unsafeUnwrap()
     const hand = player.hand
     game.updateRegisters(player.id, hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(player.id, hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
@@ -150,8 +150,8 @@ describe('public register lifecycle', () => {
   })
 
   it('preserves colours across departure', () => {
-    const { game } = createGame('empty-map')
-    const first = game.addPlayer()._unsafeUnwrap()
+    const game = createGame('empty-map', 'Test game')
+    const first = game.addPlayer('red')._unsafeUnwrap()
     const second = game.addPlayer('#4d8deb')._unsafeUnwrap()
     expect(first.robot.colour).not.toBe(second.robot.colour)
     const colour = second.robot.colour

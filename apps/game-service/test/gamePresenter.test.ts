@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
+import type { Instruction } from '@robo-rally/game-events'
 import type {
   CardsDealt,
   PublicGameState,
@@ -8,12 +9,10 @@ import type {
 import {
   Board,
   Card,
+  Deck,
   Direction,
   EmptyTile,
-  Game,
   PitTile,
-  Player,
-  Robot,
   createGame,
   type TileKind,
 } from '@/game/index.ts'
@@ -23,18 +22,19 @@ import {
   presentRobotActionResolved,
 } from '@/socket/gamePresenter.ts'
 import { Integer } from '@/numbers'
+import { createTestGame, createTestPlayer, placeTestPlayer } from './fixtures.ts'
 
 function createGameWithPlayer() {
-    const { gameId, game } = createGame('empty-map', undefined, () => 0)
-  const player = game.addPlayer()._unsafeUnwrap()
-  return { gameId, game, player }
+  const game = createGame('empty-map', 'Test game')
+  const player = game.addPlayer('red')._unsafeUnwrap()
+  return { gameId: game.id, game, player }
 }
 
 describe('game presenter', () => {
   it('serializes pushed robot positions and orientations alongside the acting robot', () => {
     const { game, player } = createGameWithPlayer()
     const resolvedInstruction = player.hand[0].instruction === 'AGAIN' ? undefined : player.hand[0].instruction
-    const resolved = presentRobotActionResolved('game', game, {
+    const resolved = presentRobotActionResolved(game, {
       registerIndex: 0,
       registers: player.registers,
       action: {
@@ -67,10 +67,10 @@ describe('game presenter', () => {
       new PitTile(),
       new PitTile([Direction.NORTH, Direction.WEST]),
       new EmptyTile([Direction.SOUTH], 1),
-    ]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
+    ]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
-    const game = new Game({ board, players: [], deck: cards, rebootTile: { x: Integer(0), y: Integer(0) }, random: () => 0 })
-    const state = presentPublicGameState('game', game, { status: 'IDLE' })
+    const game = createTestGame({ board, players: [], deck: cards })
+    const state = presentPublicGameState(game, { status: 'IDLE' })
 
     expect(state.checkpointCount).toBe(1)
     expect(state.board.tiles).toEqual([
@@ -83,7 +83,7 @@ describe('game presenter', () => {
 
   it('presents a complete public programming state in row-major order', () => {
     const { gameId, game, player } = createGameWithPlayer()
-    const state = presentPublicGameState(gameId, game, { status: 'IDLE' })
+    const state = presentPublicGameState(game, { status: 'IDLE' })
 
     expectTypeOf(state).toEqualTypeOf<PublicGameState>()
     expect(state).toMatchObject({
@@ -125,19 +125,16 @@ describe('game presenter', () => {
         new EmptyTile([Direction.NORTH, Direction.WEST], 1),
         new EmptyTile(),
       ],
-    ], { x: Integer(1), y: Integer(0), angle: Math.PI / 2 })
-    const robot = new Robot('robot', Direction.EAST)
-    board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })
-    const player = new Player('player', robot)
+    ], { x: Integer(1), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
     const cards = Array.from(
       { length: 5 },
       (_, index) => new Card(`card-${index}`, 'MOVE_1'),
     )
-    player.deck.add(cards)
-    const game = new Game({ board, players: [player], deck: cards, rebootTile: { x: Integer(0), y: Integer(0) } })
+    const player = placeTestPlayer(board, { x: Integer(0), y: Integer(0) }, { direction: Direction.EAST, deck: new Deck(cards) })
+    const game = createTestGame({ board, players: [player], deck: cards })
     game.submitProgram(player.id, cards.map((card) => card.id))
 
-    const state = presentPublicGameState('game', game, { status: 'CLOSED' })
+    const state = presentPublicGameState(game, { status: 'CLOSED' })
 
     expect(state.phase).toBe('EXECUTING')
     expect(state.board.tiles).toEqual([
@@ -155,36 +152,33 @@ describe('game presenter', () => {
   it('presents the winner once a player completes the final checkpoint', () => {
     const board = new Board([
       [new EmptyTile(), new EmptyTile([], 1), new EmptyTile()],
-    ], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
-    const robot = new Robot('robot', Direction.EAST)
-    board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })
-    const player = new Player('player', robot)
+    ], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
-    player.deck.add(cards)
-    const game = new Game({ board, players: [player], deck: cards, rebootTile: { x: Integer(0), y: Integer(0) } })
+    const player = placeTestPlayer(board, { x: Integer(0), y: Integer(0) }, { direction: Direction.EAST, deck: new Deck(cards) })
+    const game = createTestGame({ board, players: [player], deck: cards })
     game.submitProgram(player.id, cards.map((card) => card.id))
-    expect(presentPublicGameState('game', game, { status: 'CLOSED' }).winner).toBeNull()
+    expect(presentPublicGameState(game, { status: 'CLOSED' }).winner).toBeNull()
 
     game.executeNextAction()
 
     expect(game.winner).toBe(player.id)
     const winner = { playerId: player.id, username: 'Winner' }
-    expect(presentPublicGameState('game', game, { status: 'CLOSED' }, [], winner).winner).toEqual(winner)
+    expect(presentPublicGameState(game, { status: 'CLOSED' }, [], winner).winner).toEqual(winner)
   })
 
   it('presents all dealt card instruction types without exposing domain objects', () => {
-    const { gameId, player } = createGameWithPlayer()
-    const dealt = presentCardsDealt(gameId, player)
+    const instructions: Instruction[] = [
+      'MOVE_1', 'MOVE_2', 'MOVE_3', 'BACK_UP', 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'AGAIN',
+    ]
+    const cards = instructions.map((instruction) => new Card(instruction, instruction))
+    const player = createTestPlayer({ deck: new Deck(cards) })
+    player.drawHand()
+    const dealt = presentCardsDealt('game', player)
 
     expectTypeOf(dealt).toEqualTypeOf<CardsDealt>()
-    expect(dealt.cards).toHaveLength(9)
-    expect(dealt.cards.map((card) => card.instruction)).toEqual([
-      'MOVE_1', 'MOVE_1', 'MOVE_1', 'MOVE_1', 'MOVE_2', 'MOVE_2', 'MOVE_2', 'MOVE_3', 'BACK_UP',
-    ])
-    expect(dealt.cards[0]).toEqual({
-      id: player.hand[0].id,
-      instruction: 'MOVE_1',
-    })
+    expect(dealt.cards).toHaveLength(instructions.length)
+    expect(dealt.cards.map((card) => card.instruction).sort()).toEqual([...instructions].sort())
+    expect(dealt.cards).toEqual(player.hand.map((card) => ({ id: card.id, instruction: card.instruction })))
     expect(dealt.cards[0]).not.toBe(player.hand[0])
   })
 
@@ -203,11 +197,11 @@ describe('game presenter', () => {
       direction: Direction.SOUTH,
     }
 
-    const resolved = presentRobotActionResolved('game', game, { registerIndex: 4, action, pushedRobots: [], registers: player.registers, roundConcluded: false })
+    const resolved = presentRobotActionResolved(game, { registerIndex: 4, action, pushedRobots: [], registers: player.registers, roundConcluded: false })
 
     expectTypeOf(resolved).toEqualTypeOf<RobotActionResolved>()
     expect(resolved).toEqual({
-      gameId: 'game',
+      gameId: game.id,
       registerIndex: 4,
       robotId: player.robot.id,
       playerId: player.id,
@@ -220,5 +214,4 @@ describe('game presenter', () => {
       },
     })
   })
-
 })

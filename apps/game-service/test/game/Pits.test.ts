@@ -1,19 +1,18 @@
 import { Integer } from '@/numbers'
 import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
-import { Board, Card, Direction, EmptyTile, Game, PitTile, Player, Robot, type Tile } from '@/game/index'
+import { Board, Card, Direction, EmptyTile, PitTile, type Tile } from '@/game/index'
+import { Deck } from '@/game/Deck'
+import { addTestPlayer, createEmptyTileGrid, createTestGame, placeTestPlayer, programLeadingWith } from '../fixtures.ts'
 
 function createGame(
   pit = { x: Integer(1), y: Integer(1) },
   rebootTile = { x: Integer(0), y: Integer(2) },
   walls: readonly Direction[] = [],
 ) {
-  const tiles: Tile[][] = Array.from({ length: 3 }, () => Array.from({ length: 5 }, () => new EmptyTile()))
+  const tiles: Tile[][] = createEmptyTileGrid(5, 3)
   tiles[pit.y][pit.x] = new PitTile(walls)
-  const board = new Board(tiles, { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
-  const robot = new Robot('robot', Direction.EAST)
-  board.placeRobot(robot.id, { x: Integer(0), y: Integer(1) })
-  const player = new Player('player', robot)
+  const board = new Board(tiles, { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, rebootTile)
   const cards = {
     MOVE_1: new Card('move-1', 'MOVE_1'),
     MOVE_2: new Card('move-2', 'MOVE_2'),
@@ -23,8 +22,11 @@ function createGame(
     TURN_RIGHT: new Card('right', 'TURN_RIGHT'),
     U_TURN: new Card('uturn', 'U_TURN'),
   }
-  player.deck.add(Object.values(cards))
-  const game = new Game({ board, players: [player], deck: Object.values(cards), rebootTile, random: () => 0 })
+  const player = placeTestPlayer(board, { x: Integer(0), y: Integer(1) }, {
+    direction: Direction.EAST, deck: new Deck(Object.values(cards)),
+  })
+  const robot = player.robot
+  const game = createTestGame({ board, players: [player], deck: Object.values(cards) })
   return { board, robot, player, cards, game }
 }
 
@@ -41,14 +43,13 @@ describe('pit entry and rebooting', () => {
     const { board, robot, player, cards, game } = createGame({ x: Integer(pitX), y: Integer(1) })
     if (instruction === 'BACK_UP') robot.turn(2)
     const direction = robot.direction
-    const first = cards[instruction]
-    const program = [first, ...Object.values(cards).filter((card) => card !== first).slice(0, 4)]
+    const program = programLeadingWith(Object.values(cards), instruction)
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
     expect(game.executeNextAction()).toMatchObject({
       registerIndex: 0,
       pushedRobots: [],
-      action: { robotId: robot.id, card: first, position: { x: Integer(0), y: Integer(2) }, direction },
+      action: { robotId: robot.id, card: program[0], position: { x: Integer(0), y: Integer(2) }, direction },
     })
     expect(board.positionOf(robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
     expect(board.occupantAt({ x: Integer(pitX), y: Integer(1) })).toBeUndefined()
@@ -67,9 +68,9 @@ describe('pit entry and rebooting', () => {
 
   it('pushes another robot into a pit and resolves a later fall during the same move', () => {
     const { board, robot, player, cards: c, game } = createGame({ x: Integer(3), y: Integer(1) })
-    const other = game.addPlayer()._unsafeUnwrap()
+    const other = addTestPlayer(game)
     game.submitProgram(player.id, [c.MOVE_3, c.MOVE_1, c.TURN_LEFT, c.TURN_RIGHT, c.BACK_UP].map((card) => card.id))._unsafeUnwrap()
-    game.submitProgram(other.id, [4, 5, 6, 0, 1].map((index) => other.hand[index].id))._unsafeUnwrap()
+    game.submitProgram(other.id, programLeadingWith(other.hand, 'TURN_LEFT').map((card) => card.id))._unsafeUnwrap()
 
     expect(game.executeNextAction().action.robotId).toBe(other.robot.id)
     expect(game.executeNextAction().action.position).toEqual({ x: Integer(0), y: Integer(1) })
@@ -129,10 +130,10 @@ describe('pit entry and rebooting', () => {
 
   it('skips the antenna when choosing a fallback for an occupied reboot tile', () => {
     const { board, robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, { x: Integer(2), y: Integer(1) })
-    const other = game.addPlayer()._unsafeUnwrap()
+    const other = addTestPlayer(game)
     other.robot.turn(1)
     game.submitProgram(player.id, [c.MOVE_3, c.MOVE_1, c.TURN_LEFT, c.TURN_RIGHT, c.BACK_UP].map((card) => card.id))._unsafeUnwrap()
-    game.submitProgram(other.id, [4, 5, 6, 0, 1].map((index) => other.hand[index].id))._unsafeUnwrap()
+    game.submitProgram(other.id, programLeadingWith(other.hand, 'TURN_LEFT').map((card) => card.id))._unsafeUnwrap()
     expect(game.executeNextAction().action.robotId).toBe(other.robot.id)
 
     const { action } = game.executeNextAction()
@@ -152,19 +153,18 @@ describe('pit entry and rebooting', () => {
       [new EmptyTile(), new EmptyTile([], 2), new PitTile()],
       [new EmptyTile(), new EmptyTile([], 1), new EmptyTile()],
       [new EmptyTile([], 3), new EmptyTile(), new EmptyTile()],
-    ], { x: Integer(2), y: Integer(1), angle: Math.PI / 2 })
-    const robot = new Robot('robot', Direction.EAST)
-    board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })
-    const player = new Player('player', robot)
-    player.completeCheckpoint(1)
+    ], { x: Integer(2), y: Integer(1), angle: Math.PI / 2 }, rebootTile)
     const instructions: Instruction[] = ['MOVE_3', 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'BACK_UP']
     const program = instructions.map((instruction, index) => new Card(`card-${index}`, instruction))
-    player.deck.add(program)
-    const game = new Game({ board, players: [player], deck: program, rebootTile, random: () => 0 })
+    const player = placeTestPlayer(board, { x: Integer(0), y: Integer(0) }, {
+      direction: Direction.EAST, deck: new Deck(program),
+    })
+    player.completeCheckpoint(1)
+    const game = createTestGame({ board, players: [player], deck: program })
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
     expect(game.executeNextAction().action.position).toEqual(rebootTile)
     expect(player.lastCheckpoint).toBe(expectedProgress)
-    expect(robot.program).toEqual(program)
+    expect(player.robot.program).toEqual(program)
   })
 })
