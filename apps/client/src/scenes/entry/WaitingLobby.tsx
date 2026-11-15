@@ -11,11 +11,7 @@ export default function WaitingLobby({ lobby, userId, disabled, onStart, onLeave
 
   return (
     <section className="waiting-lobby" aria-labelledby="waiting-lobby-title">
-      <header className="waiting-lobby__title">
-        <h2 id="waiting-lobby-title">{lobby.name}</h2>
-        <img className="waiting-lobby__map-icon" src={lobby.mapIcon} alt={`${lobby.mapDisplayName} map preview`} />
-      </header>
-      <p className="waiting-lobby__status">Map: {lobby.mapDisplayName}</p>
+      <h2 id="waiting-lobby-title" className="waiting-lobby__title">{lobby.name}</h2>
       <p className="waiting-lobby__status">{owner ? 'Waiting for players.' : 'Waiting for the owner to start.'}</p>
       <div aria-live="polite" aria-atomic="true">
         <p className="waiting-lobby__heading"><span>Players</span><span>{lobby.playerCount}/{lobby.maxPlayers} connected</span></p>

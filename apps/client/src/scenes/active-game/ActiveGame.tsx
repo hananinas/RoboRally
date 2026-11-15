@@ -13,7 +13,7 @@ import {
   type ProgramCard 
 } from './gameState.ts'
 import type useGameConnection from './useGameConnection.ts'
-import useOverlayLayout from './useOverlayLayout.ts'
+import LeaveGameButton from './components/LeaveGameButton.tsx'
 import WinnerPopup from './components/WinnerPopup.tsx'
 
 
@@ -47,13 +47,6 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
   onSettings: () => void
 }) {
   const { state, dispatch, submit } = game
-  const {
-    handBelowHud,
-    handRef,
-    hudContentRef,
-    hudFits,
-    overlayRef,
-  } = useOverlayLayout(state.handVersion)
   const disabled = leaving || state.paused || !canProgram(state)
   const handleRemove = (registerIndex: number) => dispatch({ type: 'remove', registerIndex })
   const handleMove = (fromIndex: number, toIndex: number) =>
@@ -76,18 +69,12 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
     state.hand, registeredCardIds, disabled, handlePlaceCard, handleRemove,
     handleClearRegisters, handleUndo, handleRedo, submit, registersAreFilled(state.registers),
   )
-  const overlayClassName = [
-    'game-overlay',
-    handBelowHud && 'game-overlay--hand-below-hud',
-    hudFits && 'game-overlay--hud-fits',
-  ].filter(Boolean).join(' ')
-
   return (
     <div className="game">
       {state.board && <BoardViewport board={state.board} robots={state.playback.robots} />}
-      <div ref={overlayRef} className={overlayClassName}>
+      <div className="game-overlay">
         <aside className="game-hud" aria-label="Game controls">
-          <div ref={hudContentRef} className="game-hud__content">
+          <div className="game-hud__content">
             <PlayerPanel
               player={{ name: username, lastCheckpoint: player?.lastCheckpoint ?? 0 }}
               robotColour={robotColour}
@@ -102,6 +89,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
               activeRegister={state.playback.active?.registerIndex ?? null}
               disabled={disabled}
               submission={state.submission}
+              locked={state.phase === 'PROGRAMMING' && !state.playback.active && state.submission === 'accepted'}
               status={status}
               localDeadline={game.localDeadline}
               error={state.error}
@@ -126,7 +114,6 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
         {hasHand && (
           <ProgrammingHand
             key={state.handVersion}
-            containerRef={handRef}
             cards={state.hand}
             registeredCardIds={registeredCardIds}
             disabled={disabled}
@@ -139,7 +126,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
           />
         )}
       </div>
-            {showWinner && (
+      {showWinner && (
         <WinnerPopup
           winnerName={state.winner?.username ?? ''}
           isWinner={state.winner?.playerId === state.assignment?.playerId}
@@ -157,14 +144,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
                     : 'A player has disconnected'}
             </h2>
             <div className="disconnect-spinner" role="status"/>
-            <button
-              className="game-menu__button game-menu__button--leave"
-              type="button"
-              onClick={onLeave}
-              disabled={leaving || !state.connected}
-            >
-              Leave game
-            </button>
+            <LeaveGameButton onLeave={onLeave} disabled={leaving || !state.connected} />
           </div>
         </div>
       )}

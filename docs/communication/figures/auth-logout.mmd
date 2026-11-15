@@ -1,0 +1,13 @@
+%%{init: {'sequence': {'noteMargin': 20}}}%%
+sequenceDiagram
+    participant Client
+    participant Server as Game Service
+    participant Hydra
+    participant Kratos
+
+    Client->>Server: GET /auth/logout
+    Note over Server: Destroy server-side session
+    Server-->>Client: Clear session cookie and redirect to Hydra end-session endpoint
+    Client->>Hydra: End-session request
+    Hydra->>Kratos: Clear identity provider session
+    Hydra-->>Client: Redirect to login screen

@@ -19,7 +19,7 @@ export default function EntryScreen({ children, onLogout, onSettings, aside }: {
           </div>
           {children}
         </section>
-        {aside && <aside className="entry-panel" aria-label="Your robot">{aside}</aside>}
+        {aside && <div className="entry-side-panels">{aside}</div>}
       </div>
     </main>
   )
