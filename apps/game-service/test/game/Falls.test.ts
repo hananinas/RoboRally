@@ -33,6 +33,23 @@ const edges = [
 ]
 
 describe('board-edge falls', () => {
+  it.each(edges)('reboots immediately after falling off the $direction edge', ({ direction, start, outside }) => {
+    const { board, robot, player, program, reboot, game } = createGame('MOVE_3', start)
+    robot.turn([Direction.EAST, Direction.NORTH, Direction.WEST, Direction.SOUTH].indexOf(direction))
+    game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
+
+    const result = game.executeNextAction()
+
+    expect(result.action.position).toEqual(reboot)
+    expect(board.positionOf(robot.id)).toEqual(reboot)
+    expect(board.occupantAt(start)).toBeUndefined()
+    expect(board.occupantAt(outside)).toBeUndefined()
+    expect(board.occupantAt(reboot)).toBe(robot.id)
+    expect(robot.program).toEqual(program)
+    expect(player.hand).toEqual([])
+    expect(game.currentRegister).toBe(1)
+  })
+
   it.each(edges)('does not fall through a wall on the $direction edge', ({ direction, start, outside }) => {
     const { board, robot, player, program, reboot, game } = createGame('MOVE_3', start, [direction])
     robot.turn([Direction.EAST, Direction.NORTH, Direction.WEST, Direction.SOUTH].indexOf(direction))

@@ -90,4 +90,47 @@ describe('shared gameplay movement', () => {
     expect(game.lastActivePhase).toBe('programming')
     expect(game.currentRegister).toBe(0)
   })
+
+  it('still executes a pushed robot\'s own pending card after it reboots mid-register', () => {
+    const tiles = [[new EmptyTile(), new EmptyTile(), new EmptyTile(), new PitTile(), new EmptyTile()]]
+    const reboot = { x: Integer(4), y: Integer(0) }
+    const board = new Board(tiles, { x: Integer(0), y: Integer(0), angle: 0 }, reboot)
+    const moverProgram = [
+      new Card('mover-0', 'MOVE_1'),
+      new Card('mover-1', 'TURN_LEFT'),
+      new Card('mover-2', 'TURN_RIGHT'),
+      new Card('mover-3', 'U_TURN'),
+      new Card('mover-4', 'TURN_LEFT'),
+    ]
+    const bystanderProgram = [
+      new Card('bystander-0', 'TURN_LEFT'),
+      new Card('bystander-1', 'TURN_RIGHT'),
+      new Card('bystander-2', 'U_TURN'),
+      new Card('bystander-3', 'TURN_LEFT'),
+      new Card('bystander-4', 'TURN_RIGHT'),
+    ]
+    const mover = placeTestPlayer(board, { x: Integer(1), y: Integer(0) }, { direction: Direction.EAST, deck: new Deck(moverProgram) })
+    const bystander = placeTestPlayer(board, { x: Integer(2), y: Integer(0) }, { direction: Direction.EAST, deck: new Deck(bystanderProgram) })
+    const game = createTestGame({ board, players: [mover, bystander], deck: moverProgram })
+    game.submitProgram(mover.id, moverProgram.map((card) => card.id))._unsafeUnwrap()
+    game.submitProgram(bystander.id, bystanderProgram.map((card) => card.id))._unsafeUnwrap()
+
+    const pushResult = game.executeNextAction()
+    expect(pushResult.pushedRobots).toEqual([{ robotId: bystander.robot.id, position: reboot, direction: Direction.EAST }])
+    expect(board.positionOf(bystander.robot.id)).toEqual(reboot)
+
+    const ownAction = game.executeNextAction()
+    expect(ownAction.action.robotId).toBe(bystander.robot.id)
+    expect(ownAction.action.card).toBe(bystanderProgram[0])
+    expect(ownAction.action.position).toEqual(reboot)
+    expect(game.currentRegister).toBe(1)
+    expect(bystander.robot.program).toEqual(bystanderProgram)
+
+    const register1Actions = [game.executeNextAction(), game.executeNextAction()]
+    const bystanderAction = register1Actions.find((result) => result.action.robotId === bystander.robot.id)
+    expect(bystanderAction?.registerIndex).toBe(1)
+    expect(bystanderAction?.action.card).toBe(bystanderProgram[1])
+    expect(bystanderAction?.action.position).toEqual(reboot)
+    expect(game.currentRegister).toBe(2)
+  })
 })
