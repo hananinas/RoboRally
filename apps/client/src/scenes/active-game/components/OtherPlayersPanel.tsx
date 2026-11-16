@@ -25,17 +25,22 @@ function OtherPlayerRow({ player, checkpointCount, phase, activeAction, queuedAc
   const [hovered, setHovered] = useState(false)
   const [focused, setFocused] = useState(false)
   const [dismissed, setDismissed] = useState(false)
-  const expanded = (hovered || focused) && !dismissed
+  const [dismissedAction, setDismissedAction] = useState<RobotActionResolved | null>(null)
+  const executing = phase === 'EXECUTING' && !paused && player.connected &&
+    activeAction?.robotId === player.robotId && player.registers[activeAction.registerIndex]?.status === 'REVEALED'
+  const expanded = ((hovered || focused) && !dismissed) ||
+    (executing && activeAction !== dismissedAction)
   useEffect(() => {
     if (!expanded) return
     const dismiss = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setDismissed(true)
+      if (event.key === 'Escape') {
+        setDismissed(true)
+        setDismissedAction(activeAction)
+      }
     }
     window.addEventListener('keydown', dismiss)
     return () => window.removeEventListener('keydown', dismiss)
-  }, [expanded])
-  const executing = phase === 'EXECUTING' && !paused && player.connected &&
-    activeAction?.robotId === player.robotId && player.registers[activeAction.registerIndex]?.status === 'REVEALED'
+  }, [expanded, activeAction])
   const timing = (slot: PublicRegisterSlot, index: number) => {
     if (executing && activeAction.registerIndex === index) return 'current'
     if (phase !== 'EXECUTING') return ''
@@ -71,12 +76,13 @@ function OtherPlayerRow({ player, checkpointCount, phase, activeAction, queuedAc
         if (event.pointerType === 'touch') return
         setHovered(true)
         setDismissed(false)
+        setDismissedAction(null)
       }}
       onMouseDown={(event) => {
         if (event.button === 0) event.preventDefault()
       }}
       onPointerLeave={() => setHovered(false)}
-      onFocus={() => { setFocused(true); setDismissed(false) }}
+      onFocus={() => { setFocused(true); setDismissed(false); setDismissedAction(null) }}
       onBlur={() => { setFocused(false); setDismissed(false) }}
     >
       <div className="other-player__identity">
