@@ -10,11 +10,13 @@ export type CardDrag = {
   y: number
   moved: boolean
   overRegister: number | null
+  handIndex: number | null
 }
 
 type CardDragOptions = {
   onTap: (card: Card) => void
-  onDrop: (card: Card, registerIndex: number | null) => void
+  onDrop: (card: Card, registerIndex: number | null, handIndex: number | null) => void
+  getHandIndex?: (x: number, y: number) => number | null
 }
 
 const dragThreshold = 4
@@ -31,8 +33,14 @@ function hasMoved(drag: CardDrag, x: number, y: number): boolean {
   return drag.moved || Math.hypot(x - drag.startX, y - drag.startY) >= dragThreshold
 }
 
-function useCardDrag({ onTap, onDrop }: CardDragOptions) {
+function useCardDrag({ onTap, onDrop, getHandIndex }: CardDragOptions) {
   const [drag, setDrag] = useState<CardDrag | null>(null)
+
+  function dropTarget(x: number, y: number) {
+    const overRegister = registerAtPoint(x, y)
+    const handIndex = overRegister === null ? getHandIndex?.(x, y) ?? null : null
+    return { overRegister, handIndex }
+  }
 
   function startDrag(card: Card, event: PointerEvent<HTMLButtonElement>) {
     if (event.button !== 0 || !event.isPrimary) return
@@ -46,7 +54,7 @@ function useCardDrag({ onTap, onDrop }: CardDragOptions) {
       x: event.clientX,
       y: event.clientY,
       moved: false,
-      overRegister: registerAtPoint(event.clientX, event.clientY),
+      ...dropTarget(event.clientX, event.clientY),
     })
   }
 
@@ -63,9 +71,7 @@ function useCardDrag({ onTap, onDrop }: CardDragOptions) {
         x: event.clientX,
         y: event.clientY,
         moved,
-        overRegister: moved
-          ? registerAtPoint(event.clientX, event.clientY)
-          : currentDrag.overRegister,
+        ...(moved && dropTarget(event.clientX, event.clientY)),
       }
     })
   }
@@ -74,7 +80,8 @@ function useCardDrag({ onTap, onDrop }: CardDragOptions) {
     if (!drag || drag.pointerId !== event.pointerId) return
 
     if (hasMoved(drag, event.clientX, event.clientY)) {
-      onDrop(drag.card, registerAtPoint(event.clientX, event.clientY))
+      const { overRegister, handIndex } = dropTarget(event.clientX, event.clientY)
+      onDrop(drag.card, overRegister, handIndex)
     } else {
       onTap(drag.card)
     }

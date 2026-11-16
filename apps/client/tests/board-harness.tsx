@@ -31,13 +31,14 @@ declare global {
   }
 }
 
-const hand: readonly ProgramCard[] = Array.from({ length: 9 }, (_, index) => ({
+const initialHand: readonly ProgramCard[] = Array.from({ length: 9 }, (_, index) => ({
   id: `board-fixture-card-${index}`,
   instruction: index % 2 === 0 ? 'MOVE_1' : 'TURN_LEFT',
 }))
 
 export default function BoardHarness() {
   const { robots, enqueue } = useRobotPlayback(DEMO_ROBOTS)
+  const [hand, setHand] = useState(initialHand)
   const [registers, setRegisters] = useState<Registers>(() => Array(5).fill(null))
   const [registersPast, setRegistersPast] = useState<readonly Registers[]>([])
   const [registersFuture, setRegistersFuture] = useState<readonly Registers[]>([])
@@ -126,6 +127,7 @@ export default function BoardHarness() {
           onHighlightCard={highlightCard}
           onSelect={(card) => setRegisters((current) => placeCard(current, card, current.indexOf(null)))}
           onPlaceCard={handlePlaceCard}
+          onReorder={setHand}
         />
       </div>
     </div>

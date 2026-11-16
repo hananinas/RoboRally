@@ -143,6 +143,8 @@ test('lifts a hovered card and closes and reopens the fan around a register chan
 
   await middle.hover()
   await expect(middle).toHaveCSS('translate', '0px -8px')
+  await expect(middle.locator('..')).toHaveCSS('z-index', '4')
+  await expect(available.nth(5).locator('..')).toHaveCSS('z-index', '5')
   await page.mouse.move(0, 0)
   await expect(middle).toHaveCSS('translate', 'none')
 
@@ -154,6 +156,33 @@ test('lifts a hovered card and closes and reopens the fan around a register chan
   await expect(available).toHaveCount(9)
   await expect(available.nth(4)).toHaveAccessibleName('Turn Left')
   await expect.poll(fanRight).toBeCloseTo(fullFanRight, 1)
+})
+
+test('closes the fan during a drag, reopens it on return, and commits the new order', async ({ page }) => {
+  await openGame(page)
+
+  const hand = page.getByRole('region', { name: 'Programming hand' })
+  const cards = hand.getByRole('button')
+  const first = cards.first()
+  const last = cards.last()
+  const firstBox = await first.boundingBox()
+  const lastBox = await last.boundingBox()
+  if (!firstBox || !lastBox) throw new Error('Card positions are unavailable')
+
+  await page.mouse.move(firstBox.x + firstBox.width / 2, firstBox.y + firstBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(page.viewportSize()!.width / 2, 200, { steps: 5 })
+  await expect(first.locator('..')).toHaveAttribute('data-outside-fan', 'true')
+  await expect(last.locator('..')).toHaveCSS('z-index', '7')
+
+  await page.mouse.move(lastBox.x + lastBox.width / 2, lastBox.y + lastBox.height / 2, { steps: 5 })
+  await expect(first.locator('..')).not.toHaveAttribute('data-outside-fan')
+  await expect(first.locator('..')).toHaveCSS('z-index', '8')
+  await page.mouse.up()
+
+  await expect(cards.first()).toHaveAccessibleName('Move 2')
+  await expect(cards.last()).toHaveAccessibleName('Move 1')
+  await expect(page.getByRole('button', { name: /remove from register/ })).toHaveCount(0)
 })
 
 test('programs, removes, and confirms cards without resetting on a duplicate hand', async ({ page, game }) => {

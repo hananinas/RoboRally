@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import './ActiveGame.css'
 import BoardViewport from './components/BoardViewport.tsx'
 import PlayerPanel from './components/PlayerPanel.tsx'
@@ -47,6 +48,11 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
   onSettings: () => void
 }) {
   const { state, dispatch, submit } = game
+  const [handOrder, setHandOrder] = useState<{
+    deal: readonly ProgramCard[]
+    cards: readonly ProgramCard[]
+  }>()
+  const hand = handOrder?.deal === state.hand ? handOrder.cards : state.hand
   const disabled = leaving || state.paused || !canProgram(state)
   const handleRemove = (registerIndex: number) => dispatch({ type: 'remove', registerIndex })
   const handleMove = (fromIndex: number, toIndex: number) =>
@@ -76,7 +82,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
     state.registers.flatMap((card) => (card ? [card.id] : [])),
   )
   const [highlightedIndex, highlightCard, pendingDelete, awaitingSubmitConfirm] = useGameKeybinds(
-    state.hand, registeredCardIds, disabled, handlePlaceCard, handleRemove,
+    hand, registeredCardIds, disabled, handlePlaceCard, handleRemove,
     handleClearRegisters, handleUndo, handleRedo, submit, registersAreFilled(state.registers),
   )
   return (
@@ -125,7 +131,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
         {hasHand && (
           <ProgrammingHand
             key={state.handVersion}
-            cards={state.hand}
+            cards={hand}
             registeredCardIds={registeredCardIds}
             playedCardIds={playedCardIds}
             disabled={disabled}
@@ -135,6 +141,12 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
               type: 'place', cardId: card.id, registerIndex: state.registers.indexOf(null),
             })}
             onPlaceCard={handlePlaceCard}
+            onReorder={(cards) => {
+              setHandOrder({ deal: state.hand, cards })
+              if (highlightedIndex !== null) {
+                highlightCard(cards.indexOf(hand[highlightedIndex]))
+              }
+            }}
           />
         )}
       </div>

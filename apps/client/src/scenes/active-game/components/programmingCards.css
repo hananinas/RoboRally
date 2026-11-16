@@ -24,15 +24,11 @@
   pointer-events: auto;
 }
 
-.programming-hand__slot[aria-hidden] {
+.programming-hand__slot[data-outside-fan] {
   --fan-exit-drop: 2.25rem;
 
   opacity: 0;
   pointer-events: none;
-}
-
-.programming-hand__slot:has(.program-card:focus-visible) {
-  z-index: 1;
 }
 
 .programming-hand__slot > .program-card {
@@ -46,10 +42,6 @@
 }
 
 @media (hover: hover) {
-  .programming-hand__slot:hover {
-    z-index: 2;
-  }
-
   .programming-hand__slot:hover > .program-card:enabled {
     translate: 0 calc(-1 * var(--hud-hand-hover-lift));
     background-color: var(--hud-surface);
