@@ -157,7 +157,7 @@
 }
 
 .dragged-card[data-moving='true'] {
-  animation: card-pickup var(--hud-card-motion-duration) ease-out;
+  animation: card-pickup var(--card-motion);
 }
 
 @keyframes card-pickup {

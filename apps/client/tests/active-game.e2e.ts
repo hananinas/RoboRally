@@ -196,14 +196,30 @@ test('animates clicked cards between the hand and a register', async ({ page }) 
 
   await hand.getByRole('button', { name: 'Move 2', exact: true }).click()
   await expect(flight).toHaveClass(/program-card--register/)
-  expect(await easing()).toBe('ease-out')
+  expect(await easing()).toBe('cubic-bezier(0.24, 0.65, 0.4, 1)')
   await expect(flight).toHaveCount(0)
 
+  // Leave time to change hover while the card is still on its way back.
+  await page.addStyleTag({
+    content: '.game { --hud-card-motion-duration: 1000ms; } .programming-hand__slot > .program-card { transition-duration: 120ms; }',
+  })
   await page.getByRole('button', { name: 'Move 2, remove from register 1' }).click()
   await expect(flight).toHaveClass(/program-card--hand/)
-  expect(await easing()).toBe('ease-out')
+  expect(await easing()).toBe('cubic-bezier(0.24, 0.65, 0.4, 1)')
+
+  const returningCard = hand.getByRole('button', { name: 'Move 2', exact: true })
+  const landingY = () => flight.evaluate((card) => {
+    const effect = card.getAnimations()[0]?.effect as KeyframeEffect
+    return Number.parseFloat(String(effect.getKeyframes().at(-1)?.top))
+  })
+  const restingY = await landingY()
+
+  await returningCard.hover()
+  await expect.poll(landingY).toBeLessThan(restingY - 6)
+  await page.mouse.move(0, 0)
+  await expect.poll(landingY).toBeGreaterThan(restingY - 2)
   await expect(flight).toHaveCount(0)
-  await expect(hand.getByRole('button', { name: 'Move 2', exact: true })).toBeVisible()
+  await expect(returningCard).toBeVisible()
 })
 
 test('programs, removes, and confirms cards without resetting on a duplicate hand', async ({ page, game }) => {

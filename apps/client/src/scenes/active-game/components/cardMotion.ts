@@ -58,10 +58,25 @@ export function animateCardTransfer(source: HTMLElement, update: () => void, fro
   ghost.setAttribute('aria-hidden', 'true')
   overlay.append(ghost)
 
-  const duration = Number.parseFloat(getComputedStyle(overlay).getPropertyValue('--hud-card-motion-duration'))
-  const flight = ghost.animate([from, to], { duration, easing: 'ease-out', fill: 'both' })
+  const motionStyle = getComputedStyle(overlay)
+  const duration = Number.parseFloat(motionStyle.getPropertyValue('--hud-card-motion-duration'))
+  const easing = motionStyle.getPropertyValue('--hud-card-motion-ease').trim()
+  const flight = ghost.animate([from, to], { duration, easing, fill: 'both' })
+  let trackingFrame = 0
+  const effect = flight.effect as KeyframeEffect
+  if (slot) {
+    // Reflow can put the moving hand slot under or away from the pointer.
+    // Follow the card's changing lift without restarting the flight.
+    const trackHandPose = () => {
+      effect.setKeyframes([from, cardPose(destination)])
+      trackingFrame = requestAnimationFrame(trackHandPose)
+    }
+    trackingFrame = requestAnimationFrame(trackHandPose)
+  }
+
   const hideDestination = destination.animate([{ opacity: 0 }, { opacity: 0 }], { duration, fill: 'both' })
   function finish() {
+    cancelAnimationFrame(trackingFrame)
     hideDestination.cancel()
     ghost.remove()
   }

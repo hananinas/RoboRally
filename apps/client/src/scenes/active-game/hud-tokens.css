@@ -37,7 +37,7 @@
   /* Motion */
   --hud-opponent-motion-duration: 160ms;
   --hud-opponent-motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
-  --hud-card-motion-duration: 240ms;
-  --hud-card-motion-ease: cubic-bezier(0.2, 0.75, 0.25, 1);
+  --hud-card-motion-duration: 150ms;
+  --hud-card-motion-ease: cubic-bezier(0.24, 0.65, 0.4, 1);
   --hud-hand-hover-lift: var(--ui-space-sm);
 }
