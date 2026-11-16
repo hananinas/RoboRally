@@ -10,6 +10,7 @@ import type {
   ProgramFinalized,
   ProgramTimerChanged,
   RobotActionResolved,
+  EnvironmentStepResolved,
   PlayerLeft,
   PlayerConnectionChanged,
   PlayerCheckpointProgress,
@@ -49,6 +50,7 @@ export interface ServerToClientEvents {
   'program.submitted': (payload: ProgramSubmitted) => void
   'program.finalized': (payload: ProgramFinalized) => void
   'program.timerChanged': (payload: ProgramTimerChanged) => void
+  'environment.stepResolved': (payload: EnvironmentStepResolved) => void
   'robot.actionResolved': (payload: RobotActionResolved) => void
   'game.aborted': (payload: GameAborted) => void
   'game.won': (payload: GameWon) => void
