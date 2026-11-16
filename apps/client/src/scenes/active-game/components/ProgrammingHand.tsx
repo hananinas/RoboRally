@@ -131,9 +131,6 @@ function ProgrammingHand({
                 data-played={playedCardIds?.has(card.id) || undefined}
                 disabled={registered || disabled}
                 dragging={isDragging(card)}
-                onClick={(event) => {
-                  if (event.detail === 0) onSelect(card)
-                }}
                 {...dragHandlers(card)}
                 onMouseEnter={() => onHighlightCard(index)}
                 onFocus={() => onHighlightCard(index)}

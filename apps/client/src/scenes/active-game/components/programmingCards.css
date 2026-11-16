@@ -142,14 +142,27 @@
 .dragged-card {
   --card-motion: var(--hud-card-motion-duration) var(--hud-card-motion-ease);
 
-  position: fixed;
-  z-index: 2;
-  translate: -50% -50%;
-  pointer-events: none;
   transition:
     width var(--card-motion),
     height var(--card-motion),
     border-radius var(--card-motion);
+}
+
+.dragged-card,
+.card-transfer {
+  position: fixed;
+  z-index: 2;
+  translate: -50% -50%;
+  pointer-events: none;
+}
+
+.dragged-card[data-moving='true'] {
+  animation: card-pickup var(--hud-card-motion-duration) ease-out;
+}
+
+@keyframes card-pickup {
+  from { transform: translate(var(--pickup-x), var(--pickup-y)); }
+  to { transform: none; }
 }
 
 .dragged-card[data-moving='false'] {
@@ -198,6 +211,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .dragged-card[data-moving='true'] {
+    animation: none;
+  }
+
   .programming-hand__slot,
   .programming-hand__slot > .program-card,
   .register__card .program-card__icon,

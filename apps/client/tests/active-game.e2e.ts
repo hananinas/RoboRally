@@ -185,6 +185,27 @@ test('closes the fan during a drag, reopens it on return, and commits the new or
   await expect(page.getByRole('button', { name: /remove from register/ })).toHaveCount(0)
 })
 
+test('animates clicked cards between the hand and a register', async ({ page }) => {
+  await openGame(page)
+
+  const hand = page.getByRole('region', { name: 'Programming hand' })
+  const flight = page.locator('.card-transfer')
+  const easing = () => flight.evaluate((card) =>
+    card.getAnimations()[0]?.effect?.getTiming().easing,
+  )
+
+  await hand.getByRole('button', { name: 'Move 2', exact: true }).click()
+  await expect(flight).toHaveClass(/program-card--register/)
+  expect(await easing()).toBe('ease-out')
+  await expect(flight).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Move 2, remove from register 1' }).click()
+  await expect(flight).toHaveClass(/program-card--hand/)
+  expect(await easing()).toBe('ease-out')
+  await expect(flight).toHaveCount(0)
+  await expect(hand.getByRole('button', { name: 'Move 2', exact: true })).toBeVisible()
+})
+
 test('programs, removes, and confirms cards without resetting on a duplicate hand', async ({ page, game }) => {
   await openGame(page)
 

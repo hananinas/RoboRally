@@ -35,6 +35,7 @@ function ProgramCard({
     <button
       {...buttonProps}
       type="button"
+      data-card-id={card.id}
       aria-label={label}
       className={`program-card program-card--${size}${dragging ? ' program-card--dragging' : ''}`}
     >

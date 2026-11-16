@@ -37,7 +37,6 @@ type RegisterSlotProps = {
   pendingDelete: boolean
   dragging: boolean
   dragHandlers: ReturnType<typeof useCardDrag>['dragHandlers']
-  onRemove: (registerIndex: number) => void
 }
 
 // Renders one register slot.
@@ -50,7 +49,6 @@ function RegisterSlot({
   pendingDelete,
   dragging,
   dragHandlers,
-  onRemove,
 }: RegisterSlotProps) {
   const registerIndex = disabled ? undefined : index
 
@@ -76,10 +74,6 @@ function RegisterSlot({
             label={`${cardPresentation[card.instruction].label}, remove from register ${index + 1}`}
             disabled={disabled}
             dragging={dragging}
-            onClick={(event) => {
-              // Pointer taps are handled by the drag hook; this covers the keyboard.
-              if (event.detail === 0) onRemove(index)
-            }}
             {...dragHandlers(card)}
           />
         )}
@@ -140,7 +134,6 @@ function RegisterPanel({
             pendingDelete={pendingDelete}
             dragging={card !== null && isDragging(card)}
             dragHandlers={dragHandlers}
-            onRemove={onRemove}
           />
         ))}
       </ol>
