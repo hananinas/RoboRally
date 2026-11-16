@@ -7,6 +7,8 @@ function DraggedCard({ drag }: { drag: CardDrag }) {
 
   return (
     <div
+      aria-hidden="true"
+      data-moving={drag.moved}
       className={`program-card program-card--${size} dragged-card`}
       style={{ left: drag.x, top: drag.y }}
     >

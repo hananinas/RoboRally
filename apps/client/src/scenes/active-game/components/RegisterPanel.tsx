@@ -144,7 +144,7 @@ function RegisterPanel({
           />
         ))}
       </ol>
-      {drag?.moved && <DraggedCard drag={drag} />}
+      {drag && <DraggedCard drag={drag} />}
       <button
         className={
           'register-panel__done' +

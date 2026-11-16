@@ -13,13 +13,11 @@ export type CardDrag = {
 }
 
 type CardDragOptions = {
-  
   onTap: (card: Card) => void
   onDrop: (card: Card, registerIndex: number | null) => void
 }
 
 const dragThreshold = 4
-
 
 function registerAtPoint(x: number, y: number): number | null {
   const target = document.elementFromPoint(x, y)
@@ -29,15 +27,12 @@ function registerAtPoint(x: number, y: number): number | null {
   return Number.isInteger(registerIndex) ? registerIndex : null
 }
 
-
 function hasMoved(drag: CardDrag, x: number, y: number): boolean {
   return drag.moved || Math.hypot(x - drag.startX, y - drag.startY) >= dragThreshold
 }
 
-
 function useCardDrag({ onTap, onDrop }: CardDragOptions) {
   const [drag, setDrag] = useState<CardDrag | null>(null)
-
 
   function startDrag(card: Card, event: PointerEvent<HTMLButtonElement>) {
     if (event.button !== 0 || !event.isPrimary) return
@@ -51,11 +46,10 @@ function useCardDrag({ onTap, onDrop }: CardDragOptions) {
       x: event.clientX,
       y: event.clientY,
       moved: false,
-      overRegister: null,
+      overRegister: registerAtPoint(event.clientX, event.clientY),
     })
   }
 
-  
   function moveDrag(event: PointerEvent<HTMLButtonElement>) {
     setDrag((currentDrag) => {
       if (!currentDrag || currentDrag.pointerId !== event.pointerId) {
@@ -71,12 +65,11 @@ function useCardDrag({ onTap, onDrop }: CardDragOptions) {
         moved,
         overRegister: moved
           ? registerAtPoint(event.clientX, event.clientY)
-          : null,
+          : currentDrag.overRegister,
       }
     })
   }
 
-  
   function finishDrag(event: PointerEvent<HTMLButtonElement>) {
     if (!drag || drag.pointerId !== event.pointerId) return
 
@@ -89,7 +82,6 @@ function useCardDrag({ onTap, onDrop }: CardDragOptions) {
     setDrag(null)
   }
 
-  
   function cancelDrag(event: PointerEvent<HTMLButtonElement>) {
     if (drag?.pointerId === event.pointerId) setDrag(null)
   }

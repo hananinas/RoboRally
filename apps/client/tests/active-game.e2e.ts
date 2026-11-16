@@ -191,29 +191,17 @@ test('drags a card into a register and ignores outside drops', async ({
   )
 
   const preview = page.locator('.dragged-card')
-  const targetShape = await target.evaluate((element) => {
-    const style = getComputedStyle(element)
-    return {
-      borderRadius: style.borderRadius,
-      height: style.height,
-      width: style.width,
-    }
-  })
+  const shape = (element: Element) => {
+    const { borderRadius, height, width } = getComputedStyle(element)
+    return { borderRadius, height, width }
+  }
+  const registerShape = await target.evaluate(shape)
+  const handShape = await source.evaluate(shape)
 
-  await expect(preview).toHaveCount(1)
-  await expect
-    .poll(() =>
-      preview.evaluate((element) => {
-        const style = getComputedStyle(element)
-        return {
-          borderRadius: style.borderRadius,
-          height: style.height,
-          width: style.width,
-        }
-      }),
-    )
-    .toEqual(targetShape)
-
+  await expect.poll(() => preview.evaluate(shape)).toEqual(registerShape)
+  await page.mouse.move(300, 200)
+  await expect.poll(() => preview.evaluate(shape)).toEqual(handShape)
+  await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2)
   await page.mouse.up()
   const registeredCards = page.getByRole('button', {
     name: /remove from register/,

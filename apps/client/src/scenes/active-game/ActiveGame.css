@@ -1,4 +1,5 @@
 @import "./hud-tokens.css";
+@import "./components/programmingCards.css";
 
 /* Page layers */
 .game {
@@ -300,7 +301,7 @@
   outline-offset: 2px;
 }
 
-/* Hand and cards */
+/* Hand placement */
 .programming-hand {
   grid-column: 1 / -1;
   grid-row: 2;
@@ -318,119 +319,12 @@
   overscroll-behavior-inline: contain;
   pointer-events: auto;
 }
-.program-card {
-  appearance: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  flex: none;
-  padding: 0.5rem;
-  border: 0;
-  background: var(--hud-surface-raised);
-  color: var(--hud-text);
-  cursor: pointer;
-  touch-action: none;
-}
 
-.program-card__icon {
-  display: block;
-  flex-shrink: 0;
-}
-
-.program-card--hand .program-card__icon {
-  width: var(--hud-hand-icon);
-  height: var(--hud-hand-icon);
-}
-
-.program-card--register .program-card__icon {
-  width: min(var(--hud-register-icon), 72%);
-  height: var(--hud-register-icon);
-  object-fit: contain;
-}
-
-.program-card__label {
-  font-weight: 700;
-  text-align: center;
-}
-
-.program-card--register .program-card__label {
-  display: none;
-}
-
-.program-card--hand {
-  width: var(--hud-hand-width);
-  height: var(--hud-hand-height);
-  border: 1px solid var(--hud-border);
-  box-shadow: var(--hud-hand-card-shadow);
-  font-size: var(--hud-font-small);
-  border-radius: var(--hud-radius);
-  touch-action: pan-x;
-}
-
-@media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .program-card--hand:enabled {
-    position: relative;
-    transition: translate var(--hud-card-motion-duration) ease-out;
-  }
-
-  .program-card--hand:enabled:hover:not(.program-card--dragging) {
-    translate: 0 calc(-1 * var(--hud-hand-hover-lift));
-  }
-
-  /* Keep the original lower edge hoverable as the card lifts. */
-  .program-card--hand:enabled:hover:not(.program-card--dragging)::after {
-    content: '';
-    position: absolute;
-    inset: 100% 0 auto;
-    height: var(--hud-hand-hover-lift);
-  }
-}
-
-.program-card--register {
-  padding: var(--ui-space-sm) 0 0;
-  width: var(--hud-register-width);
-  height: var(--hud-register-height);
-  border-radius: var(--ui-control-radius);
-}
-
-.register-card > .program-card {
-  width: 100%;
-  height: 100%;
-  padding-inline: 0;
-  border-radius: inherit;
-  background: transparent;
-}
-
-.program-card--selected {
-  background: var(--hud-surface-inset);
-  opacity: 0.65;
-}
-
-.program-card--dragging {
-  opacity: 0;
-}
-
-.dragged-card {
-  position: fixed;
-  z-index: 2;
-  transform: translate(-50%, -50%);
-  transition:
-    width var(--hud-card-motion-duration) ease,
-    height var(--hud-card-motion-duration) ease,
-    border-radius var(--hud-card-motion-duration) ease;
-  pointer-events: none;
-}
 
 /* Interaction states */
 .game :is(button, summary, .other-player):focus-visible {
   outline: 2px solid var(--hud-accent);
   outline-offset: -2px;
-}
-
-.program-card:disabled {
-  cursor: default;
 }
 
 /* Disconnect overlay */
@@ -574,9 +468,6 @@
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .dragged-card {
-    transition: none;
-  }
   .winner-confetti {
     display: none;
   }

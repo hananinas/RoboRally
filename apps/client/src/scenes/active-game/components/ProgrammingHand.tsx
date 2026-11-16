@@ -68,7 +68,7 @@ function ProgrammingHand({
           />
         )
       })}
-      {drag?.moved && <DraggedCard drag={drag} />}
+      {drag && <DraggedCard drag={drag} />}
     </section>
   )
 }
