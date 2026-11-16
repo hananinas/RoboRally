@@ -123,16 +123,18 @@
 }
 
 .other-player__slot--hidden::before {
+  --card-back-dot: color-mix(in srgb, var(--hud-border) 55%, transparent);
+
   content: '';
   position: absolute;
   inset: 1rem 0.375rem 0.375rem;
   border: 1px solid var(--hud-border);
   border-radius: var(--ui-control-radius);
-  background: repeating-linear-gradient(
-    45deg,
-    color-mix(in srgb, var(--hud-border) 35%, transparent) 0 2px,
-    transparent 2px 6px
-  );
+  background-image:
+    radial-gradient(circle, var(--card-back-dot) 1px, transparent 1.25px),
+    radial-gradient(circle, var(--card-back-dot) 1px, transparent 1.25px);
+  background-size: 10.5px 6px;
+  background-position: 0 0, 5.25px 3px;
 }
 
 .other-player__slot--hidden .other-player__slot-label {
