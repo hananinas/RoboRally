@@ -2,15 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { Board, Direction, EmptyTile, PitTile, ConveyorTile } from '@/game/index.ts'
 import type { Position, Tile, TileKind } from '@/game/index.ts'
 import { Integer } from '@/numbers'
+import { createEmptyTileGrid } from '../fixtures.ts'
 
 const antenna = { x: Integer(0), y: Integer(0), angle: Math.PI / 2 }
 const rebootTile = { x: Integer(2), y: Integer(2) }
-
-function grid(width = 3, height = 3): Tile[][] {
-  return Array.from({ length: height }, () =>
-    Array.from({ length: width }, () => new EmptyTile()),
-  )
-}
 
 const steps: { direction: Direction; target: Position; opposite: Direction }[] = [
   { direction: Direction.NORTH, target: { x: Integer(1), y: Integer(0) }, opposite: Direction.SOUTH },
@@ -22,7 +17,7 @@ const steps: { direction: Direction; target: Position; opposite: Direction }[] =
 describe('Tile and Board layout', () => {
     it('stores distinct starting tiles and rejects ones a robot cannot stand on', () => {
     const at = (x: number, y: number) => ({ x: Integer(x), y: Integer(y) })
-    const tiles = grid()
+    const tiles = createEmptyTileGrid(3, 3)
     tiles[2][2] = new PitTile()
     const reboot = at(0, 1)
 
@@ -107,7 +102,7 @@ describe('Tile and Board layout', () => {
     expect(() => new Board([[]], antenna, rebootTile)).toThrow(RangeError)
     expect(() => new Board([[new EmptyTile()], []], antenna, rebootTile)).toThrow(RangeError)
 
-    const tiles = grid(2, 2)
+    const tiles = createEmptyTileGrid(2, 2)
     const original = tiles[0][0]
     const board = new Board(tiles, antenna, { x: Integer(1), y: Integer(1) })
     tiles[0][0] = new EmptyTile([Direction.EAST])
@@ -121,7 +116,7 @@ describe('Tile and Board layout', () => {
 
   it('keeps an independent, frozen copy of its antenna', () => {
     const source = { x: Integer(1), y: Integer(2), angle: Math.PI / 2 }
-    const board = new Board(grid(), source, { x: Integer(0), y: Integer(0) })
+    const board = new Board(createEmptyTileGrid(3, 3), source, { x: Integer(0), y: Integer(0) })
     source.x = Integer(0)
     source.angle = 0
 
@@ -137,13 +132,13 @@ describe('Tile and Board layout', () => {
       { x: Integer(0), y: Integer(0), angle: Infinity },
       { x: Integer(0), y: Integer(0), angle: NaN },
     ]) {
-      expect(() => new Board(grid(), invalid, rebootTile)).toThrow(RangeError)
+      expect(() => new Board(createEmptyTileGrid(3, 3), invalid, rebootTile)).toThrow(RangeError)
     }
   })
 
   it('copies and freezes a valid reboot tile', () => {
     const source = { x: Integer(2), y: Integer(2) }
-    const board = new Board(grid(), antenna, source)
+    const board = new Board(createEmptyTileGrid(3, 3), antenna, source)
     source.x = Integer(0)
 
     expect(board.rebootTile).toEqual({ x: 2, y: 2 })
@@ -162,7 +157,7 @@ describe('Tile and Board layout', () => {
   })
 
   it('rejects positions outside the grid or between tiles', () => {
-    const board = new Board(grid(), antenna, rebootTile)
+    const board = new Board(createEmptyTileGrid(3, 3), antenna, rebootTile)
     for (const position of [
       { x: Integer(-1), y: Integer(0) },
       { x: Integer(3), y: Integer(0) },
@@ -204,7 +199,7 @@ describe('Board robot ownership', () => {
   })
 
   it('relocates a robot without retaining its old occupancy or the supplied position', () => {
-    const board = new Board(grid(), { ...antenna, x: Integer(2) }, { x: Integer(0), y: Integer(0) })
+    const board = new Board(createEmptyTileGrid(3, 3), { ...antenna, x: Integer(2) }, { x: Integer(0), y: Integer(0) })
     board.placeRobot('alpha', { x: Integer(0), y: Integer(0) })
     const destination = { x: Integer(2), y: Integer(2) }
 
@@ -237,7 +232,7 @@ describe('Board robot ownership', () => {
   })
 
   it('places robots, answers occupancy, and does not expose mutable positions', () => {
-    const board = new Board(grid(), antenna, rebootTile)
+    const board = new Board(createEmptyTileGrid(3, 3), antenna, rebootTile)
     const placement = { x: Integer(1), y: Integer(1) }
     board.placeRobot('alpha', placement)
     placement.x = Integer(2)
@@ -252,7 +247,7 @@ describe('Board robot ownership', () => {
   })
 
   it('rejects duplicate, occupied, and out-of-bounds placements', () => {
-    const board = new Board(grid(), antenna, rebootTile)
+    const board = new Board(createEmptyTileGrid(3, 3), antenna, rebootTile)
     board.placeRobot('alpha', { x: Integer(1), y: Integer(1) })
 
     expect(() => board.placeRobot('alpha', { x: Integer(2), y: Integer(2) })).toThrow()
@@ -263,7 +258,7 @@ describe('Board robot ownership', () => {
   })
 
   it.each(steps)('moves one tile $direction and updates occupancy', ({ direction, target }) => {
-    const board = new Board(grid(), antenna, rebootTile)
+    const board = new Board(createEmptyTileGrid(3, 3), antenna, rebootTile)
     board.placeRobot('alpha', { x: Integer(1), y: Integer(1) })
 
     expect(board.pushRobot('alpha', direction)).toEqual(['alpha'])
@@ -274,7 +269,7 @@ describe('Board robot ownership', () => {
 
   it.each(steps)('blocks $direction when either tile has a wall', ({ direction, target, opposite }) => {
     for (const wallPosition of ['source', 'destination'] as const) {
-      const tiles = grid()
+      const tiles = createEmptyTileGrid(3, 3)
       if (wallPosition === 'source') {
         tiles[1][1] = new EmptyTile([direction])
       } else {
@@ -291,7 +286,7 @@ describe('Board robot ownership', () => {
   })
 
   it('pushes an occupying robot and returns displaced robots farthest first', () => {
-    const board = new Board(grid(3, 2), { ...antenna, y: Integer(1) }, { x: Integer(2), y: Integer(1) })
+    const board = new Board(createEmptyTileGrid(3, 2), { ...antenna, y: Integer(1) }, { x: Integer(2), y: Integer(1) })
     board.placeRobot('alpha', { x: Integer(0), y: Integer(0) })
     board.placeRobot('beta', { x: Integer(1), y: Integer(0) })
 
@@ -316,7 +311,7 @@ describe('Board robot ownership', () => {
   })
 
   it('rejects invalid movement requests without changing state', () => {
-    const board = new Board(grid(), antenna, rebootTile)
+    const board = new Board(createEmptyTileGrid(3, 3), antenna, rebootTile)
     board.placeRobot('alpha', { x: Integer(1), y: Integer(1) })
 
     expect(() => board.pushRobot('unknown', Direction.NORTH)).toThrow()
@@ -324,7 +319,7 @@ describe('Board robot ownership', () => {
   })
 
   it('moves off the board without resolving the reboot', () => {
-    const board = new Board(grid(3, 2), { ...antenna, y: Integer(1) }, { x: Integer(2), y: Integer(1) })
+    const board = new Board(createEmptyTileGrid(3, 2), { ...antenna, y: Integer(1) }, { x: Integer(2), y: Integer(1) })
     board.placeRobot('alpha', { x: Integer(2), y: Integer(0) })
 
     expect(board.pushRobot('alpha', Direction.EAST)).toEqual(['alpha'])
@@ -335,7 +330,7 @@ describe('Board robot ownership', () => {
 
 describe('Board antenna obstacle', () => {
   it('rejects placement and relocation onto the antenna without changing occupancy', () => {
-    const board = new Board(grid(), antenna, rebootTile)
+    const board = new Board(createEmptyTileGrid(3, 3), antenna, rebootTile)
     const start = { x: Integer(1), y: Integer(1) }
     board.placeRobot('alpha', start)
 
@@ -347,7 +342,7 @@ describe('Board antenna obstacle', () => {
   })
 
   it.each(steps)('blocks entry into the antenna when facing $opposite', ({ target, opposite }) => {
-    const board = new Board(grid(), { ...antenna, x: Integer(1), y: Integer(1) }, { x: Integer(0), y: Integer(0) })
+    const board = new Board(createEmptyTileGrid(3, 3), { ...antenna, x: Integer(1), y: Integer(1) }, { x: Integer(0), y: Integer(0) })
     board.placeRobot('alpha', target)
 
     expect(board.pushRobot('alpha', opposite)).toEqual([])
@@ -356,7 +351,7 @@ describe('Board antenna obstacle', () => {
   })
 
   it('skips the antenna when finding a safe destination, including when it is the only tile', () => {
-    const board = new Board(grid(2, 1), antenna, { x: Integer(1), y: Integer(0) })
+    const board = new Board(createEmptyTileGrid(2, 1), antenna, { x: Integer(1), y: Integer(0) })
     expect(board.nearestFreePosition(board.antenna)).toEqual({ x: 1, y: 0 })
     board.placeRobot('alpha', { x: Integer(1), y: Integer(0) })
     expect(board.nearestFreePosition(board.antenna)).toBeUndefined()
@@ -365,7 +360,7 @@ describe('Board antenna obstacle', () => {
 
 describe('Board reboot destinations', () => {
   it('prefers the requested tile, then distance, then top-to-bottom and left-to-right order', () => {
-    const board = new Board(grid(5, 5), antenna, { x: Integer(4), y: Integer(4) })
+    const board = new Board(createEmptyTileGrid(5, 5), antenna, { x: Integer(4), y: Integer(4) })
     const origin = { x: Integer(2), y: Integer(2) }
     expect(board.nearestFreePosition(origin)).toEqual(origin)
     board.placeRobot('centre', origin)
@@ -381,7 +376,7 @@ describe('Board reboot destinations', () => {
   })
 
   it('skips pits and occupied tiles while allowing destinations enclosed by walls', () => {
-    const tiles = grid()
+    const tiles = createEmptyTileGrid(3, 3)
     tiles[0][1] = new PitTile()
     tiles[1][0] = new PitTile()
     tiles[2][1] = new EmptyTile([Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST])

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Board, Card, Direction, EmptyTile, PitTile, type Tile } from '@/game/index'
 import { Deck } from '@/game/Deck'
 import { Integer } from '@/numbers'
-import { addTestPlayer, createEmptyTileGrid, createTestGame, placeTestPlayer } from '../fixtures.ts'
+import { addTestPlayer, createEmptyTileGrid, createTestGame, placeTestPlayer, programLeadingWith } from '../fixtures.ts'
 
 function createGame(
   pitWalls: readonly Direction[] = [],
@@ -36,8 +36,7 @@ describe('shared gameplay movement', () => {
   it('continues across ordinary tiles when movement has no terminal entry effect', () => {
     const { board, robot, player, program, game } = createGame([], [], Direction.EAST)
     board.relocateRobot(robot.id, { x: Integer(0), y: Integer(0) })
-    const move = program[3]
-    game.submitProgram(player.id, [move, ...program.filter((card) => card !== move)].map((card) => card.id))._unsafeUnwrap()
+    game.submitProgram(player.id, programLeadingWith(program, 'MOVE_3').map((card) => card.id))._unsafeUnwrap()
 
     const result = game.executeNextAction()
 
@@ -51,8 +50,7 @@ describe('shared gameplay movement', () => {
     const start = { x: Integer(2), y: Integer(1) }
     const destination = { x: Integer(3), y: Integer(1) }
     board.relocateRobot(robot.id, start)
-    const move = program[3]
-    game.submitProgram(player.id, [move, ...program.filter((card) => card !== move)].map((card) => card.id))._unsafeUnwrap()
+    game.submitProgram(player.id, programLeadingWith(program, 'MOVE_3').map((card) => card.id))._unsafeUnwrap()
 
     const result = game.executeNextAction()
 
@@ -67,8 +65,7 @@ describe('shared gameplay movement', () => {
     { wall: 'destination', pitWalls: [Direction.WEST], startWalls: [] },
   ])('does not resolve pit entry when a $wall wall blocks movement', ({ pitWalls, startWalls }) => {
     const { board, robot, player, program, game, start, pit, reboot } = createGame(pitWalls, startWalls, Direction.EAST)
-    const move = program[3]
-    game.submitProgram(player.id, [move, ...program.filter((card) => card !== move)].map((card) => card.id))._unsafeUnwrap()
+    game.submitProgram(player.id, programLeadingWith(program, 'MOVE_3').map((card) => card.id))._unsafeUnwrap()
 
     const result = game.executeNextAction()
 

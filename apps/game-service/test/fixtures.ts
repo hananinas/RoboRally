@@ -9,11 +9,13 @@ import { Robot, ROBOT_COLOURS } from '@/game/Robot'
 import { Direction, type Position } from '@/game/spatial'
 import { EmptyTile, type Tile } from '@/game/Tile'
 
-export function createTestRobot(overrides: Partial<{
+type RobotOverrides = Partial<{
   id: string
   direction: Direction
   colour: string
-}> = {}): Robot {
+}>
+
+export function createTestRobot(overrides: RobotOverrides = {}): Robot {
   return new Robot(
     overrides.id ?? randomUUID(),
     overrides.direction ?? Direction.NORTH,
@@ -47,15 +49,14 @@ export function createTestGame(options: {
   })
 }
 
-export function placeTestPlayer(board: Board, position: Position, overrides: Partial<{
-  id: string
-  direction: Direction
-  colour: string
-  deck: Deck
-}> = {}): Player {
+export function placeTestPlayer(
+  board: Board,
+  position: Position,
+  overrides: RobotOverrides & Partial<{ deck: Deck }> = {},
+): Player {
   const robot = createTestRobot(overrides)
   board.placeRobot(robot.id, position)
-  return createTestPlayer({ id: overrides.id, robot, deck: overrides.deck })
+  return createTestPlayer({ robot, deck: overrides.deck })
 }
 
 export function addTestPlayer(game: Game, colour?: string): Player {
