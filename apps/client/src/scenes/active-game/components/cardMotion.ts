@@ -13,7 +13,7 @@ function cardPose(card: HTMLElement) {
     width: style.width,
     height: style.height,
     borderRadius: style.borderRadius,
-    rotate: `${Math.atan2(matrix.b, matrix.a)}rad`,
+    rotate: style.rotate === 'none' ? `${Math.atan2(matrix.b, matrix.a)}rad` : style.rotate,
   }
 }
 
@@ -49,7 +49,7 @@ export function animateCardTransfer(source: HTMLElement, update: () => void, fro
     }
   }
   const to = cardPose(destination)
-  if (from.left === to.left && from.top === to.top && from.width === to.width && from.rotate === to.rotate) return
+  if (Object.entries(from).every(([key, value]) => value === to[key as keyof typeof to])) return
 
   const ghost = destination.cloneNode(true) as HTMLButtonElement
   ghost.className = destination.className + ' card-transfer'

@@ -1,18 +1,22 @@
-import { useRef, useState, type MouseEvent, type PointerEvent } from 'react'
+import { useState, type MouseEvent, type PointerEvent } from 'react'
 import type { ProgramCard as Card, Registers } from '../gameState.ts'
 import { animateCardTransfer } from './cardMotion.ts'
 
 export type CardDrag = {
   card: Card
-  pointerId: number
-  startX: number
-  startY: number
   pickupOffset: { x: number; y: number }
   x: number
   y: number
   moved: boolean
   overRegister: number | null
   handIndex: number | null
+}
+
+type DragGesture = CardDrag & {
+  pointerId: number
+  startX: number
+  startY: number
+  dropZone: ReturnType<typeof measureDropZone> | null
 }
 
 type CardDragOptions = {
@@ -44,9 +48,9 @@ function measureDropZone(hand: HTMLElement, fromRegister: boolean) {
   }
 }
 
-function insertCard(cards: readonly Card[], card: Card, index: number) {
+function arrangeHand(cards: readonly Card[], card: Card, index: number | null) {
   const reordered = cards.filter((candidate) => candidate.id !== card.id)
-  reordered.splice(index, 0, card)
+  if (index !== null) reordered.splice(index, 0, card)
   return reordered
 }
 
@@ -60,19 +64,17 @@ function registerAtPoint(x: number, y: number): number | null {
   return Number.isInteger(registerIndex) ? registerIndex : null
 }
 
-function hasMoved(drag: CardDrag, x: number, y: number): boolean {
+function hasMoved(drag: DragGesture, x: number, y: number): boolean {
   return drag.moved || Math.hypot(x - drag.startX, y - drag.startY) >= dragThreshold
 }
 
 function useCardDrag({ cards, registers, disabled, onPlace, onRemove, onMove, onReorder }: CardDragOptions) {
-  const [drag, setDrag] = useState<CardDrag | null>(null)
-  const dropZone = useRef<ReturnType<typeof measureDropZone> | null>(null)
+  const [gesture, setGesture] = useState<DragGesture | null>(null)
   const registerOf = (card: Card) => registers.findIndex((registered) => registered?.id === card.id)
   const available = cards.filter((card) => registerOf(card) === -1)
 
-  function dropTarget(x: number, y: number) {
+  function dropTarget(zone: DragGesture['dropZone'], x: number, y: number) {
     const overRegister = registerAtPoint(x, y)
-    const zone = dropZone.current
     const insideHand = zone && x >= zone.left && x <= zone.right && y >= zone.top && y <= zone.bottom
     const handIndex = overRegister === null && insideHand
       ? zone.boundaries.filter((boundary) => x >= boundary).length
@@ -101,7 +103,7 @@ function useCardDrag({ cards, registers, disabled, onPlace, onRemove, onMove, on
     if (fromRegister !== -1) onRemove(fromRegister)
     if (handIndex === null || !cards.includes(card) || available[handIndex] === card) return
 
-    const reordered = insertCard(available, card, handIndex).values()
+    const reordered = arrangeHand(available, card, handIndex).values()
     onReorder(cards.map((candidate) =>
       candidate.id === card.id || registerOf(candidate) === -1 ? reordered.next().value! : candidate,
     ))
@@ -112,10 +114,10 @@ function useCardDrag({ cards, registers, disabled, onPlace, onRemove, onMove, on
 
     // Freeze insertion points so the opening gap cannot move its own drop target.
     const hand = event.currentTarget.closest('.game-overlay')?.querySelector<HTMLElement>('.programming-hand')
-    dropZone.current = hand ? measureDropZone(hand, registerOf(card) !== -1) : null
+    const dropZone = hand ? measureDropZone(hand, registerOf(card) !== -1) : null
     const bounds = event.currentTarget.getBoundingClientRect()
     event.currentTarget.setPointerCapture(event.pointerId)
-    setDrag({
+    setGesture({
       card: cards.find((candidate) => candidate.id === card.id) ?? card,
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -127,53 +129,61 @@ function useCardDrag({ cards, registers, disabled, onPlace, onRemove, onMove, on
       x: event.clientX,
       y: event.clientY,
       moved: false,
-      ...dropTarget(event.clientX, event.clientY),
+      dropZone,
+      overRegister: registerAtPoint(event.clientX, event.clientY),
+      handIndex: null,
     })
   }
 
   function moveDrag(event: PointerEvent<HTMLButtonElement>) {
-    setDrag((currentDrag) => {
-      if (!currentDrag || currentDrag.pointerId !== event.pointerId) {
-        return currentDrag
+    const { pointerId, clientX: x, clientY: y } = event
+    if (gesture?.pointerId !== pointerId || !event.currentTarget.hasPointerCapture(pointerId)) return
+
+    const target = dropTarget(gesture.dropZone, x, y)
+
+    setGesture((current) => {
+      if (!current || current.pointerId !== pointerId || !hasMoved(current, x, y)) return current
+
+      const pickupOffset = current.moved ? current.pickupOffset : {
+        x: current.pickupOffset.x + current.startX - x,
+        y: current.pickupOffset.y + current.startY - y,
       }
 
-      const moved = hasMoved(currentDrag, event.clientX, event.clientY)
-
       return {
-        ...currentDrag,
-        x: event.clientX,
-        y: event.clientY,
-        moved,
-        ...(moved && !currentDrag.moved && {
-          pickupOffset: {
-            x: currentDrag.pickupOffset.x + currentDrag.startX - event.clientX,
-            y: currentDrag.pickupOffset.y + currentDrag.startY - event.clientY,
-          },
-        }),
-        ...(moved && dropTarget(event.clientX, event.clientY)),
+        ...current,
+        x,
+        y,
+        pickupOffset,
+        moved: true,
+        ...target,
       }
     })
   }
 
   function finishDrag(event: PointerEvent<HTMLButtonElement>) {
-    if (!drag || drag.pointerId !== event.pointerId) return
+    if (!gesture || gesture.pointerId !== event.pointerId) return
 
-    const moved = hasMoved(drag, event.clientX, event.clientY)
-    const { overRegister, handIndex } = dropTarget(event.clientX, event.clientY)
+    const { clientX: x, clientY: y } = event
+    const moved = hasMoved(gesture, x, y)
     animateCardTransfer(event.currentTarget, () => {
-      setDrag(null)
-      if (moved) onDrop(drag.card, overRegister, handIndex)
-      else onTap(drag.card)
+      setGesture(null)
+      if (!moved) {
+        onTap(gesture.card)
+        return
+      }
+
+      const { overRegister, handIndex } = dropTarget(gesture.dropZone, x, y)
+      onDrop(gesture.card, overRegister, handIndex)
     }, moved)
   }
 
   function cancelDrag(event: PointerEvent<HTMLButtonElement>) {
-    if (drag?.pointerId !== event.pointerId) return
+    if (gesture?.pointerId !== event.pointerId) return
 
-    if (drag.moved) {
-      animateCardTransfer(event.currentTarget, () => setDrag(null), true)
+    if (gesture.moved) {
+      animateCardTransfer(event.currentTarget, () => setGesture(null), true)
     } else {
-      setDrag(null)
+      setGesture(null)
     }
   }
 
@@ -190,15 +200,12 @@ function useCardDrag({ cards, registers, disabled, onPlace, onRemove, onMove, on
     }
   }
 
+  const drag = !disabled && gesture && cards.includes(gesture.card) ? gesture : null
+  const fan = drag?.moved ? arrangeHand(available, drag.card, drag.handIndex) : available
+
   function isDragging(card: Card): boolean {
     return drag?.card.id === card.id && drag.moved
   }
-
-  const fan = disabled || !drag?.moved
-    ? available
-    : drag.handIndex === null || !cards.includes(drag.card)
-      ? available.filter((card) => card.id !== drag.card.id)
-      : insertCard(available, drag.card, drag.handIndex)
 
   return { drag, dragHandlers, isDragging, fan }
 }

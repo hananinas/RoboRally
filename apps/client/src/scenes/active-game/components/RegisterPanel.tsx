@@ -22,7 +22,7 @@ type RegisterPanelProps = {
   status: string
   localDeadline: number | null
   error: string | null
-  cardDrag: ReturnType<typeof useCardDrag>
+  cardDrag: Pick<ReturnType<typeof useCardDrag>, 'dragHandlers' | 'isDragging'>
   onConfirm: () => void
 }
 

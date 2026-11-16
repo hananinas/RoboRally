@@ -90,7 +90,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
   const cardDrag = useCardDrag({
     cards: hand,
     registers: state.registers,
-    disabled: disabled,
+    disabled,
     onPlace: handlePlaceCard,
     onRemove: handleRemove,
     onMove: handleMove,

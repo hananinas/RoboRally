@@ -10,7 +10,7 @@ type ProgrammingHandProps = {
   disabled: boolean
   highlightedIndex: number | null
   onHighlightCard: (cardIndex: number) => void
-  cardDrag: ReturnType<typeof useCardDrag>
+  cardDrag: Pick<ReturnType<typeof useCardDrag>, 'dragHandlers' | 'isDragging' | 'fan'>
 }
 
 function ProgrammingHand({
