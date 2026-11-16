@@ -248,6 +248,18 @@
   box-shadow: 0 0 0 1px var(--hud-accent);
 }
 
+.register-card[data-played],
+.program-card--hand[data-played] {
+  opacity: 0.4;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .register-card,
+  .program-card--hand:disabled {
+    transition: opacity var(--hud-card-motion-duration) ease-out;
+  }
+}
+
 .register-card[data-pending-delete] {
   outline: 2px solid var(--hud-danger);
   outline-offset: 2px;

@@ -60,6 +60,13 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
   const status = getGameStatus(state)
   const disconnectedNames = state.players.filter((player) => !player.connected).map((player) => player.username)
   const player = state.players.find((candidate) => candidate.playerId === state.assignment?.playerId)
+  const displayedRegisters = state.playbackProgram ?? state.registers
+  const publicRegisters = player && (state.playbackRegisters?.get(player.playerId) ?? player.registers)
+  const activeRegister = state.playback.active?.playerId === state.assignment?.playerId
+    ? state.playback.active?.registerIndex ?? null : null
+  const playedCardIds = new Set(displayedRegisters.flatMap((card, index) =>
+    card && publicRegisters?.[index]?.status === 'REVEALED' && index !== activeRegister ? [card.id] : [],
+  ))
   const showWinner = isGameOver(state) && state.connected
   const robotColour = state.playback.robots.find((robot) => robot.robotId === state.assignment?.robotId)?.colour
   const registeredCardIds = new Set(
@@ -85,8 +92,9 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
               onSettings={onSettings}
             />
             <RegisterPanel
-              registers={state.playbackProgram ?? state.registers}
-              activeRegister={state.playback.active?.registerIndex ?? null}
+              registers={displayedRegisters}
+              activeRegister={activeRegister}
+              playedCardIds={playedCardIds}
               disabled={disabled}
               submission={state.submission}
               locked={state.phase === 'PROGRAMMING' && !state.playback.active && state.submission === 'accepted'}
@@ -116,6 +124,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
             key={state.handVersion}
             cards={state.hand}
             registeredCardIds={registeredCardIds}
+            playedCardIds={playedCardIds}
             disabled={disabled}
             highlightedIndex={highlightedIndex}
             onHighlightCard={highlightCard}
