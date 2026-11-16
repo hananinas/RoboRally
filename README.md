@@ -122,7 +122,7 @@ If you prefer not to use Nix, you must install the required tools yourself.
 
 At minimum, you will need:
 
-- Node.js 24 or a compatible version
+- Node.js 26 or a compatible version
 - pnpm 10.9 or newer
 - [Process Compose](https://f1bonacc1.github.io/process-compose/)
 - [Ory Kratos](https://www.ory.com/docs/kratos) and [Ory Hydra](https://www.ory.com/docs/hydra), the identity and OAuth2/OIDC providers used for authentication
