@@ -128,12 +128,13 @@ describe('Player', () => {
   )
 
   it('preserves checkpoint progress across rounds and program clearing', () => {
-    const { game } = createGame('empty-map')
+    const { game } = createGame('empty-map', undefined, () => 0, () => 0)
     const player = game.addPlayer()._unsafeUnwrap()
     player.completeCheckpoint(1)
 
     for (let round = 0; round < 2; round++) {
-      game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
+      const submitted = game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
+      expect(submitted.isOk()).toBe(true)
       for (let register = 0; register < 5; register++) resolveRobotAction(game)
 
       expect(game.lastActivePhase).toBe('programming')
