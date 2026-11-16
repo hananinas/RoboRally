@@ -1,12 +1,83 @@
+.programming-hand {
+  --card-motion: var(--hud-card-motion-duration) var(--hud-card-motion-ease);
+
+  container-type: inline-size;
+  position: relative;
+  isolation: isolate;
+  margin-inline: auto;
+  width: min(100%, 42rem);
+  height: calc(var(--hud-hand-height) + 3rem);
+}
+
+.programming-hand__slot {
+  --fan-step: min(
+    var(--hud-hand-width) - var(--ui-space-md),
+    (100cqw - var(--hud-hand-width) - 2rem) / var(--fan-intervals)
+  );
+
+  position: absolute;
+  inset: var(--ui-space-md) auto auto calc(50% - var(--hud-hand-width) / 2);
+  transform: translate(calc(var(--fan-offset) * var(--fan-step)), var(--fan-exit-drop, var(--fan-drop)))
+    rotate(var(--fan-angle));
+  transform-origin: center 85%;
+  transition: transform var(--card-motion), opacity var(--card-motion);
+  pointer-events: auto;
+}
+
+.programming-hand__slot[aria-hidden] {
+  --fan-exit-drop: 2.25rem;
+
+  opacity: 0;
+  pointer-events: none;
+}
+
+.programming-hand__slot:has(.program-card:focus-visible) {
+  z-index: 1;
+}
+
+.programming-hand__slot > .program-card {
+  position: relative;
+  transition: translate var(--card-motion), background-color var(--card-motion);
+}
+
+.programming-hand__slot > .program-card:focus-visible {
+  translate: 0 calc(-1 * var(--hud-hand-hover-lift));
+  background-color: var(--hud-surface);
+}
+
+@media (hover: hover) {
+  .programming-hand__slot:hover {
+    z-index: 2;
+  }
+
+  .programming-hand__slot:hover > .program-card:enabled {
+    translate: 0 calc(-1 * var(--hud-hand-hover-lift));
+    background-color: var(--hud-surface);
+  }
+
+  /* Keep the original lower edge clickable as the card lifts. */
+  .programming-hand__slot:hover > .program-card:enabled::after {
+    content: '';
+    position: absolute;
+    inset: 100% 0 auto;
+    height: var(--hud-hand-hover-lift);
+  }
+
+  .register__card:hover > .program-card:enabled .program-card__icon {
+    scale: 1.1;
+  }
+}
+
 .program-card {
   appearance: none;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: var(--ui-space-xs);
   flex: none;
-  padding: 0.5rem;
+  box-sizing: border-box;
+  padding: var(--ui-space-sm);
   border: 0;
   background: var(--hud-surface-raised);
   color: var(--hud-text);
@@ -46,26 +117,6 @@
   box-shadow: var(--hud-hand-card-shadow);
   font-size: var(--hud-font-small);
   border-radius: var(--hud-radius);
-  touch-action: pan-x;
-}
-
-@media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .program-card--hand:enabled {
-    position: relative;
-    transition: translate var(--hud-card-motion-duration) ease-out;
-  }
-
-  .program-card--hand:enabled:hover:not(.program-card--dragging) {
-    translate: 0 calc(-1 * var(--hud-hand-hover-lift));
-  }
-
-  /* Keep the original lower edge hoverable as the card lifts. */
-  .program-card--hand:enabled:hover:not(.program-card--dragging)::after {
-    content: '';
-    position: absolute;
-    inset: 100% 0 auto;
-    height: var(--hud-hand-hover-lift);
-  }
 }
 
 .program-card--register {
@@ -83,18 +134,17 @@
   background: transparent;
 }
 
-.program-card--selected {
-  background: var(--hud-surface-inset);
-  opacity: 0.65;
+.register__card .program-card__icon {
+  transition: scale var(--hud-card-motion-duration) var(--hud-card-motion-ease);
+}
+
+.program-card:disabled {
+  cursor: default;
 }
 
 .program-card--dragging {
   opacity: 0;
   pointer-events: none;
-}
-
-.program-card:disabled {
-  cursor: default;
 }
 
 .dragged-card {
@@ -135,7 +185,30 @@
   opacity: 0;
 }
 
+@container (width < 36rem) {
+  .programming-hand__slot .program-card__icon {
+    position: absolute;
+    inset: var(--ui-space-sm) auto auto var(--ui-space-xs);
+    width: var(--hud-register-icon);
+    height: var(--hud-register-icon);
+  }
+
+  .programming-hand__slot .program-card__label {
+    position: absolute;
+    inset: auto var(--ui-space-xs) var(--ui-space-sm);
+    opacity: 0;
+  }
+
+  .programming-hand__slot:has(.program-card:focus-visible) .program-card__label,
+  .programming-hand__slot:hover .program-card__label {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .programming-hand__slot,
+  .programming-hand__slot > .program-card,
+  .register__card .program-card__icon,
   .dragged-card,
   .dragged-card .program-card__icon,
   .dragged-card .program-card__label {

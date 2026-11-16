@@ -305,21 +305,7 @@
 .programming-hand {
   grid-column: 1 / -1;
   grid-row: 2;
-  justify-self: center;
-  width: max-content;
-  max-width: 100%;
-  padding: var(--ui-space-xs) var(--ui-space-md);
-  display: grid;
-  grid-auto-columns: var(--hud-hand-width);
-  grid-auto-flow: column;
-  gap: var(--ui-space-md);
-  justify-content: safe center;
-  overflow-x: auto;
-  overflow-y: hidden;
-  overscroll-behavior-inline: contain;
-  pointer-events: auto;
 }
-
 
 /* Interaction states */
 .game :is(button, summary, .other-player):focus-visible {

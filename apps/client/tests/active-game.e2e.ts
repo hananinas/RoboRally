@@ -2,8 +2,14 @@ import type { Dialog, Page } from '@playwright/test'
 import { expect, openGame, pauseClock, test } from './game-fixture.ts'
 import { GAME_ID, OTHER_PLAYER_ID, OTHER_ROBOT_ID, PLAYER_ID, ROBOT_ID, ROUND_ACTIONS } from './game-fixture-data.ts'
 import { gameStatus } from './browserClient.ts'
+
+// Program indices refer to deal order, including cards already moved to registers.
+function dealtCards(page: Page) {
+  return page.getByRole('region', { name: 'Programming hand' }).locator('button')
+}
+
 async function fillProgram(page: Page, indices = [0, 1, 2, 3, 4]) {
-  const cards = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
+  const cards = dealtCards(page)
   for (const index of indices) await cards.nth(index).click()
 }
 
@@ -125,13 +131,36 @@ test('collapses player details from the keyboard', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Health' })).toBeVisible()
 })
 
+test('lifts a hovered card and closes and reopens the fan around a register change', async ({ page }) => {
+  await openGame(page)
+
+  const hand = page.getByRole('region', { name: 'Programming hand' })
+  const available = hand.getByRole('button')
+  const middle = available.nth(4)
+  const lastSlot = available.last().locator('..')
+  const fanRight = () => lastSlot.evaluate((slot) => slot.getBoundingClientRect().right)
+  const fullFanRight = await fanRight()
+
+  await middle.hover()
+  await expect(middle).toHaveCSS('translate', '0px -8px')
+  await page.mouse.move(0, 0)
+  await expect(middle).toHaveCSS('translate', 'none')
+
+  await middle.click()
+  await expect(available).toHaveCount(8)
+  await expect.poll(fanRight).toBeLessThan(fullFanRight - 2)
+
+  await page.getByRole('button', { name: 'Turn Left, remove from register 1' }).click()
+  await expect(available).toHaveCount(9)
+  await expect(available.nth(4)).toHaveAccessibleName('Turn Left')
+  await expect.poll(fanRight).toBeCloseTo(fullFanRight, 1)
+})
+
 test('programs, removes, and confirms cards without resetting on a duplicate hand', async ({ page, game }) => {
   await openGame(page)
 
   const controls = page.getByRole('complementary', { name: 'Game controls' })
-  const handCards = page
-    .getByRole('region', { name: 'Programming hand' })
-    .getByRole('button')
+  const handCards = dealtCards(page)
   const done = controls.getByRole('button', { name: 'Done' })
 
   for (let index = 0; index < 5; index += 1) {
@@ -254,9 +283,7 @@ test('drags a card out of a register to remove it', async ({ page }) => {
   await openGame(page)
   await fillProgram(page, [0, 1])
 
-  const handCards = page
-    .getByRole('region', { name: 'Programming hand' })
-    .getByRole('button')
+  const handCards = dealtCards(page)
   const registeredCards = page.getByRole('button', {
     name: /remove from register/,
   })
@@ -298,7 +325,7 @@ test('drags a card out of a register to remove it', async ({ page }) => {
 
 test('navigates the hand with h/l, wrapping around and skipping registered cards', async ({ page }) => {
   await openGame(page)
-  const handCards = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
+  const handCards = dealtCards(page)
 
   await handCards.nth(1).click()
   await expect(handCards.nth(1)).toBeDisabled()
@@ -410,7 +437,7 @@ test(':w then Enter submits after confirming, only once the program is complete'
   await expect(controls.getByRole('button', { name: 'Confirmed' })).toBeDisabled()
 })
 
-test('centres the hand below the edge-aligned HUD and keeps short layouts scrollable', async ({ page }) => {
+test('fits the fan below the edge-aligned HUD and keeps short HUDs scrollable', async ({ page }) => {
   const hand = page.getByRole('region', { name: 'Programming hand' })
   const hud = page.getByRole('complementary', { name: 'Game controls' })
 
@@ -426,9 +453,22 @@ test('centres the hand below the edge-aligned HUD and keeps short layouts scroll
     expect(hudBox.y + hudBox.height).toBeLessThanOrEqual(handBox.y)
   }
 
-  expect(await hand.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
+  expect(await hand.evaluate((element) => element.scrollWidth)).toBe(480)
   await openGame(page, 700, 400)
   expect(await hud.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)
+})
+
+test.describe('compact touch hand', () => {
+  test.use({ hasTouch: true, viewport: { width: 375, height: 812 } })
+
+  test('selects a card from its exposed edge', async ({ page }) => {
+    await openGame(page)
+
+    const cards = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
+    await cards.nth(4).tap({ position: { x: 12, y: 20 } })
+    await expect(cards).toHaveCount(8)
+    await expect(page.getByRole('button', { name: 'Turn Left, remove from register 1' })).toBeVisible()
+  })
 })
 
 test('centres registers and cards when space allows', async ({ page }) => {
@@ -483,7 +523,7 @@ test('preserves the selected program after rejection and submits the same ordere
   await expect(done).toBeEnabled()
   expect(await registered.evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')))).toEqual(selectedLabels)
   await expect(registered.first()).toBeEnabled()
-  const hand = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
+  const hand = dealtCards(page)
   await expect(hand.nth(4)).toBeDisabled()
   await expect(hand.nth(0)).toBeEnabled()
 
@@ -534,7 +574,7 @@ test('plays every burst result and starts the next program without refreshing st
   const hand = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
   const registered = page.getByRole('button', { name: /remove from register/ })
   await expect(registered).toHaveCount(5)
-  await expect(hand).toHaveCount(9)
+  await expect(hand).toHaveCount(4)
 
   const angles = ['0deg', '0deg', '-90deg', '-90deg', '-180deg']
   for (const [index, action] of ROUND_ACTIONS.entries()) {
@@ -732,7 +772,7 @@ for (const submitting of [false, true]) {
     expect(await registered.allTextContents()).toEqual(selection)
     for (const card of await registered.all()) await expect(card).toBeDisabled()
     const hand = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
-    await expect(hand).toHaveCount(9)
+    await expect(hand).toHaveCount(4)
     for (const card of await hand.all()) await expect(card).toBeDisabled()
     await expect(page.getByRole('button', { name: submitting ? 'Submitting…' : 'Done', exact: true })).toBeDisabled()
     const snapshot = await game.snapshot()
