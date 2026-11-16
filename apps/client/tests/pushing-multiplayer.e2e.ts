@@ -17,7 +17,10 @@ async function tileOf(page: Page, id: string) {
 
 test.use({
   reducedMotion: 'reduce',
-  gameServiceArgs: [fileURLToPath(new URL('./pushing-server.mjs', import.meta.url))],
+  gameServiceArgs: [
+    '--experimental-test-module-mocks',
+    fileURLToPath(new URL('./pushing-server.mjs', import.meta.url)),
+  ],
 })
 
 test('keeps three clients synchronized through pushing and a fresh snapshot', async ({ browser, page, baseURL }) => {
