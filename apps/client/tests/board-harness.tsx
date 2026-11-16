@@ -1,3 +1,5 @@
+import DraggedCard from '../src/scenes/active-game/components/DraggedCard.tsx'
+import useCardDrag from '../src/scenes/active-game/components/useCardDrag.ts'
 import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import '../src/index.css'
@@ -95,6 +97,15 @@ export default function BoardHarness() {
     hand, registeredCardIds, confirmed, handlePlaceCard, handleRemove,
     handleClearRegisters, handleUndo, handleRedo, handleSubmit, registersAreFilled(registers),
   )
+  const cardDrag = useCardDrag({
+    cards: hand,
+    registers: registers,
+    disabled: confirmed,
+    onPlace: handlePlaceCard,
+    onRemove: handleRemove,
+    onMove: handleMove,
+    onReorder: setHand,
+  })
   return (
     <div className="game">
       <BoardViewport board={DEMO_BOARD} robots={robots} />
@@ -113,8 +124,7 @@ export default function BoardHarness() {
               status="Programming"
               localDeadline={null}
               error={null}
-              onRemove={handleRemove}
-              onMove={handleMove}
+              cardDrag={cardDrag}
               onConfirm={handleSubmit}
             />
           </div>
@@ -125,10 +135,9 @@ export default function BoardHarness() {
           disabled={confirmed}
           highlightedIndex={highlightedIndex}
           onHighlightCard={highlightCard}
-          onSelect={(card) => setRegisters((current) => placeCard(current, card, current.indexOf(null)))}
-          onPlaceCard={handlePlaceCard}
-          onReorder={setHand}
+          cardDrag={cardDrag}
         />
+        {cardDrag.drag && <DraggedCard drag={cardDrag.drag} />}
       </div>
     </div>
   )

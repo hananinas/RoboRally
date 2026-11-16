@@ -4,12 +4,11 @@ import {
   type ProgramCard as Card,
   type Registers,
 } from '../gameState.ts'
-import DraggedCard from './DraggedCard.tsx'
 import Panel from './Panel.tsx'
 import { cardPresentation } from './cardInstructions.ts'
 import ProgramCard from './ProgramCard.tsx'
 import ProgrammingCountdown from './ProgrammingCountdown.tsx'
-import useCardDrag from './useCardDrag.ts'
+import type useCardDrag from './useCardDrag.ts'
 
 type RegisterPanelProps = {
   registers: Registers
@@ -23,8 +22,7 @@ type RegisterPanelProps = {
   status: string
   localDeadline: number | null
   error: string | null
-  onRemove: (registerIndex: number) => void
-  onMove: (fromIndex: number, toIndex: number) => void
+  cardDrag: ReturnType<typeof useCardDrag>
   onConfirm: () => void
 }
 
@@ -95,23 +93,9 @@ function RegisterPanel({
   status,
   localDeadline,
   error,
-  onRemove,
-  onMove,
+  cardDrag: { dragHandlers, isDragging },
   onConfirm,
 }: RegisterPanelProps) {
-  const registerOf = (card: Card) =>
-    registers.findIndex((registeredCard) => registeredCard?.id === card.id)
-  const { drag, dragHandlers, isDragging } = useCardDrag({
-    onTap: (card) => onRemove(registerOf(card)),
-    onDrop: (card, registerIndex) => {
-      const fromIndex = registerOf(card)
-      // Dropped outside every register: take the card out.
-      if (registerIndex === null) onRemove(fromIndex)
-      // Dropped on another register: swap the two cards.
-      else if (registerIndex !== fromIndex) onMove(fromIndex, registerIndex)
-    },
-  })
-
   return (
     <Panel className="register-panel">
       <h2 className="register-panel__heading">Registers</h2>
@@ -137,7 +121,6 @@ function RegisterPanel({
           />
         ))}
       </ol>
-      {drag && <DraggedCard drag={drag} />}
       <button
         className={
           'register-panel__done' +

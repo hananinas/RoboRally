@@ -1,3 +1,5 @@
+import DraggedCard from './components/DraggedCard.tsx'
+import useCardDrag from './components/useCardDrag.ts'
 import { useState } from 'react'
 import './ActiveGame.css'
 import BoardViewport from './components/BoardViewport.tsx'
@@ -85,6 +87,18 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
     hand, registeredCardIds, disabled, handlePlaceCard, handleRemove,
     handleClearRegisters, handleUndo, handleRedo, submit, registersAreFilled(state.registers),
   )
+  const cardDrag = useCardDrag({
+    cards: hand,
+    registers: state.registers,
+    disabled: disabled,
+    onPlace: handlePlaceCard,
+    onRemove: handleRemove,
+    onMove: handleMove,
+    onReorder: (cards) => {
+      setHandOrder({ deal: state.hand, cards })
+      if (highlightedIndex !== null) highlightCard(cards.indexOf(hand[highlightedIndex]))
+    },
+  })
   return (
     <div className="game">
       {state.board && <BoardViewport board={state.board} robots={state.playback.robots} />}
@@ -112,8 +126,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
               error={state.error}
               pendingDelete={pendingDelete}
               awaitingSubmitConfirm={awaitingSubmitConfirm}
-              onRemove={handleRemove}
-              onMove={handleMove}
+              cardDrag={cardDrag}
               onConfirm={submit}
             />
           </div>
@@ -137,18 +150,10 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
             disabled={disabled}
             highlightedIndex={highlightedIndex}
             onHighlightCard={highlightCard}
-            onSelect={(card) => dispatch({
-              type: 'place', cardId: card.id, registerIndex: state.registers.indexOf(null),
-            })}
-            onPlaceCard={handlePlaceCard}
-            onReorder={(cards) => {
-              setHandOrder({ deal: state.hand, cards })
-              if (highlightedIndex !== null) {
-                highlightCard(cards.indexOf(hand[highlightedIndex]))
-              }
-            }}
+            cardDrag={cardDrag}
           />
         )}
+        {cardDrag.drag && <DraggedCard drag={cardDrag.drag} />}
       </div>
       {showWinner && (
         <WinnerPopup

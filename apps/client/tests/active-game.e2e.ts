@@ -389,6 +389,31 @@ test('drags a card out of a register to remove it', async ({ page }) => {
   await expect(handCards.first()).toBeEnabled()
 })
 
+test('opens a moving gap for a register card and returns it to that gap', async ({ page }) => {
+  await openGame(page)
+  await fillProgram(page, [2])
+
+  const hand = page.getByRole('region', { name: 'Programming hand' })
+  const cards = hand.getByRole('button')
+  const source = page.getByRole('button', { name: 'Move 3, remove from register 1' })
+  const first = await cards.first().boundingBox()
+  const last = await cards.last().boundingBox()
+  const register = await source.boundingBox()
+  if (!first || !last || !register) throw new Error('Card positions are unavailable')
+
+  const gap = dealtCards(page).nth(2).locator('..')
+  await page.mouse.move(register.x + register.width / 2, register.y + register.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(first.x + 20, first.y + first.height / 2)
+  await expect(gap).toHaveCSS('z-index', '0')
+  await page.mouse.move(last.x + last.width - 20, last.y + last.height / 2)
+  await expect(gap).toHaveCSS('z-index', '8')
+  await page.mouse.up()
+
+  await expect(cards.last()).toHaveAccessibleName('Move 3')
+  await expect(source).toHaveCount(0)
+})
+
 test('navigates the hand with h/l, wrapping around and skipping registered cards', async ({ page }) => {
   await openGame(page)
   const handCards = dealtCards(page)

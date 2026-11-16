@@ -1,5 +1,5 @@
-import { useState, type MouseEvent, type PointerEvent } from 'react'
-import type { ProgramCard as Card } from '../gameState.ts'
+import { useRef, useState, type MouseEvent, type PointerEvent } from 'react'
+import type { ProgramCard as Card, Registers } from '../gameState.ts'
 import { animateCardTransfer } from './cardMotion.ts'
 
 export type CardDrag = {
@@ -16,9 +16,38 @@ export type CardDrag = {
 }
 
 type CardDragOptions = {
-  onTap: (card: Card) => void
-  onDrop: (card: Card, registerIndex: number | null, handIndex: number | null) => void
-  getHandIndex?: (x: number, y: number) => number | null
+  cards: readonly Card[]
+  registers: Registers
+  disabled: boolean
+  onPlace: (card: Card, registerIndex: number) => void
+  onRemove: (registerIndex: number) => void
+  onMove: (fromIndex: number, toIndex: number) => void
+  onReorder: (cards: readonly Card[]) => void
+}
+
+const handDropMargin = 24
+
+function measureDropZone(hand: HTMLElement, fromRegister: boolean) {
+  const bounds = hand.getBoundingClientRect()
+  const slots = [...hand.querySelectorAll('.programming-hand__slot:not([aria-hidden])')]
+    .map((slot) => slot.getBoundingClientRect())
+  const centers = slots.map((slot) => (slot.left + slot.right) / 2)
+
+  return {
+    left: (slots[0]?.left ?? bounds.left) - handDropMargin,
+    right: (slots.at(-1)?.right ?? bounds.right) + handDropMargin,
+    top: bounds.top - handDropMargin,
+    bottom: bounds.bottom + handDropMargin,
+    boundaries: fromRegister
+      ? centers
+      : centers.slice(1).map((center, index) => (center + centers[index]) / 2),
+  }
+}
+
+function insertCard(cards: readonly Card[], card: Card, index: number) {
+  const reordered = cards.filter((candidate) => candidate.id !== card.id)
+  reordered.splice(index, 0, card)
+  return reordered
 }
 
 const dragThreshold = 4
@@ -35,22 +64,59 @@ function hasMoved(drag: CardDrag, x: number, y: number): boolean {
   return drag.moved || Math.hypot(x - drag.startX, y - drag.startY) >= dragThreshold
 }
 
-function useCardDrag({ onTap, onDrop, getHandIndex }: CardDragOptions) {
+function useCardDrag({ cards, registers, disabled, onPlace, onRemove, onMove, onReorder }: CardDragOptions) {
   const [drag, setDrag] = useState<CardDrag | null>(null)
+  const dropZone = useRef<ReturnType<typeof measureDropZone> | null>(null)
+  const registerOf = (card: Card) => registers.findIndex((registered) => registered?.id === card.id)
+  const available = cards.filter((card) => registerOf(card) === -1)
 
   function dropTarget(x: number, y: number) {
     const overRegister = registerAtPoint(x, y)
-    const handIndex = overRegister === null ? getHandIndex?.(x, y) ?? null : null
+    const zone = dropZone.current
+    const insideHand = zone && x >= zone.left && x <= zone.right && y >= zone.top && y <= zone.bottom
+    const handIndex = overRegister === null && insideHand
+      ? zone.boundaries.filter((boundary) => x >= boundary).length
+      : null
     return { overRegister, handIndex }
+  }
+
+  function onTap(card: Card) {
+    if (disabled) return
+
+    const fromRegister = registerOf(card)
+    if (fromRegister === -1) onPlace(card, registers.indexOf(null))
+    else onRemove(fromRegister)
+  }
+
+  function onDrop(card: Card, registerIndex: number | null, handIndex: number | null) {
+    if (disabled) return
+
+    const fromRegister = registerOf(card)
+    if (registerIndex !== null) {
+      if (fromRegister === -1) onPlace(card, registerIndex)
+      else if (fromRegister !== registerIndex) onMove(fromRegister, registerIndex)
+      return
+    }
+
+    if (fromRegister !== -1) onRemove(fromRegister)
+    if (handIndex === null || !cards.includes(card) || available[handIndex] === card) return
+
+    const reordered = insertCard(available, card, handIndex).values()
+    onReorder(cards.map((candidate) =>
+      candidate.id === card.id || registerOf(candidate) === -1 ? reordered.next().value! : candidate,
+    ))
   }
 
   function startDrag(card: Card, event: PointerEvent<HTMLButtonElement>) {
     if (event.button !== 0 || !event.isPrimary) return
 
+    // Freeze insertion points so the opening gap cannot move its own drop target.
+    const hand = event.currentTarget.closest('.game-overlay')?.querySelector<HTMLElement>('.programming-hand')
+    dropZone.current = hand ? measureDropZone(hand, registerOf(card) !== -1) : null
     const bounds = event.currentTarget.getBoundingClientRect()
     event.currentTarget.setPointerCapture(event.pointerId)
     setDrag({
-      card,
+      card: cards.find((candidate) => candidate.id === card.id) ?? card,
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
@@ -128,7 +194,13 @@ function useCardDrag({ onTap, onDrop, getHandIndex }: CardDragOptions) {
     return drag?.card.id === card.id && drag.moved
   }
 
-  return { drag, dragHandlers, isDragging }
+  const fan = disabled || !drag?.moved
+    ? available
+    : drag.handIndex === null || !cards.includes(drag.card)
+      ? available.filter((card) => card.id !== drag.card.id)
+      : insertCard(available, drag.card, drag.handIndex)
+
+  return { drag, dragHandlers, isDragging, fan }
 }
 
 export default useCardDrag
