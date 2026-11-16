@@ -8,6 +8,7 @@ type ProgrammingHandProps = {
   registeredCardIds: ReadonlySet<string>
   playedCardIds?: ReadonlySet<string>
   disabled: boolean
+  retired?: boolean
   highlightedIndex: number | null
   onHighlightCard: (cardIndex: number) => void
   cardDrag: Pick<ReturnType<typeof useCardDrag>, 'dragHandlers' | 'isDragging' | 'fan'>
@@ -18,6 +19,7 @@ function ProgrammingHand({
   registeredCardIds,
   playedCardIds,
   disabled,
+  retired,
   highlightedIndex,
   onHighlightCard,
   cardDrag: { dragHandlers, isDragging, fan },
@@ -38,6 +40,7 @@ function ProgrammingHand({
     <section
       className="programming-hand"
       aria-label="Programming hand"
+      data-retired={retired || undefined}
       style={{ '--fan-intervals': Math.max(1, lastSlot) } as CSSProperties}
     >
       {cards.map((card, index) => {
@@ -52,6 +55,7 @@ function ProgrammingHand({
             data-outside-fan={slot === -1 || undefined}
             style={{
               zIndex: slot,
+              '--deal-index': Math.max(0, slot),
               '--fan-offset': offset,
               '--fan-angle': `${offset * 3.5}deg`,
               '--fan-drop': `${offset ** 2 * 0.1}rem`,

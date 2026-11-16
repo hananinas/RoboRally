@@ -131,6 +131,32 @@ test('collapses player details from the keyboard', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Health' })).toBeVisible()
 })
 
+test('deals cards in sequence and slides the unused hand off screen after confirmation', async ({ page }) => {
+  await page.addInitScript(() => {
+    document.addEventListener('DOMContentLoaded', () => {
+      const style = document.createElement('style')
+      style.textContent = '.game { --hud-card-motion-duration: 600ms; }'
+      document.head.append(style)
+    })
+  })
+  await openGame(page)
+
+  const hand = page.getByRole('region', { name: 'Programming hand' })
+  const lastSlot = hand.getByRole('button').last().locator('..')
+  await expect(lastSlot).toHaveCSS('transition-delay', '0s, 0s, 0.2s')
+  expect(await lastSlot.evaluate((slot) => slot.getAnimations().some((animation) =>
+    animation instanceof CSSTransition && animation.transitionProperty === 'translate',
+  ))).toBe(true)
+  await expect(lastSlot).toHaveCSS('translate', 'none')
+
+  await fillProgram(page)
+  await page.getByRole('button', { name: 'Done', exact: true }).click()
+  await expect(hand).toHaveAttribute('data-retired', 'true')
+  await expect.poll(() => hand.evaluate((element) =>
+    element.getBoundingClientRect().top >= window.innerHeight,
+  )).toBe(true)
+})
+
 test('lifts a hovered card and closes and reopens the fan around a register change', async ({ page }) => {
   await openGame(page)
 
@@ -165,6 +191,7 @@ test('closes the fan during a drag, reopens it on return, and commits the new or
   const cards = hand.getByRole('button')
   const first = cards.first()
   const last = cards.last()
+  await expect(last.locator('..')).toHaveCSS('translate', 'none')
   const firstBox = await first.boundingBox()
   const lastBox = await last.boundingBox()
   if (!firstBox || !lastBox) throw new Error('Card positions are unavailable')
@@ -269,6 +296,7 @@ test('drags a card into a register and ignores outside drops', async ({
     .getByRole('button')
   const source = handCards.first()
   const target = page.locator('[data-register-index="2"]')
+  await expect(handCards.last().locator('..')).toHaveCSS('translate', 'none')
   const sourceBox = await source.boundingBox()
   const targetBox = await target.boundingBox()
 
@@ -396,6 +424,7 @@ test('opens a moving gap for a register card and returns it to that gap', async 
   const hand = page.getByRole('region', { name: 'Programming hand' })
   const cards = hand.getByRole('button')
   const source = page.getByRole('button', { name: 'Move 3, remove from register 1' })
+  await expect(cards.last().locator('..')).toHaveCSS('translate', 'none')
   const first = await cards.first().boundingBox()
   const last = await cards.last().boundingBox()
   const register = await source.boundingBox()

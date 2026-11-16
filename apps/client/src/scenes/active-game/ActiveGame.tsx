@@ -65,6 +65,8 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
   const handleUndo = () => dispatch({ type: 'undo' })
   const handleRedo = () => dispatch({ type: 'redo' })
   const hasHand = state.handVersion > 0
+  const handRetired = !state.handReady || state.phase !== 'PROGRAMMING' ||
+    state.programmingTimer.status === 'CLOSED' || state.submission === 'accepted'
   const status = getGameStatus(state)
   const disconnectedNames = state.players.filter((player) => !player.connected).map((player) => player.username)
   const { active } = state.playback
@@ -145,6 +147,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
           <ProgrammingHand
             key={state.handVersion}
             cards={hand}
+            retired={handRetired}
             registeredCardIds={registeredCardIds}
             playedCardIds={playedCardIds}
             disabled={disabled}

@@ -305,6 +305,7 @@
   grid-column: 1 / -1;
   grid-row: 2;
   --card-motion: var(--hud-card-motion-duration) var(--hud-card-motion-ease);
+  --hand-travel: calc(var(--hud-hand-height) + 5rem);
 
   container-type: inline-size;
   position: relative;
@@ -312,6 +313,15 @@
   margin-inline: auto;
   width: min(100%, 42rem);
   height: calc(var(--hud-hand-height) + 3rem);
+  transition: translate var(--card-motion);
+}
+
+.programming-hand[data-retired] {
+  translate: 0 var(--hand-travel);
+}
+
+.programming-hand[data-retired] .programming-hand__slot {
+  pointer-events: none;
 }
 
 .programming-hand__slot {
@@ -325,8 +335,17 @@
   transform: translate(calc(var(--fan-offset) * var(--fan-step)), var(--fan-exit-drop, var(--fan-drop)))
     rotate(var(--fan-angle));
   transform-origin: center 85%;
-  transition: transform var(--card-motion), opacity var(--card-motion);
+  transition:
+    transform var(--card-motion),
+    opacity var(--card-motion),
+    translate var(--card-motion) calc(var(--deal-index) * 25ms);
   pointer-events: auto;
+}
+
+@starting-style {
+  .programming-hand:not([data-retired]) .programming-hand__slot {
+    translate: 0 var(--hand-travel);
+  }
 }
 
 .programming-hand__slot[data-outside-fan] {
@@ -520,6 +539,7 @@
     animation: none;
   }
 
+  .programming-hand,
   .programming-hand__slot,
   .programming-hand__slot > .program-card,
   .register__card .program-card__icon,
