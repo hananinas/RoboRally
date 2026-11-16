@@ -215,6 +215,11 @@ test('closes the fan during a drag, reopens it on return, and commits the new or
 test('animates clicked cards between the hand and a register', async ({ page }) => {
   await openGame(page)
 
+  // Keep both transfers on screen long enough to inspect them and change hover.
+  await page.addStyleTag({
+    content: '.game { --hud-card-motion-duration: 1000ms; } .programming-hand__slot > .program-card { transition-duration: 120ms; }',
+  })
+
   const hand = page.getByRole('region', { name: 'Programming hand' })
   const flight = page.locator('.card-transfer')
   const easing = () => flight.evaluate((card) =>
@@ -226,10 +231,6 @@ test('animates clicked cards between the hand and a register', async ({ page }) 
   expect(await easing()).toBe('cubic-bezier(0.24, 0.65, 0.4, 1)')
   await expect(flight).toHaveCount(0)
 
-  // Leave time to change hover while the card is still on its way back.
-  await page.addStyleTag({
-    content: '.game { --hud-card-motion-duration: 1000ms; } .programming-hand__slot > .program-card { transition-duration: 120ms; }',
-  })
   await page.getByRole('button', { name: 'Move 2, remove from register 1' }).click()
   await expect(flight).toHaveClass(/program-card--hand/)
   expect(await easing()).toBe('cubic-bezier(0.24, 0.65, 0.4, 1)')
