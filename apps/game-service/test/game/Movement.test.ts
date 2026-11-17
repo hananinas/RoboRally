@@ -132,7 +132,7 @@ describe('shared gameplay movement', () => {
     expect(game.currentRegister).toBe(0)
   })
 
-  it('still executes a pushed robot\'s own pending card after it reboots mid-register', () => {
+  it('never executes a pushed robot\'s pending cards after it reboots mid-register', () => {
     const tiles = [[new EmptyTile(), new EmptyTile(), new EmptyTile(), new PitTile(), new EmptyTile()]]
     const reboot = { x: Integer(4), y: Integer(0) }
     const board = new Board(withRebootTiles(tiles, reboot), { x: Integer(0), y: Integer(0), angle: 0 })
@@ -158,20 +158,19 @@ describe('shared gameplay movement', () => {
 
     const pushResult = resolveRobotAction(game)
     expect(pushResult.pushedRobots).toEqual([{ robotId: bystander.robot.id, position: reboot, direction: Direction.EAST }])
+    expect(pushResult.reboots).toEqual([{ robotId: bystander.robot.id, fellAt: { x: 3, y: 0 }, landedAt: reboot }])
     expect(board.positionOf(bystander.robot.id)).toEqual(reboot)
-
-    const ownAction = resolveRobotAction(game)
-    expect(ownAction.action.robotId).toBe(bystander.robot.id)
-    expect(ownAction.action.card).toBe(bystanderProgram[0])
-    expect(ownAction.action.position).toEqual(reboot)
+    expect(bystander.robot.program).toEqual([])
     expect(game.currentRegister).toBe(1)
-    expect(bystander.robot.program).toEqual(bystanderProgram)
 
-    const register1Actions = [resolveRobotAction(game), resolveRobotAction(game)]
-    const bystanderAction = register1Actions.find((result) => result.action.robotId === bystander.robot.id)
-    expect(bystanderAction?.registerIndex).toBe(1)
-    expect(bystanderAction?.action.card).toBe(bystanderProgram[1])
-    expect(bystanderAction?.action.position).toEqual(reboot)
-    expect(game.currentRegister).toBe(2)
+    // The rebooted robot is out of the priority order, so only the mover resolves the rest of the round.
+    const remaining = Array.from({ length: 4 }, () => resolveRobotAction(game))
+    expect(remaining.map(({ registerIndex, action }) => [registerIndex, action.robotId, action.card]))
+      .toEqual([1, 2, 3, 4].map((registerIndex) => [registerIndex, mover.robot.id, moverProgram[registerIndex]]))
+    expect(remaining.map(({ roundConcluded }) => roundConcluded)).toEqual([false, false, false, true])
+    expect(board.positionOf(bystander.robot.id)).toEqual(reboot)
+    expect(bystander.robot.direction).toBe(Direction.EAST)
+    expect(bystander.hand).toEqual(expect.arrayContaining(bystanderProgram))
+    expect(game.lastActivePhase).toBe('programming')
   })
 })
