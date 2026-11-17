@@ -34,6 +34,8 @@ channels:
         $ref: '#/components/messages/LeaveGame'
       submitProgram:
         $ref: '#/components/messages/SubmitProgram'
+      chooseCardAction:
+        $ref: '#/components/messages/ChooseCardAction'
       updateRegisters:
         $ref: '#/components/messages/UpdateRegisters'
       getClock:
@@ -122,6 +124,13 @@ channels:
       result:
         $ref: '#/components/messages/UpdateRegistersResult'
 
+  cardChoiceReplies:
+    address: null
+    description: Delivered through the acknowledgement of card.choose.
+    messages:
+      result:
+        $ref: '#/components/messages/CardChoiceResult'
+
   player:
     address: 'game:{gameId}:player:{playerId}'
     parameters:
@@ -149,6 +158,8 @@ channels:
         $ref: '#/components/messages/ProgramSubmitted'
       programTimerChanged:
         $ref: '#/components/messages/ProgramTimerChanged'
+      cardChoiceChanged:
+        $ref: '#/components/messages/CardChoiceChanged'
       robotActionResolved:
         $ref: '#/components/messages/RobotActionResolved'
       environmentStepResolved:
@@ -338,6 +349,20 @@ operations:
         $ref: '#/channels/clockReplies'
       messages:
         - $ref: '#/channels/clockReplies/messages/result'
+      x-socketio:
+        acknowledgement: true
+
+  handleCardChoice:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/chooseCardAction'
+    reply:
+      channel:
+        $ref: '#/channels/cardChoiceReplies'
+      messages:
+        - $ref: '#/channels/cardChoiceReplies/messages/result'
       x-socketio:
         acknowledgement: true
 
@@ -766,6 +791,53 @@ components:
               - id: 00000000-0000-4000-8000-000000000111
                 instruction: BACK_UP
 
+    ChooseCardAction:
+      name: card.choose
+      description: >-
+        The authenticated owner answers the current pending decision. The unique
+        choiceId prevents duplicate and late submissions from executing another action.
+      payload:
+        type: object
+        additionalProperties: false
+        required: [choiceId, instruction]
+        properties:
+          choiceId:
+            type: string
+            format: uuid
+          instruction:
+            $ref: '#/components/schemas/ResolvedInstruction'
+
+    CardChoiceResult:
+      name: card.chooseResult
+      description: >-
+        Socket.IO acknowledgement. ACCEPTED stores the selection for execution.
+        INVALID_CHOICE rejects a wrong owner, stale ID, unavailable action or duplicate.
+        Missing acknowledgement leaves the result unknown; restore with session.get.
+      payload:
+        type: object
+        additionalProperties: false
+        required: [outcome]
+        properties:
+          outcome:
+            type: string
+            enum: [ACCEPTED, INVALID_REQUEST, NOT_A_MEMBER, INVALID_CHOICE, GAME_PAUSED, GAME_ABORTED, GAME_FINISHED, WRONG_PHASE, INTERNAL_ERROR]
+
+    CardChoiceChanged:
+      name: card.choiceChanged
+      description: >-
+        Public event announcing the current interactive card and choices. A null
+        choice clears the pending decision before its resolved action is broadcast.
+      payload:
+        type: object
+        required: [gameId, choice]
+        properties:
+          gameId:
+            $ref: '#/components/schemas/GameId'
+          choice:
+            oneOf:
+              - $ref: '#/components/schemas/PendingCardChoice'
+              - type: 'null'
+
     ProgramTimerChanged:
       name: program.timerChanged
       description: >-
@@ -818,9 +890,8 @@ components:
           instruction:
             $ref: "#/components/schemas/Instruction"
           resolvedInstruction:
-            description: What the register actually did. Differs from instruction for AGAIN, which repeats the previous register's resolved instruction. Null when AGAIN had nothing to repeat.
-            oneOf:
-              - $ref: "#/components/schemas/Instruction"
+            description: Concrete movement or rotation selected or repeated by the card; null when a repeat has nothing to repeat.
+              - $ref: "#/components/schemas/ResolvedInstruction"
               - type: 'null'
           position:
             $ref: "#/components/schemas/Position"
@@ -1474,6 +1545,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PlayerState"
+        pendingChoice:
+          $ref: '#/components/schemas/PendingCardChoice'
         paused:
           type: boolean
           description: Whether gameplay is paused because a game member is disconnected.
@@ -1641,9 +1714,34 @@ components:
       type: string
       format: uuid
 
+    ResolvedInstruction:
+      type: string
+      enum: [MOVE_1, MOVE_2, MOVE_3, BACK_UP, TURN_LEFT, TURN_RIGHT, U_TURN]
+
+    PendingCardChoice:
+      type: object
+      required: [choiceId, playerId, registerIndex, instruction, options]
+      properties:
+        choiceId:
+          type: string
+          format: uuid
+        playerId:
+          $ref: '#/components/schemas/PlayerId'
+        registerIndex:
+          type: integer
+          minimum: 0
+          maximum: 4
+        instruction:
+          type: string
+          enum: [SANDBOX_ROUTINE, WEASEL_ROUTINE]
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResolvedInstruction'
+
     Instruction:
       type: string
-      enum: [ MOVE_1, MOVE_2, MOVE_3, BACK_UP, TURN_LEFT, TURN_RIGHT, U_TURN, AGAIN ]
+      enum: [ MOVE_1, MOVE_2, MOVE_3, BACK_UP, TURN_LEFT, TURN_RIGHT, U_TURN, AGAIN, SANDBOX_ROUTINE, WEASEL_ROUTINE, SPEED_ROUTINE, REPEAT_ROUTINE ]
 
     Card:
       type: object

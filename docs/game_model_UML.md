@@ -166,6 +166,33 @@ The client keeps labels and icons in one presentation map and uses the shared ef
 
 A Player's hand and Game's deck are unordered Card collections. A Robot's program is an ordered list of five Cards. These are properties, not separate classes.
 
+## Special programming cards
+
+Sandbox Routine, Weasel Routine, Speed Routine and Repeat Routine are supported.
+Energy Routine and SPAM Folder remain deferred until energy and damage support is available.
+
+| Card | Resolution |
+| --- | --- |
+| Sandbox Routine | The owner chooses Move 1, Move 2, Move 3, Back Up, Turn Left, Turn Right or U-Turn during activation. |
+| Weasel Routine | The owner chooses Turn Left, Turn Right or U-Turn during activation. |
+| Speed Routine | Resolves as the existing Move 3 action. |
+| Repeat Routine | Reuses Again's history of the previous register's resolved action, including choices made for an interactive card. |
+
+An interactive action reveals its card and creates one uniquely identified pending decision.
+Activation stops before moving the robot, advancing the register, activating board elements,
+or allowing the next robot to act. Only the owning player can supply an allowed action.
+Once accepted, the existing movement/rotation path executes the chosen action, including
+pushing, walls and pit reboots. Clients animate its concrete resolved instruction.
+
+Repeat Routine uses the current Again convention: no action in the first register.
+It repeats the already selected movement or turn after an interactive card, without a new
+choice. Damage-card and multiple-card upgrade exceptions remain deferred with those features.
+
+Until upgrade acquisition is implemented, newly created lobby games include one copy of
+each supported special card in every player's private deck. The default standard-deck
+helper remains unchanged unless special cards are explicitly requested. This temporary
+availability rule differs from the rulebook's upgrade acquisition rule.
+
 # Direction
 
 Enum of `NORTH`, `EAST`, `SOUTH`, and `WEST` (cardinal indicating global/non-local directions). `Robot.direction` indicates where it faces (therefore a direction rather than an orientation). `Tile.walls` is a set of Directions indicating which sides have walls. Board checks both sides of a tile boundary when moving a robot or tracing a laser.
