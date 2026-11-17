@@ -1,6 +1,6 @@
 import { handleListLobbies, handleCreateLobby, handleJoinLobby, handleLeaveLobby, handleStartLobby } from '@/socket/handlers/lobbyHandlers'
 import { handleGetSession, handleLeaveGame, handleDisconnectSession, handleSessionProgram, handleSessionRegisters, recoverSession, validateRecoveredSession } from '@/socket/handlers/sessionHandlers'
-import type { SessionContext } from '@/socket/sessionContext'
+import { MembershipRegistry } from '@/membership/MembershipRegistry'
 import type { Server as HttpServer } from 'node:http'
 import { emptyRequestSchema } from '@robo-rally/game-events'
 import type {
@@ -23,6 +23,8 @@ export type GameSocketServer = Server<
 >
 
 export type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents, {}, GameSocketData>
+
+export type SocketContext = { io: GameSocketServer; registry: MembershipRegistry }
 
 function authenticateSocket(sessionStore: SessionStore, socket: GameSocket, next: (error?: Error) => void): void {
   const cookies = parseCookie(socket.handshake.headers.cookie ?? '')
@@ -70,10 +72,8 @@ export function createGameSocketServer(
     pingTimeout: 1000,
     adapter: createAuthGatedAdapter(sessionStore),
   })
-  const context: SessionContext = {
-    io, games: new Map(), lobbies: new Map(), sessionsByUser: new Map(),
-  }
-  httpServer.once('close', () => { for (const ctx of context.games.values()) ctx.actionScheduler.stop() })
+  const context: SocketContext = { io, registry: new MembershipRegistry() }
+  httpServer.once('close', () => { for (const ctx of context.registry.games) ctx.actionScheduler.stop() })
 
   io.use((socket, next) => authenticateSocket(sessionStore, socket, next))
 
