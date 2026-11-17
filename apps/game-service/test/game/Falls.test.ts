@@ -46,9 +46,10 @@ describe('board-edge falls', () => {
     expect(board.occupantAt(start)).toBeUndefined()
     expect(board.occupantAt(outside)).toBeUndefined()
     expect(board.occupantAt(reboot)).toBe(robot.id)
-    expect(robot.program).toEqual(program)
-    expect(player.hand).toEqual([])
-    expect(game.currentRegister).toBe(1)
+    expect(robot.program).toEqual([])
+    expect(player.hand).toEqual(expect.arrayContaining([...program]))
+    expect(game.lastActivePhase).toBe('programming')
+    expect(game.currentRegister).toBe(0)
   })
 
   it.each(edges)('does not fall through a wall on the $direction edge', ({ direction, start, outside }) => {
@@ -72,7 +73,7 @@ describe('board-edge falls', () => {
     { instruction: 'MOVE_3', x: 3 },
     { instruction: 'MOVE_3', x: 4 },
     { instruction: 'BACK_UP', x: 4 },
-  ] as const)('reboots during $instruction from column $x and discards remaining steps', ({ instruction, x }) => {
+  ] as const)('reboots during $instruction from column $x and cancels the rest of the round', ({ instruction, x }) => {
     const start = { x: Integer(x), y: Integer(2) }
     const { board, robot, player, program, reboot, game } = createGame(instruction, start)
     const direction = robot.direction
@@ -84,20 +85,18 @@ describe('board-edge falls', () => {
       registerIndex: 0,
       pushedRobots: [],
       action: { robotId: robot.id, card: program[0], position: reboot, direction },
+      roundConcluded: true,
     })
     expect(board.positionOf(robot.id)).toEqual(reboot)
     expect(board.occupantAt(start)).toBeUndefined()
     expect(robot.direction).toBe(direction)
-    expect(robot.program).toEqual(program)
-    expect(player.hand).toEqual([])
+    expect(robot.program).toEqual([])
+    expect(player.hand).toHaveLength(program.length)
+    expect(player.hand).toEqual(expect.arrayContaining([...program]))
     expect(player.lastCheckpoint).toBe(1)
-    expect(game.currentRegister).toBe(1)
-    expect(game.lastActivePhase).toBe('activation')
-
-    expect(resolveRobotAction(game).action.card).toBe(program[1])
-    expect(board.positionOf(robot.id)).toEqual(reboot)
-    expect(robot.program).toEqual(program)
-    expect(game.currentRegister).toBe(2)
+    expect(game.currentRegister).toBe(0)
+    expect(game.lastActivePhase).toBe('programming')
+    expect(() => game.executeNextAction()).toThrow()
   })
 
   it('can reboot onto the only safe square after vacating it', () => {
@@ -109,11 +108,14 @@ describe('board-edge falls', () => {
     const game = createTestGame({ board, players: [player], deck: program })
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
-    for (let register = 0; register < 5; register++) {
-      expect(resolveRobotAction(game).action.position).toEqual(reboot)
-      expect(board.occupantAt(reboot)).toBe(robot.id)
-      expect(robot.direction).toBe(Direction.WEST)
-    }
+    const result = resolveRobotAction(game)
+
+    expect(result.action.position).toEqual(reboot)
+    expect(result.roundConcluded).toBe(true)
+    expect(board.occupantAt(reboot)).toBe(robot.id)
+    expect(robot.direction).toBe(Direction.WEST)
+    expect(robot.program).toEqual([])
     expect(game.lastActivePhase).toBe('programming')
+    expect(() => game.executeNextAction()).toThrow()
   })
 })

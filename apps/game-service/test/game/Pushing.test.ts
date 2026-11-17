@@ -186,21 +186,27 @@ describe('robot pushing', () => {
     expect(board.occupantAt(reboot)).toBeUndefined()
   })
 
-  it('executes a pushed robot\'s pending card from its reboot destination', () => {
+  it('never lets a robot pushed into a pit act again in the same round', () => {
     const tiles = grid()
     tiles[3][3] = new PitTile()
     const { board, players, robots, cards, reboot, game } = createGame([position(1), position(2)], tiles)
-    const program = cards.slice(0, 5)
+    const program = (['MOVE_1', 'TURN_LEFT', 'TURN_RIGHT', 'BACK_UP', 'U_TURN'] as const)
+      .map((instruction) => cards.find((card) => card.instruction === instruction)!)
     for (const player of players) game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
     expect(resolveRobotAction(game).action.robotId).toBe(robots[0].id)
     expect(board.positionOf(robots[1].id)).toEqual(reboot)
-    expect(robots[1].program).toEqual(program)
-    expect(game.currentRegister).toBe(0)
-    expect(resolveRobotAction(game).action).toMatchObject({
-      robotId: robots[1].id, card: program[0], position: position(0, 4), direction: Direction.NORTH,
-    })
-    expect(game.currentRegister).toBe(1)
+    expect(robots[1].program).toEqual([])
+    expect(players[1].registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'HIDDEN' })))
+
+    const remaining = Array.from({ length: 4 }, () => resolveRobotAction(game))
+
+    expect(remaining.map(({ registerIndex, action }) => [registerIndex, action.robotId])).toEqual(
+      [1, 2, 3, 4].map((registerIndex) => [registerIndex, robots[0].id]),
+    )
+    expect(remaining.map(({ roundConcluded }) => roundConcluded)).toEqual([false, false, false, true])
+    expect(game.lastActivePhase).toBe('programming')
+    expect(() => game.executeNextAction()).toThrow()
   })
 
   it('can push a robot again immediately after it has rebooted', () => {
@@ -227,19 +233,21 @@ describe('robot pushing', () => {
     game.submitProgram(mover.id, moverDeck.map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(bystander.id, bystanderDeck.map((card) => card.id))._unsafeUnwrap()
 
-    resolveRobotAction(game)
-    resolveRobotAction(game)
+    // The pushed robot reboots and is cancelled, so only the mover acts for the rest of the round.
+    expect(resolveRobotAction(game).reboots).toEqual([
+      { robotId: bystander.robot.id, fellAt: position(3), landedAt: position(2, 2) },
+    ])
     expect(board.positionOf(mover.robot.id)).toEqual(position(2))
     expect(board.positionOf(bystander.robot.id)).toEqual(position(2, 2))
 
-    resolveRobotAction(game)
-    resolveRobotAction(game)
-    resolveRobotAction(game)
-    resolveRobotAction(game)
+    expect(resolveRobotAction(game).action).toMatchObject({ robotId: mover.robot.id, card: moverDeck[1] })
+    expect(resolveRobotAction(game).action).toMatchObject({ robotId: mover.robot.id, card: moverDeck[2] })
 
     expect(board.positionOf(mover.robot.id)).toEqual(position(2, 2))
     expect(board.positionOf(bystander.robot.id)).toEqual(position(2, 1))
     expect(bystander.robot.direction).toBe(Direction.NORTH)
+    expect(resolveRobotAction(game).action.robotId).toBe(mover.robot.id)
+    expect(resolveRobotAction(game).roundConcluded).toBe(true)
   })
 
   it('can push a robot that already acted without activating it again', () => {
