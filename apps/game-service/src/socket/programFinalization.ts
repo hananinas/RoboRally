@@ -1,7 +1,7 @@
 import type { ProgramFinalized } from '@robo-rally/game-events'
 import type { CompletedProgram } from '@/game/index'
 import { presentProgramFinalized } from '@/socket/gamePresenter'
-import type { MembershipContext } from '@/socket/handlers/membershipHandlers'
+import type { MembershipContext } from '@/socket/gameMembership'
 
 export function publishProgramFinalized(
   { io, game, publicRoom, playerRoom }: Pick<MembershipContext, 'io' | 'game' | 'publicRoom' | 'playerRoom'>,

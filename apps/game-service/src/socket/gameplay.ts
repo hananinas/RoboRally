@@ -13,7 +13,7 @@ import { withAcknowledgeOnce } from '@/socket/utilities/acknowledgeOnce'
 import type { Player } from '@/game/index'
 import type { GameSocket } from '@/socket/gameServer'
 import { logError, logWarn } from '@/logger'
-import { ownedMembership, type MembershipContext } from '@/socket/handlers/membershipHandlers'
+import { ownedMembership, type MembershipContext } from '@/socket/gameMembership'
 import { toRejection, type Rejection } from '@/socket/utilities/rejection'
 import { publishProgramFinalized } from '@/socket/programFinalization'
 

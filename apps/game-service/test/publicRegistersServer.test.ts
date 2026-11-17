@@ -11,7 +11,7 @@ import * as actionScheduler from '@/actionScheduler'
 import type { Game } from '@/game/Game'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
 import * as gameContext from '@/socket/gameContext'
-import { handleUpdateRegisters } from '@/socket/handlers/gameplayHandlers'
+import { handleUpdateRegisters } from '@/socket/gameplay'
 import { createSessionStore, type SessionStore } from '@/auth/sessionStore'
 import { authCookieHeader } from './authTestHelper.ts'
 
@@ -78,7 +78,7 @@ describe('public registers over Socket.IO', () => {
   }
 
   async function snapshot(client: Client): Promise<GameInitialization> {
-    const result = await client.timeout(1000).emitWithAck('session.get', {})
+    const result = await client.timeout(1000).emitWithAck('membership.get', {})
     if (result.outcome !== 'IN_GAME') throw new Error(result.outcome)
     return result.initialization
   }
@@ -231,7 +231,7 @@ describe('public registers over Socket.IO', () => {
       { status: 'EMPTY' }, { status: 'EMPTY' },
     ])
     expect(await raw(duplicate, update(a))).toEqual({ outcome: 'NOT_A_MEMBER' })
-    expect(await duplicate.timeout(1000).emitWithAck('session.get', {})).toEqual({ outcome: 'USER_ALREADY_IN_SESSION' })
+    expect(await duplicate.timeout(1000).emitWithAck('membership.get', {})).toEqual({ outcome: 'ALREADY_HAS_MEMBERSHIP' })
     expect((await snapshot(first)).state.players.map((player) => player.registers)).toEqual([empty, empty])
     expect(events).toEqual([])
     expect(await first.timeout(1000).emitWithAck('program.submit', {
@@ -278,8 +278,8 @@ describe('public registers over Socket.IO', () => {
     expect(await raw(returning, update(a))).toEqual({ outcome: 'NOT_A_MEMBER' })
     expect(await raw(second, update(b))).toEqual({ outcome: 'ACCEPTED' })
     await snapshot(second)
-    expect(await returning.timeout(1000).emitWithAck('session.get', {})).toEqual({
-      outcome: 'NO_SESSION', user: { userId: 'Returning', username: 'Returning' },
+    expect(await returning.timeout(1000).emitWithAck('membership.get', {})).toEqual({
+      outcome: 'NO_MEMBERSHIP', user: { userId: 'Returning', username: 'Returning' },
     })
     expect(departedEvents).toEqual([])
   })
@@ -438,7 +438,7 @@ describe('public registers over Socket.IO', () => {
     await snapshot(first)
     await snapshot(second)
     expect(result).toEqual({ outcome })
-    expect(acknowledgementIds).toHaveLength(2) // Command ACK, then the session.get barrier ACK.
+    expect(acknowledgementIds).toHaveLength(2) // Command ACK, then the membership.get barrier ACK.
     expect(new Set(acknowledgementIds).size).toBe(2)
     expect(events).toEqual([])
     expect(game.players.map((player) => player.registers)).toEqual(before)
@@ -477,7 +477,7 @@ describe('public registers over Socket.IO', () => {
       { status: 'REVEALED', instruction: action.instruction },
       { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' },
     ])
-    // session.get resumes a game with no disconnected members; activation still rejects edits.
+    // membership.get resumes a game with no disconnected members; activation still rejects edits.
     expect(executed.state.paused).toBe(false)
     expect(await raw(first, update(a))).toEqual({ outcome: 'WRONG_PHASE' })
     await disconnect(returning)

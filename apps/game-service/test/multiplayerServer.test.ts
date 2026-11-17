@@ -47,7 +47,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
     const robotIds = players.map((player) => player.robot.id)
 
     for (const socket of clients) {
-      await socket.timeout(1000).emitWithAck('session.get', {})
+      await socket.timeout(1000).emitWithAck('membership.get', {})
     }
     events[0] = []
     events[1] = []
@@ -60,7 +60,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
         .toEqual({ outcome: 'ACCEPTED' })
       // Session acknowledgements fence each connection's earlier deliveries.
       for (const socket of clients) {
-        const waiting = await socket.timeout(1000).emitWithAck('session.get', {})
+        const waiting = await socket.timeout(1000).emitWithAck('membership.get', {})
         expect(waiting).toMatchObject({ outcome: 'IN_GAME', initialization: { state: { phase: 'PROGRAMMING' } } })
       }
       expect(events[0].map((event) => event.name)).toEqual(['program.submitted'])

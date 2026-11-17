@@ -5,7 +5,7 @@ import { createActionScheduler } from '@/actionScheduler'
 import { createProgrammingTimer } from '@/programmingTimer'
 import { publishProgramFinalized } from '@/socket/programFinalization'
 import { logError } from '@/logger'
-import type { GameMembership, MembershipContext } from '@/socket/handlers/membershipHandlers'
+import type { GameMembership, MembershipContext } from '@/socket/gameMembership'
 
 export function createGameContext(io: GameSocketServer, game: Game): MembershipContext {
   const publicRoom = `game:${game.id}:public`

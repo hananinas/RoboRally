@@ -54,7 +54,7 @@ describe('started game membership over Socket.IO', () => {
     return client
   }
   async function getSnapshot(client: Client): Promise<GameInitialization> {
-    const result = await client.emitWithAck('session.get', {})
+    const result = await client.emitWithAck('membership.get', {})
     if (result.outcome !== 'IN_GAME') throw new Error(result.outcome)
     return result.initialization
   }
@@ -105,14 +105,14 @@ describe('started game membership over Socket.IO', () => {
     expect(await client.emitWithAck('clock.get', {})).toEqual({ outcome: 'CLOCK', serverTime: now })
     clock.mockReturnValue(now + 100)
     expect(await client.emitWithAck('clock.get', {})).toEqual({ outcome: 'CLOCK', serverTime: now + 100 })
-    expect((await client.emitWithAck('session.get', {})).outcome).toBe('NO_SESSION')
+    expect((await client.emitWithAck('membership.get', {})).outcome).toBe('NO_MEMBERSHIP')
     expect(broadcasts).toEqual([])
   })
 
   it('rejects malformed session requests and starts with no session', async () => {
     const client = await connect('Dane')
-    expect(await raw(client, 'session.get', { gameId: 'irrelevant' })).toEqual({ outcome: 'INVALID_REQUEST' })
-    expect(await client.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION', user: { userId: 'Dane', username: 'Dane' } })
+    expect(await raw(client, 'membership.get', { gameId: 'irrelevant' })).toEqual({ outcome: 'INVALID_REQUEST' })
+    expect(await client.emitWithAck('membership.get', {})).toEqual({ outcome: 'NO_MEMBERSHIP', user: { userId: 'Dane', username: 'Dane' } })
     expect(server.sockets.sockets.get(client.id!)!.rooms).toEqual(new Set([client.id]))
   })
   it('returns the same assignment and hand on repeated session discovery', async () => {
@@ -139,7 +139,7 @@ describe('started game membership over Socket.IO', () => {
     expect(await left).toEqual({ gameId: game.id, playerId: initial.assignment.playerId, robotId: initial.assignment.robotId })
     expect(game.board.occupantAt({ x: Integer(10), y: Integer(7) })).toBeUndefined()
     expect(server.sockets.sockets.get(first.id!)!.rooms).toEqual(new Set([first.id]))
-    expect(await first.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION', user: { userId: 'First', username: 'First' } })
+    expect(await first.emitWithAck('membership.get', {})).toEqual({ outcome: 'NO_MEMBERSHIP', user: { userId: 'First', username: 'First' } })
     expect(await first.emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'NOT_A_MEMBER' })
   })
   it('completes the programming barrier when an unsubmitted member leaves', async () => {
@@ -174,7 +174,7 @@ describe('started game membership over Socket.IO', () => {
     const restoredSecond = await getSnapshot(returnedSecond)
     expect(restoredSecond.assignment).toEqual(other.assignment)
     expect(restoredSecond.state.paused).toBe(false)
-    await witness.emitWithAck('session.get', {})
+    await witness.emitWithAck('membership.get', {})
     expect(changed.map((event) => [event.connected, event.paused])).toEqual([[false, true], [false, true], [true, true], [true, false]])
     expect(await witness.emitWithAck('program.submit', submission(observer))).toEqual({ outcome: 'ACCEPTED' })
   })
@@ -309,7 +309,7 @@ describe('started game membership over Socket.IO', () => {
     await disconnect(first)
     const replacement = await connect('First')
     vi.spyOn(game.board, 'getTile').mockImplementationOnce(() => { throw new Error('Snapshot failed') })
-    expect(await replacement.emitWithAck('session.get', {})).toEqual({ outcome: 'INTERNAL_ERROR' })
+    expect(await replacement.emitWithAck('membership.get', {})).toEqual({ outcome: 'INTERNAL_ERROR' })
     expect(game.paused).toBe(true)
     expect(server.sockets.sockets.get(replacement.id!)!.rooms).toEqual(new Set([replacement.id]))
     expect((await getSnapshot(replacement)).assignment).toEqual(initial.assignment)
@@ -395,7 +395,7 @@ describe('started game membership over Socket.IO', () => {
     emit('lobby.create', {})
     emit('program.submit', {})
     emit('game.updateRegisters', {})
-    expect(await client.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION', user: { userId: 'Abid', username: 'Abid' } })
+    expect(await client.emitWithAck('membership.get', {})).toEqual({ outcome: 'NO_MEMBERSHIP', user: { userId: 'Abid', username: 'Abid' } })
     expect(contexts.mock.results).toHaveLength(0)
   })
   it('aborts the game permanently on an unexpected execution failure, still tells (re)joining members, and still allows leaving', async () => {
@@ -514,7 +514,7 @@ describe('started game membership over Socket.IO', () => {
         position: actions[4].position,
       }])
       expect(game.board.occupantAt({ x: Integer(3), y: Integer(3) })).toBeUndefined()
-      await outsider.timeout(1000).emitWithAck('session.get', {})
+      await outsider.timeout(1000).emitWithAck('membership.get', {})
       expect(outsideEvents).not.toHaveBeenCalled()
 
       await disconnect(client)

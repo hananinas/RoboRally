@@ -1,5 +1,5 @@
 import { handleListLobbies, handleCreateLobby, handleJoinLobby, handleLeaveLobby, handleStartLobby } from '@/socket/handlers/lobbyHandlers'
-import { handleGetSession, handleLeaveGame, handleDisconnectSession, handleSessionProgram, handleSessionRegisters, recoverSession, validateRecoveredSession } from '@/socket/handlers/sessionHandlers'
+import { handleGetMembership, handleLeaveGame, handleSocketDisconnect, handleCurrentGameProgram, handleCurrentGameRegisters, recoverSocketSession, validateSocketSession } from '@/socket/handlers/membershipHandlers'
 import { MembershipRegistry } from '@/membership/MembershipRegistry'
 import type { Server as HttpServer } from 'node:http'
 import { emptyRequestSchema } from '@robo-rally/game-events'
@@ -77,12 +77,12 @@ export function createGameSocketServer(
 
   io.use((socket, next) => authenticateSocket(sessionStore, socket, next))
 
-  io.use((socket, next) => validateRecoveredSession(context, socket, next))
+  io.use((socket, next) => validateSocketSession(context, socket, next))
 
   io.on('connection', (socket) => {
     socket.use((_event, next) => rejectExpiredSession(sessionStore, socket, next))
 
-    recoverSession(context, socket)
+    recoverSocketSession(context, socket)
 
     socket.on('clock.get', (payload, ack) => {
       if (typeof ack !== 'function') return
@@ -95,12 +95,12 @@ export function createGameSocketServer(
     socket.on('lobby.join', (payload, ack) => handleJoinLobby(context, socket, payload, ack))
     socket.on('lobby.leave', (payload, ack) => handleLeaveLobby(context, socket, payload, ack))
     socket.on('lobby.start', (payload, ack) => handleStartLobby(context, socket, payload, ack))
-    socket.on('session.get', (payload, ack) => handleGetSession(context, socket, payload, ack))
+    socket.on('membership.get', (payload, ack) => handleGetMembership(context, socket, payload, ack))
 
     socket.on('game.leave', (payload, ack) => handleLeaveGame(context, socket, payload, ack))
-    socket.on('disconnect', () => handleDisconnectSession(context, socket))
-    socket.on('program.submit', (payload, ack) => handleSessionProgram(context, socket, payload, ack))
-    socket.on('game.updateRegisters', (payload, ack) => handleSessionRegisters(context, socket, payload, ack))
+    socket.on('disconnect', () => handleSocketDisconnect(context, socket))
+    socket.on('program.submit', (payload, ack) => handleCurrentGameProgram(context, socket, payload, ack))
+    socket.on('game.updateRegisters', (payload, ack) => handleCurrentGameRegisters(context, socket, payload, ack))
   })
 
   return io

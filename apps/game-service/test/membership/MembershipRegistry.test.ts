@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { User } from '@robo-rally/game-events'
-import type { MembershipContext } from '@/socket/handlers/membershipHandlers'
+import type { MembershipContext } from '@/socket/gameMembership'
 import { Lobby } from '@/membership/Lobby'
 import { MembershipRegistry } from '@/membership/MembershipRegistry'
 

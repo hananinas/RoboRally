@@ -1,7 +1,7 @@
 import { err, ok, type Result } from 'neverthrow'
 import type { Player } from '@/game/Player'
 import { Lobby } from '@/membership/Lobby'
-import { withSessionRequest } from '@/socket/utilities/withSessionRequest'
+import { withValidatedRequest } from '@/socket/utilities/withValidatedRequest'
 import { ROBOT_COLOURS } from '@/game/Robot'
 import { boardMaps, type BoardMapName } from '@/game/boardMaps'
 import { createGame } from '@/game/GameFactory'
@@ -11,7 +11,7 @@ import {
   type LobbyListResult, type LobbyJoinResult, type LobbyLeaveResult, type LobbyStartResult,
 } from '@robo-rally/game-events'
 import { createGameContext } from '@/socket/gameContext'
-import { presentInitialization, type MembershipContext } from '@/socket/handlers/membershipHandlers'
+import { presentInitialization, type MembershipContext } from '@/socket/gameMembership'
 import type { GameSocket, SocketContext } from '@/socket/gameServer'
 
 const lobbyRoom = (id: string) => `lobby:${id}`
@@ -62,7 +62,7 @@ export function handleListLobbies(
   payload: EmptyRequest,
   acknowledge: (result: LobbyListResult) => void,
 ): void {
-  withSessionRequest(socket, 'lobby.list', emptyRequestSchema, payload, acknowledge, (_user, ack) => {
+  withValidatedRequest(socket, 'lobby.list', emptyRequestSchema, payload, acknowledge, (_user, ack) => {
     ack({
       outcome: 'LOBBIES_FOUND',
       maps: presentBoardMaps(),
@@ -80,7 +80,7 @@ export function handleCreateLobby(
   payload: CreateLobbyRequest,
   acknowledge: (result: LobbyJoinResult) => void,
 ): void {
-  withSessionRequest(socket, 'lobby.create', createLobbyRequestSchema, payload, acknowledge, (user, ack) => {
+  withValidatedRequest(socket, 'lobby.create', createLobbyRequestSchema, payload, acknowledge, (user, ack) => {
     const mapName = payload.mapName ?? defaultLobbyMapName()
     if (!isBoardMapName(mapName)) return ack({ outcome: 'INVALID_REQUEST' })
     const membership = context.registry.getActiveMembership(user.userId)
@@ -88,7 +88,7 @@ export function handleCreateLobby(
       const existing = context.registry.getCurrentLobby(user.userId)
       return ack(existing?.getMember(user.userId)?.connectionId === socket.id
         ? { outcome: 'LOBBY_JOINED', lobby: presentLobby(existing) }
-        : { outcome: 'USER_ALREADY_IN_SESSION' })
+        : { outcome: 'ALREADY_HAS_MEMBERSHIP' })
     }
     const lobby = new Lobby(payload.name, mapName, user, socket.id)
     void socket.join(lobbyRoom(lobby.lobbyId))
@@ -104,7 +104,7 @@ export function handleJoinLobby(
   payload: LobbyRequest,
   acknowledge: (result: LobbyJoinResult) => void,
 ): void {
-  withSessionRequest(socket, 'lobby.join', lobbyRequestSchema, payload, acknowledge, (user, ack) => {
+  withValidatedRequest(socket, 'lobby.join', lobbyRequestSchema, payload, acknowledge, (user, ack) => {
     const lobby = context.registry.getLobby(payload.lobbyId)
     if (!lobby) return ack({ outcome: 'LOBBY_NOT_FOUND' })
     const membership = context.registry.getActiveMembership(user.userId)
@@ -112,7 +112,7 @@ export function handleJoinLobby(
       return ack(membership.kind === 'lobby' && membership.lobbyId === lobby.lobbyId
         && lobby.getMember(user.userId)?.connectionId === socket.id
         ? { outcome: 'LOBBY_JOINED', lobby: presentLobby(lobby) }
-        : { outcome: 'USER_ALREADY_IN_SESSION' })
+        : { outcome: 'ALREADY_HAS_MEMBERSHIP' })
     }
     if (lobby.isFull) return ack({ outcome: 'LOBBY_FULL' })
     void socket.join(lobbyRoom(lobby.lobbyId))
@@ -129,7 +129,7 @@ export function handleLeaveLobby(
   payload: EmptyRequest,
   acknowledge: (result: LobbyLeaveResult) => void,
 ): void {
-  withSessionRequest(socket, 'lobby.leave', emptyRequestSchema, payload, acknowledge, (user, ack) => {
+  withValidatedRequest(socket, 'lobby.leave', emptyRequestSchema, payload, acknowledge, (user, ack) => {
     const membership = context.registry.getActiveMembership(user.userId)
     if (!membership) return ack({ outcome: 'LEFT' })
     const lobby = membership.kind === 'lobby' ? context.registry.getLobby(membership.lobbyId) : undefined
@@ -160,7 +160,7 @@ export function handleStartLobby(
   acknowledge: (result: LobbyStartResult) => void,
 ): void {
   const { io } = context
-  withSessionRequest(socket, 'lobby.start', emptyRequestSchema, payload, acknowledge, (user, ack) => {
+  withValidatedRequest(socket, 'lobby.start', emptyRequestSchema, payload, acknowledge, (user, ack) => {
     const activeMembership = context.registry.getActiveMembership(user.userId)
     const lobby = activeMembership?.kind === 'lobby' ? context.registry.getLobby(activeMembership.lobbyId) : undefined
     if (!lobby || lobby.getMember(user.userId)?.connectionId !== socket.id) return ack({ outcome: 'NOT_LOBBY_MEMBER' })

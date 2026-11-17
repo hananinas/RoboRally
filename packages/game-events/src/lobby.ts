@@ -31,7 +31,7 @@ export type LobbyState = LobbySummary & Readonly<{ ownerUserId: string; players:
 export type LobbyFailure = Readonly<{
   outcome: 'INVALID_REQUEST' | 'INTERNAL_ERROR'
     | 'LOBBY_NOT_FOUND' | 'NOT_LOBBY_MEMBER' | 'NOT_LOBBY_OWNER'
-    | 'LOBBY_FULL' | 'USER_ALREADY_IN_SESSION'
+    | 'LOBBY_FULL' | 'ALREADY_HAS_MEMBERSHIP'
 }>
 export type LobbyListResult = Readonly<{
   outcome: 'LOBBIES_FOUND'
@@ -44,8 +44,8 @@ export type LobbyStartResult =
   | Readonly<{ outcome: 'STARTED'; gameId: string }>
   | Readonly<{ outcome: 'LOBBY_MEMBER_DISCONNECTED' }>
   | LobbyFailure
-export type SessionResult =
-  | Readonly<{ outcome: 'NO_SESSION'; user: User }>
+export type MembershipResult =
+  | Readonly<{ outcome: 'NO_MEMBERSHIP'; user: User }>
   | Readonly<{ outcome: 'IN_LOBBY'; lobby: LobbyState; user: User }>
   | Readonly<{ outcome: 'IN_GAME'; initialization: GameInitialization; user: User }>
   | LobbyFailure

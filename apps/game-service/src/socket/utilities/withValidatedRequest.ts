@@ -3,7 +3,7 @@ import { logError, logWarn } from '@/logger'
 import type { GameSocket } from '@/socket/gameServer'
 import { withAcknowledgeOnce } from '@/socket/utilities/acknowledgeOnce'
 
-export function withSessionRequest<R>(
+export function withValidatedRequest<R>(
   socket: GameSocket,
   command: string,
   schema: typeof emptyRequestSchema | typeof lobbyRequestSchema | typeof createLobbyRequestSchema,

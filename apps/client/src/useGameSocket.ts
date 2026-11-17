@@ -26,7 +26,7 @@ export default function useGameSocket() {
       setError(null)
     }
     const handleConnectError = (error: Error) => {
-      if (error.message === 'SESSION_EXPIRED') {
+      if (error.message === 'SOCKET_SESSION_EXPIRED') {
         setSocket(io({ autoConnect: false, forceNew: true }))
         return
       }
