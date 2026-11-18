@@ -24,7 +24,7 @@ import {
   presentEnvironmentStepResolved,
   presentPublicGameState,
   presentRobotActionResolved,
-} from '@/socket/gamePresenter.ts'
+} from '@/gamePresenter.ts'
 import { Integer } from '@/numbers'
 import { createTestGame, createTestPlayer, placeTestPlayer } from './fixtures.ts'
 

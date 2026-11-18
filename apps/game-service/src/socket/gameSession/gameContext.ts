@@ -1,11 +1,11 @@
 import type { GameSocketServer } from '@/socket/gameServer'
 import type { Game } from '@/game/index'
-import { presentProgrammingTimer, presentPublicGameState } from '@/socket/gamePresenter'
-import { createActionScheduler } from '@/actionScheduler'
+import { presentProgrammingTimer, presentPublicGameState } from '@/gamePresenter'
+import { createActionScheduler } from '@/socket/gameSession/actionScheduler'
 import { createProgrammingTimer } from '@/programmingTimer'
-import { publishProgramFinalized } from '@/socket/programFinalization'
+import { publishProgramFinalized } from '@/socket/gameSession/programFinalization'
 import { logError } from '@/logger'
-import type { GameMembership, MembershipContext } from '@/socket/gameMembership'
+import type { GameMembership, MembershipContext } from '@/socket/gameSession/gameMembership'
 
 export function createGameContext(io: GameSocketServer, game: Game): MembershipContext {
   const publicRoom = `game:${game.id}:public`

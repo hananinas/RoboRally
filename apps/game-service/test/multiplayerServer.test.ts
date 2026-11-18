@@ -4,7 +4,7 @@ import type { CardsDealt, ClientToServerEvents, RobotActionResolved, ServerToCli
 import { io as connectSocket, type Socket } from 'socket.io-client'
 import { expect, it, vi, type MockInstance } from 'vitest'
 import { createGameSocketServer } from '@/socket/gameServer.ts'
-import * as gameContext from '@/socket/gameContext.ts'
+import * as gameContext from '@/socket/gameSession/gameContext.ts'
 import { createSessionStore } from '@/auth/sessionStore.ts'
 import { authCookieHeader } from './authTestHelper.ts'
 

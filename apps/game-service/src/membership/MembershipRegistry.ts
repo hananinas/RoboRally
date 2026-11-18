@@ -1,4 +1,4 @@
-import type { MembershipContext } from '@/socket/gameMembership'
+import type { MembershipContext } from '@/socket/gameSession/gameMembership'
 import { Lobby } from '@/membership/Lobby'
 
 export type ActiveMembership = { kind: 'lobby'; lobbyId: string } | { kind: 'game'; gameId: string }

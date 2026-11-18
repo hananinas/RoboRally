@@ -1,5 +1,5 @@
 import type { Game } from '@/game/index'
-import { presentCardsDealt, presentEnvironmentStepResolved, presentRobotActionResolved } from '@/socket/gamePresenter'
+import { presentCardsDealt, presentEnvironmentStepResolved, presentRobotActionResolved } from '@/gamePresenter'
 import type { GameSocketServer } from '@/socket/gameServer'
 import { logError } from '@/logger'
 import type { Winner } from '@robo-rally/game-events'

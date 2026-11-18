@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import { Game, type BoardMapName } from '@/game/index'
 import { HAND_SIZE } from '@/game/Deck'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
-import * as gameContext from '@/socket/gameContext'
+import * as gameContext from '@/socket/gameSession/gameContext'
 import { createSessionStore, type SessionStore } from '@/auth/sessionStore'
 import { authCookieHeader } from './authTestHelper.ts'
 

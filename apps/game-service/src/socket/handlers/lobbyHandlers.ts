@@ -10,8 +10,8 @@ import {
   type EmptyRequest, type LobbyRequest, type CreateLobbyRequest, type GameInitialization, type LobbyState, type User,
   type LobbyListResult, type LobbyJoinResult, type LobbyLeaveResult, type LobbyStartResult,
 } from '@robo-rally/game-events'
-import { createGameContext } from '@/socket/gameContext'
-import { presentInitialization, type MembershipContext } from '@/socket/gameMembership'
+import { createGameContext } from '@/socket/gameSession/gameContext'
+import { presentInitialization, type MembershipContext } from '@/socket/gameSession/gameMembership'
 import type { GameSocket, SocketContext } from '@/socket/gameServer'
 
 const lobbyRoom = (id: string) => `lobby:${id}`
