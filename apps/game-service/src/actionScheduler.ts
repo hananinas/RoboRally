@@ -66,7 +66,9 @@ export function createActionScheduler(
         if (step.type === 'robot') {
           io.to(publicRoom).emit('robot.actionResolved', presentRobotActionResolved(gameId, game, step.result))
         } else {
-          io.to(publicRoom).emit('environment.stepResolved', presentEnvironmentStepResolved(gameId, step.result))
+          const result = presentEnvironmentStepResolved(gameId, step.result)
+          const changed = result.kind === 'GEARS' ? result.robots.length > 0 : result.checkpointProgress.length > 0
+          if (changed) io.to(publicRoom).emit('environment.stepResolved', result)
         }
         announceProgress(step.result)
         scheduleNextAction()

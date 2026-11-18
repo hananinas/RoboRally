@@ -8,7 +8,6 @@ import { Deck } from '@/game/Deck'
 import type { CardId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
 import { ROBOT_COLOURS, Robot } from '@/game/Robot'
-import { tileDefinitions } from '@/game/Tile'
 import { Direction, opposite, type Position } from '@/game/spatial'
 import { Integer, PositiveInteger, UnsignedInteger } from '@/numbers'
 import {
@@ -503,7 +502,7 @@ export class Game {
 
   private resolveMovementEntry(robot: Robot, position: Position): 'continue' | 'stop' {
     const tile = this.board.getTile(position)
-    const effect = tile === undefined ? 'reboot' : tileDefinitions[tile.kind].entryEffect
+    const effect = tile === undefined ? 'reboot' : tile.entryEffect
     switch (effect) {
       case undefined:
         return 'continue'

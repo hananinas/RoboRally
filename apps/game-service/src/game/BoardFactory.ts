@@ -52,7 +52,7 @@ export function createBoard(mapName: BoardMapName = DEFAULT_MAP): Board {
   for (const { at: [x, y], sprite, direction } of conveyors) {
     const tile = boardTiles[y]?.[x]
 
-    if (!tile || tile.kind !== 'EMPTY') {
+    if (!(tile instanceof EmptyTile)) {
       throw new RangeError(
         `Conveyor at (${x}, ${y}) in map "${mapName}" must occupy an unused board tile`,
       )
@@ -68,7 +68,7 @@ export function createBoard(mapName: BoardMapName = DEFAULT_MAP): Board {
 
   for (const { at: [x, y], rotation } of gears) {
     const tile = boardTiles[y]?.[x]
-    if (!tile || tile.kind !== 'EMPTY' || tile.checkpointNumber !== undefined) {
+    if (!(tile instanceof EmptyTile) || tile.checkpointNumber !== undefined) {
       throw new RangeError(`Gear at (${x}, ${y}) in map "${mapName}" must occupy an empty non-checkpoint board tile`)
     }
     boardTiles[y][x] = new GearTile(rotation, tile.walls)

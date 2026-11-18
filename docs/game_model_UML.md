@@ -118,19 +118,19 @@ Placement, relocation, spawning, reboot configuration, and safe-destination sear
 
 # Tile
 
-Tile is descriptive data with a readonly `TileKind`: EmptyTile uses `EMPTY`, and PitTile uses `PIT`. The exhaustive `tileDefinitions` table declares:
+Tile is descriptive data with a readonly `TileKind`: EmptyTile uses `EMPTY`, and PitTile uses `PIT`. Tile subclasses declare placement suitability and entry effects.
 
 | Kind | `canOccupy` for placement/reboot | `entryEffect` |
 | --- | --- | --- |
 | `EMPTY` | true | absent |
 | `PIT` | false | `reboot` |
 
-Definitions contain no callbacks. Walls, optional checkpoint numbers, and future settings such as conveyor direction belong to instances. Board validates unique checkpoint numbers consecutive from 1 and derives their count. Checkpoints can coexist with walls without a separate subclass. Tiles hold neither robots nor activation logic.
+Walls, optional checkpoint numbers, and future settings such as conveyor direction belong to instances. Board validates unique checkpoint numbers consecutive from 1 and derives their count. Checkpoints can coexist with walls without a separate subclass. Tiles hold neither robots nor activation logic.
 
 ## Extending tiles
 
 1. Add a tile kind and subclass with its instance data.
-2. Declare placement suitability and any entry effect in `tileDefinitions`.
+2. Override placement suitability and any entry effect on the tile subclass.
 3. Reuse an effect or extend `TileEntryEffect` and Game's exhaustive resolver. Leave collision logic and card interpretation generic.
 4. Add map construction and, for public kinds, shared types, AsyncAPI, the board adapter, and rendering. The presenter serializes `tile.kind` directly.
 5. Test placement, movement, effect timing, and presentation through public APIs.

@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Board, Card, Deck, Direction, EmptyTile, Game, Player, Robot } from '@/game/index'
+import { Board, Card, Deck, Direction, EmptyTile, Game, GearTile, Player, Robot } from '@/game/index'
 import { createActionScheduler, type ActionScheduler } from '@/actionScheduler'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
 import { createSessionStore } from '@/auth/sessionStore'
@@ -18,14 +18,14 @@ describe('activation scheduler', () => {
     vi.useRealTimers()
   })
 
-  function createGame() {
+  function createGame(onGear = false) {
     const board = new Board([
       [new EmptyTile(), new EmptyTile(), new EmptyTile()],
-      [new EmptyTile(), new EmptyTile([], 1), new EmptyTile()],
+      [new GearTile('CLOCKWISE'), new EmptyTile([], 1), new EmptyTile()],
       [new EmptyTile(), new EmptyTile([], 2), new EmptyTile()],
     ], { x: Integer(0), y: Integer(0), angle: 0 })
     const robot = new Robot('robot', Direction.NORTH)
-    board.placeRobot(robot.id, { x: Integer(1), y: Integer(1) })
+    board.placeRobot(robot.id, { x: Integer(onGear ? 0 : 1), y: Integer(1) })
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'TURN_LEFT'))
     const player = new Player('player', robot, new Deck(cards))
     const game = new Game({ board, players: [player], deck: cards, rebootTile: { x: Integer(0), y: Integer(1) }, drawRandom: () => 0 })
@@ -65,14 +65,29 @@ describe('activation scheduler', () => {
     scheduler.scheduleNextAction()
     vi.runAllTimers()
     expect(events().map((event) => event.name)).toEqual([
-      ...Array.from({ length: 5 }, () => ['robot.actionResolved', 'environment.stepResolved', 'environment.stepResolved']).flat(), 'cards.dealt',
+      'robot.actionResolved', 'environment.stepResolved',
+      ...Array.from({ length: 4 }, () => 'robot.actionResolved'), 'cards.dealt',
     ])
     expect(events().filter((event) => event.name === 'environment.stepResolved').map((event) => event.payload.kind))
-      .toEqual(Array.from({ length: 5 }, () => ['GEARS', 'CHECKPOINTS']).flat())
+      .toEqual(['CHECKPOINTS'])
     expect(events().at(-1)?.rooms).toEqual(['private:player'])
     scheduler.scheduleNextAction()
     vi.runAllTimers()
-    expect(events()).toHaveLength(16)
+    expect(events()).toHaveLength(7)
+  })
+
+  it('broadcasts gear changes before the next action and deals after the last register', () => {
+    const { game, player, events } = createGame(true)
+    scheduler.scheduleNextAction()
+    vi.runAllTimers()
+    expect(events().map(({ name }) => name)).toEqual([
+      ...Array.from({ length: 5 }, () => ['robot.actionResolved', 'environment.stepResolved']).flat(),
+      'cards.dealt',
+    ])
+    expect(events().filter(({ name }) => name === 'environment.stepResolved').map(({ payload }) => payload.kind))
+      .toEqual(Array.from({ length: 5 }, () => 'GEARS'))
+    expect(player.robot.direction).toBe(Direction.NORTH)
+    expect(game.lastActivePhase).toBe('programming')
   })
 
   it.each(['abort', 'stop'] as const)('does not execute an already queued callback after %s', (action) => {

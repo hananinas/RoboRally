@@ -866,7 +866,8 @@ components:
     EnvironmentStepResolved:
       name: environment.stepResolved
       description: >-
-        Apply the step's changes together after the register's robot actions.
+        Reports changed robots or checkpoint progress. Apply changes together after
+        the register's robot actions. Steps without changes produce no event.
       payload:
         $ref: '#/components/schemas/EnvironmentStepResolved'
       examples:

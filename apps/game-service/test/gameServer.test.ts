@@ -321,7 +321,7 @@ describe('started game membership over Socket.IO', () => {
     expect((await progress).checkpointProgress).toEqual([{ playerId: player.id, lastCheckpoint: 2 }])
     expect(await won).toEqual({ gameId: shared.gameId, playerId: player.id, username: 'First' })
     await getSnapshot(first)
-    expect(events).toEqual(['game.playerLeft', 'environment.stepResolved', 'environment.stepResolved', 'game.won'])
+    expect(events).toEqual(['game.playerLeft', 'environment.stepResolved', 'game.won'])
   })
 
   it('announces the winner after the final checkpoint and ends the game', async () => {
@@ -339,7 +339,7 @@ describe('started game membership over Socket.IO', () => {
     const snapshot = await getSnapshot(client)
     expect(events).toEqual([
       'program.finalized', 'game.registersChanged', 'program.submitted',
-      'robot.actionResolved', 'environment.stepResolved', 'environment.stepResolved', 'game.won',
+      'robot.actionResolved', 'environment.stepResolved', 'game.won',
     ])
     expect(snapshot.state.winner).toEqual({ playerId: player.id, username: 'First' })
     expect(snapshot.state.phase).toBe('EXECUTING')
@@ -485,7 +485,8 @@ describe('started game membership over Socket.IO', () => {
       ])
       expect(events).toEqual([
         'program.finalized', 'game.registersChanged', 'program.submitted',
-        ...Array.from({ length: 5 }, () => ['robot.actionResolved', 'environment.stepResolved', 'environment.stepResolved']).flat(),
+        'robot.actionResolved', 'environment.stepResolved',
+        ...Array.from({ length: 4 }, () => 'robot.actionResolved'),
         'cards.dealt',
       ])
       const snapshot = await getSnapshot(client)

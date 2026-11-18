@@ -89,7 +89,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
         expect(events[index].map((event) => event.name)).toEqual([
           'program.submitted', 'program.submitted',
           ...Array.from({ length: 5 }, () => [
-            'robot.actionResolved', 'robot.actionResolved', 'environment.stepResolved', 'environment.stepResolved',
+            'robot.actionResolved', 'robot.actionResolved',
           ]).flat(),
           'cards.dealt',
         ])
