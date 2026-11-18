@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { err, ok, type Result } from 'neverthrow'
 import type { Board } from '@/game/Board'
-import { effects, type PrivateProgram, type PublicRegisters, type ResolvedInstruction } from '@robo-rally/game-events'
+import { effects, type PrivateProgram, type PublicRegisters, type ResolvedInstruction, type PendingCardChoice, type ChooseCardAction,} from '@robo-rally/game-events'
 import { Card } from '@/game/Card'
 import { Deck } from '@/game/Deck'
 import type { CardId, PlayerId, RobotId } from '@/game/ids'
@@ -81,6 +81,7 @@ export class Game {
   private readonly deck: readonly Card[]
   private readonly lifecycle = new GameLifecycle('programming')
   private registerIndex = 0
+  private choice: (PendingCardChoice & {selected?: ResolvedInstruction}) | null = null
   private readonly submittedPlayerIds = new Set<PlayerId>()
   private readonly activatedRobotIds = new Set<RobotId>()
   private readonly random: () => number
@@ -136,6 +137,10 @@ export class Game {
 
   get currentRegister(): number {
     return this.registerIndex
+  }
+
+  get pendingChoice(): PendingCardChoice | null {
+    return this.choice?.selected === undefined ? this.choice : null
   }
 
   get players(): readonly Player[] {
@@ -369,6 +374,13 @@ export class Game {
 
     const registerIndex = this.registerIndex
     const card = robot.getProgramCard(UnsignedInteger(registerIndex))
+    if (
+      (card.instruction === 'SANDBOX_ROUTINE'
+        || card.instruction === 'WEASEL_ROUTINE')
+      && this.choice?.selected === undefined
+    ) {
+      throw new Error('An interactive card requires a choice before execution')
+    }
     const previousPositions = this.roster.map((player) => this.board.positionOf(player.robot.id))
     const resolvedInstruction = this.executeCard(robot, card, registerIndex)
     this.activatedRobotIds.add(robot.id)
@@ -391,6 +403,66 @@ export class Game {
 
     const { roundConcluded } = this.recheckActivationPhase()
     return { registerIndex, action, registers, pushedRobots, roundConcluded }
+  }
+
+  prepareNextChoice(): PendingCardChoice | null {
+    if (this.requirePhase('activation').isErr()) return null
+    if (this.choice) return this.pendingChoice
+
+    const robot = this.nextRobotByPriority()
+    if (!robot) return null
+
+    const card = robot.getProgramCard(
+      UnsignedInteger(this.registerIndex),
+    )
+
+    if (
+      card.instruction !== 'SANDBOX_ROUTINE'
+      && card.instruction !== 'WEASEL_ROUTINE'
+    ) return null
+
+    const player = this.roster.find(
+      (candidate) => candidate.robot === robot,
+    )!
+
+    player.revealRegister(this.registerIndex, card.instruction)
+
+    this.choice = {
+      choiceId: randomUUID(),
+      playerId: player.id,
+      registerIndex: this.registerIndex,
+      instruction: card.instruction,
+      options: card.instruction === 'SANDBOX_ROUTINE'
+        ? Object.keys(effects) as ResolvedInstruction[]
+        : ['TURN_LEFT', 'TURN_RIGHT', 'U_TURN'],
+    }
+
+    return this.choice
+  }
+
+  chooseCardAction(
+    playerId: PlayerId,
+    payload: ChooseCardAction,
+  ): Result<void, PhaseError | 'INVALID_CHOICE'> {
+    return this.requirePhase('activation').andThen(() => {
+      const choice = this.pendingChoice
+
+      if (
+        !choice
+        || choice.playerId !== playerId
+        || choice.choiceId !== payload.choiceId
+        || !choice.options.includes(payload.instruction)
+      ) {
+        return err('INVALID_CHOICE')
+      }
+
+      this.choice = {
+        ...choice,
+        selected: payload.instruction,
+      }
+
+      return ok(undefined)
+    })
   }
 
   private dealInitialHands(): void {
@@ -447,7 +519,17 @@ export class Game {
     // TODO: With damage cards, Again after a damage card instead draws the top
     // card of the player's deck and resolves that.
     const history = this.resolvedInstructions.get(robot.id) ?? []
-    const resolved = card.instruction === 'AGAIN' ? history[registerIndex - 1] : card.instruction
+    const resolved =
+      card.instruction === 'AGAIN'
+      || card.instruction === 'REPEAT_ROUTINE'
+        ? history[registerIndex - 1]
+        : card.instruction === 'SPEED_ROUTINE'
+          ? 'MOVE_3'
+          : card.instruction === 'SANDBOX_ROUTINE'
+            || card.instruction === 'WEASEL_ROUTINE'
+              ? this.choice?.selected
+              : card.instruction
+    this.choice = null
     history[registerIndex] = resolved
     this.resolvedInstructions.set(robot.id, history)
     if (resolved === undefined) return undefined

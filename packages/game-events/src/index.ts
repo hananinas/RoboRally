@@ -48,6 +48,10 @@ export type {
   UpdateRegistersResult,
   User,
   UserId,
+  PendingCardChoice,
+  ChooseCardAction,
+  CardChoiceChanged,
+  CardChoiceResult,
 } from './payloads.js'
 export { submitProgramSchema } from './submitProgram.js'
 export type { ProgramCardIds, SubmitProgram } from './submitProgram.js'

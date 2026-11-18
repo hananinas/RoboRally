@@ -254,7 +254,7 @@ export type CardChoiceChanged = Readonly<{
   choice: PendingCardChoice | null
 }>
 
-export type ChooseCardActionResult = Readonly<{
+export type ChooseCardAction = Readonly<{
   choiceId: string
   instruction: ResolvedInstruction
 }>
