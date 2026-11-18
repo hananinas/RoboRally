@@ -1,6 +1,6 @@
 import { err, ok, type Result } from 'neverthrow'
 import type { Player } from '@/game/Player'
-import { Lobby } from '@/membership/Lobby'
+import { Lobby } from '@/domain/lobby/Lobby'
 import { withValidatedRequest } from '@/socket/utilities/withValidatedRequest'
 import { ROBOT_COLOURS } from '@/game/Robot'
 import { boardMaps, type BoardMapName } from '@/game/boardMaps'

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { User } from '@robo-rally/game-events'
-import { Lobby } from '@/membership/Lobby'
+import { Lobby } from '@/domain/lobby/Lobby'
 
 function user(userId: string): User {
   return { userId, username: userId }

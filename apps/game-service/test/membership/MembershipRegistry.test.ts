@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { User } from '@robo-rally/game-events'
 import type { MembershipContext } from '@/socket/gameSession/gameMembership'
-import { Lobby } from '@/membership/Lobby'
+import { Lobby } from '@/domain/lobby/Lobby'
 import { MembershipRegistry } from '@/membership/MembershipRegistry'
 
 function user(userId: string): User {
