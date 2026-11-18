@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import type { Instruction } from '@robo-rally/game-events'
-import type { Card } from '@/game/Card'
-import { Deck, createDeckCards } from '@/game/Deck'
-import { Game } from '@/game/Game'
-import type { Board } from '@/game/Board'
-import { Player } from '@/game/Player'
-import { Robot, ROBOT_COLOURS } from '@/game/Robot'
-import { Direction, type Position } from '@/game/spatial'
-import { EmptyTile, type Tile } from '@/game/Tile'
+import type { Card } from '@/domain/game/Card'
+import { Deck, createDeckCards } from '@/domain/game/Deck'
+import { Game } from '@/domain/game/Game'
+import type { Board } from '@/domain/game/Board'
+import { Player } from '@/domain/game/Player'
+import { Robot, ROBOT_COLOURS } from '@/domain/game/Robot'
+import { Direction, type Position } from '@/domain/game/spatial'
+import { EmptyTile, type Tile } from '@/domain/game/Tile'
 
 type RobotOverrides = Partial<{
   id: string

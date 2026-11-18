@@ -12,7 +12,7 @@ import {
   type PublicGameState,
   type User,
 } from '@robo-rally/game-events'
-import type { Player, Game } from '@/game/index'
+import type { Player, Game } from '@/domain/game/index'
 import { presentCardsDealt, presentProgrammingTimer } from '@/gamePresenter'
 import type { ActionScheduler } from '@/socket/gameSession/actionScheduler'
 import type { ProgrammingTimer } from '@/programmingTimer'

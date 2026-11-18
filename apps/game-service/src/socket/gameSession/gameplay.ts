@@ -10,7 +10,7 @@ import {
 import { err, ok, type Result } from 'neverthrow'
 import type { ZodError } from 'zod'
 import { withAcknowledgeOnce } from '@/socket/utilities/acknowledgeOnce'
-import type { Player } from '@/game/index'
+import type { Player } from '@/domain/game/index'
 import type { GameSocket } from '@/socket/gameServer'
 import { logError, logWarn } from '@/logger'
 import { ownedMembership, type MembershipContext } from '@/socket/gameSession/gameMembership'

@@ -8,7 +8,7 @@ import type {
 import { io as createClient, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import * as actionScheduler from '@/socket/gameSession/actionScheduler'
-import type { Game } from '@/game/Game'
+import type { Game } from '@/domain/game/Game'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
 import * as gameContext from '@/socket/gameSession/gameContext'
 import { handleUpdateRegisters } from '@/socket/gameSession/gameplay'

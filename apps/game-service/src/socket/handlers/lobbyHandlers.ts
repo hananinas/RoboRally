@@ -1,10 +1,10 @@
 import { err, ok, type Result } from 'neverthrow'
-import type { Player } from '@/game/Player'
+import type { Player } from '@/domain/game/Player'
 import { Lobby } from '@/domain/lobby/Lobby'
 import { withValidatedRequest } from '@/socket/utilities/withValidatedRequest'
-import { ROBOT_COLOURS } from '@/game/Robot'
-import { boardMaps, type BoardMapName } from '@/game/boardMaps'
-import { createGame } from '@/game/GameFactory'
+import { ROBOT_COLOURS } from '@/domain/game/Robot'
+import { boardMaps, type BoardMapName } from '@/domain/game/boardMaps'
+import { createGame } from '@/domain/game/GameFactory'
 import {
   emptyRequestSchema, lobbyRequestSchema, createLobbyRequestSchema,
   type EmptyRequest, type LobbyRequest, type CreateLobbyRequest, type GameInitialization, type LobbyState, type User,

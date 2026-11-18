@@ -18,7 +18,7 @@ import {
   PitTile,
   createGame,
   type TileKind,
-} from '@/game/index.ts'
+} from '@/domain/game/index.ts'
 import {
   presentCardsDealt,
   presentEnvironmentStepResolved,

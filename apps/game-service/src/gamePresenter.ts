@@ -24,10 +24,10 @@ import {
   type NextActionResult,
   type Player,
   type Position,
-} from '@/game/index'
+} from '@/domain/game/index'
 import { Integer } from '@/numbers'
-import type { EnvironmentStepResult } from '@/game/Game'
-import { ConveyorTile, GearTile } from '@/game/Tile'
+import type { EnvironmentStepResult } from '@/domain/game/Game'
+import { ConveyorTile, GearTile } from '@/domain/game/Tile'
 
 const orientations: Record<Direction, Orientation> = {
   [Direction.NORTH]: 'NORTH',

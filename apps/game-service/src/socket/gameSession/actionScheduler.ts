@@ -1,4 +1,4 @@
-import type { Game } from '@/game/index'
+import type { Game } from '@/domain/game/index'
 import { presentCardsDealt, presentEnvironmentStepResolved, presentRobotActionResolved } from '@/gamePresenter'
 import type { GameSocketServer } from '@/socket/gameServer'
 import { logError } from '@/logger'

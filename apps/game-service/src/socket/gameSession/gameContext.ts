@@ -1,5 +1,5 @@
 import type { GameSocketServer } from '@/socket/gameServer'
-import type { Game } from '@/game/index'
+import type { Game } from '@/domain/game/index'
 import { presentProgrammingTimer, presentPublicGameState } from '@/gamePresenter'
 import { createActionScheduler } from '@/socket/gameSession/actionScheduler'
 import { createProgrammingTimer } from '@/programmingTimer'
