@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { User } from '@robo-rally/game-events'
 import type { BoardMapName } from '@/domain/game/boardMaps'
 
-type LobbyMember = { user: User; connectionId: string }
+export type LobbyMember = { user: User; connectionId: string }
 
 export class Lobby {
   static readonly MAX_PLAYERS = 6

@@ -1,6 +1,7 @@
 import { emptyRequestSchema, type EmptyRequest, type MembershipResult, type LeaveResult, type SubmitProgram, type ProgramResult, type UpdateRegisters, type UpdateRegistersResult } from '@robo-rally/game-events'
 import type { GameSocket, SocketContext } from '@/socket/gameServer'
-import { presentLobby, leaveLobby } from '@/socket/handlers/lobbyHandlers'
+import { leaveLobby } from '@/socket/handlers/lobbyHandlers'
+import { presentLobby } from '@/socket/presenters/lobbyPresenter'
 import { handleReattachGame, handleLeave, handleDisconnect, reconnectIfRecovered } from '@/socket/gameSession/gameMembership'
 import { handleSubmitProgram, handleUpdateRegisters } from '@/socket/gameSession/gameplay'
 import { withValidatedRequest } from '@/socket/utilities/withValidatedRequest'
@@ -15,10 +16,10 @@ export function handleGetMembership(
     const membership = context.registry.getActiveMembership(user.userId)
     if (!membership) return ack({ outcome: 'NO_MEMBERSHIP', user })
     if (membership.kind === 'lobby') {
-      const lobby = context.registry.getCurrentLobby(user.userId)
-      if (!lobby) throw new Error('Membership references a missing lobby')
-      return ack(lobby.getMember(user.userId)?.connectionId === socket.id
-        ? { outcome: 'IN_LOBBY', lobby: presentLobby(lobby), user }
+      const session = context.registry.getCurrentLobby(user.userId)
+      if (!session) throw new Error('Membership references a missing lobby')
+      return ack(session.isMember(socket).isOk()
+        ? { outcome: 'IN_LOBBY', lobby: presentLobby(session.lobby), user }
         : { outcome: 'ALREADY_HAS_MEMBERSHIP' })
     }
     const game = context.registry.getCurrentGame(user.userId)

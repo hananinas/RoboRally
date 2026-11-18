@@ -24,9 +24,9 @@ import {
   presentEnvironmentStepResolved,
   presentPublicGameState,
   presentRobotActionResolved,
-} from '@/gamePresenter.ts'
+} from '@/socket/presenters/gamePresenter.ts'
 import { Integer } from '@/numbers'
-import { createTestGame, createTestPlayer, placeTestPlayer } from './fixtures.ts'
+import { createTestGame, createTestPlayer, placeTestPlayer } from '../../fixtures.ts'
 
 function createGameWithPlayer() {
   const game = createGame('empty-map', 'Test game')

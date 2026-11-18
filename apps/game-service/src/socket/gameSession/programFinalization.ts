@@ -1,6 +1,6 @@
 import type { ProgramFinalized } from '@robo-rally/game-events'
 import type { CompletedProgram } from '@/domain/game/index'
-import { presentProgramFinalized } from '@/gamePresenter'
+import { presentProgramFinalized } from '@/socket/presenters/gamePresenter'
 import type { MembershipContext } from '@/socket/gameSession/gameMembership'
 
 export function publishProgramFinalized(

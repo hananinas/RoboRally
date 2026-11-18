@@ -16,10 +16,10 @@ describe('MembershipRegistry', () => {
   it('tracks lobbies independently of active membership', () => {
     const registry = new MembershipRegistry()
     const lobby = new Lobby('Lobby', 'test-map', user('owner'), 'connection-1')
-    registry.addLobby(lobby)
+    const session = registry.addLobby(lobby)
 
-    expect(registry.getLobby(lobby.lobbyId)).toBe(lobby)
-    expect(registry.lobbies).toEqual([lobby])
+    expect(registry.getLobby(lobby.lobbyId)).toBe(session)
+    expect(registry.lobbies).toEqual([session])
 
     registry.removeLobby(lobby.lobbyId)
     expect(registry.getLobby(lobby.lobbyId)).toBeUndefined()
@@ -29,11 +29,11 @@ describe('MembershipRegistry', () => {
   it("resolves a user's current lobby or game through their active membership", () => {
     const registry = new MembershipRegistry()
     const lobby = new Lobby('Lobby', 'test-map', user('owner'), 'connection-1')
-    registry.addLobby(lobby)
+    const session = registry.addLobby(lobby)
     registry.setActiveMembership('owner', { kind: 'lobby', lobbyId: lobby.lobbyId })
 
     expect(registry.getActiveMembership('owner')).toEqual({ kind: 'lobby', lobbyId: lobby.lobbyId })
-    expect(registry.getCurrentLobby('owner')).toBe(lobby)
+    expect(registry.getCurrentLobby('owner')).toBe(session)
     expect(registry.getCurrentGame('owner')).toBeUndefined()
     expect(registry.getCurrentLobby('stranger')).toBeUndefined()
 
@@ -46,12 +46,12 @@ describe('MembershipRegistry', () => {
     const registry = new MembershipRegistry()
     const lobby = new Lobby('Lobby', 'test-map', user('owner'), 'connection-1')
     lobby.addMember(user('second'), 'connection-2')
-    registry.addLobby(lobby)
+    const session = registry.addLobby(lobby)
     registry.setActiveMembership('owner', { kind: 'lobby', lobbyId: lobby.lobbyId })
     registry.setActiveMembership('second', { kind: 'lobby', lobbyId: lobby.lobbyId })
 
     const gameContext = fakeGameContext('game-1')
-    registry.promoteLobbyToGame(lobby, gameContext, ['owner', 'second'])
+    registry.promoteLobbyToGame(session, gameContext, ['owner', 'second'])
 
     expect(registry.getLobby(lobby.lobbyId)).toBeUndefined()
     expect(registry.lobbies).toEqual([])

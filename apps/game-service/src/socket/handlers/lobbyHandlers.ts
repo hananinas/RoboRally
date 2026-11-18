@@ -7,21 +7,14 @@ import { boardMaps, type BoardMapName } from '@/domain/game/boardMaps'
 import { createGame } from '@/domain/game/GameFactory'
 import {
   emptyRequestSchema, lobbyRequestSchema, createLobbyRequestSchema,
-  type EmptyRequest, type LobbyRequest, type CreateLobbyRequest, type GameInitialization, type LobbyState, type User,
+  type EmptyRequest, type LobbyRequest, type CreateLobbyRequest, type GameInitialization, type User,
   type LobbyListResult, type LobbyJoinResult, type LobbyLeaveResult, type LobbyStartResult,
 } from '@robo-rally/game-events'
 import { createGameContext } from '@/socket/gameSession/gameContext'
 import { presentInitialization, type MembershipContext } from '@/socket/gameSession/gameMembership'
 import type { GameSocket, SocketContext } from '@/socket/gameServer'
-
-const lobbyRoom = (id: string) => `lobby:${id}`
-export function presentLobby(lobby: Lobby): LobbyState {
-  const map = boardMaps[lobby.mapName]
-  return { lobbyId: lobby.lobbyId, name: lobby.name, mapName: lobby.mapName, mapDisplayName: map.name, mapIcon: map.icon,
-    ownerUserId: lobby.ownerUserId,
-    playerCount: lobby.size, maxPlayers: Lobby.MAX_PLAYERS,
-    players: lobby.members.map(({ user }) => ({ userId: user.userId, username: user.username })) }
-}
+import { LobbySession } from '@/socket/LobbySession'
+import { presentLobby } from '@/socket/presenters/lobbyPresenter'
 
 function isBoardMapName(mapName: string): mapName is BoardMapName {
   return Object.hasOwn(boardMaps, mapName)
@@ -45,15 +38,11 @@ function defaultLobbyMapName(): BoardMapName {
 
 export function leaveLobby(context: SocketContext, socket: GameSocket): void {
   const userId = socket.data.user.userId
-  const lobby = context.registry.getCurrentLobby(userId)
-  if (!lobby || lobby.getMember(userId)?.connectionId !== socket.id) return
-  lobby.removeMember(userId)
+  const session = context.registry.getCurrentLobby(userId)
+  if (!session || session.isMember(socket).isErr()) return
+  session.leave(socket)
   context.registry.clearActiveMembership(userId)
-  void socket.leave(lobbyRoom(lobby.lobbyId))
-  if (lobby.size === 0) context.registry.removeLobby(lobby.lobbyId)
-  else {
-    context.io.to(lobbyRoom(lobby.lobbyId)).emit('lobby.updated', { lobby: presentLobby(lobby) })
-  }
+  if (session.lobby.size === 0) context.registry.removeLobby(session.lobby.lobbyId)
 }
 
 export function handleListLobbies(
@@ -66,8 +55,8 @@ export function handleListLobbies(
     ack({
       outcome: 'LOBBIES_FOUND',
       maps: presentBoardMaps(),
-      lobbies: context.registry.lobbies.map((lobby) => {
-        const { lobbyId, name, mapName, mapDisplayName, mapIcon, playerCount, maxPlayers } = presentLobby(lobby)
+      lobbies: context.registry.lobbies.map((session) => {
+        const { lobbyId, name, mapName, mapDisplayName, mapIcon, playerCount, maxPlayers } = presentLobby(session.lobby)
         return { lobbyId, name, mapName, mapDisplayName, mapIcon, playerCount, maxPlayers }
       }),
     })
@@ -86,12 +75,12 @@ export function handleCreateLobby(
     const membership = context.registry.getActiveMembership(user.userId)
     if (membership) {
       const existing = context.registry.getCurrentLobby(user.userId)
-      return ack(existing?.getMember(user.userId)?.connectionId === socket.id
-        ? { outcome: 'LOBBY_JOINED', lobby: presentLobby(existing) }
+      return ack(existing && existing.isMember(socket).isOk()
+        ? { outcome: 'LOBBY_JOINED', lobby: presentLobby(existing.lobby) }
         : { outcome: 'ALREADY_HAS_MEMBERSHIP' })
     }
     const lobby = new Lobby(payload.name, mapName, user, socket.id)
-    void socket.join(lobbyRoom(lobby.lobbyId))
+    new LobbySession(lobby).connect(socket)
     context.registry.addLobby(lobby)
     context.registry.setActiveMembership(user.userId, { kind: 'lobby', lobbyId: lobby.lobbyId })
     ack({ outcome: 'LOBBY_JOINED', lobby: presentLobby(lobby) })
@@ -105,21 +94,19 @@ export function handleJoinLobby(
   acknowledge: (result: LobbyJoinResult) => void,
 ): void {
   withValidatedRequest(socket, 'lobby.join', lobbyRequestSchema, payload, acknowledge, (user, ack) => {
-    const lobby = context.registry.getLobby(payload.lobbyId)
-    if (!lobby) return ack({ outcome: 'LOBBY_NOT_FOUND' })
+    const session = context.registry.getLobby(payload.lobbyId)
+    if (!session) return ack({ outcome: 'LOBBY_NOT_FOUND' })
     const membership = context.registry.getActiveMembership(user.userId)
     if (membership) {
-      return ack(membership.kind === 'lobby' && membership.lobbyId === lobby.lobbyId
-        && lobby.getMember(user.userId)?.connectionId === socket.id
-        ? { outcome: 'LOBBY_JOINED', lobby: presentLobby(lobby) }
+      return ack(membership.kind === 'lobby' && membership.lobbyId === session.lobby.lobbyId
+        && session.isMember(socket).isOk()
+        ? { outcome: 'LOBBY_JOINED', lobby: presentLobby(session.lobby) }
         : { outcome: 'ALREADY_HAS_MEMBERSHIP' })
     }
-    if (lobby.isFull) return ack({ outcome: 'LOBBY_FULL' })
-    void socket.join(lobbyRoom(lobby.lobbyId))
-    lobby.addMember(user, socket.id)
-    context.registry.setActiveMembership(user.userId, { kind: 'lobby', lobbyId: lobby.lobbyId })
-    ack({ outcome: 'LOBBY_JOINED', lobby: presentLobby(lobby) })
-    socket.to(lobbyRoom(lobby.lobbyId)).emit('lobby.updated', { lobby: presentLobby(lobby) })
+    if (session.lobby.isFull) return ack({ outcome: 'LOBBY_FULL' })
+    session.join(socket)
+    context.registry.setActiveMembership(user.userId, { kind: 'lobby', lobbyId: session.lobby.lobbyId })
+    ack({ outcome: 'LOBBY_JOINED', lobby: presentLobby(session.lobby) })
   })
 }
 
@@ -132,8 +119,8 @@ export function handleLeaveLobby(
   withValidatedRequest(socket, 'lobby.leave', emptyRequestSchema, payload, acknowledge, (user, ack) => {
     const membership = context.registry.getActiveMembership(user.userId)
     if (!membership) return ack({ outcome: 'LEFT' })
-    const lobby = membership.kind === 'lobby' ? context.registry.getLobby(membership.lobbyId) : undefined
-    if (lobby?.getMember(user.userId)?.connectionId !== socket.id) {
+    const session = context.registry.getCurrentLobby(user.userId)
+    if (!session || session.isMember(socket).isErr()) {
       return ack({ outcome: 'NOT_LOBBY_MEMBER' })
     }
     leaveLobby(context, socket)
@@ -161,9 +148,9 @@ export function handleStartLobby(
 ): void {
   const { io } = context
   withValidatedRequest(socket, 'lobby.start', emptyRequestSchema, payload, acknowledge, (user, ack) => {
-    const activeMembership = context.registry.getActiveMembership(user.userId)
-    const lobby = activeMembership?.kind === 'lobby' ? context.registry.getLobby(activeMembership.lobbyId) : undefined
-    if (!lobby || lobby.getMember(user.userId)?.connectionId !== socket.id) return ack({ outcome: 'NOT_LOBBY_MEMBER' })
+    const session = context.registry.getCurrentLobby(user.userId)
+    if (!session || session.isMember(socket).isErr()) return ack({ outcome: 'NOT_LOBBY_MEMBER' })
+    const { lobby } = session
     if (lobby.ownerUserId !== user.userId) return ack({ outcome: 'NOT_LOBBY_OWNER' })
 
     const connected = getConnectedMembers(context, lobby)
@@ -202,8 +189,8 @@ export function handleStartLobby(
       gameContext?.actionScheduler.stop()
       throw error
     }
-    context.registry.promoteLobbyToGame(lobby, gameContext, prepared.map((entry) => entry.member.user.userId))
-    for (const entry of prepared) void entry.socket.leave(lobbyRoom(lobby.lobbyId))
+    context.registry.promoteLobbyToGame(session, gameContext, prepared.map((entry) => entry.member.user.userId))
+    for (const entry of prepared) session.disconnect(entry.socket)
     for (const entry of prepared) {
       io.to(gameContext.playerRoom(entry.member.player.id)).emit('game.started', {
         lobbyId: lobby.lobbyId, initialization: entry.initialization,
