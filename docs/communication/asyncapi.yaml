@@ -1106,7 +1106,7 @@ components:
             - INVALID_REQUEST
             - INTERNAL_ERROR
             - LOBBY_NOT_FOUND
-            - NOT_LOBBY_MEMBER
+            - NOT_A_MEMBER
             - NOT_LOBBY_OWNER
             - LOBBY_FULL
             - USER_ALREADY_IN_SESSION

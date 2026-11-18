@@ -126,7 +126,7 @@ export default function useSessionConnection() {
     void run(async () => {
       const result = await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.start', {})
       if (result.outcome === 'STARTED' && current.current.status === 'joined') return
-      return result.outcome === 'STARTED' || result.outcome === 'NOT_LOBBY_MEMBER'
+      return result.outcome === 'STARTED' || result.outcome === 'NOT_A_MEMBER'
         ? { type: 'sync-requested' } : { type: 'error', error: result.outcome }
     }, 'start')
   }

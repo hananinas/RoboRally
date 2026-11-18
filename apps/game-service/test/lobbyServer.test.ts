@@ -84,7 +84,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     const duplicate = await connect('Owner')
     expect(await duplicate.emitWithAck('lobby.create', {})).toEqual({ outcome: 'ALREADY_HAS_MEMBERSHIP' })
     expect(await duplicate.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'ALREADY_HAS_MEMBERSHIP' })
-    expect(await duplicate.emitWithAck('lobby.start', {})).toEqual({ outcome: 'NOT_LOBBY_MEMBER' })
+    expect(await duplicate.emitWithAck('lobby.start', {})).toEqual({ outcome: 'NOT_A_MEMBER' })
     expect(createGame).not.toHaveBeenCalled()
   })
   it('uses the creator-provided lobby name', async () => {
@@ -170,7 +170,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(await owner.emitWithAck('lobby.list', {})).toMatchObject({
       outcome: 'LOBBIES_FOUND', lobbies: [], maps: expect.any(Array),
     })
-    expect(await owner.emitWithAck('lobby.start', {})).toEqual({ outcome: 'NOT_LOBBY_MEMBER' })
+    expect(await owner.emitWithAck('lobby.start', {})).toEqual({ outcome: 'NOT_A_MEMBER' })
     const outsider = await connect('Outsider')
     expect(await outsider.emitWithAck('membership.get', {})).toEqual({ outcome: 'NO_MEMBERSHIP', user: { userId: 'Outsider', username: 'Outsider' } })
     expect(await outsider.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'LOBBY_NOT_FOUND' })

@@ -36,13 +36,15 @@ function defaultLobbyMapName(): BoardMapName {
   return mapName
 }
 
-export function leaveLobby(context: SocketContext, socket: GameSocket): void {
+export function leaveLobby(context: SocketContext, socket: GameSocket): Result<void, 'NOT_A_MEMBER'> {
   const userId = socket.data.user.userId
   const session = context.registry.getCurrentLobby(userId)
-  if (!session || session.isMember(socket).isErr()) return
-  session.leave(socket)
-  context.registry.clearActiveMembership(userId)
-  if (session.lobby.size === 0) context.registry.removeLobby(session.lobby.lobbyId)
+  if (!session) return err('NOT_A_MEMBER')
+  return session.isMember(socket).map(() => {
+    session.leave(socket)
+    context.registry.clearActiveMembership(userId)
+    if (session.lobby.size === 0) context.registry.removeLobby(session.lobby.lobbyId)
+  })
 }
 
 export function handleListLobbies(
@@ -116,15 +118,9 @@ export function handleLeaveLobby(
   payload: EmptyRequest,
   acknowledge: (result: LobbyLeaveResult) => void,
 ): void {
-  withValidatedRequest(socket, 'lobby.leave', emptyRequestSchema, payload, acknowledge, (user, ack) => {
-    const membership = context.registry.getActiveMembership(user.userId)
-    if (!membership) return ack({ outcome: 'LEFT' })
-    const session = context.registry.getCurrentLobby(user.userId)
-    if (!session || session.isMember(socket).isErr()) {
-      return ack({ outcome: 'NOT_LOBBY_MEMBER' })
-    }
-    leaveLobby(context, socket)
-    ack({ outcome: 'LEFT' })
+  withValidatedRequest(socket, 'lobby.leave', emptyRequestSchema, payload, acknowledge, (_user, ack) => {
+    const result = leaveLobby(context, socket)
+    ack(result.isOk() ? { outcome: 'LEFT' } : { outcome: result.error })
   })
 }
 
@@ -149,7 +145,7 @@ export function handleStartLobby(
   const { io } = context
   withValidatedRequest(socket, 'lobby.start', emptyRequestSchema, payload, acknowledge, (user, ack) => {
     const session = context.registry.getCurrentLobby(user.userId)
-    if (!session || session.isMember(socket).isErr()) return ack({ outcome: 'NOT_LOBBY_MEMBER' })
+    if (!session || session.isMember(socket).isErr()) return ack({ outcome: 'NOT_A_MEMBER' })
     const { lobby } = session
     if (lobby.ownerUserId !== user.userId) return ack({ outcome: 'NOT_LOBBY_OWNER' })
 
