@@ -54,4 +54,5 @@ export interface ServerToClientEvents {
   'robot.actionResolved': (payload: RobotActionResolved) => void
   'game.aborted': (payload: GameAborted) => void
   'game.won': (payload: GameWon) => void
+  'card.choiceChanged': (payload: import('./payloads.js').CardChoiceChanged) => void
 }

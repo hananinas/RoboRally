@@ -20,6 +20,8 @@ import type {
   RegistersChanged,
   RobotActionResolved,
   SubmitProgram,
+  CardChoiceChanged,
+  PendingCardChoice,
 } from '@robo-rally/game-events'
 import { createBoardRenderModel, type BoardRenderModel } from './board/boardModel.ts'
 import {
@@ -52,6 +54,8 @@ export type ClientGameState = {
   connected: boolean
   assignment: PlayerAssignment | null
   phase: GamePhase | null
+  pendingChoice: PendingCardChoice | null
+  choosing: boolean
   programmingTimer: ProgrammingTimer
   paused: boolean
   players: readonly Player[]
@@ -88,6 +92,8 @@ export type GameStateEvent =
   | { type: 'checkpoint-progress'; payload: PlayerCheckpointProgress }
   | { type: 'registers-changed'; payload: RegistersChanged }
   | { type: 'program-submitted'; payload: ProgramSubmitted }
+  | { type: 'choice-changed'; payload: CardChoiceChanged }
+  | { type: 'choosing'}
   | { type: 'disconnected' }
   | { type: 'reconnected' }
   | { type: 'connect-error'; message: string }
@@ -140,6 +146,8 @@ export function createClientGameState(): ClientGameState {
     registers: emptyRegisters(),
     registersPast: [],
     registersFuture: [],
+    pendingChoice: null,
+    choosing: false,
     playbackProgram: null,
     handVersion: 0,
     handReady: false,
@@ -299,8 +307,58 @@ export function gameStateReducer(
   event: GameStateEvent,
 ): ClientGameState {
   switch (event.type) {
+    case 'choice-changed': {
+      if (event.payload.gameId !== state.assignment?.gameId) {
+        return state
+      }
+
+      const choice = event.payload.choice
+      const next = choice ? adoptPendingHand(state) : state
+
+      const players = choice
+        ? next.players.map((player) => {
+            if (player.playerId !== choice.playerId) return player
+
+            const registers: [...PublicRegisters] = [
+              ...player.registers,
+            ]
+
+            registers[choice.registerIndex] = {
+              status: 'REVEALED',
+              instruction: choice.instruction,
+            }
+
+            return { ...player, registers }
+          })
+        : next.players
+
+      return {
+        ...next,
+        players,
+        pendingChoice: choice,
+        choosing: false,
+        error: null,
+        playbackProgram:
+          choice && !next.playback.active
+            ? next.registers
+            : next.playbackProgram,
+        ...(choice
+          ? {
+              phase: 'EXECUTING' as const,
+              handReady: false,
+            }
+          : {}),
+      }
+    }
+
+    case 'choosing':
+      return {
+        ...state,
+        choosing: true,
+        error: null,
+      } 
     case 'error':
-      return { ...state, error: event.message }
+      return { ...state, choosing: false, error: event.message }
     case 'registers-changed': {
       const { gameId, playerId, registers } = event.payload
       if (gameId !== state.assignment?.gameId ||
