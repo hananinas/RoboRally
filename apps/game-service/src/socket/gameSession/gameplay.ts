@@ -3,7 +3,6 @@ import {
   updateRegistersSchema,
   type UpdateRegisters,
   type UpdateRegistersResult,
-  type RegistersChanged,
   type ProgramResultAcknowledgement,
   type SubmitProgram,
 } from '@robo-rally/game-events'
@@ -16,6 +15,7 @@ import { logError, logWarn } from '@/logger'
 import { ownedMembership, type MembershipContext } from '@/socket/gameSession/gameMembership'
 import { toRejection, type Rejection } from '@/socket/utilities/rejection'
 import { publishProgramFinalized } from '@/socket/gameSession/programFinalization'
+import { presentRegistersChanged } from '@/socket/presenters/gamePresenter'
 
 type ValidateSubmissionRequestError =
   | 'NOT_A_MEMBER'
@@ -107,13 +107,7 @@ export function handleUpdateRegisters(
     }
 
     ack({ outcome: 'ACCEPTED' })
-    ctx.io.to(ctx.publicRoom).emit('game.registersChanged', {
-      gameId: ctx.game.id,
-      playerId: player.id,
-      // Successful updateRegisters synchronously replaces every slot with EMPTY/HIDDEN.
-      // No activation can interleave before this read; snapshots retain their wider type.
-      registers: player.registers as RegistersChanged['registers'],
-    })
+    ctx.io.to(ctx.publicRoom).emit('game.registersChanged', presentRegistersChanged(ctx.game.id, player))
   }, (error) => {
     logError('Failed to update registers', error, { command: 'game.updateRegisters', gameId: ctx.game.id })
     return { outcome: 'INTERNAL_ERROR' } as const

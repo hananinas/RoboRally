@@ -1,6 +1,6 @@
 import type { ProgramFinalized } from '@robo-rally/game-events'
 import type { CompletedProgram } from '@/domain/game/index'
-import { presentProgramFinalized } from '@/socket/presenters/gamePresenter'
+import { presentProgramFinalized, presentRegistersChanged } from '@/socket/presenters/gamePresenter'
 import type { MembershipContext } from '@/socket/gameSession/gameMembership'
 
 export function publishProgramFinalized(
@@ -9,12 +9,8 @@ export function publishProgramFinalized(
   reason: ProgramFinalized['reason'],
 ): void {
   io.to(playerRoom(program.playerId)).emit('program.finalized', presentProgramFinalized(game.id, program, reason))
-  io.to(publicRoom).emit('game.registersChanged', {
-    gameId: game.id,
-    playerId: program.playerId,
-    registers: [
-      { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' },
-    ],
-  })
+  const player = game.players.find((candidate) => candidate.id === program.playerId)
+  if (!player) throw new Error(`Missing player ${program.playerId} for finalized program`)
+  io.to(publicRoom).emit('game.registersChanged', presentRegistersChanged(game.id, player))
   io.to(publicRoom).emit('program.submitted', { gameId: game.id, playerId: program.playerId })
 }

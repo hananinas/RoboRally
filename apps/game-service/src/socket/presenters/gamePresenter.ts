@@ -2,13 +2,16 @@ import type {
   Card as CardPayload,
   CardsDealt,
   EnvironmentStepResolved,
+  GameInitialization,
   ProgramFinalized,
   ProgrammingTimer,
   ProgramTimerChanged,
   GamePhase as GamePhasePayload,
   Orientation,
   Position as PositionPayload,
+  PlayerConnectionChanged,
   PublicGameState,
+  RegistersChanged,
   Winner,
   RobotActionResolved,
   PlayerState,
@@ -130,6 +133,25 @@ export function presentCardsDealt(
   player: Player,
 ): CardsDealt {
   return { gameId, playerId: player.id, cards: player.hand.map(presentCard) }
+}
+
+export function presentInitialization(game: Game, player: Player, state: PublicGameState): GameInitialization {
+  return {
+    outcome: 'JOINED',
+    assignment: { gameId: game.id, playerId: player.id, robotId: player.robot.id },
+    state,
+    hand: presentCardsDealt(game.id, player).cards,
+    program: player.program,
+    programSubmitted: game.hasSubmittedProgram(player.id),
+  }
+}
+
+export function presentRegistersChanged(gameId: GameId, player: Player): RegistersChanged {
+  return { gameId, playerId: player.id, registers: player.registers as RegistersChanged['registers'] }
+}
+
+export function presentPlayerConnectionChanged(game: Game, player: Player, connected: boolean): PlayerConnectionChanged {
+  return { gameId: game.id, playerId: player.id, connected, paused: game.paused }
 }
 
 export function presentProgramFinalized(

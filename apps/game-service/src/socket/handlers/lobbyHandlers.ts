@@ -11,22 +11,14 @@ import {
   type LobbyListResult, type LobbyJoinResult, type LobbyLeaveResult, type LobbyStartResult,
 } from '@robo-rally/game-events'
 import { createGameContext } from '@/socket/gameSession/gameContext'
-import { presentInitialization, type MembershipContext } from '@/socket/gameSession/gameMembership'
+import type { MembershipContext } from '@/socket/gameSession/gameMembership'
 import type { GameSocket, SocketContext } from '@/socket/gameServer'
 import { LobbySession } from '@/socket/LobbySession'
-import { presentLobby } from '@/socket/presenters/lobbyPresenter'
+import { presentInitialization } from '@/socket/presenters/gamePresenter'
+import { presentBoardMaps, presentLobby, presentLobbySummary } from '@/socket/presenters/lobbyPresenter'
 
 function isBoardMapName(mapName: string): mapName is BoardMapName {
   return Object.hasOwn(boardMaps, mapName)
-}
-
-function presentBoardMaps() {
-  return Object.entries(boardMaps).map(([mapName, map]) => ({
-    mapName,
-    name: map.name,
-    icon: map.icon,
-    defaultForLobbyCreation: map.defaultForLobbyCreation,
-  }))
 }
 
 function defaultLobbyMapName(): BoardMapName {
@@ -57,10 +49,7 @@ export function handleListLobbies(
     ack({
       outcome: 'LOBBIES_FOUND',
       maps: presentBoardMaps(),
-      lobbies: context.registry.lobbies.map((session) => {
-        const { lobbyId, name, mapName, mapDisplayName, mapIcon, playerCount, maxPlayers } = presentLobby(session.lobby)
-        return { lobbyId, name, mapName, mapDisplayName, mapIcon, playerCount, maxPlayers }
-      }),
+      lobbies: context.registry.lobbies.map((session) => presentLobbySummary(session.lobby)),
     })
   })
 }
@@ -168,7 +157,7 @@ export function handleStartLobby(
       })
       const state = preparedContext.publicState()
       prepared = members.map((entry) => ({
-        ...entry, initialization: presentInitialization(preparedContext, entry.member, state),
+        ...entry, initialization: presentInitialization(preparedContext.game, entry.member.player, state),
       }))
       for (const entry of prepared) {
         for (const room of [gameContext.publicRoom, gameContext.playerRoom(entry.member.player.id)]) {

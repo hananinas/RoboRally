@@ -13,7 +13,7 @@ import {
   type User,
 } from '@robo-rally/game-events'
 import type { Player, Game } from '@/domain/game/index'
-import { presentCardsDealt, presentProgrammingTimer } from '@/socket/presenters/gamePresenter'
+import { presentInitialization, presentPlayerConnectionChanged, presentProgrammingTimer } from '@/socket/presenters/gamePresenter'
 import type { ActionScheduler } from '@/socket/gameSession/actionScheduler'
 import type { ProgrammingTimer } from '@/programmingTimer'
 import type { GameSocket, GameSocketServer } from '@/socket/gameServer'
@@ -51,11 +51,9 @@ function resumeUnlessStillDisconnected(ctx: MembershipContext): void {
   if (result.isOk()) ctx.actionScheduler.announceProgress(result.value)
 }
 
-function notifyReconnected(ctx: MembershipContext, playerId: string): void {
-  ctx.io.to(ctx.publicRoom).emit('game.playerConnectionChanged', {
-    gameId: ctx.game.id, playerId, connected: true, paused: ctx.game.paused,
-  })
-  ctx.io.to(ctx.playerRoom(playerId)).emit('program.timerChanged', presentProgrammingTimer(ctx.game.id, ctx.programmingTimer.state()))
+function notifyReconnected(ctx: MembershipContext, player: Player): void {
+  ctx.io.to(ctx.publicRoom).emit('game.playerConnectionChanged', presentPlayerConnectionChanged(ctx.game, player, true))
+  ctx.io.to(ctx.playerRoom(player.id)).emit('program.timerChanged', presentProgrammingTimer(ctx.game.id, ctx.programmingTimer.state()))
   ctx.actionScheduler.scheduleNextAction()
 }
 
@@ -81,7 +79,7 @@ export function reconnectIfRecovered(ctx: MembershipContext, socket: GameSocket)
   const membership = ctx.memberships.get(socket.data.user.userId)
   if (membership && reattachMembership(membership, socket.id)) {
     resumeUnlessStillDisconnected(ctx)
-    notifyReconnected(ctx, membership.player.id)
+    notifyReconnected(ctx, membership.player)
   }
 }
 
@@ -104,7 +102,7 @@ export function handleReattachGame(
   resumeUnlessStillDisconnected(ctx)
   let initialization: GameInitialization
   try {
-    initialization = presentInitialization(ctx, membership)
+    initialization = presentInitialization(ctx.game, membership.player, ctx.publicState())
     void socket.join([ctx.publicRoom, ctx.playerRoom(membership.player.id)])
   } catch (error) {
     for (const room of [ctx.publicRoom, ctx.playerRoom(membership.player.id)]) {
@@ -116,7 +114,7 @@ export function handleReattachGame(
     return acknowledge({ outcome: 'INTERNAL_ERROR' })
   }
   acknowledge({ outcome: 'IN_GAME', initialization, user })
-  if (reconnected) notifyReconnected(ctx, membership.player.id)
+  if (reconnected) notifyReconnected(ctx, membership.player)
 }
 
 export function handleLeave(
@@ -168,26 +166,8 @@ export function handleDisconnect(ctx: MembershipContext, socket: GameSocket): vo
   try {
     membership.connectionId = null
     ctx.game.pause()
-    ctx.io.to(ctx.publicRoom).emit('game.playerConnectionChanged', {
-      gameId: ctx.game.id, playerId: membership.player.id, connected: false, paused: ctx.game.paused,
-    })
+    ctx.io.to(ctx.publicRoom).emit('game.playerConnectionChanged', presentPlayerConnectionChanged(ctx.game, membership.player, false))
   } catch (error) {
     logError('Failed to process player disconnect', error, { command: 'disconnect', gameId: ctx.game.id, playerId: membership.player.id })
-  }
-}
-
-export function presentInitialization(
-  ctx: MembershipContext,
-  membership: GameMembership,
-  state: PublicGameState = ctx.publicState(),
-): GameInitialization {
-  const { player } = membership
-  return {
-    outcome: 'JOINED',
-    assignment: { gameId: ctx.game.id, playerId: player.id, robotId: player.robot.id },
-    state,
-    hand: presentCardsDealt(ctx.game.id, player).cards,
-    program: player.program,
-    programSubmitted: ctx.game.hasSubmittedProgram(player.id),
   }
 }
