@@ -13,4 +13,4 @@ export const effects = {
 export type ResolvedInstruction = keyof typeof effects
 
 // What a card says. AGAIN has no effect of its own; the server resolves it to a ResolvedInstruction.
-export type Instruction = ResolvedInstruction | 'AGAIN'
+export type Instruction = ResolvedInstruction | 'AGAIN' | 'SANDBOX_ROUTINE' | 'WEASEL_ROUTINE' | 'SPEED_ROUTINE' | 'REPEAT_ROUTINE'
