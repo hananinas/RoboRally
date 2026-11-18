@@ -26,14 +26,14 @@ export class LobbySession {
   }
 
   join(socket: GameSocket): void {
-    this.lobby.addMember(socket.data.user, socket.id)
     this.connect(socket)
+    this.lobby.addMember(socket.data.user, socket.id)
     socket.to(this.room).emit('lobby.updated', { lobby: presentLobby(this.lobby) })
   }
 
   leave(socket: GameSocket): void {
-    this.lobby.removeMember(socket.data.user.userId)
     this.disconnect(socket)
+    this.lobby.removeMember(socket.data.user.userId)
     if (this.lobby.size > 0) {
       socket.to(this.room).emit('lobby.updated', { lobby: presentLobby(this.lobby) })
     }
