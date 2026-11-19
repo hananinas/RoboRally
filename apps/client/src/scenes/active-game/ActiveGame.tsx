@@ -63,7 +63,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
   const handleRedo = () => dispatch({ type: 'redo' })
   const hasHand = state.handVersion > 0
   const status = getGameStatus(state)
-  const visibleChoice = !state.playback.active === null ? state.pendingChoice : null
+  const visibleChoice = !state.playback.active && !state.aborted && state.winner === null ? state.pendingChoice : null
   const disconnectedNames = state.players.filter((player) => !player.connected).map((player) => player.username)
   const player = state.players.find((candidate) => candidate.playerId === state.assignment?.playerId)
   const showWinner = isGameOver(state) && state.connected
