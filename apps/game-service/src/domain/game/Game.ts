@@ -7,7 +7,7 @@ import { Card } from '@/domain/game/Card'
 import { Deck } from '@/domain/game/Deck'
 import type { CardId, GameId, PlayerId, RobotId } from '@/domain/game/ids'
 import { Player } from '@/domain/game/Player'
-import { Robot } from '@/domain/game/Robot'
+import { Robot, ROBOT_COLOURS } from '@/domain/game/Robot'
 import { tileDefinitions } from '@/domain/game/Tile'
 import { Direction, opposite, type Position } from '@/domain/game/spatial'
 import { Integer, PositiveInteger, UnsignedInteger } from '@/numbers'
@@ -188,9 +188,15 @@ export class Game {
     return ok({ ...free[0] })
   }
 
-  addPlayer(colour: string): Result<Player, AddPlayerError> {
+  private nextAvailableColour(): string {
+    return ROBOT_COLOURS.find((colour) => !this.roster.some((player) => player.robot.colour === colour))
+      ?? ROBOT_COLOURS[this.roster.length % ROBOT_COLOURS.length]
+  }
+
+  addPlayer(colour?: string): Result<Player, AddPlayerError> {
+    const assignedColour = colour ?? this.nextAvailableColour()
     return this.findSpawn().map((position) => {
-      const robot = new Robot(randomUUID(), Direction.NORTH, colour)
+      const robot = new Robot(randomUUID(), Direction.NORTH, assignedColour)
       const player = new Player(randomUUID(), robot, Deck.fromTemplate(this.deck))
       player.drawHand()
       this.board.placeRobot(robot.id, position)

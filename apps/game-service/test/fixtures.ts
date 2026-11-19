@@ -60,7 +60,7 @@ export function placeTestPlayer(
 }
 
 export function addTestPlayer(game: Game, colour?: string): Player {
-  return game.addPlayer(colour ?? ROBOT_COLOURS[game.players.length % ROBOT_COLOURS.length])._unsafeUnwrap()
+  return game.addPlayer(colour)._unsafeUnwrap()
 }
 
 export function createEmptyTileGrid(width: number, height: number): Tile[][] {

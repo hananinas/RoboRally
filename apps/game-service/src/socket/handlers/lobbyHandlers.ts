@@ -2,7 +2,6 @@ import { err, ok, type Result } from 'neverthrow'
 import type { Player } from '@/domain/game/Player'
 import { Lobby } from '@/domain/lobby/Lobby'
 import { withValidatedRequest } from '@/socket/utilities/withValidatedRequest'
-import { ROBOT_COLOURS } from '@/domain/game/Robot'
 import { isBoardMapName } from '@/domain/game/boardMaps'
 import { createGame } from '@/domain/game/GameFactory'
 import {
@@ -147,7 +146,7 @@ export function handleStartLobby(
         const preparedContext = createGameContext(io, createGame(lobby.mapName, lobby.name))
         gameContext = preparedContext
         const members = connected.map(({ socket: connection, ...member }) => {
-          const result = preparedContext.game.addPlayer(ROBOT_COLOURS[preparedContext.memberships.size])
+          const result = preparedContext.game.addPlayer()
           if (result.isErr()) throw new Error(result.error)
           const membership = { ...member, player: result.value }
           preparedContext.memberships.set(member.user.userId, membership)
