@@ -12,6 +12,7 @@ import type {
   PlayerConnectionChanged,
   PublicGameState,
   RegistersChanged,
+  User,
   Winner,
   RobotActionResolved,
   PlayerState,
@@ -27,6 +28,7 @@ import {
   type NextActionResult,
   type Player,
   type Position,
+  type PlayerId,
 } from '@/domain/game/index'
 import { Integer } from '@/numbers'
 import type { EnvironmentStepResult } from '@/domain/game/Game'
@@ -89,10 +91,25 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
   throw new Error(`Unsupported tile type at ${x},${y}: ${tile.kind}`)
 }
 
+export function presentPlayerState(game: Game, player: Player, username: string, connected: boolean): PlayerState {
+  return {
+    playerId: player.id,
+    lastCheckpoint: player.lastCheckpoint,
+    username,
+    programSubmitted: game.hasSubmittedProgram(player.id),
+    connected,
+    registers: player.registers,
+  }
+}
+
+export function presentWinner(playerId: PlayerId, username: string): Winner {
+  return { playerId, username }
+}
+
 export function presentPublicGameState(
   game: Game,
   programmingTimer: ProgrammingTimer,
-  players: readonly PlayerState[] = [],
+  memberships: Iterable<{ user: User; player: Player; connectionId: string | null }> = [],
   winner: Winner | null = null,
 ): PublicGameState {
   const tiles = Array.from({ length: game.board.height }, (_, y) =>
@@ -104,7 +121,8 @@ export function presentPublicGameState(
     serverTime: Date.now(),
     programmingTimer,
     checkpointCount: game.board.checkpointCount,
-    players,
+    players: [...memberships].map(({ user, player, connectionId }) =>
+      presentPlayerState(game, player, user.username, connectionId !== null)),
     antenna: game.board.antenna,
     board: {
       width: game.board.width,

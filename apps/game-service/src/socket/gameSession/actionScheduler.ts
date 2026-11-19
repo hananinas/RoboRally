@@ -9,7 +9,7 @@ export type ActionSchedulerDeps = {
   game: Game
   publicRoom: string
   playerRoom: (playerId: string) => string
-  usernameOf: (playerId: string) => string | undefined
+  winner: () => Winner | null
   onProgrammingStarted: () => void
   onStop: () => void
 }
@@ -17,25 +17,15 @@ export type ActionSchedulerDeps = {
 export type ActionScheduler = {
   scheduleNextAction: () => void
   announceProgress: (result: { roundConcluded: boolean }) => void
-  winner: () => Winner | null
   stop: () => void
 }
 
 export function createActionScheduler(
-  { io, game, publicRoom, playerRoom, usernameOf, onProgrammingStarted, onStop }: ActionSchedulerDeps,
+  { io, game, publicRoom, playerRoom, winner, onProgrammingStarted, onStop }: ActionSchedulerDeps,
 ): ActionScheduler {
   let scheduledAction: NodeJS.Immediate | undefined
   let closed = false
   let winnerAnnounced = false
-  let recordedWinner: Winner | null = null
-
-  // Record the winner before they can leave.
-  function winner(): Winner | null {
-    if (recordedWinner === null && game.winner !== undefined) {
-      recordedWinner = { playerId: game.winner, username: usernameOf(game.winner) ?? '' }
-    }
-    return recordedWinner
-  }
 
   function announceWinner(): void {
     if (winnerAnnounced) return
@@ -91,5 +81,5 @@ export function createActionScheduler(
     onStop()
   }
 
-  return { scheduleNextAction, announceProgress, winner, stop }
+  return { scheduleNextAction, announceProgress, stop }
 }

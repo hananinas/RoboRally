@@ -1,21 +1,30 @@
 import type { GameSocketServer } from '@/socket/gameServer'
 import type { Game } from '@/domain/game/index'
-import { presentProgrammingTimer, presentPublicGameState } from '@/socket/presenters/gamePresenter'
+import { presentProgrammingTimer, presentPublicGameState, presentWinner } from '@/socket/presenters/gamePresenter'
 import { createActionScheduler } from '@/socket/gameSession/actionScheduler'
 import { createProgrammingTimer } from '@/programmingTimer'
 import { publishProgramFinalized } from '@/socket/gameSession/programFinalization'
 import { logError } from '@/logger'
 import type { GameMembership, MembershipContext } from '@/socket/gameSession/gameMembership'
+import type { Winner } from '@robo-rally/game-events'
 
 export function createGameContext(io: GameSocketServer, game: Game): MembershipContext {
   const publicRoom = `game:${game.id}:public`
   const playerRoom = (playerId: string) => `game:${game.id}:player:${playerId}`
   const memberships = new Map<string, GameMembership>()
-  const usernameOf = (playerId: string) =>
-    [...memberships.values()].find((membership) => membership.player.id === playerId)?.user.username
+
+  // Record the winner's name while they are still a member; they may leave later.
+  let recordedWinner: Winner | null = null
+  const winner = (): Winner | null => {
+    if (recordedWinner === null && game.winner !== undefined) {
+      const membership = [...memberships.values()].find(({ player }) => player.id === game.winner)
+      recordedWinner = presentWinner(game.winner, membership?.user.username ?? '')
+    }
+    return recordedWinner
+  }
 
   const actionScheduler = createActionScheduler({
-    io, game, publicRoom, playerRoom, usernameOf,
+    io, game, publicRoom, playerRoom, winner,
     onProgrammingStarted: () => programmingTimer.reset(),
     onStop: () => programmingTimer.stop(),
   })
@@ -45,17 +54,7 @@ export function createGameContext(io: GameSocketServer, game: Game): MembershipC
     },
   })
 
-  const publicState = () => presentPublicGameState(game, programmingTimer.state(),
-    [...memberships.values()].map(({ user, player, connectionId }) => ({
-      playerId: player.id,
-      lastCheckpoint: player.lastCheckpoint,
-      username: user.username,
-      programSubmitted: game.hasSubmittedProgram(player.id),
-      connected: connectionId !== null,
-      registers: player.registers,
-    })),
-    actionScheduler.winner(),
-  )
+  const publicState = () => presentPublicGameState(game, programmingTimer.state(), memberships.values(), winner())
 
   return {
     io, game, publicRoom, playerRoom, memberships, publicState, actionScheduler, programmingTimer,
