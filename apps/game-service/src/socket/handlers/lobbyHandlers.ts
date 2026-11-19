@@ -119,18 +119,6 @@ export function handleLeaveLobby(
   })
 }
 
-type ConnectedLobbyMember = { user: User; connectionId: string; socket: GameSocket }
-
-function getConnectedMembers(context: SocketContext, lobby: Lobby): Result<ConnectedLobbyMember[], 'LOBBY_MEMBER_DISCONNECTED'> {
-  const members: ConnectedLobbyMember[] = []
-  for (const member of lobby.members) {
-    const socket = context.io.sockets.sockets.get(member.connectionId)
-    if (!socket?.connected) return err('LOBBY_MEMBER_DISCONNECTED')
-    members.push({ ...member, socket })
-  }
-  return ok(members)
-}
-
 export function handleStartLobby(
   context: SocketContext,
   socket: GameSocket,
@@ -144,7 +132,7 @@ export function handleStartLobby(
       const session = context.registry.getCurrentLobby(user.userId)
       if (!session || session.isMember(socket).isErr()) return err({ outcome: 'NOT_A_MEMBER' as const })
       if (session.lobby.ownerUserId !== user.userId) return err({ outcome: 'NOT_LOBBY_OWNER' as const })
-      const connected = getConnectedMembers(context, session.lobby)
+      const connected = session.resolveConnectedMembers(context.io)
       if (connected.isErr()) return err({ outcome: connected.error })
       return ok({ session, connected: connected.value })
     },

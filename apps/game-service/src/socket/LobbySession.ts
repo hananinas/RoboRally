@@ -1,7 +1,10 @@
 import { err, ok, type Result } from 'neverthrow'
+import type { User } from '@robo-rally/game-events'
 import { Lobby, type LobbyMember } from '@/domain/lobby/Lobby'
-import type { GameSocket } from '@/socket/gameServer'
+import type { GameSocket, GameSocketServer } from '@/socket/gameServer'
 import { presentLobby } from '@/socket/presenters/lobbyPresenter'
+
+type ConnectedLobbyMember = { user: User; connectionId: string; socket: GameSocket }
 
 export class LobbySession {
   readonly lobby: Lobby
@@ -41,5 +44,15 @@ export class LobbySession {
     if (this.lobby.size > 0) {
       socket.to(this.room).emit('lobby.updated', { lobby: presentLobby(this.lobby) })
     }
+  }
+
+  resolveConnectedMembers(io: GameSocketServer): Result<ConnectedLobbyMember[], 'LOBBY_MEMBER_DISCONNECTED'> {
+    const members: ConnectedLobbyMember[] = []
+    for (const member of this.lobby.members) {
+      const socket = io.sockets.sockets.get(member.connectionId)
+      if (!socket?.connected) return err('LOBBY_MEMBER_DISCONNECTED')
+      members.push({ ...member, socket })
+    }
+    return ok(members)
   }
 }
