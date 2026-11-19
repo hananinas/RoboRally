@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { BoardMapName, BoardMapSummary, LobbySummary, ServerToClientEvents } from '@robo-rally/game-events'
 import useGameConnection from './scenes/active-game/useGameConnection.ts'
-import { createSessionState, sessionReducer, type SessionEvent } from './sessionState.ts'
+import { createMembershipState, membershipReducer, type MembershipEvent } from './membershipState.ts'
 import useGameSocket, { ACKNOWLEDGEMENT_TIMEOUT_MS } from './useGameSocket.ts'
 
-export default function useSessionConnection() {
+export default function useMembershipConnection() {
   const connection = useGameSocket()
   const { socket } = connection
   const game = useGameConnection(socket)
   const { initialize, dispatch: dispatchGame, needsReconciliation } = game
-  const [session, setSession] = useState(createSessionState)
-  const current = useRef(session)
+  const [membership, setMembership] = useState(createMembershipState)
+  const current = useRef(membership)
   const generation = useRef(0)
   const pending = useRef(false)
   const [busy, setBusy] = useState(false)
@@ -21,16 +21,16 @@ export default function useSessionConnection() {
   const listAttempt = useRef(0)
 
   // Update event-time state before the next Socket.IO packet is handled.
-  const dispatch = useCallback((event: SessionEvent) => {
-    const next = sessionReducer(current.current, event)
+  const dispatch = useCallback((event: MembershipEvent) => {
+    const next = membershipReducer(current.current, event)
     if (event.type === 'game-started' && next !== current.current && next.status === 'joined') initialize(event.initialization)
-    if (event.type === 'session-result' && next.status === 'joined' && event.result.outcome === 'IN_GAME') initialize(event.result.initialization)
-    if (event.type === 'left' || (event.type === 'session-result' && event.result.outcome === 'NO_SESSION')) dispatchGame({ type: 'reset' })
+    if (event.type === 'membership-result' && next.status === 'joined' && event.result.outcome === 'IN_GAME') initialize(event.result.initialization)
+    if (event.type === 'left' || (event.type === 'membership-result' && event.result.outcome === 'NO_MEMBERSHIP')) dispatchGame({ type: 'reset' })
     current.current = next
-    setSession(next)
+    setMembership(next)
   }, [initialize, dispatchGame])
 
-  const run = useCallback(async (operation: () => Promise<SessionEvent | undefined>, kind: 'sync' | 'command' | 'start' = 'command') => {
+  const run = useCallback(async (operation: () => Promise<MembershipEvent | undefined>, kind: 'sync' | 'command' | 'start' = 'command') => {
     if (pending.current || !socket.connected) return
     pending.current = true
     setBusy(true)
@@ -82,12 +82,12 @@ export default function useSessionConnection() {
   }, [socket, dispatch, needsReconciliation])
 
   useEffect(() => {
-    if (session.status !== 'resyncing' || !socket.connected || busy) return
+    if (membership.status !== 'resyncing' || !socket.connected || busy) return
     void run(async () => {
-      const result = await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('session.get', {})
-      return { type: 'session-result', result }
+      const result = await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('membership.get', {})
+      return { type: 'membership-result', result }
     }, 'sync')
-  }, [session, socket, connection.status, busy, run])
+  }, [membership, socket, connection.status, busy, run])
 
   const refreshLobbies = useCallback(() => {
     if (!socket.connected) return
@@ -105,8 +105,8 @@ export default function useSessionConnection() {
     })
   }, [socket])
   useEffect(() => {
-    if (session.status === 'browsing') refreshLobbies()
-  }, [session.status, refreshLobbies])
+    if (membership.status === 'browsing') refreshLobbies()
+  }, [membership.status, refreshLobbies])
 
   function joinLobby(lobbyId: string) {
     if (pending.current || !socket.connected) return
@@ -122,7 +122,7 @@ export default function useSessionConnection() {
     }))
   }
   function startLobby() {
-    if (session.status !== 'waiting') return
+    if (membership.status !== 'waiting') return
     void run(async () => {
       const result = await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.start', {})
       if (result.outcome === 'STARTED' && current.current.status === 'joined') return
@@ -130,9 +130,9 @@ export default function useSessionConnection() {
         ? { type: 'sync-requested' } : { type: 'error', error: result.outcome }
     }, 'start')
   }
-  function leaveSession() {
+  function leaveMembership() {
     void run(async () => {
-      const result = session.status === 'waiting'
+      const result = membership.status === 'waiting'
         ? await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.leave', {})
         : game.state.assignment
           ? await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('game.leave', {}) : undefined
@@ -142,9 +142,9 @@ export default function useSessionConnection() {
   }
 
   return {
-    connection, game, session, busy, lobbies, maps, mapsLoaded, listError,
-    joinLobby, startLobby, leaveSession, refreshLobbies,
+    connection, game, membership, busy, lobbies, maps, mapsLoaded, listError,
+    joinLobby, startLobby, leaveMembership, refreshLobbies,
     createLobby,
-    retrySession: () => socket.connected ? dispatch({ type: 'sync-requested' }) : connection.connect(),
+    retryMembership: () => socket.connected ? dispatch({ type: 'sync-requested' }) : connection.connect(),
   }
 }

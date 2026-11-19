@@ -1,6 +1,6 @@
-import type { GameInitialization, LobbyJoinResult, LobbyState, SessionResult, User } from '@robo-rally/game-events'
+import type { GameInitialization, LobbyJoinResult, LobbyState, MembershipResult, User } from '@robo-rally/game-events'
 
-export type SessionState =
+export type MembershipState =
   | { status: 'resyncing'; user: User | null }
   | { status: 'browsing'; user: User; error: string | null }
   | { status: 'joining'; user: User; lobbyId: string | null }
@@ -8,22 +8,22 @@ export type SessionState =
   | { status: 'joined'; user: User; gameId: string }
   | { status: 'sync-failed'; user: User | null; error: string }
 
-export type SessionEvent =
+export type MembershipEvent =
   | { type: 'lobby-requested'; lobbyId: string | null }
   | { type: 'lobby-result'; result: LobbyJoinResult }
   | { type: 'lobby-updated'; lobby: LobbyState }
   | { type: 'game-started'; lobbyId: string; initialization: GameInitialization }
   | { type: 'sync-requested' }
-  | { type: 'session-result'; result: SessionResult }
+  | { type: 'membership-result'; result: MembershipResult }
   | { type: 'error'; error: string }
   | { type: 'left' }
   | { type: 'disconnected' }
 
-export function createSessionState(): SessionState {
+export function createMembershipState(): MembershipState {
   return { status: 'resyncing', user: null }
 }
 
-export function sessionReducer(state: SessionState, event: SessionEvent): SessionState {
+export function membershipReducer(state: MembershipState, event: MembershipEvent): MembershipState {
   switch (event.type) {
     case 'lobby-requested':
       return state.status === 'browsing' ? { status: 'joining', user: state.user, lobbyId: event.lobbyId } : state
@@ -41,10 +41,10 @@ export function sessionReducer(state: SessionState, event: SessionEvent): Sessio
         ? { status: 'joined', user: state.user, gameId: event.initialization.assignment.gameId } : state
     case 'sync-requested':
       return { status: 'resyncing', user: state.user }
-    case 'session-result': {
+    case 'membership-result': {
       if (state.status !== 'resyncing') return state
       const result = event.result
-      if (result.outcome === 'NO_SESSION') return { status: 'browsing', user: result.user, error: null }
+      if (result.outcome === 'NO_MEMBERSHIP') return { status: 'browsing', user: result.user, error: null }
       if (result.outcome === 'IN_LOBBY') return { status: 'waiting', user: result.user, lobby: result.lobby, error: null }
       if (result.outcome === 'IN_GAME') return { status: 'joined', user: result.user, gameId: result.initialization.assignment.gameId }
       return { status: 'sync-failed', user: state.user, error: result.outcome }

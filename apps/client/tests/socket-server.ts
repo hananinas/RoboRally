@@ -330,10 +330,10 @@ io.on('connection', (socket) => {
     if (fixture.clock.deferred) fixture.pendingClocks.push({ socket, respond })
     else respond()
   })
-  socket.on('session.get', (_, acknowledge) => {
-    fixture.entryRequests.push({ event: 'session.get', socketId: socket.id, payload: {} })
+  socket.on('membership.get', (_, acknowledge) => {
+    fixture.entryRequests.push({ event: 'membership.get', socketId: socket.id, payload: {} })
     acknowledge(fixture.started ? { outcome: 'IN_GAME', initialization: initialization(), user }
-      : lobby ? { outcome: 'IN_LOBBY', lobby, user } : { outcome: 'NO_SESSION', user })
+      : lobby ? { outcome: 'IN_LOBBY', lobby, user } : { outcome: 'NO_MEMBERSHIP', user })
   })
   socket.on('lobby.list', (_, acknowledge) => acknowledge({ outcome: 'LOBBIES_FOUND', lobbies: [lobbyState()], maps }))
   socket.on('lobby.create', (payload, acknowledge) => {
