@@ -4,7 +4,7 @@ import { Lobby, type LobbyMember } from '@/domain/lobby/Lobby'
 import type { GameSocket, GameSocketServer } from '@/socket/gameServer'
 import { presentLobby } from '@/socket/presenters/lobbyPresenter'
 
-type ConnectedLobbyMember = { user: User; connectionId: string; socket: GameSocket }
+export type ConnectedLobbyMember = { user: User; connectionId: string; socket: GameSocket }
 
 export class LobbySession {
   readonly lobby: Lobby

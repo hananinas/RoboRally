@@ -9,10 +9,9 @@ import {
   type EmptyRequest, type LobbyRequest, type CreateLobbyRequest, type GameInitialization, type User,
   type LobbyListResult, type LobbyJoinResult, type LobbyLeaveResult, type LobbyStartResult,
 } from '@robo-rally/game-events'
-import { createGameContext } from '@/socket/gameSession/gameContext'
-import type { MembershipContext } from '@/socket/gameSession/gameMembership'
-import type { GameSocket, SocketContext } from '@/socket/gameServer'
-import { LobbySession } from '@/socket/LobbySession'
+import { GameSession } from '@/socket/gameSession/GameSession'
+import type { GameSocket, GameSocketServer, SocketContext } from '@/socket/gameServer'
+import { LobbySession, type ConnectedLobbyMember } from '@/socket/LobbySession'
 import { presentInitialization } from '@/socket/presenters/gamePresenter'
 import { presentBoardMaps, presentLobby, presentLobbySummary } from '@/socket/presenters/lobbyPresenter'
 
@@ -118,6 +117,49 @@ export function handleLeaveLobby(
   })
 }
 
+type PreparedMember = { member: { user: User; player: Player }; socket: GameSocket; initialization: GameInitialization }
+
+function startGame(
+  io: GameSocketServer,
+  lobby: Lobby,
+  connected: ConnectedLobbyMember[],
+): { gameSession: GameSession; prepared: PreparedMember[] } {
+  // The in-memory adapter joins synchronously. Prepare everything before publishing
+  // or notifying clients; no event-loop yield can change the roster mid-transition.
+  let gameSession: GameSession | undefined
+  let prepared: PreparedMember[] = []
+  try {
+    const session = new GameSession(io, createGame(lobby.mapName, lobby.name))
+    gameSession = session
+    const members = connected.map(({ socket: connection, ...member }) => {
+      const result = session.game.addPlayer()
+      if (result.isErr()) throw new Error(result.error)
+      const membership = { ...member, player: result.value }
+      session.memberships.set(member.user.userId, membership)
+      return { member: membership, socket: connection }
+    })
+    const state = session.publicState()
+    prepared = members.map((entry) => ({
+      ...entry, initialization: presentInitialization(session.game, entry.member.player, state),
+    }))
+    for (const entry of prepared) {
+      for (const room of [gameSession.publicRoom, gameSession.playerRoom(entry.member.player.id)]) {
+        void entry.socket.join(room)
+      }
+    }
+    return { gameSession, prepared }
+  } catch (error) {
+    if (gameSession) {
+      for (const { socket: connection, member } of prepared) {
+        void connection.leave(gameSession.publicRoom)
+        void connection.leave(gameSession.playerRoom(member.player.id))
+      }
+    }
+    gameSession?.actionScheduler.stop()
+    throw error
+  }
+}
+
 export function handleStartLobby(
   context: SocketContext,
   socket: GameSocket,
@@ -137,48 +179,15 @@ export function handleStartLobby(
     },
     run: ({ session, connected }, ack) => {
       const { lobby } = session
-
-      // The in-memory adapter joins synchronously. Prepare everything before publishing
-      // or notifying clients; no event-loop yield can change the roster mid-transition.
-      let gameContext: MembershipContext | undefined
-      let prepared: { member: { user: User; player: Player }; socket: GameSocket; initialization: GameInitialization }[] = []
-      try {
-        const preparedContext = createGameContext(io, createGame(lobby.mapName, lobby.name))
-        gameContext = preparedContext
-        const members = connected.map(({ socket: connection, ...member }) => {
-          const result = preparedContext.game.addPlayer()
-          if (result.isErr()) throw new Error(result.error)
-          const membership = { ...member, player: result.value }
-          preparedContext.memberships.set(member.user.userId, membership)
-          return { member: membership, socket: connection }
-        })
-        const state = preparedContext.publicState()
-        prepared = members.map((entry) => ({
-          ...entry, initialization: presentInitialization(preparedContext.game, entry.member.player, state),
-        }))
-        for (const entry of prepared) {
-          for (const room of [gameContext.publicRoom, gameContext.playerRoom(entry.member.player.id)]) {
-            void entry.socket.join(room)
-          }
-        }
-      } catch (error) {
-        if (gameContext) {
-          for (const { socket: connection, member } of prepared) {
-            void connection.leave(gameContext.publicRoom)
-            void connection.leave(gameContext.playerRoom(member.player.id))
-          }
-        }
-        gameContext?.actionScheduler.stop()
-        throw error
-      }
-      context.registry.promoteLobbyToGame(session, gameContext, prepared.map((entry) => entry.member.user.userId))
+      const { gameSession, prepared } = startGame(io, lobby, connected)
       for (const entry of prepared) session.disconnect(entry.socket)
+      context.registry.promoteLobbyToGame(session, gameSession, prepared.map((entry) => entry.member.user.userId))
       for (const entry of prepared) {
-        io.to(gameContext.playerRoom(entry.member.player.id)).emit('game.started', {
+        io.to(gameSession.playerRoom(entry.member.player.id)).emit('game.started', {
           lobbyId: lobby.lobbyId, initialization: entry.initialization,
         })
       }
-      ack({ outcome: 'STARTED', gameId: gameContext.game.id })
+      ack({ outcome: 'STARTED', gameId: gameSession.game.id })
     },
   })
 }

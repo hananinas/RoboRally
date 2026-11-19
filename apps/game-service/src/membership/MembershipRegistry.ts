@@ -1,11 +1,11 @@
-import type { MembershipContext } from '@/socket/gameSession/gameMembership'
+import type { GameSession } from '@/socket/gameSession/GameSession'
 import type { Lobby } from '@/domain/lobby/Lobby'
 import { LobbySession } from '@/socket/LobbySession'
 
 export type ActiveMembership = { kind: 'lobby'; lobbyId: string } | { kind: 'game'; gameId: string }
 
 export class MembershipRegistry {
-  private readonly gamesById = new Map<string, MembershipContext>()
+  private readonly gamesById = new Map<string, GameSession>()
   private readonly lobbiesById = new Map<string, LobbySession>()
   private readonly activeMembershipsByUser = new Map<string, ActiveMembership>()
 
@@ -13,11 +13,11 @@ export class MembershipRegistry {
     return [...this.lobbiesById.values()]
   }
 
-  get games(): MembershipContext[] {
+  get games(): GameSession[] {
     return [...this.gamesById.values()]
   }
 
-  getCurrentGame(userId: string): MembershipContext | undefined {
+  getCurrentGame(userId: string): GameSession | undefined {
     const membership = this.activeMembershipsByUser.get(userId)
     return membership?.kind === 'game' ? this.gamesById.get(membership.gameId) : undefined
   }
@@ -57,10 +57,10 @@ export class MembershipRegistry {
     this.gamesById.delete(gameId)
   }
 
-  promoteLobbyToGame(lobbySession: LobbySession, gameContext: MembershipContext, memberUserIds: Iterable<string>): void {
-    this.gamesById.set(gameContext.game.id, gameContext)
+  promoteLobbyToGame(lobbySession: LobbySession, gameSession: GameSession, memberUserIds: Iterable<string>): void {
+    this.gamesById.set(gameSession.game.id, gameSession)
     for (const userId of memberUserIds) {
-      this.activeMembershipsByUser.set(userId, { kind: 'game', gameId: gameContext.game.id })
+      this.activeMembershipsByUser.set(userId, { kind: 'game', gameId: gameSession.game.id })
     }
     this.removeLobby(lobbySession.lobby.lobbyId)
   }

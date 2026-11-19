@@ -10,11 +10,12 @@ import { err, ok, type Result } from 'neverthrow'
 import { withValidatedRequest } from '@/socket/utilities/withValidatedRequest'
 import type { GameSocket } from '@/socket/gameServer'
 import { logWarn } from '@/logger'
-import { ownedMembership, type MembershipContext } from '@/socket/gameSession/gameMembership'
+import { ownedMembership } from '@/socket/gameSession/gameMembership'
+import type { GameSession } from '@/socket/gameSession/GameSession'
 import { publishProgramFinalized } from '@/socket/gameSession/programFinalization'
 import { presentRegistersChanged } from '@/socket/presenters/gamePresenter'
 
-function expireProgrammingIfDue(ctx: MembershipContext): Result<void, 'WRONG_PHASE'> {
+function expireProgrammingIfDue(ctx: GameSession): Result<void, 'WRONG_PHASE'> {
   if (ctx.game.aborted || ctx.game.winner !== undefined || ctx.game.paused) return ok(undefined)
 
   const expired = ctx.programmingTimer.expireIfDue()
@@ -25,7 +26,7 @@ function expireProgrammingIfDue(ctx: MembershipContext): Result<void, 'WRONG_PHA
 }
 
 export function handleSubmitProgram(
-  ctx: MembershipContext,
+  ctx: GameSession,
   socket: GameSocket,
   payload: SubmitProgram,
   acknowledge: ProgramResultAcknowledgement,
@@ -52,7 +53,7 @@ export function handleSubmitProgram(
 }
 
 export function handleUpdateRegisters(
-  ctx: MembershipContext,
+  ctx: GameSession,
   socket: GameSocket,
   payload: UpdateRegisters,
   acknowledge: (result: UpdateRegistersResult) => void,

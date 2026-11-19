@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import * as actionScheduler from '@/socket/gameSession/actionScheduler'
 import type { Game } from '@/domain/game/Game'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
-import * as gameContext from '@/socket/gameSession/gameContext'
+import * as gameSessionModule from '@/socket/gameSession/GameSession'
 import { handleUpdateRegisters } from '@/socket/gameSession/gameplay'
 import { createSessionStore, type SessionStore } from '@/auth/sessionStore'
 import { authCookieHeader } from './authTestHelper.ts'
@@ -26,12 +26,12 @@ describe('public registers over Socket.IO', () => {
   let server: GameSocketServer
   let url: string
   let clients: Client[]
-  let contexts: MockInstance<typeof gameContext.createGameContext>
+  let contexts: MockInstance<typeof gameSessionModule.GameSession>
   let sessionStore: SessionStore
 
   beforeEach(async () => {
     clients = []
-    contexts = vi.spyOn(gameContext, 'createGameContext')
+    contexts = vi.spyOn(gameSessionModule, 'GameSession')
     const http = createServer()
     sessionStore = createSessionStore({ oidcClient: { refreshToken: vi.fn() }, refreshBufferSeconds: 0 })
     server = createGameSocketServer(http, sessionStore)
@@ -109,7 +109,7 @@ describe('public registers over Socket.IO', () => {
     const first = await connect('First')
     const second = await connect('Second')
     const [a, b] = await start([first, second])
-    const ctx = contexts.mock.results[0].value as ReturnType<typeof gameContext.createGameContext>
+    const ctx = contexts.mock.results[0].value as gameSessionModule.GameSession
     vi.spyOn(ctx.actionScheduler, 'scheduleNextAction').mockImplementation(() => {})
     let now = Date.now()
     vi.spyOn(Date, 'now').mockImplementation(() => now)

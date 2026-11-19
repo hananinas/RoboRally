@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { User } from '@robo-rally/game-events'
-import type { MembershipContext } from '@/socket/gameSession/gameMembership'
+import type { GameSession } from '@/socket/gameSession/GameSession'
 import { Lobby } from '@/domain/lobby/Lobby'
 import { MembershipRegistry } from '@/membership/MembershipRegistry'
 
@@ -8,8 +8,8 @@ function user(userId: string): User {
   return { userId, username: userId }
 }
 
-function fakeGameContext(gameId: string): MembershipContext {
-  return { game: { id: gameId } } as unknown as MembershipContext
+function fakeGameSession(gameId: string): GameSession {
+  return { game: { id: gameId } } as unknown as GameSession
 }
 
 describe('MembershipRegistry', () => {
@@ -50,14 +50,14 @@ describe('MembershipRegistry', () => {
     registry.setActiveMembership('owner', { kind: 'lobby', lobbyId: lobby.lobbyId })
     registry.setActiveMembership('second', { kind: 'lobby', lobbyId: lobby.lobbyId })
 
-    const gameContext = fakeGameContext('game-1')
-    registry.promoteLobbyToGame(session, gameContext, ['owner', 'second'])
+    const gameSession = fakeGameSession('game-1')
+    registry.promoteLobbyToGame(session, gameSession, ['owner', 'second'])
 
     expect(registry.getLobby(lobby.lobbyId)).toBeUndefined()
     expect(registry.lobbies).toEqual([])
-    expect(registry.games).toEqual([gameContext])
+    expect(registry.games).toEqual([gameSession])
     for (const userId of ['owner', 'second']) {
-      expect(registry.getCurrentGame(userId)).toBe(gameContext)
+      expect(registry.getCurrentGame(userId)).toBe(gameSession)
       expect(registry.getActiveMembership(userId)).toEqual({ kind: 'game', gameId: 'game-1' })
     }
 

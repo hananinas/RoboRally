@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import { Game, type BoardMapName } from '@/domain/game/index'
 import { HAND_SIZE } from '@/domain/game/Deck'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
-import * as gameContext from '@/socket/gameSession/gameContext'
+import * as gameSessionModule from '@/socket/gameSession/GameSession'
 import { createSessionStore, type SessionStore } from '@/auth/sessionStore'
 import { authCookieHeader } from './authTestHelper.ts'
 
@@ -19,10 +19,10 @@ describe('started game membership over Socket.IO', () => {
   let sessionStore: SessionStore
   let url: string
   let clients: Client[]
-  let contexts: MockInstance<typeof gameContext.createGameContext>
+  let contexts: MockInstance<typeof gameSessionModule.GameSession>
   beforeEach(async () => {
     clients = []
-    contexts = vi.spyOn(gameContext, 'createGameContext')
+    contexts = vi.spyOn(gameSessionModule, 'GameSession')
     await start()
   })
   async function start() {
@@ -40,7 +40,7 @@ describe('started game membership over Socket.IO', () => {
   function currentGame(): Game {
     const latest = contexts.mock.results.at(-1)
     if (!latest) throw new Error('No game has started yet')
-    return (latest.value as ReturnType<typeof gameContext.createGameContext>).game
+    return (latest.value as gameSessionModule.GameSession).game
   }
   async function connect(username: string): Promise<Client> {
     const client: Client = io(url, {
@@ -181,7 +181,7 @@ describe('started game membership over Socket.IO', () => {
   it('skips an action queued before disconnect and executes it once after reconnect', async () => {
     const { members: [first, second] } = await startGame(['First', 'Second'])
     const game = currentGame()
-    const ctx = contexts.mock.results.at(-1)!.value as ReturnType<typeof gameContext.createGameContext>
+    const ctx = contexts.mock.results.at(-1)!.value as gameSessionModule.GameSession
     for (const player of game.players) game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
     for (let action = 0; action < 9; action++) resolveRobotAction(game)
     const execute = vi.spyOn(game, 'executeNextAction')

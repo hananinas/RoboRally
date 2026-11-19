@@ -7,14 +7,12 @@ import {
   type GameInitialization,
   type MembershipResult,
   type LeaveResult,
-  type PublicGameState,
   type User,
 } from '@robo-rally/game-events'
-import type { Player, Game } from '@/domain/game/index'
+import type { Player } from '@/domain/game/index'
 import { presentInitialization, presentPlayerConnectionChanged, presentProgrammingTimer } from '@/socket/presenters/gamePresenter'
-import type { ActionScheduler } from '@/socket/gameSession/actionScheduler'
-import type { ProgrammingTimer } from '@/programmingTimer'
-import type { GameSocket, GameSocketServer } from '@/socket/gameServer'
+import type { GameSocket } from '@/socket/gameServer'
+import type { GameSession } from '@/socket/gameSession/GameSession'
 
 export type GameMembership = {
   user: User
@@ -22,18 +20,7 @@ export type GameMembership = {
   connectionId: string | null
 }
 
-export type MembershipContext = {
-  io: GameSocketServer
-  game: Game
-  publicRoom: string
-  playerRoom: (playerId: string) => string
-  memberships: Map<string, GameMembership>
-  publicState: () => PublicGameState
-  actionScheduler: ActionScheduler
-  programmingTimer: ProgrammingTimer
-}
-
-function anyDisconnected(ctx: MembershipContext): boolean {
+function anyDisconnected(ctx: GameSession): boolean {
   return [...ctx.memberships.values()].some((membership) => membership.connectionId === null)
 }
 
@@ -43,24 +30,24 @@ function reattachMembership(membership: GameMembership, socketId: string): boole
   return wasDisconnected
 }
 
-function resumeUnlessStillDisconnected(ctx: MembershipContext): void {
+function resumeUnlessStillDisconnected(ctx: GameSession): void {
   if (anyDisconnected(ctx)) return
   const result = ctx.game.resume()
   if (result.isOk()) ctx.actionScheduler.announceProgress(result.value)
 }
 
-function notifyReconnected(ctx: MembershipContext, player: Player): void {
+function notifyReconnected(ctx: GameSession, player: Player): void {
   ctx.io.to(ctx.publicRoom).emit('game.playerConnectionChanged', presentPlayerConnectionChanged(ctx.game, player, true))
   ctx.io.to(ctx.playerRoom(player.id)).emit('program.timerChanged', presentProgrammingTimer(ctx.game.id, ctx.programmingTimer.state()))
   ctx.actionScheduler.scheduleNextAction()
 }
 
-export function ownedMembership(ctx: MembershipContext, socket: GameSocket): GameMembership | undefined {
+export function ownedMembership(ctx: GameSession, socket: GameSocket): GameMembership | undefined {
   const membership = ctx.memberships.get(socket.data.user.userId)
   return membership?.connectionId === socket.id ? membership : undefined
 }
 
-export function reconnectIfRecovered(ctx: MembershipContext, socket: GameSocket): void {
+export function reconnectIfRecovered(ctx: GameSession, socket: GameSocket): void {
   if (!socket.recovered) return
   const membership = ctx.memberships.get(socket.data.user.userId)
   if (membership && reattachMembership(membership, socket.id)) {
@@ -71,7 +58,7 @@ export function reconnectIfRecovered(ctx: MembershipContext, socket: GameSocket)
 
 // Published games have a fixed roster. Only an existing member can reattach.
 export function handleReattachGame(
-  ctx: MembershipContext,
+  ctx: GameSession,
   socket: GameSocket,
   acknowledge: (result: MembershipResult) => void,
 ): void {
@@ -104,12 +91,12 @@ export function handleReattachGame(
 }
 
 export function handleLeave(
-  ctx: MembershipContext,
+  ctx: GameSession,
   socket: GameSocket,
   payload: EmptyRequest,
   acknowledge: (result: LeaveResult) => void,
 ): void {
-  const { io, game, memberships, publicRoom, playerRoom, actionScheduler } = ctx
+  const { io, game, memberships, actionScheduler } = ctx
   withValidatedRequest({
     socket, command: 'game.leave', schema: emptyRequestSchema, payload, acknowledge,
     resolve: () => {
@@ -120,10 +107,10 @@ export function handleLeave(
       const { player, user } = membership
       const { roundConcluded } = game.removePlayer(player.id)
       memberships.delete(user.userId)
-      void socket.leave(publicRoom)
-      void socket.leave(playerRoom(player.id))
+      void socket.leave(ctx.publicRoom)
+      void socket.leave(ctx.playerRoom(player.id))
       ack({ outcome: 'LEFT' })
-      io.to(publicRoom).emit('game.playerLeft', {
+      io.to(ctx.publicRoom).emit('game.playerLeft', {
         gameId: game.id, playerId: player.id, robotId: player.robot.id,
       })
       if (game.requirePhase('activation').isOk()) ctx.programmingTimer.close()
@@ -133,7 +120,7 @@ export function handleLeave(
   })
 }
 
-export function handleDisconnect(ctx: MembershipContext, socket: GameSocket): void {
+export function markDisconnected(ctx: GameSession, socket: GameSocket): void {
   const membership = ownedMembership(ctx, socket)
   if (!membership) return
 

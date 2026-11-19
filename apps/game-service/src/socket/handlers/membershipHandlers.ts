@@ -3,7 +3,7 @@ import { emptyRequestSchema, type ClockResult, type EmptyRequest, type Membershi
 import type { GameSocket, SocketContext } from '@/socket/gameServer'
 import { leaveLobby } from '@/socket/handlers/lobbyHandlers'
 import { presentLobby } from '@/socket/presenters/lobbyPresenter'
-import { handleReattachGame, handleLeave, handleDisconnect, reconnectIfRecovered } from '@/socket/gameSession/gameMembership'
+import { handleReattachGame, handleLeave, markDisconnected, reconnectIfRecovered } from '@/socket/gameSession/gameMembership'
 import { handleSubmitProgram, handleUpdateRegisters } from '@/socket/gameSession/gameplay'
 import { withValidatedRequest } from '@/socket/utilities/withValidatedRequest'
 
@@ -90,7 +90,7 @@ export function handleLeaveGame(
 export function handleSocketDisconnect(context: SocketContext, socket: GameSocket): void {
   leaveLobby(context, socket)
   const game = context.registry.getCurrentGame(socket.data.user.userId)
-  if (game) handleDisconnect(game, socket)
+  if (game) markDisconnected(game, socket)
 }
 
 export function handleCurrentGameProgram(
