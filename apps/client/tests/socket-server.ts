@@ -106,8 +106,13 @@ function acknowledgeProgram(
 
 function controlFixture(fixture: Fixture, control: FixtureControl) {
   switch (control.type) {
-    case 'checkpoint-progress':
-      for (const socket of fixture.sockets) socket.emit('player.checkpointProgress', control.progress)
+    case 'player-left':
+      fixture.state = {
+        ...fixture.state,
+        players: fixture.state.players.filter((player) => player.playerId !== control.player.playerId),
+        robots: fixture.state.robots.filter((robot) => robot.robotId !== control.player.robotId),
+      }
+      for (const socket of fixture.sockets) socket.emit('game.playerLeft', control.player)
       break
     case 'connection-changed':
       for (const socket of fixture.sockets) socket.emit('game.playerConnectionChanged', control.payload)
@@ -178,22 +183,37 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
         acknowledgeProgram(fixture, pending.socket, pending.acknowledge, control.outcome, pending.submission)
       }
       break
+    case 'inject-environment':
+      for (const socket of fixture.sockets) socket.emit('environment.stepResolved', control.result)
+      break
     case 'round': {
-      timerChanged(fixture, { status: 'CLOSED' })
       let robots = fixture.state.robots
+      let players = fixture.state.players
       for (const action of control.actions) {
+        if (action.gameId !== fixture.state.gameId) throw new Error('Round result belongs to another game')
+        const changes = 'kind' in action ? action.robots ?? []
+          : [{ robotId: action.robotId, position: action.position }, ...action.pushedRobots]
         robots = robots.map((robot) => {
-          const position = robot.robotId === action.robotId ? action.position
-            : action.pushedRobots.find((pushed) => pushed.robotId === robot.robotId)?.position
+          const position = changes.find((change) => change.robotId === robot.robotId)?.position
           return position === undefined ? robot : { ...robot, position }
         })
+        if ('kind' in action && action.kind === 'CHECKPOINTS') {
+          players = players.map((player) => {
+            const progress = action.checkpointProgress.find((change) => change.playerId === player.playerId)
+            return progress ? { ...player, lastCheckpoint: progress.lastCheckpoint } : player
+          })
+        }
       }
-      fixture.state = { ...fixture.state, phase: 'PROGRAMMING', robots }
+      timerChanged(fixture, { status: 'CLOSED' })
+      fixture.state = { ...fixture.state, phase: 'PROGRAMMING', robots, players }
       fixture.cards = dealCards()
       fixture.program = [null, null, null, null, null]
       fixture.programSubmitted = false
       for (const socket of fixture.sockets) {
-        for (const action of control.actions) socket.emit('robot.actionResolved', action)
+        for (const action of control.actions) {
+          if ('kind' in action) socket.emit('environment.stepResolved', action)
+          else socket.emit('robot.actionResolved', action)
+        }
         if (!control.deferHand) socket.emit('cards.dealt', {
           gameId: GAME_ID, playerId: PLAYER_ID, cards: fixture.cards,
         })

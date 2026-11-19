@@ -104,7 +104,9 @@ Game deals cards, accepts programs, and executes five registers. `submitProgram(
 
 `Game.moveRobot(robot, direction, steps)` calls `Board.pushRobot()` one step at a time. After each successful step, it resolves entry effects for every displaced robot, farthest first. Blocked steps stop movement without an effect and preserve earlier successful steps. Entering a pit or leaving the board immediately reboots that robot through the same resolver. A pushed robot rebooting does not stop the initiating robot's remaining movement; the initiating robot rebooting does. Facing and programmed registers are preserved. Pushing does not mark the displaced robot as activated. Each programmed action reports the acting robot's final position and orientation before pending priority is recalculated.
 
-Direct movement preserves orientation, programs, submissions, and register state. It neither starts a round nor marks an action complete, awards checkpoints, or emits events. Checkpoints are evaluated at final positions when all remaining robots finish a register, including when a departure completes it. Only the next numbered checkpoint counts; passing over one does not. After register five, Game returns to programming with progress preserved. When a player completes the final checkpoint, Game records them as the winner and stops: remaining registers are skipped, no new hand is dealt, and `submitProgram()` rejects with `GAME_FINISHED`. Robots cannot share a space, so only one player can win.
+After all remaining robots act, Game resolves gears together and checks each
+robot's final tile for its next checkpoint. The final checkpoint ends the game.
+Otherwise, register five ends the round and Game deals new hands.
 
 # Board
 
@@ -116,24 +118,24 @@ Placement, relocation, spawning, reboot configuration, and safe-destination sear
 
 # Tile
 
-Tile is descriptive data with a readonly `TileKind`: EmptyTile uses `EMPTY`, and PitTile uses `PIT`. The exhaustive `tileDefinitions` table declares:
+Tile is descriptive data with a readonly `TileKind`: EmptyTile uses `EMPTY`, and PitTile uses `PIT`. Tile subclasses declare placement suitability and entry effects.
 
 | Kind | `canOccupy` for placement/reboot | `entryEffect` |
 | --- | --- | --- |
 | `EMPTY` | true | absent |
 | `PIT` | false | `reboot` |
 
-Definitions contain no callbacks. Walls, optional checkpoint numbers, and future settings such as conveyor direction belong to instances. Board validates unique checkpoint numbers consecutive from 1 and derives their count. Checkpoints can coexist with walls without a separate subclass. Tiles hold neither robots nor activation logic.
+Walls, optional checkpoint numbers, and future settings such as conveyor direction belong to instances. Board validates unique checkpoint numbers consecutive from 1 and derives their count. Checkpoints can coexist with walls without a separate subclass. Tiles hold neither robots nor activation logic.
 
 ## Extending tiles
 
 1. Add a tile kind and subclass with its instance data.
-2. Declare placement suitability and any entry effect in `tileDefinitions`.
+2. Override placement suitability and any entry effect on the tile subclass.
 3. Reuse an effect or extend `TileEntryEffect` and Game's exhaustive resolver. Leave collision logic and card interpretation generic.
 4. Add map construction and, for public kinds, shared types, AsyncAPI, the board adapter, and rendering. The presenter serializes `tile.kind` directly.
 5. Test placement, movement, effect timing, and presentation through public APIs.
 
-Register-end effects need their own ordered phase when implemented. Conveyors and push panels remain unimplemented. Pit animations, damage, register cancellation, and direction selection remain deferred.
+Gears rotate during the register-end phase. Pits reboot on entry.
 
 ## Action playback
 
@@ -179,24 +181,16 @@ Later, directional board elements such as lasers or conveyor belts can use Direc
 
 ```
 # submitProgram enters activation once all players have submitted.
-while game.phase == "activation":
-    result = game.executeNextAction()             # Select next pending robot by current priority
-    # Execute its card: Game.moveRobot resolves entries; Robot handles turning.
-    # Mark this robot as activated and capture the final position after any reboot.
-    # After the last robot: evaluate checkpoints and advance the register.
-    # If a player completed the final checkpoint: record the winner and stop the game.
-    # After the fifth register: clear programs and return to programming.
-    # The socket layer publishes the action before associated checkpoint updates.
+while game is actively executing:
+    publish(game.executeNextStep())  # Robot actions, gears, then checkpoints.
 ```
 
 ## Laser obstacle:
 
 ```
-game.activateBoardElements():                     # Illustrative future laser phase; retain checkpoint checks
-    for each (position, laser) on board:
-        hit = board.firstRobotHit(position, laser.direction)
-        if hit exists:
-            game.damageRobot(hit)
+calculateLasers(stepStart):                       # Illustrative future step before checkpoints
+    calculate every laser hit against stepStart
+    return the resulting damage batch
 
 board.firstRobotHit(position, direction):
     while board.isInBounds(position):
