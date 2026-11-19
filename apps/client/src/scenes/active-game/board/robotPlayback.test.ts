@@ -192,7 +192,6 @@ describe('pit entry', () => {
     let state = createRobotPlaybackState(robots)
     state = robotPlaybackReducer(state, { type: 'enqueue', action, board })
     expect(state.active).toBe(action)
-    expect(state.activeSequence).toBe(0)
     expect(state.robots[0]).toMatchObject({ position: { ...start, coordinate: { x: 2, y: 1 } }, phase: 'pit-enter' })
     expect(state.robots[1]).toMatchObject({ position: action.pushedRobots[0].position })
     expect(state.robots[1].phase).toBeUndefined()
@@ -215,8 +214,8 @@ describe('pit entry', () => {
     let state = createRobotPlaybackState(robots)
     state = robotPlaybackReducer(state, { type: 'enqueue', action: { ...first, instruction: 'MOVE_1', position: start }, board })
     state = robotPlaybackReducer(state, { type: 'enqueue', action: move('MOVE_2'), board })
-    expect(state.pending.map((entry) => [entry.sequence, entry.phases[0]?.position.coordinate]))
-      .toEqual([[1, { x: 2, y: 1 }]])
+    expect(state.pending.map((entry) => [entry.phases[0]?.robots[0].position.coordinate]))
+      .toEqual([[{ x: 2, y: 1 }]])
   })
 
   it('does not stall when completed mid sequence or without a board', () => {
@@ -224,7 +223,7 @@ describe('pit entry', () => {
     let state = robotPlaybackReducer(createRobotPlaybackState(robots), { type: 'enqueue', action: move('MOVE_2'), board })
     state = robotPlaybackReducer(state, { type: 'enqueue', action: move('TURN_LEFT'), board })
     state = robotPlaybackReducer(state, { type: 'complete' })
-    expect(state.active?.instruction).toBe('TURN_LEFT')
+    expect(state.active).toMatchObject({ instruction: 'TURN_LEFT' })
     expect(state.phases).toEqual([])
     expect(state.robots[0].phase).toBeUndefined()
     expect(state.robots[0].position).toEqual(reboot)
@@ -251,9 +250,9 @@ describe('pit entry', () => {
       for (const robot of state.robots) {
         shown.push([robot.robotId, robot.phase, `${robot.position.coordinate.x},${robot.position.coordinate.y}`])
       }
-      const sequence = state.activeSequence
+      const active = state.active
       state = robotPlaybackReducer(state, { type: 'advance' })
-      if (state.activeSequence !== sequence) completions++
+      if (state.active !== active) completions++
     }
     return { state, shown, completions }
   }
@@ -311,7 +310,7 @@ describe('pit entry', () => {
 
     const left = robotPlaybackReducer(falling, { type: 'remove', robotId: 'red' })
     expect(left.robots.map((robot) => robot.robotId)).toEqual([DEMO_ROBOTS[0].robotId])
-    expect(left.activeSequence).toBe(1)
+    expect(left.active).toMatchObject({ robotId: DEMO_ROBOTS[0].robotId })
     expect(left.robots[0].phase).toBeUndefined()
     expect(playOut(left).completions).toBe(1)
 
