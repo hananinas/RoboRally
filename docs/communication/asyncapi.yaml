@@ -355,7 +355,7 @@ components:
     LobbyCreate:
       name: lobby.create
       payload:
-        $ref: '#/components/schemas/EmptyRequest'
+        $ref: '#/components/schemas/CreateLobbyRequest'
     LobbyCreateReply:
       name: lobby.createResult
       description: Delivered only through the request acknowledgement.
@@ -1034,6 +1034,18 @@ components:
       properties:
         robotSpriteId:
           $ref: '#/components/schemas/RobotSpriteId'
+    CreateLobbyRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - mapName
+      properties:
+        mapName:
+          type: string
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
     LobbySummary:
       type: object
       additionalProperties: false

@@ -21,13 +21,6 @@ function isBoardMapName(mapName: string): mapName is BoardMapName {
   return Object.hasOwn(boardMaps, mapName)
 }
 
-function defaultLobbyMapName(): BoardMapName {
-  const mapName = (Object.keys(boardMaps) as BoardMapName[])
-    .find((name) => boardMaps[name].defaultForLobbyCreation)
-  if (!mapName) throw new Error('No default map is configured for lobby creation')
-  return mapName
-}
-
 export function leaveLobby(context: SocketContext, socket: GameSocket): Result<void, 'NOT_A_MEMBER'> {
   const userId = socket.data.user.userId
   const session = context.registry.getCurrentLobby(userId)
@@ -61,7 +54,7 @@ export function handleCreateLobby(
   acknowledge: (result: LobbyJoinResult) => void,
 ): void {
   withValidatedRequest(socket, 'lobby.create', createLobbyRequestSchema, payload, acknowledge, (user, ack) => {
-    const mapName = payload.mapName ?? defaultLobbyMapName()
+    const { mapName } = payload
     if (!isBoardMapName(mapName)) return ack({ outcome: 'INVALID_REQUEST' })
     const membership = context.registry.getActiveMembership(user.userId)
     if (membership) {

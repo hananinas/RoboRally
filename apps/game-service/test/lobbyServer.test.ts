@@ -82,7 +82,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(server.sockets.sockets.get(owner.id!)!.rooms).toEqual(new Set([owner.id, `lobby:${lobby.lobbyId}`]))
     expect(await owner.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'LOBBY_JOINED', lobby })
     const duplicate = await connect('Owner')
-    expect(await duplicate.emitWithAck('lobby.create', {})).toEqual({ outcome: 'ALREADY_HAS_MEMBERSHIP' })
+    expect(await duplicate.emitWithAck('lobby.create', { mapName: 'test-map' })).toEqual({ outcome: 'ALREADY_HAS_MEMBERSHIP' })
     expect(await duplicate.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'ALREADY_HAS_MEMBERSHIP' })
     expect(await duplicate.emitWithAck('lobby.start', {})).toEqual({ outcome: 'NOT_A_MEMBER' })
     expect(createGame).not.toHaveBeenCalled()
@@ -337,7 +337,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     const owner = await connect('Owner')
     const connection = server.sockets.sockets.get(owner.id!)!
     vi.spyOn(connection, 'join').mockImplementationOnce(() => { throw new Error('Room failure') })
-    expect(await owner.emitWithAck('lobby.create', {})).toEqual({ outcome: 'INTERNAL_ERROR' })
+    expect(await owner.emitWithAck('lobby.create', { mapName: 'test-map' })).toEqual({ outcome: 'INTERNAL_ERROR' })
     expect(await owner.emitWithAck('membership.get', {})).toEqual({ outcome: 'NO_MEMBERSHIP', user: { userId: 'Owner', username: 'Owner' } })
     expect(await owner.emitWithAck('lobby.list', {})).toMatchObject({
       outcome: 'LOBBIES_FOUND', lobbies: [], maps: expect.any(Array),

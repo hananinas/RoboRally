@@ -66,7 +66,7 @@ describe('public registers over Socket.IO', () => {
   }
 
   async function start(members: Client[]): Promise<GameInitialization[]> {
-    const created = await members[0].timeout(1000).emitWithAck('lobby.create', {})
+    const created = await members[0].timeout(1000).emitWithAck('lobby.create', { mapName: 'test-map' })
     if (created.outcome !== 'LOBBY_JOINED') throw new Error(created.outcome)
     const { lobbyId } = created.lobby
     for (const member of members.slice(1)) {

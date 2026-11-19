@@ -38,7 +38,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
       socket.connect()
       await connected
     }
-    const created = await clients[0].emitWithAck('lobby.create', {})
+    const created = await clients[0].emitWithAck('lobby.create', { mapName: 'test-map' })
     if (created.outcome !== 'LOBBY_JOINED') throw new Error(created.outcome)
     await clients[1].emitWithAck('lobby.join', { lobbyId: created.lobby.lobbyId })
     await clients[0].emitWithAck('lobby.start', {})

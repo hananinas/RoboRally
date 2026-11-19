@@ -240,7 +240,7 @@ describe('started game membership over Socket.IO', () => {
   it('rejects a recovery attempt and withholds buffered updates once the backing session was destroyed while disconnected', async () => {
     const { client: first, sessionId } = await connectWithSessionId('First')
     const second = await connect('Second')
-    const created = await first.emitWithAck('lobby.create', {})
+    const created = await first.emitWithAck('lobby.create', { mapName: 'test-map' })
     if (created.outcome !== 'LOBBY_JOINED') throw new Error(created.outcome)
     await second.emitWithAck('lobby.join', { lobbyId: created.lobby.lobbyId })
     await disconnect(first, true)
@@ -257,7 +257,7 @@ describe('started game membership over Socket.IO', () => {
   it('drops a still-connected member and withholds further broadcasts once their session is destroyed', async () => {
     const { client: first, sessionId } = await connectWithSessionId('First')
     const second = await connect('Second')
-    const created = await second.emitWithAck('lobby.create', {})
+    const created = await second.emitWithAck('lobby.create', { mapName: 'test-map' })
     if (created.outcome !== 'LOBBY_JOINED') throw new Error(created.outcome)
     await first.emitWithAck('lobby.join', { lobbyId: created.lobby.lobbyId })
     sessionStore.destroy(sessionId)
@@ -274,7 +274,7 @@ describe('started game membership over Socket.IO', () => {
     const { client: first, sessionId } = await connectWithSessionId('First')
     sessionStore.destroy(sessionId)
     const disconnected = new Promise<void>((resolve) => first.once('disconnect', () => resolve()))
-    await expect(first.timeout(500).emitWithAck('lobby.create', {})).rejects.toThrow()
+    await expect(first.timeout(500).emitWithAck('lobby.create', { mapName: 'test-map' })).rejects.toThrow()
     await disconnected
   })
   it('rejects a command from a still-connected socket once its session naturally expires and disconnects it', async () => {
@@ -282,13 +282,13 @@ describe('started game membership over Socket.IO', () => {
     await new Promise((resolve) => setTimeout(resolve, 100))
     expect(sessionStore.get(sessionId)).toBeUndefined()
     const disconnected = new Promise<void>((resolve) => first.once('disconnect', () => resolve()))
-    await expect(first.timeout(500).emitWithAck('lobby.create', {})).rejects.toThrow()
+    await expect(first.timeout(500).emitWithAck('lobby.create', { mapName: 'test-map' })).rejects.toThrow()
     await disconnected
   })
   it('drops a still-connected member and withholds further broadcasts once their session naturally expires', async () => {
     const { client: first, sessionId } = await connectWithSessionId('First', 0.05)
     const second = await connect('Second')
-    const created = await second.emitWithAck('lobby.create', {})
+    const created = await second.emitWithAck('lobby.create', { mapName: 'test-map' })
     if (created.outcome !== 'LOBBY_JOINED') throw new Error(created.outcome)
     await first.emitWithAck('lobby.join', { lobbyId: created.lobby.lobbyId })
     await new Promise((resolve) => setTimeout(resolve, 100))
