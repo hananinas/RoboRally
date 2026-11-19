@@ -3,6 +3,7 @@ import BoardViewport from './components/BoardViewport.tsx'
 import PlayerPanel from './components/PlayerPanel.tsx'
 import ProgrammingHand from './components/ProgrammingHand.tsx'
 import RegisterPanel from './components/RegisterPanel.tsx'
+import CardChoicePanel from './components/CardChoicePanel.tsx'
 import OtherPlayersPanel from './components/OtherPlayersPanel.tsx'
 import useGameKeybinds from './components/useGameKeybinds.ts'
 import { 
@@ -28,6 +29,10 @@ function getGameStatus(state: ClientGameState): string {
   if (state.paused) {
     const names = state.players.filter((player) => !player.connected).map((player) => player.username)
     return names.length > 0 ? `Game paused · Waiting for ${names.join(', ')}` : 'Game paused'
+  }
+  if (state.pendingChoice && !state.playback.active) {
+    const name = state.players.find((player) => player.playerId === state.pendingChoice?.playerId)?.username ?? 'player'
+    return state.pendingChoice.playerId === state.assignment.playerId ? 'Choose an action' : `Waiting for ${name} to choose`
   }
   if (state.playback.active || state.phase === 'EXECUTING') return 'Executing'
   if (state.phase === 'PROGRAMMING') {
@@ -58,6 +63,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
   const handleRedo = () => dispatch({ type: 'redo' })
   const hasHand = state.handVersion > 0
   const status = getGameStatus(state)
+  const visibleChoice = !state.playback.active === null ? state.pendingChoice : null
   const disconnectedNames = state.players.filter((player) => !player.connected).map((player) => player.username)
   const player = state.players.find((candidate) => candidate.playerId === state.assignment?.playerId)
   const showWinner = isGameOver(state) && state.connected
@@ -99,6 +105,17 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
               onMove={handleMove}
               onConfirm={submit}
             />
+
+            {visibleChoice && (
+              <CardChoicePanel
+                choice={visibleChoice}
+                status={status}
+                choosing={state.choosing}
+                disabled={leaving || state.paused || !state.connected}
+                error={state.error}
+                onChoose={visibleChoice.playerId == state.assignment?.playerId ? game.chooseAction : undefined}
+              />
+            )}
           </div>
         </aside>
         {state.phase && (
