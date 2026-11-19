@@ -129,3 +129,45 @@ export function handleUpdateRegisters(
     return { outcome: 'INTERNAL_ERROR' } as const
   })
 }
+
+export function handleCardChoice(
+  ctx: MembershipContext,
+  socket: GameSocket,
+  payload: import('@robo-rally/game-events').ChooseCardAction,
+  acknowledge: (
+    result: import('@robo-rally/game-events').CardChoiceResult,
+  ) => void,
+): void {
+  withAcknowledgeOnce(acknowledge, (ack) => {
+    const membership = ownedMembership(ctx, socket)
+
+    if (!membership) {
+      return ack({ outcome: 'NOT_A_MEMBER' })
+    }
+
+    const parsed = chooseCardActionSchema.safeParse(payload)
+
+    if (!parsed.success) {
+      return ack({ outcome: 'INVALID_REQUEST' })
+    }
+
+    const result = ctx.game.chooseCardAction(
+      membership.player.id,
+      parsed.data,
+    )
+
+    if (result.isErr()) {
+      return ack({ outcome: result.error })
+    }
+
+    ack({ outcome: 'ACCEPTED' })
+    ctx.actionScheduler.scheduleNextAction()
+  }, (error) => {
+    logError('Failed to choose card action', error, {
+      command: 'card.choose',
+      gameId: ctx.gameId,
+    })
+
+    return { outcome: 'INTERNAL_ERROR' } as const
+  })
+}

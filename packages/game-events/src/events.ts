@@ -37,6 +37,7 @@ export interface ClientToServerEvents {
     payload: SubmitProgram,
     acknowledge: ProgramResultAcknowledgement,
   ) => void
+  'card.choose': (payload: import('./payloads.js').ChooseCardAction, acknowledge: (result: import('./payloads.js').CardChoiceResult,) => void,) => void
 }
 
 export interface ServerToClientEvents {

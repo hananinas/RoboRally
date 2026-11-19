@@ -3,7 +3,7 @@ import type { GameSocket } from '@/socket/gameServer'
 import { currentGame, type SessionContext } from '@/socket/sessionContext'
 import { presentLobby, leaveLobby } from '@/socket/handlers/lobbyHandlers'
 import { handleReattachGame, handleLeave, handleDisconnect, reconnectIfRecovered } from '@/socket/handlers/membershipHandlers'
-import { handleSubmitProgram, handleUpdateRegisters } from '@/socket/handlers/gameplayHandlers'
+import { handleCardChoice, handleSubmitProgram, handleUpdateRegisters } from '@/socket/handlers/gameplayHandlers'
 import { withSessionRequest } from '@/socket/utilities/withSessionRequest'
 
 export function handleGetSession(
@@ -96,4 +96,23 @@ export function handleSessionRegisters(
   const game = currentGame(context, socket)
   if (game) handleUpdateRegisters(game, socket, payload, acknowledge)
   else acknowledge({ outcome: 'NOT_A_MEMBER' })
+}
+
+export function handleSessionCardChoice(
+  context: SessionContext,
+  socket: GameSocket,
+  payload: import('@robo-rally/game-events').ChooseCardAction,
+  acknowledge: (
+    result: import('@robo-rally/game-events').CardChoiceResult,
+  ) => void,
+): void {
+  if (typeof acknowledge !== 'function') return
+
+  const game = currentGame(context, socket)
+
+  if (game) {
+    handleCardChoice(game, socket, payload, acknowledge)
+  } else {
+    acknowledge({ outcome: 'NOT_A_MEMBER' })
+  }
 }

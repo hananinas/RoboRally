@@ -275,7 +275,7 @@ function updatePlayback(state: ClientGameState, playback: RobotPlaybackState): C
     ...state,
     playback,
     playbackRegisters: registersForPlayback(state, playback),
-    playbackProgram: playback.active?.program ?? state.playbackProgram,
+    playbackProgram: playback.active?.program ?? (state.pendingChoice ? state.registers : state.playbackProgram),
   }
 }
 
