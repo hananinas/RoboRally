@@ -1,8 +1,7 @@
 import { handleListLobbies, handleCreateLobby, handleJoinLobby, handleLeaveLobby, handleStartLobby } from '@/socket/handlers/lobbyHandlers'
-import { handleGetMembership, handleLeaveGame, handleSocketDisconnect, handleCurrentGameProgram, handleCurrentGameRegisters, recoverSocketSession, validateSocketSession } from '@/socket/handlers/membershipHandlers'
+import { handleClockGet, handleGetMembership, handleLeaveGame, handleSocketDisconnect, handleCurrentGameProgram, handleCurrentGameRegisters, recoverSocketSession, validateSocketSession } from '@/socket/handlers/membershipHandlers'
 import { MembershipRegistry } from '@/membership/MembershipRegistry'
 import type { Server as HttpServer } from 'node:http'
-import { emptyRequestSchema } from '@robo-rally/game-events'
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -84,11 +83,7 @@ export function createGameSocketServer(
 
     recoverSocketSession(context, socket)
 
-    socket.on('clock.get', (payload, ack) => {
-      if (typeof ack !== 'function') return
-      if (!emptyRequestSchema.safeParse(payload).success) return ack({ outcome: 'INVALID_REQUEST' })
-      ack({ outcome: 'CLOCK', serverTime: Date.now() })
-    })
+    socket.on('clock.get', (payload, ack) => handleClockGet(socket, payload, ack))
 
     socket.on('lobby.list', (payload, ack) => handleListLobbies(context, socket, payload, ack))
     socket.on('lobby.create', (payload, ack) => handleCreateLobby(context, socket, payload, ack))

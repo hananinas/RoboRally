@@ -7,9 +7,13 @@ export class LobbySession {
   readonly lobby: Lobby
   readonly room: string
 
+  static roomFor(lobbyId: string): string {
+    return `lobby:${lobbyId}`
+  }
+
   constructor(lobby: Lobby) {
     this.lobby = lobby
-    this.room = `lobby:${lobby.lobbyId}`
+    this.room = LobbySession.roomFor(lobby.lobbyId)
   }
 
   isMember(socket: GameSocket): Result<LobbyMember, 'NOT_A_MEMBER'> {

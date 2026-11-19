@@ -1,8 +1,6 @@
-import type { ZodError } from 'zod'
-import { withAcknowledgeOnce } from '@/socket/utilities/acknowledgeOnce'
-import { toRejection, type Rejection } from '@/socket/utilities/rejection'
-import { logError, logWarn } from '@/logger'
-import { err, ok, type Result } from 'neverthrow'
+import { withValidatedRequest } from '@/socket/utilities/withValidatedRequest'
+import { logError } from '@/logger'
+import { err, ok } from 'neverthrow'
 import {
   emptyRequestSchema,
   type EmptyRequest,
@@ -55,18 +53,6 @@ function notifyReconnected(ctx: MembershipContext, player: Player): void {
   ctx.io.to(ctx.publicRoom).emit('game.playerConnectionChanged', presentPlayerConnectionChanged(ctx.game, player, true))
   ctx.io.to(ctx.playerRoom(player.id)).emit('program.timerChanged', presentProgrammingTimer(ctx.game.id, ctx.programmingTimer.state()))
   ctx.actionScheduler.scheduleNextAction()
-}
-
-type ValidateMembershipRequestError = Rejection<'INVALID_REQUEST', ZodError>
-
-function validateMembershipRequest(
-  schema: typeof emptyRequestSchema,
-  payload: unknown,
-  user: User,
-): Result<User, ValidateMembershipRequestError> {
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return err({ outcome: 'INVALID_REQUEST', detail: parsed.error })
-  return ok(user)
 }
 
 export function ownedMembership(ctx: MembershipContext, socket: GameSocket): GameMembership | undefined {
@@ -124,38 +110,26 @@ export function handleLeave(
   acknowledge: (result: LeaveResult) => void,
 ): void {
   const { io, game, memberships, publicRoom, playerRoom, actionScheduler } = ctx
-  let playerId: string | undefined
-
-  withAcknowledgeOnce(acknowledge, (ack) => {
-    const result = validateMembershipRequest(emptyRequestSchema, payload, socket.data.user)
-      .andThen(() => {
-        const membership = ownedMembership(ctx, socket)
-        return membership ? ok(membership) : err('GAME_NOT_FOUND' as const)
+  withValidatedRequest({
+    socket, command: 'game.leave', schema: emptyRequestSchema, payload, acknowledge,
+    resolve: () => {
+      const membership = ownedMembership(ctx, socket)
+      return membership ? ok(membership) : err({ outcome: 'GAME_NOT_FOUND' as const })
+    },
+    run: (membership, ack) => {
+      const { player, user } = membership
+      const { roundConcluded } = game.removePlayer(player.id)
+      memberships.delete(user.userId)
+      void socket.leave(publicRoom)
+      void socket.leave(playerRoom(player.id))
+      ack({ outcome: 'LEFT' })
+      io.to(publicRoom).emit('game.playerLeft', {
+        gameId: game.id, playerId: player.id, robotId: player.robot.id,
       })
-      .mapErr(toRejection)
-    if (result.isErr()) {
-      const { outcome, detail } = result.error
-      logWarn('Rejected game.leave request', { command: 'game.leave', gameId: game.id, outcome, detail, payload })
-      ack({ outcome })
-      return
-    }
-    const { player, user } = result.value
-    playerId = player.id
-
-    const { roundConcluded } = game.removePlayer(player.id)
-    memberships.delete(user.userId)
-    void socket.leave(publicRoom)
-    void socket.leave(playerRoom(player.id))
-    ack({ outcome: 'LEFT' })
-    io.to(publicRoom).emit('game.playerLeft', {
-      gameId: game.id, playerId: player.id, robotId: player.robot.id,
-    })
-    if (game.requirePhase('activation').isOk()) ctx.programmingTimer.close()
-    actionScheduler.announceProgress({ roundConcluded })
-    actionScheduler.scheduleNextAction()
-  }, (error) => {
-    logError('Failed to process player leaving', error, { command: 'game.leave', gameId: game.id, playerId })
-    return { outcome: 'INTERNAL_ERROR' } as const
+      if (game.requirePhase('activation').isOk()) ctx.programmingTimer.close()
+      actionScheduler.announceProgress({ roundConcluded })
+      actionScheduler.scheduleNextAction()
+    },
   })
 }
 

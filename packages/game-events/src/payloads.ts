@@ -15,7 +15,7 @@ export type User = Readonly<{
 
 export type ClockResult =
   | Readonly<{ outcome: 'CLOCK'; serverTime: number }>
-  | Readonly<{ outcome: 'INVALID_REQUEST' }>
+  | Readonly<{ outcome: 'INVALID_REQUEST' | 'INTERNAL_ERROR' }>
 
 export type PlayerAssignment = Readonly<{
   gameId: GameId

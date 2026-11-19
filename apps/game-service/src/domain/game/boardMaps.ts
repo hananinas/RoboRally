@@ -146,3 +146,7 @@ export const boardMaps = {
 } as const satisfies Record<string, MapSpec>
 
 export type BoardMapName = keyof typeof boardMaps
+
+export function isBoardMapName(mapName: string): mapName is BoardMapName {
+  return Object.hasOwn(boardMaps, mapName)
+}
