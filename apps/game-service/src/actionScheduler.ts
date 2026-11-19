@@ -73,12 +73,6 @@ export function createActionScheduler(
         }
         if (choice) return
 
-        const result = game.executeNextAction()
-        io.to(publicRoom).emit(
-          'robot.actionResolved',
-          presentRobotActionResolved(gameId, game, result),
-        )
-        announceProgress(result)
         const step = game.executeNextStep()
         if (step.type === 'robot') {
           io.to(publicRoom).emit('robot.actionResolved', presentRobotActionResolved(gameId, game, step.result))
