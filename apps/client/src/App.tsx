@@ -69,6 +69,7 @@ function App() {
       onSettings={openSettings}
       aside={session.status === 'waiting' ? (
         <>
+          <LobbyMapPanel lobby={session.lobby} />
           <aside className="entry-panel" aria-label="Your robot">
             <RobotPicker
               robots={session.lobby.robots}
@@ -79,7 +80,6 @@ function App() {
               onSelect={selectRobot}
             />
           </aside>
-          <LobbyMapPanel lobby={session.lobby} />
         </>
       ) : undefined}
     >

@@ -1,7 +1,7 @@
 .robot-picker {
   --platform-width: 240px;
-  --platform-depth: 9px;
-  --platform-lift: 7px;
+  --platform-depth: 12px;
+  --platform-lift: 10px;
 }
 
 .robot-picker__heading {
@@ -24,16 +24,16 @@
   position: relative;
   display: grid;
   place-items: center;
-  height: 190px;
+  height: 265px;
   overflow: hidden;
 }
 
 .robot-picker__platform {
   position: absolute;
-  top: 14px;
+  top: 26px;
   left: calc(50% - var(--platform-width) / 2);
   width: var(--platform-width);
-  height: 170px;
+  height: 248px;
 }
 
 .robot-picker__base,
@@ -46,10 +46,10 @@
 }
 
 .robot-picker__base {
-  top: 10px;
+  top: 17px;
   left: 10px;
   width: 220px;
-  height: 140px;
+  height: 198px;
 }
 
 .robot-picker__base::before,
@@ -68,10 +68,10 @@
 .robot-picker__base::after { bottom: 5px; }
 
 .robot-picker__top {
-  top: 12px;
+  top: 19px;
   left: 26px;
   width: 188px;
-  height: 120px;
+  height: 169px;
   background: var(--entry-platform);
   box-shadow: 0 var(--platform-lift) 0 var(--entry-background);
   overflow: hidden;
@@ -93,16 +93,28 @@
   animation: platform-turn 24s linear infinite;
 }
 
+.robot-picker__stage .robot-preview {
+  --robot-layer-offset: 5px;
+  width: min(var(--robot-preview-size), 150px);
+  height: min(var(--robot-preview-size), 150px);
+  margin-top: -5px;
+}
+
+.robot-picker__stage .robot-preview__layer {
+  animation: robot-turn 24s linear infinite;
+}
+
 .robot-picker__stage .robot-picker__icon {
   width: min(100%, 150px);
   height: 150px;
   margin-top: -5px;
+  object-fit: contain;
   animation: robot-turn 24s linear infinite;
 }
 
 .robot-picker__selected {
-  text-align: center;
   margin-bottom: var(--entry-space-3);
+  text-align: center;
 }
 
 .robot-picker__selected h3 {
@@ -118,24 +130,22 @@
 
 .robot-picker__choices {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, 52px);
+  justify-content: center;
   gap: var(--entry-space-2);
+  margin: var(--entry-space-4) 0 var(--entry-space-5);
 }
 
 .robot-picker__choice {
   display: grid;
-  min-width: 0;
-  min-height: 76px;
-  justify-items: center;
-  align-content: center;
-  gap: var(--entry-space-1);
-  padding: var(--entry-space-2);
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  padding: 0;
   border: 1px solid var(--entry-border);
-  border-radius: var(--entry-radius-md);
+  border-radius: 50%;
   background: var(--entry-inset);
   color: var(--entry-text);
-  font: inherit;
-  font-size: 10px;
   cursor: pointer;
 }
 
@@ -145,21 +155,66 @@
   box-shadow: 0 0 0 1px var(--entry-accent);
 }
 
-.robot-picker__choice .robot-picker__icon {
-  width: 44px;
-  height: 44px;
+.robot-picker__choice .robot-preview,
+.robot-picker__choice-icon {
+  width: 40px;
+  height: 40px;
 }
 
-.robot-picker__icon {
-  display: block;
+.robot-picker__choice-icon {
   object-fit: contain;
-  --robot-preview-size: 44px;
 }
 
-.robot-picker__choice:focus-visible {
-  outline: 2px solid var(--entry-accent);
-  outline-offset: 2px;
+.robot-picker__colours {
+  min-width: 0;
+  margin: 0;
+  padding: var(--entry-space-5) 0 0;
+  border: 0;
+  border-top: 1px solid var(--entry-border);
 }
+
+.robot-picker__colours legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  margin-bottom: var(--entry-space-4);
+  font-size: 12px;
+}
+
+.robot-picker__swatches {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--entry-space-2);
+  clear: both;
+}
+
+.robot-picker__swatch {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--swatch-colour);
+  color: var(--entry-text);
+  font: inherit;
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.robot-picker__swatch[aria-pressed='true'] {
+  outline: 1px solid var(--swatch-colour);
+  outline-offset: 4px;
+}
+
+.robot-picker__swatch--blue { --swatch-colour: var(--entry-player-blue); }
+.robot-picker__swatch--red { --swatch-colour: var(--entry-player-red); }
+.robot-picker__swatch--yellow { --swatch-colour: var(--entry-accent); }
+.robot-picker__swatch--green { --swatch-colour: var(--entry-player-green); }
+.robot-picker__swatch--purple { --swatch-colour: var(--entry-player-purple); }
+.robot-picker__swatch--pink { --swatch-colour: var(--entry-player-pink); }
 
 .robot-picker__help {
   margin: var(--entry-space-4) 0 0;
@@ -168,8 +223,8 @@
 }
 
 @keyframes robot-turn {
-  from { transform: rotate(-30deg); }
-  to { transform: rotate(330deg); }
+  from { transform: translateY(calc(var(--layer) * var(--robot-layer-offset) * -1)) rotate(-30deg); }
+  to { transform: translateY(calc(var(--layer) * var(--robot-layer-offset) * -1)) rotate(330deg); }
 }
 
 @keyframes platform-turn {
@@ -178,14 +233,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .robot-picker__stage .robot-picker__icon,
+  .robot-picker__stage :is(.robot-preview__layer, .robot-picker__icon),
   .robot-picker__markings {
     animation: none;
-  }
-}
-
-@media (max-width: 420px) {
-  .robot-picker__choices {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

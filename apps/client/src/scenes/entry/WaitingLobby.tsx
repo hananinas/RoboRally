@@ -1,4 +1,6 @@
 import type { LobbyState } from '@robo-rally/game-events'
+import RobotPreview from './RobotPreview.tsx'
+import { robotOptionFor } from './robotPreviews.ts'
 import './WaitingLobby.css'
 
 type Props = { lobby: LobbyState; userId: string; disabled: boolean; onStart: () => void; onLeave: () => void }
@@ -21,7 +23,7 @@ export default function WaitingLobby({ lobby, userId, disabled, onStart, onLeave
             return (
               <li className={`waiting-lobby__seat${self ? ' waiting-lobby__seat--self' : ''}`} key={player.userId}>
                 <span className="waiting-lobby__portrait" role="img" aria-label={`${robot?.name ?? 'Unknown'} robot`}>
-                  {robot && <img src={robot.icon} alt="" draggable={false} />}
+                  <RobotPreview sprite={robotOptionFor(player.robotSpriteId).sprite} />
                 </span>
                 <span className="waiting-lobby__name">{player.username}</span>
                 <span className="waiting-lobby__roles">
