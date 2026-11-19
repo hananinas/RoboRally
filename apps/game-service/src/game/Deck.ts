@@ -16,6 +16,11 @@ const DECK_COMPOSITION: readonly (readonly [Instruction, number])[] = [
   ['TURN_LEFT', 4],
   ['U_TURN', 1],
   ['AGAIN', 1],
+  // ROUTINES - should not be part of starting deck, remove when upgrades are implemented
+  ['SANDBOX_ROUTINE', 1],
+  ['WEASEL_ROUTINE', 1],
+  ['SPEED_ROUTINE', 1],
+  ['REPEAT_ROUTINE', 1],
 ]
 
 export function createDeckCards(): Card[] {

@@ -411,6 +411,23 @@
   pointer-events: none;
 }
 
+/* Choice panel */
+.card-choice .game-status {
+  margin-top: var(--ui-space-sm);
+}
+
+.card-choice__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-sm);
+  margin-top: var(--ui-space-sm);
+}
+
+.card-choice .register-panel__done {
+  margin: 0;
+  padding: var(--ui-space-sm);
+}
+
 /* Interaction states */
 .game :is(button, summary, .other-player):focus-visible {
   outline: 2px solid var(--hud-accent);

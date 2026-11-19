@@ -113,7 +113,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
                 choosing={state.choosing}
                 disabled={leaving || state.paused || !state.connected}
                 error={state.error}
-                onChoose={visibleChoice.playerId == state.assignment?.playerId ? game.chooseAction : undefined}
+                onChoose={visibleChoice.playerId === state.assignment?.playerId ? game.chooseAction : undefined}
               />
             )}
           </div>
