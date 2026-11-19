@@ -1,3 +1,4 @@
+import { resolveRobotAction } from '../activationTestHelper.ts'
 import { describe, expect, it } from 'vitest'
 import { Board, Card, Direction, EmptyTile, Game, PitTile, Player, Robot, type Tile } from '@/game/index'
 import { Integer, PositiveInteger } from '@/numbers'
@@ -122,7 +123,7 @@ describe('shared gameplay movement', () => {
 
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
     expect(player.lastCheckpoint).toBe(initialProgress)
-    const { registerIndex, action } = game.executeNextAction()
+    const { registerIndex, action } = resolveRobotAction(game)
     expect(registerIndex).toBe(0)
     expect(action.card.instruction).toBe('TURN_LEFT')
     expect(action.position).toEqual(destination)
@@ -152,7 +153,7 @@ describe('shared gameplay movement', () => {
     const { board, robot, player, program, game, reboot } = createGame()
     player.completeCheckpoint(1)
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
-    expect(game.executeNextAction().action.card).toBe(program[0])
+    expect(resolveRobotAction(game).action.card).toBe(program[0])
     expect(game.currentRegister).toBe(1)
 
     game.moveRobot(robot, Direction.EAST, PositiveInteger(3))
@@ -166,7 +167,7 @@ describe('shared gameplay movement', () => {
     expect(game.currentRegister).toBe(1)
     expect(game.hasSubmittedProgram(player.id)).toBe(true)
 
-    const { registerIndex, action } = game.executeNextAction()
+    const { registerIndex, action } = resolveRobotAction(game)
     expect(registerIndex).toBe(1)
     expect(action.card).toBe(program[1])
     expect(action.position).toEqual(reboot)

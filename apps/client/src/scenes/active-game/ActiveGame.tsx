@@ -65,7 +65,9 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
   const status = getGameStatus(state)
   const visibleChoice = !state.playback.active && !state.aborted && state.winner === null ? state.pendingChoice : null
   const disconnectedNames = state.players.filter((player) => !player.connected).map((player) => player.username)
-  const player = state.players.find((candidate) => candidate.playerId === state.assignment?.playerId)
+  const { active } = state.playback
+  const activeCard = active && !('kind' in active) ? active : null
+  const lastCheckpoint = state.assignment ? state.playback.checkpoints.get(state.assignment.playerId) ?? 0 : 0
   const showWinner = isGameOver(state) && state.connected
   const robotColour = state.playback.robots.find((robot) => robot.robotId === state.assignment?.robotId)?.colour
   const registeredCardIds = new Set(
@@ -82,7 +84,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
         <aside className="game-hud" aria-label="Game controls">
           <div className="game-hud__content">
             <PlayerPanel
-              player={{ name: username, lastCheckpoint: player?.lastCheckpoint ?? 0 }}
+              player={{ name: username, lastCheckpoint }}
               robotColour={robotColour}
               checkpointCount={state.checkpointCount}
               onLeave={onLeave}
@@ -92,7 +94,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
             />
             <RegisterPanel
               registers={state.playbackProgram ?? state.registers}
-              activeRegister={state.playback.active?.registerIndex ?? null}
+              activeRegister={activeCard?.registerIndex ?? null}
               disabled={disabled}
               submission={state.submission}
               locked={state.phase === 'PROGRAMMING' && !state.playback.active && state.submission === 'accepted'}
@@ -123,8 +125,8 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
             players={getOtherPlayers(state)}
             checkpointCount={state.checkpointCount}
             phase={state.playback.active ? 'EXECUTING' : state.phase}
-            activeAction={state.playback.active}
-            queuedActions={state.playback.pending.map(({ action }) => action)}
+            activeAction={activeCard}
+            queuedActions={state.playback.pending.flatMap(({ action }) => 'kind' in action ? [] : [action])}
             paused={state.paused || !state.connected}
           />
         )}

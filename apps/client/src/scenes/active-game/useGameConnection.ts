@@ -4,7 +4,7 @@ import type {
   GameInitialization,
   GameWon,
   PlayerConnectionChanged,
-  PlayerCheckpointProgress,
+  EnvironmentStepResolved,
   RegistersChanged,
   RobotActionResolved,
   PlayerLeft,
@@ -145,8 +145,7 @@ export default function useGameConnection(socket: GameSocket) {
       receive({ type: 'player-connection-changed', payload })
     const handleAborted = (_payload: GameAborted) => receive({ type: 'aborted' })
     const handleWon = (payload: GameWon) => receive({ type: 'won', payload })
-    const handleCheckpointProgress = (payload: PlayerCheckpointProgress) =>
-      receive({ type: 'checkpoint-progress', payload })
+    const handleEnvironmentStep = (result: EnvironmentStepResolved) => receive({ type: 'environment', result })
     const handleRegistersChanged = (payload: RegistersChanged) => receive({ type: 'registers-changed', payload })
     const handleProgramSubmitted = (payload: ProgramSubmitted) => receive({ type: 'program-submitted', payload })
     const handleChoiceChanged = (payload: CardChoiceChanged) => receive({ type: 'choice-changed', payload })
@@ -162,7 +161,7 @@ export default function useGameConnection(socket: GameSocket) {
     socket.on('game.playerConnectionChanged', handlePlayerConnectionChanged)
     socket.on('game.aborted', handleAborted)
     socket.on('game.won', handleWon)
-    socket.on('player.checkpointProgress', handleCheckpointProgress)
+    socket.on('environment.stepResolved', handleEnvironmentStep)
     socket.on('game.registersChanged', handleRegistersChanged)
     socket.on('program.submitted', handleProgramSubmitted)
     socket.on('card.choiceChanged', handleChoiceChanged)
@@ -179,7 +178,7 @@ export default function useGameConnection(socket: GameSocket) {
       socket.off('game.playerConnectionChanged', handlePlayerConnectionChanged)
       socket.off('game.aborted', handleAborted)
       socket.off('game.won', handleWon)
-      socket.off('player.checkpointProgress', handleCheckpointProgress)
+      socket.off('environment.stepResolved', handleEnvironmentStep)
       socket.off('game.registersChanged', handleRegistersChanged)
       socket.off('program.submitted', handleProgramSubmitted)
       socket.off('card.choiceChanged', handleChoiceChanged)
