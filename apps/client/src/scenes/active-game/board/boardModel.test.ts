@@ -125,7 +125,7 @@ describe('createBoardRenderModel', () => {
     expect(board.cells[2]).toMatchObject({ tile: 'empty', checkpointNumber: 1, reboot: true })
   })
 
-  it('rejects reboot tiles off the board, on holes or listed twice', () => {
+  it('rejects reboot tiles off the board, on pits or listed twice', () => {
     expect(() => createBoardRenderModel(1, 1, { rebootTiles: [{ x: 1, y: 0 }] })).toThrow(/outside the board/)
     expect(() => createBoardRenderModel(1, 1, { hole: [[0, 0]], rebootTiles: [{ x: 0, y: 0 }] })).toThrow(RangeError)
     expect(() => createBoardRenderModel(1, 1, { rebootTiles: [{ x: 0, y: 0 }, { x: 0, y: 0 }] })).toThrow(RangeError)
