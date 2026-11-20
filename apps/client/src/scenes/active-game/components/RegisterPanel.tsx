@@ -14,6 +14,7 @@ import useCardDrag from './useCardDrag.ts'
 type RegisterPanelProps = {
   registers: Registers
   activeRegister: number | null
+  playedCardIds?: ReadonlySet<string>
   disabled: boolean
   pendingDelete: boolean
   awaitingSubmitConfirm: boolean
@@ -31,6 +32,7 @@ type RegisterSlotProps = {
   card: Card | null
   index: number
   active: boolean
+  played: boolean
   disabled: boolean
   pendingDelete: boolean
   dragging: boolean
@@ -43,6 +45,7 @@ function RegisterSlot({
   card,
   index,
   active,
+  played,
   disabled,
   pendingDelete,
   dragging,
@@ -62,6 +65,7 @@ function RegisterSlot({
         data-register-index={registerIndex}
         data-empty={!card || dragging || undefined}
         data-active={active || undefined}
+        data-played={played || undefined}
         data-pending-delete={pendingDelete || undefined}
       >
         <span className="register-card__number">{index + 1}</span>
@@ -88,6 +92,7 @@ function RegisterSlot({
 function RegisterPanel({
   registers,
   activeRegister,
+  playedCardIds,
   disabled,
   pendingDelete,
   awaitingSubmitConfirm,
@@ -130,6 +135,7 @@ function RegisterPanel({
             card={card}
             index={index}
             active={index === activeRegister}
+            played={card !== null && playedCardIds?.has(card.id) === true}
             disabled={disabled}
             pendingDelete={pendingDelete}
             dragging={card !== null && isDragging(card)}

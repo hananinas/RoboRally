@@ -26,8 +26,9 @@ function OtherPlayerRow({ player, checkpointCount, phase, activeAction, queuedAc
   const [focused, setFocused] = useState(false)
   const [dismissed, setDismissed] = useState(false)
   const [dismissedAction, setDismissedAction] = useState<RobotActionResolved | null>(null)
-  const executing = phase === 'EXECUTING' && !paused && player.connected &&
+  const active = phase === 'EXECUTING' &&
     activeAction?.robotId === player.robotId && player.registers[activeAction.registerIndex]?.status === 'REVEALED'
+  const executing = active && !paused && player.connected
   const expanded = ((hovered || focused) && !dismissed) ||
     (executing && activeAction !== dismissedAction)
   useEffect(() => {
@@ -42,7 +43,7 @@ function OtherPlayerRow({ player, checkpointCount, phase, activeAction, queuedAc
     return () => window.removeEventListener('keydown', dismiss)
   }, [expanded, activeAction])
   const timing = (slot: PublicRegisterSlot, index: number) => {
-    if (executing && activeAction.registerIndex === index) return 'current'
+    if (active && activeAction.registerIndex === index) return 'current'
     if (phase !== 'EXECUTING') return ''
     if (slot.status !== 'REVEALED' ||
         (activeAction && index > activeAction.registerIndex) ||
@@ -105,6 +106,7 @@ function OtherPlayerRow({ player, checkpointCount, phase, activeAction, queuedAc
             className={`other-player__slot register-card program-card--register other-player__slot--${slot.status.toLowerCase()}${state ? ` other-player__slot--${state}` : ''}`}
             data-empty={!filled || undefined}
             data-active={state === 'current' || undefined}
+            data-played={state === 'past' || undefined}
           >
             <span className="register-card__number">{index + 1}</span>
             {slot.status === 'REVEALED'

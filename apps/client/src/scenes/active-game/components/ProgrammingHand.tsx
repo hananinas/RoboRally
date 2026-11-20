@@ -7,6 +7,7 @@ import useCardDrag from './useCardDrag.ts'
 type ProgrammingHandProps = {
   cards: readonly Card[]
   registeredCardIds: ReadonlySet<string>
+  playedCardIds?: ReadonlySet<string>
   disabled: boolean
   highlightedIndex: number | null
   onHighlightCard: (cardIndex: number) => void
@@ -18,6 +19,7 @@ type ProgrammingHandProps = {
 function ProgrammingHand({
   cards,
   registeredCardIds,
+  playedCardIds,
   disabled,
   highlightedIndex,
   onHighlightCard,
@@ -54,6 +56,7 @@ function ProgrammingHand({
             card={card}
             size="hand"
             selected={selected}
+            data-played={playedCardIds?.has(card.id) || undefined}
             disabled={selected || disabled}
             dragging={isDragging(card)}
             onClick={(event) => {
