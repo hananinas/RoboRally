@@ -5,10 +5,11 @@
     <link type="text/css" rel='stylesheet' href="auth-layout.css" />
   </head>
   <body>
+    {{> board_background}}
     <main data-testid="app-express">
-      <div class="auth-container spacing-16">
+      <div class="auth-container account-panel spacing-16">
+        {{> app_branding}}
         {{{body}}}
-        {{> ory_branding}}
       </div>
 
     {{> scripts }}

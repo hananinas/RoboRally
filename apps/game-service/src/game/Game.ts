@@ -5,9 +5,9 @@ import { effects, type PrivateProgram, type PublicRegisters, type ResolvedInstru
 import { captureEnvironmentSnapshot, environmentSteps, type EnvironmentChanges } from '@/game/environment'
 import { Card } from '@/game/Card'
 import { Deck } from '@/game/Deck'
-import type { CardId, PlayerId, RobotId } from '@/game/ids'
+import type { CardId, GameId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
-import { ROBOT_COLOURS, Robot } from '@/game/Robot'
+import { Robot } from '@/game/Robot'
 import { Direction, opposite, type Position } from '@/game/spatial'
 import { Integer, PositiveInteger, UnsignedInteger } from '@/numbers'
 import {
@@ -64,8 +64,6 @@ export type CompletedProgram = Readonly<{
   cards: readonly Card[]
 }>
 
-export const DEFAULT_GAME_NAME = 'Game'
-
 const REGISTERS_PER_ROUND = 5
 
 export type GameOptions = Readonly<{
@@ -73,27 +71,20 @@ export type GameOptions = Readonly<{
   players: readonly Player[]
   // Template for each private deck created by addPlayer.
   deck: readonly Card[]
-  rebootTiles: readonly Position[]
-  name?: string
-  // Picks start tiles.
-  random?: () => number
-  // Draws cards; defaults to `random`.
-  drawRandom?: () => number
+  name: string
 }>
 
 export class Game {
+  readonly id: GameId
   readonly name: string
   readonly board: Board
   private readonly roster: Player[]
-  readonly rebootTiles: readonly Position[]
   private readonly deck: readonly Card[]
   private readonly lifecycle = new GameLifecycle('programming')
   private registerIndex = 0
   private environmentStepIndex: number | null = null
   private readonly submittedPlayerIds = new Set<PlayerId>()
   private readonly activatedRobotIds = new Set<RobotId>()
-  private readonly random: () => number
-  private readonly drawRandom: () => number
   // What each robot's registers resolved to this round, so Again repeats the real action.
   private readonly resolvedInstructions = new Map<RobotId, (ResolvedInstruction | undefined)[]>()
 
@@ -101,22 +92,10 @@ export class Game {
     board,
     players,
     deck,
-    rebootTiles,
-    name = DEFAULT_GAME_NAME,
-    random = Math.random,
-    drawRandom = random,
+    name,
   }: GameOptions) {
     if (deck.length < REGISTERS_PER_ROUND || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')
-    }
-    if (rebootTiles === undefined || rebootTiles.length === 0) {
-      throw new RangeError('A game requires a reboot tile')
-    }
-    if (!rebootTiles.every((tile) => board.allowsPlacement(tile))) {
-      throw new RangeError('Reboot tiles must be non-pit tiles on the board outside the priority antenna')
-    }
-    if (new Set(rebootTiles.map(({ x, y }) => `${x},${y}`)).size !== rebootTiles.length) {
-      throw new RangeError('Reboot tiles must be distinct')
     }
 
     const playerIds = new Set<PlayerId>()
@@ -132,13 +111,11 @@ export class Game {
       robotIds.add(player.robot.id)
     }
 
+    this.id = randomUUID()
     this.board = board
     this.name = name
     this.roster = [...players]
-    this.rebootTiles = Object.freeze(rebootTiles.map((tile) => Object.freeze({ ...tile })))
     this.deck = [...deck]
-    this.random = random
-    this.drawRandom = drawRandom
     this.dealInitialHands()
   }
 
@@ -207,15 +184,14 @@ export class Game {
   private findFreeStartTile(): Result<Position, 'NO_SPAWN_AVAILABLE'> {
     const free = this.board.startTiles.filter((position) => this.board.occupantAt(position) === undefined)
     if (free.length === 0) return err('NO_SPAWN_AVAILABLE')
-    const index = Math.min(Math.floor(this.random() * free.length), free.length - 1)
-    return ok({ ...free[index] })
+    return ok({ ...free[0] })
   }
 
-  addPlayer(colour: string = ROBOT_COLOURS[0]): Result<Player, AddPlayerError> {
+  addPlayer(colour: string): Result<Player, AddPlayerError> {
     return this.findSpawn().map((position) => {
       const robot = new Robot(randomUUID(), Direction.NORTH, colour)
       const player = new Player(randomUUID(), robot, Deck.fromTemplate(this.deck))
-      player.drawHand(this.drawRandom)
+      player.drawHand()
       this.board.placeRobot(robot.id, position)
       this.roster.push(player)
       return player
@@ -315,7 +291,7 @@ export class Game {
     })
   }
 
-  recheckProgrammingPhase(): void {
+  private recheckProgrammingPhase(): void {
     if (
       this.requirePhase('programming').isOk() &&
       this.players.length > 0 &&
@@ -386,7 +362,7 @@ export class Game {
   }
 
   // Gameplay movement resolves entry effects; Board movement only changes positions.
-  moveRobot(robot: Robot, direction: Direction, steps: PositiveInteger): void {
+  private moveRobot(robot: Robot, direction: Direction, steps: PositiveInteger): void {
     for (let step = 0; step < steps; step++) {
       const movedRobotIds = this.board.pushRobot(robot.id, direction)
       if (movedRobotIds.length === 0) return
@@ -436,14 +412,14 @@ export class Game {
 
   private dealInitialHands(): void {
     for (const player of this.players) {
-      if (player.hand.length === 0) player.drawHand(this.drawRandom)
+      if (player.hand.length === 0) player.drawHand()
       player.resetRegisters()
     }
   }
 
   private dealNewHands(): void {
     for (const player of this.players) {
-      player.drawHand(this.drawRandom)
+      player.drawHand()
       player.resetRegisters()
     }
   }
@@ -510,7 +486,7 @@ export class Game {
       case undefined:
         return 'continue'
       case 'reboot':
-        this.rebootRobot(robot, position)
+        this.rebootRobot(robot)
         return 'stop'
       default: {
         const unexpectedEffect: never = effect
@@ -519,12 +495,8 @@ export class Game {
     }
   }
 
-  // Reboots on the free reboot tile closest to where the robot fell; ties keep map order.
-  private rebootRobot(robot: Robot, fellAt: Position): void {
-    const distance = (tile: Position) => Math.abs(tile.x - fellAt.x) + Math.abs(tile.y - fellAt.y)
-    const closestFirst = [...this.rebootTiles].sort((a, b) => distance(a) - distance(b))
-    const destination = closestFirst.find((tile) => this.board.occupantAt(tile) === undefined)
-      ?? this.board.nearestFreePosition(closestFirst[0])
+  private rebootRobot(robot: Robot): void {
+    const destination = this.board.nearestFreePosition(this.board.rebootTile)
     if (destination === undefined) throw new Error('No safe reboot destination is available')
     this.board.relocateRobot(robot.id, destination)
     // TODO: Add two SPAM cards and cancel this robot's remaining registers.

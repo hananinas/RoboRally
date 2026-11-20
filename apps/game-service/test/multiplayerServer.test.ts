@@ -1,29 +1,21 @@
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import type { CardsDealt, ClientToServerEvents, ServerToClientEvents, SubmitProgram } from '@robo-rally/game-events'
+import type { CardsDealt, ClientToServerEvents, RobotActionResolved, ServerToClientEvents, SubmitProgram } from '@robo-rally/game-events'
 import { io as connectSocket, type Socket } from 'socket.io-client'
-import { expect, it } from 'vitest'
-import { Board, Card, EmptyTile, Game, type Player } from '@/game/index.ts'
+import { expect, it, vi, type MockInstance } from 'vitest'
 import { createGameSocketServer } from '@/socket/gameServer.ts'
+import * as gameContext from '@/socket/gameContext.ts'
 import { createSessionStore } from '@/auth/sessionStore.ts'
 import { authCookieHeader } from './authTestHelper.ts'
-import { Integer } from '@/numbers'
 
 it('waits for the roster, broadcasts register-major actions, and deals two private next rounds', async () => {
-  const gameId = '00000000-0000-4000-8000-000000000001'
-  const players: Player[] = []
-  const board = new Board(Array.from({ length: 3 }, () =>
-    Array.from({ length: 3 }, () => new EmptyTile())), { x: Integer(1), y: Integer(0), angle: Math.PI / 2 })
-  const deck = Array.from({ length: 5 }, (_, index) =>
-    new Card(`00000000-0000-4000-8000-00000000010${index}`, 'TURN_LEFT'))
-  for (const player of players) player.deck.add(deck)
-  const game = new Game({ board, players, deck, rebootTiles: [{ x: Integer(0), y: Integer(0) }], random: () => 0 })
   const httpServer = createServer()
   const sessionStore = createSessionStore({
     oidcClient: { refreshToken: () => Promise.reject(new Error('not used in this test')) },
     refreshBufferSeconds: 0,
   })
-  const server = createGameSocketServer(httpServer, sessionStore, () => ({ gameId, game }))
+  const contexts: MockInstance<typeof gameContext.createGameContext> = vi.spyOn(gameContext, 'createGameContext')
+  const server = createGameSocketServer(httpServer, sessionStore)
   const clients: Socket<ServerToClientEvents, ClientToServerEvents>[] = []
   const events: { name: string; payload: unknown }[][] = [[], []]
   try {
@@ -37,8 +29,10 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
       })
       clients.push(socket)
       // Finalization routing and privacy are covered by the public-register tests.
+      // Checkpoint progress is incidental here (random cards can wander onto one).
+      const ignored = ['program.timerChanged', 'program.finalized', 'game.registersChanged', 'player.checkpointProgress']
       socket.onAny((name, payload: unknown) => {
-        if (!['program.timerChanged', 'program.finalized', 'game.registersChanged'].includes(name)) events[index].push({ name, payload })
+        if (!ignored.includes(name)) events[index].push({ name, payload })
       })
       const connected = new Promise<void>((resolve) => socket.once('connect', resolve))
       socket.connect()
@@ -48,14 +42,9 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
     if (created.outcome !== 'LOBBY_JOINED') throw new Error(created.outcome)
     await clients[1].emitWithAck('lobby.join', { lobbyId: created.lobby.lobbyId })
     await clients[0].emitWithAck('lobby.start', {})
-    for (let index = 0; index < clients.length; index++) {
-      const player = game.players[index]
-      players.push(player)
-      board.removeRobot(player.robot.id)
-      board.placeRobot(player.robot.id, index === 0
-        ? { x: Integer(0), y: Integer(2) }
-        : { x: Integer(1), y: Integer(1) })
-    }
+    const game: ReturnType<typeof gameContext.createGameContext>['game'] = contexts.mock.results.at(-1)!.value.game
+    const players = game.players
+    const robotIds = players.map((player) => player.robot.id)
 
     for (const socket of clients) {
       await socket.timeout(1000).emitWithAck('session.get', {})
@@ -63,7 +52,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
     events[0] = []
     events[1] = []
 
-    for (const round of [1, 2]) {
+    for (const _round of [1, 2]) {
       const submissions = players.map((player): SubmitProgram => ({
         cardIds: [player.hand[0].id, player.hand[1].id, player.hand[2].id, player.hand[3].id, player.hand[4].id],
       }))
@@ -85,7 +74,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
         .toEqual({ outcome: 'ACCEPTED' })
       const hands = await Promise.all(nextHands)
       for (let index = 0; index < clients.length; index++) {
-        expect(hands[index]).toMatchObject({ gameId, playerId: players[index].id })
+        expect(hands[index]).toMatchObject({ gameId: game.id, playerId: players[index].id })
         expect(events[index].map((event) => event.name)).toEqual([
           'program.submitted', 'program.submitted',
           ...Array.from({ length: 5 }, () => [
@@ -94,22 +83,19 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
           'cards.dealt',
         ])
         expect(events[index].filter((event) => event.name === 'program.submitted').map((event) => event.payload))
-          .toEqual(players.map((player) => ({ gameId, playerId: player.id })))
+          .toEqual(players.map((player) => ({ gameId: game.id, playerId: player.id })))
         const actions = events[index].filter((event) => event.name === 'robot.actionResolved')
-        expect(actions.map((event) => event.payload)).toEqual(
-          Array.from({ length: 5 }, (_, registerIndex) => [1, 0].map((playerIndex) => ({
-            gameId, registerIndex,
-            pushedRobots: [],
-            robotId: players[playerIndex].robot.id,
-            playerId: players[playerIndex].id,
-            instruction: 'TURN_LEFT',
-            resolvedInstruction: 'TURN_LEFT',
-            position: {
-              coordinate: playerIndex === 0 ? { x: 0, y: 2 } : { x: 1, y: 1 },
-              orientation: ['WEST', 'SOUTH', 'EAST', 'NORTH'][(registerIndex + round - 1) % 4],
-            },
-          }))).flat(),
+          .map((event) => event.payload as RobotActionResolved)
+        // Register-major order: both robots act in every register before either acts in the next.
+        expect(actions.map((action) => action.registerIndex)).toEqual(
+          Array.from({ length: 5 }, (_, registerIndex) => [registerIndex, registerIndex]).flat(),
         )
+        for (let registerIndex = 0; registerIndex < 5; registerIndex++) {
+          const pair = actions.slice(registerIndex * 2, registerIndex * 2 + 2)
+          expect(new Set(pair.map((action) => action.robotId))).toEqual(new Set(robotIds))
+          expect(new Set(pair.map((action) => action.playerId))).toEqual(new Set(players.map((player) => player.id)))
+          for (const action of pair) expect(action.gameId).toBe(game.id)
+        }
         // Each connection receives exactly one hand, for its own assignment.
         expect(events[index].filter((event) => event.name === 'cards.dealt').map((event) => event.payload))
           .toEqual([hands[index]])
@@ -121,5 +107,6 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
   } finally {
     for (const socket of clients) socket.disconnect()
     await new Promise<void>((resolve) => server.close(() => resolve()))
+    vi.restoreAllMocks()
   }
 })

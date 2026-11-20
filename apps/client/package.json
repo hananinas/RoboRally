@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@robo-rally/game-events": "workspace:*",
+    "@robo-rally/theme": "workspace:*",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "socket.io-client": "^4.8.4"

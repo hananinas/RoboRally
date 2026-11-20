@@ -1,15 +1,17 @@
 import { resolveRobotAction } from '../activationTestHelper.ts'
 import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
-import { Board, Card, Direction, EmptyTile, Game, PitTile, Player, Robot, type Antenna, type Position, type Tile } from '@/game/index'
-import { Integer, PositiveInteger } from '@/numbers'
+import { Board, Card, Direction, EmptyTile, PitTile, type Antenna, type Position, type Tile } from '@/game/index'
+import { Deck } from '@/game/Deck'
+import { Integer } from '@/numbers'
+import { createEmptyTileGrid, createTestGame, placeTestPlayer, programLeadingWith } from '../fixtures.ts'
 
 function position(x: number, y = 3): Position {
   return { x: Integer(x), y: Integer(y) }
 }
 
 function grid(): Tile[][] {
-  return Array.from({ length: 7 }, () => Array.from({ length: 9 }, () => new EmptyTile()))
+  return createEmptyTileGrid(9, 7)
 }
 
 function createGame(
@@ -18,17 +20,13 @@ function createGame(
   antenna: Antenna = { ...position(0, 0), angle: 0 },
   reboot = position(0, 5),
 ) {
-  const board = new Board(tiles, antenna)
+  const board = new Board(tiles, antenna, reboot)
   const directions = [Direction.EAST, Direction.NORTH, Direction.WEST, Direction.SOUTH]
-  const players = starts.map((start, index) => {
-    const robot = new Robot(`robot-${index}`, directions[index % directions.length])
-    board.placeRobot(robot.id, start)
-    return new Player(`player-${index}`, robot)
-  })
-  const instructions: Instruction[] = ['MOVE_1', 'MOVE_2', 'MOVE_3', 'BACK_UP', 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN']
+  const instructions: Instruction[] = ['MOVE_1', 'MOVE_2', 'MOVE_3', 'BACK_UP', 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'AGAIN']
   const cards = instructions.map((instruction) => new Card(instruction, instruction))
-  for (const player of players) player.deck.add(cards)
-  const game = new Game({ board, players, deck: cards, rebootTiles: [reboot], random: () => 0 })
+  const players = starts.map((start, index) =>
+    placeTestPlayer(board, start, { direction: directions[index % directions.length], deck: new Deck(cards) }))
+  const game = createTestGame({ board, players, deck: cards })
   return { board, players, robots: players.map((player) => player.robot), cards, game, reboot }
 }
 
@@ -37,8 +35,7 @@ describe('robot pushing', () => {
     const tiles = grid()
     tiles[3][8] = new PitTile()
     const { robots, players, cards, game, reboot } = createGame([position(5), position(6), position(7)], tiles)
-    const move = cards.find((card) => card.instruction === 'MOVE_2')!
-    const program = [move, ...cards.filter((card) => card !== move).slice(0, 4)]
+    const program = programLeadingWith(cards, 'MOVE_2')
     for (const player of players) game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
     const result = resolveRobotAction(game)
@@ -47,12 +44,12 @@ describe('robot pushing', () => {
       { robotId: robots[2].id, position: reboot, direction: Direction.WEST },
     ]
     expect(result.pushedRobots).toEqual(expected)
-    expect(result.registers[0]).toEqual({ status: 'REVEALED', instruction: move.instruction })
+    expect(result.registers[0]).toEqual({ status: 'REVEALED', instruction: program[0].instruction })
     expect(players[0].registers).toEqual(result.registers)
     for (const player of players.slice(1)) {
       expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'HIDDEN' })))
     }
-    game.moveRobot(robots[1], Direction.NORTH, PositiveInteger(1))
+    game.executeNextAction()
     expect(result.pushedRobots).toEqual(expected)
   })
 
@@ -62,10 +59,17 @@ describe('robot pushing', () => {
     { direction: Direction.SOUTH, starts: [position(4, 2), position(4, 3), position(4, 4)], ends: [position(4, 3), position(4, 4), position(4, 5)] },
     { direction: Direction.WEST, starts: [position(5), position(4), position(3)], ends: [position(4), position(3), position(2)] },
   ])('pushes a chain $direction and preserves all facing directions', ({ direction, starts, ends }) => {
-    const { board, robots, game } = createGame(starts)
+    const { board, robots, players, cards, game } = createGame(starts)
+    robots[0].turn([Direction.EAST, Direction.NORTH, Direction.WEST, Direction.SOUTH].indexOf(direction))
     const facing = robots.map((robot) => robot.direction)
+    const moveProgram = programLeadingWith(cards, 'MOVE_1')
+    const waitProgram = programLeadingWith(cards, 'AGAIN')
+    game.submitProgram(players[0].id, moveProgram.map((card) => card.id))._unsafeUnwrap()
+    for (const player of players.slice(1)) game.submitProgram(player.id, waitProgram.map((card) => card.id))._unsafeUnwrap()
 
-    game.moveRobot(robots[0], direction, PositiveInteger(1))
+    // Priority (distance to antenna) can put a waiting robot's no-op AGAIN ahead of robots[0]'s move.
+    let action = game.executeNextAction().action
+    while (action.robotId !== robots[0].id) action = game.executeNextAction().action
 
     expect(robots.map((robot) => board.positionOf(robot.id))).toEqual(ends)
     expect(ends.map((end) => board.occupantAt(end))).toEqual(robots.map((robot) => robot.id))
@@ -79,9 +83,12 @@ describe('robot pushing', () => {
       const x = 1 + boundary + (side === 'destination' ? 1 : 0)
       tiles[3][x] = new EmptyTile([side === 'source' ? Direction.EAST : Direction.WEST])
       const starts = [position(1), position(2), position(3), position(4)]
-      const { board, robots, game } = createGame(starts, tiles)
+      const { board, robots, players, cards, game } = createGame(starts, tiles)
+      const moveProgram = programLeadingWith(cards, 'MOVE_1')
+      game.submitProgram(players[0].id, moveProgram.map((card) => card.id))._unsafeUnwrap()
+      for (const player of players.slice(1)) game.submitProgram(player.id, cards.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
 
-      game.moveRobot(robots[0], Direction.EAST, PositiveInteger(1))
+      expect(game.executeNextAction().action.robotId).toBe(robots[0].id)
 
       expect(robots.map((robot) => board.positionOf(robot.id))).toEqual(starts)
       expect(starts.map((start) => board.occupantAt(start))).toEqual(robots.map((robot) => robot.id))
@@ -90,9 +97,14 @@ describe('robot pushing', () => {
 
   it('rejects the entire chain when its destination is the priority antenna', () => {
     const starts = [position(1), position(2), position(3)]
-    const { board, robots, game } = createGame(starts, grid(), { ...position(4), angle: 0 })
+    const { board, robots, players, cards, game } = createGame(starts, grid(), { ...position(4), angle: 0 })
+    const moveProgram = programLeadingWith(cards, 'MOVE_1')
+    const waitProgram = programLeadingWith(cards, 'AGAIN')
+    game.submitProgram(players[0].id, moveProgram.map((card) => card.id))._unsafeUnwrap()
+    for (const player of players.slice(1)) game.submitProgram(player.id, waitProgram.map((card) => card.id))._unsafeUnwrap()
 
-    game.moveRobot(robots[0], Direction.EAST, PositiveInteger(1))
+    let action = game.executeNextAction().action
+    while (action.robotId !== robots[0].id) action = game.executeNextAction().action
 
     expect(robots.map((robot) => board.positionOf(robot.id))).toEqual(starts)
     expect(board.occupantAt(board.antenna)).toBeUndefined()
@@ -101,9 +113,12 @@ describe('robot pushing', () => {
   it('keeps successful steps when a later push is blocked', () => {
     const tiles = grid()
     tiles[3][5] = new EmptyTile([Direction.EAST])
-    const { board, robots, game } = createGame(undefined, tiles)
+    const { board, robots, players, cards, game } = createGame(undefined, tiles)
+    const moveProgram = programLeadingWith(cards, 'MOVE_3')
+    game.submitProgram(players[0].id, moveProgram.map((card) => card.id))._unsafeUnwrap()
+    for (const player of players.slice(1)) game.submitProgram(player.id, cards.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
 
-    game.moveRobot(robots[0], Direction.EAST, PositiveInteger(3))
+    expect(game.executeNextAction().action.robotId).toBe(robots[0].id)
 
     expect(robots.map((robot) => board.positionOf(robot.id))).toEqual([position(3), position(4), position(5)])
   })
@@ -117,8 +132,7 @@ describe('robot pushing', () => {
     const { board, robots, players, cards, game } = createGame()
     if (instruction === 'BACK_UP') robots[0].turn(2)
     const facing = robots.map((robot) => robot.direction)
-    const first = cards.find((card) => card.instruction === instruction)!
-    const program = [first, ...cards.filter((card) => card !== first).slice(0, 4)]
+    const program = programLeadingWith(cards, instruction)
     for (const player of players) game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
     expect(resolveRobotAction(game).action.robotId).toBe(robots[0].id)
@@ -142,9 +156,12 @@ describe('robot pushing', () => {
     const starts = hazard === 'pit'
       ? [position(5), position(6), position(7)]
       : [position(6), position(7), position(8)]
-    const { board, robots, reboot, game } = createGame(starts, tiles)
+    const { board, robots, players, cards, reboot, game } = createGame(starts, tiles)
+    const moveProgram = programLeadingWith(cards, 'MOVE_2')
+    game.submitProgram(players[0].id, moveProgram.map((card) => card.id))._unsafeUnwrap()
+    for (const player of players.slice(1)) game.submitProgram(player.id, cards.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
 
-    game.moveRobot(robots[0], Direction.EAST, PositiveInteger(2))
+    expect(game.executeNextAction().action.robotId).toBe(robots[0].id)
 
     expect(robots.map((robot) => board.positionOf(robot.id))).toEqual([
       position(starts[0].x + 2), position(0, 4), reboot,
@@ -158,9 +175,12 @@ describe('robot pushing', () => {
     const tiles = grid()
     tiles[3][4] = new PitTile([Direction.WEST])
     const starts = [position(1), position(2), position(3)]
-    const { board, robots, reboot, game } = createGame(starts, tiles)
+    const { board, robots, players, cards, reboot, game } = createGame(starts, tiles)
+    const moveProgram = programLeadingWith(cards, 'MOVE_1')
+    game.submitProgram(players[0].id, moveProgram.map((card) => card.id))._unsafeUnwrap()
+    for (const player of players.slice(1)) game.submitProgram(player.id, cards.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
 
-    game.moveRobot(robots[0], Direction.EAST, PositiveInteger(1))
+    expect(game.executeNextAction().action.robotId).toBe(robots[0].id)
 
     expect(robots.map((robot) => board.positionOf(robot.id))).toEqual(starts)
     expect(board.occupantAt(reboot)).toBeUndefined()
@@ -186,22 +206,45 @@ describe('robot pushing', () => {
   it('can push a robot again immediately after it has rebooted', () => {
     const tiles = grid()
     tiles[3][3] = new PitTile()
-    const reboot = position(2)
-    const { board, robots, game } = createGame([position(1), position(2)], tiles, undefined, reboot)
+    const board = new Board(tiles, { x: Integer(0), y: Integer(0), angle: 0 }, position(2))
+    const moverDeck = [
+      new Card('move-a', 'MOVE_1'),
+      new Card('turn', 'TURN_LEFT'),
+      new Card('move-b', 'MOVE_1'),
+      new Card('filler-a', 'TURN_RIGHT'),
+      new Card('filler-b', 'U_TURN'),
+    ]
+    const mover = placeTestPlayer(board, position(1), { direction: Direction.EAST, deck: new Deck(moverDeck) })
+    const bystanderDeck = [
+      new Card('wait-a', 'AGAIN'),
+      new Card('wait-b', 'AGAIN'),
+      new Card('wait-c', 'AGAIN'),
+      new Card('filler-c', 'TURN_RIGHT'),
+      new Card('filler-d', 'U_TURN'),
+    ]
+    const bystander = placeTestPlayer(board, position(2), { direction: Direction.NORTH, deck: new Deck(bystanderDeck) })
+    const game = createTestGame({ board, players: [mover, bystander] })
+    game.submitProgram(mover.id, moverDeck.map((card) => card.id))._unsafeUnwrap()
+    game.submitProgram(bystander.id, bystanderDeck.map((card) => card.id))._unsafeUnwrap()
 
-    game.moveRobot(robots[0], Direction.EAST, PositiveInteger(1))
-    expect(board.positionOf(robots[0].id)).toEqual(position(2))
-    expect(board.positionOf(robots[1].id)).toEqual(position(2, 2))
-    game.moveRobot(robots[0], Direction.NORTH, PositiveInteger(1))
-    expect(board.positionOf(robots[0].id)).toEqual(position(2, 2))
-    expect(board.positionOf(robots[1].id)).toEqual(position(2, 1))
-    expect(robots[1].direction).toBe(Direction.NORTH)
+    resolveRobotAction(game)
+    resolveRobotAction(game)
+    expect(board.positionOf(mover.robot.id)).toEqual(position(2))
+    expect(board.positionOf(bystander.robot.id)).toEqual(position(2, 2))
+
+    resolveRobotAction(game)
+    resolveRobotAction(game)
+    resolveRobotAction(game)
+    resolveRobotAction(game)
+
+    expect(board.positionOf(mover.robot.id)).toEqual(position(2, 2))
+    expect(board.positionOf(bystander.robot.id)).toEqual(position(2, 1))
+    expect(bystander.robot.direction).toBe(Direction.NORTH)
   })
 
   it('can push a robot that already acted without activating it again', () => {
     const { board, robots, players, cards, game } = createGame([position(2), position(3)])
-    const turn = cards.find((card) => card.instruction === 'TURN_LEFT')!
-    const turnsFirst = [turn, ...cards.filter((card) => card !== turn).slice(0, 4)]
+    const turnsFirst = programLeadingWith(cards, 'TURN_LEFT')
     const movesFirst = cards.slice(0, 5)
     robots[1].turn(1)
     game.submitProgram(players[0].id, turnsFirst.map((card) => card.id))._unsafeUnwrap()
@@ -222,8 +265,7 @@ describe('robot pushing', () => {
     tiles[3][3] = new EmptyTile([], 1)
     tiles[6][8] = new EmptyTile([], 2)
     const { board, players, cards, game } = createGame([position(1), position(2)], tiles)
-    const turn = cards.find((card) => card.instruction === 'TURN_LEFT')!
-    const turnsFirst = [turn, ...cards.filter((card) => card !== turn).slice(0, 4)]
+    const turnsFirst = programLeadingWith(cards, 'TURN_LEFT')
     game.submitProgram(players[0].id, cards.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(players[1].id, turnsFirst.map((card) => card.id))._unsafeUnwrap()
 

@@ -9,7 +9,7 @@ describe('Robot', () => {
     [Direction.SOUTH, Direction.EAST],
     [Direction.EAST, Direction.NORTH],
   ])('turns left from %s to %s', (start, expected) => {
-    const robot = new Robot('robot-1', start)
+    const robot = new Robot('robot-1', start, 'red')
     robot.turn(1)
     expect(robot.direction).toBe(expected)
   })
@@ -18,7 +18,7 @@ describe('Robot', () => {
     [Direction.NORTH, Direction.EAST], [Direction.EAST, Direction.SOUTH],
     [Direction.SOUTH, Direction.WEST], [Direction.WEST, Direction.NORTH],
   ])('turns right from %s to %s', (start, expected) => {
-    const robot = new Robot('robot-1', start)
+    const robot = new Robot('robot-1', start, 'red')
     robot.turn(3)
     expect(robot.direction).toBe(expected)
   })
@@ -27,13 +27,13 @@ describe('Robot', () => {
     [Direction.NORTH, Direction.SOUTH], [Direction.EAST, Direction.WEST],
     [Direction.SOUTH, Direction.NORTH], [Direction.WEST, Direction.EAST],
   ])('makes a U-turn from %s to %s', (start, expected) => {
-    const robot = new Robot('robot-1', start)
+    const robot = new Robot('robot-1', start, 'red')
     robot.turn(2)
     expect(robot.direction).toBe(expected)
   })
 
   it('returns to its starting direction after four left turns', () => {
-    const robot = new Robot('robot-1', Direction.EAST)
+    const robot = new Robot('robot-1', Direction.EAST, 'red')
     for (let turn = 0; turn < 4; turn++) robot.turn(1)
     expect(robot.direction).toBe(Direction.EAST)
   })
@@ -46,7 +46,7 @@ describe('Robot', () => {
       new Card('left-2', 'TURN_LEFT'),
       new Card('move-3', 'MOVE_1'),
     ]
-    const robot = new Robot('robot-1', Direction.NORTH)
+    const robot = new Robot('robot-1', Direction.NORTH, 'red')
     robot.setProgram(program)
     program.reverse()
 
@@ -61,7 +61,7 @@ describe('Robot', () => {
   })
 
   it('rejects incomplete programs and invalid register reads', () => {
-    const robot = new Robot('robot-1', Direction.NORTH)
+    const robot = new Robot('robot-1', Direction.NORTH, 'red')
     expect(() => robot.setProgram([new Card('only-card', 'MOVE_1')])).toThrow(RangeError)
     expect(() =>
       robot.setProgram(Array.from({ length: 6 }, (_, index) => new Card(`extra-${index}`, 'MOVE_1'))),

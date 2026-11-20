@@ -1,33 +1,28 @@
 import { resolveRobotAction } from '../activationTestHelper.ts'
 import { describe, expect, it } from 'vitest'
-import { Deck, Direction, Card, Player, Robot, createGame } from '@/game/index'
+import { Card, Deck, createGame } from '@/game/index'
+import { createTestPlayer } from '../fixtures.ts'
 
 describe('Player', () => {
   it('keeps its robot and manages hands through its private deck', () => {
-    const robot = new Robot('robot-1', Direction.EAST)
-    const firstHand = [new Card('move-1', 'MOVE_1')]
-    const player = new Player('player-1', robot, new Deck(firstHand))
-    player.drawHand(() => 0)
-    firstHand.pop()
+    const card = new Card('move-1', 'MOVE_1')
+    const player = createTestPlayer({ id: 'player-1', deck: new Deck([card]) })
+    player.drawHand()
 
     expect(player.id).toBe('player-1')
-    expect(player.robot).toBe(robot)
-    expect(player.hand.map((card) => card.id)).toEqual(['move-1'])
+    expect(player.hand).toEqual([card])
 
-    const nextHand = [new Card('left-1', 'TURN_LEFT')]
     player.discard(player.hand)
     expect(player.hand).toEqual([])
-    player.deck.add(nextHand)
-    player.drawHand(() => 0)
-    nextHand.pop()
-    // New cards are drawn first, then the discard pile is recycled.
-    expect(player.hand.map((card) => card.id)).toEqual(['left-1', 'move-1'])
+
+    player.drawHand()
+    expect(player.hand).toEqual([card])
   })
 
   it('moves programmed cards to the registers on submit and discards them at round end', () => {
     const cards = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => new Card(id, 'MOVE_1'))
-    const player = new Player('player-1', new Robot('robot-1', Direction.EAST), new Deck(cards))
-    player.drawHand(() => 0, 6)
+    const player = createTestPlayer({ id: 'player-1', deck: new Deck(cards) })
+    player.drawHand()
     const program = cards.slice(0, 5)
 
     player.robot.setProgram(program)
@@ -36,21 +31,25 @@ describe('Player', () => {
 
     expect(player.hand).toEqual([])
     expect(player.robot.program).toEqual(program)
-    expect(player.deck.discarded).toBe(1)
-    expect(player.deck.size).toBe(0)
+
+    player.drawHand()
+    expect(player.hand).toEqual([cards[5]])
+    player.discard(player.hand)
 
     player.discard(player.robot.program)
     player.robot.clearProgram()
+    player.drawHand()
 
     expect(player.robot.program).toEqual([])
-    expect(player.deck.discarded).toBe(6)
+    expect(player.hand).toHaveLength(6)
+    expect(player.hand).toEqual(expect.arrayContaining(cards))
   })
 
   it('keeps immutable register snapshots independent from hands and other players', () => {
     const card = new Card('move-1', 'MOVE_1')
-    const first = new Player('player-1', new Robot('robot-1', Direction.EAST), new Deck([card]))
-    first.drawHand(() => 0)
-    const second = new Player('player-2', new Robot('robot-2', Direction.EAST))
+    const first = createTestPlayer({ id: 'player-1', deck: new Deck([card]) })
+    first.drawHand()
+    const second = createTestPlayer({ id: 'player-2' })
     const empty = Array.from({ length: 5 }, () => ({ status: 'EMPTY' }))
     const initial = first.registers
     expect(initial).toEqual(empty)
@@ -91,8 +90,8 @@ describe('Player', () => {
   })
 
   it('starts each player at checkpoint zero and tracks their progress independently', () => {
-    const first = new Player('player-1', new Robot('robot-1', Direction.EAST))
-    const second = new Player('player-2', new Robot('robot-2', Direction.EAST))
+    const first = createTestPlayer()
+    const second = createTestPlayer()
 
     expect(first.lastCheckpoint).toBe(0)
     expect(second.lastCheckpoint).toBe(0)
@@ -104,7 +103,7 @@ describe('Player', () => {
   })
 
   it('only records the next checkpoint, without repeating, skipping or losing progress', () => {
-    const player = new Player('player-1', new Robot('robot-1', Direction.EAST))
+    const player = createTestPlayer()
 
     expect(player.completeCheckpoint(2)).toBe(false)
     expect(player.lastCheckpoint).toBe(0)
@@ -120,7 +119,7 @@ describe('Player', () => {
   it.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
     'rejects invalid checkpoint number %s without changing progress',
     (checkpointNumber) => {
-      const player = new Player('player-1', new Robot('robot-1', Direction.EAST))
+      const player = createTestPlayer()
 
       expect(player.completeCheckpoint(checkpointNumber)).toBe(false)
       expect(player.lastCheckpoint).toBe(0)
@@ -128,8 +127,8 @@ describe('Player', () => {
   )
 
   it('preserves checkpoint progress across rounds and program clearing', () => {
-    const { game } = createGame('empty-map')
-    const player = game.addPlayer()._unsafeUnwrap()
+    const game = createGame('empty-map', 'Test game')
+    const player = game.addPlayer('red')._unsafeUnwrap()
     player.completeCheckpoint(1)
 
     for (let round = 0; round < 2; round++) {
