@@ -131,6 +131,10 @@ test('includes the leave action without trapping keyboard focus', async ({ page 
   await page.keyboard.press('Enter')
   await expect(options).toBeVisible()
 
+  // Cards moving under the pointer must not take focus from the open menu.
+  await page.getByRole('region', { name: 'Programming hand' }).getByRole('button').nth(2).hover()
+  await expect(trigger).toBeFocused()
+
   for (const control of [settings, logout, leave, keybindings]) {
     await page.keyboard.press('Tab')
     await expect(control).toBeFocused()

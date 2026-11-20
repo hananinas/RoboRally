@@ -10,7 +10,7 @@ type ProgrammingHandProps = {
   disabled: boolean
   retired?: boolean
   highlightedIndex: number | null
-  onHighlightCard: (cardIndex: number) => void
+  onHighlightCard: (cardIndex: number, focus?: boolean) => void
   cardDrag: Pick<ReturnType<typeof useCardDrag>, 'dragHandlers' | 'isDragging' | 'fan'>
 }
 
@@ -69,7 +69,7 @@ function ProgrammingHand({
               disabled={registered || disabled}
               dragging={isDragging(card)}
               {...dragHandlers(card)}
-              onMouseEnter={() => onHighlightCard(index)}
+              onMouseEnter={() => onHighlightCard(index, false)}
               onFocus={() => onHighlightCard(index)}
             />
           </div>
