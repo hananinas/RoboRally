@@ -182,13 +182,13 @@ test('keeps a queued environment result when the active robot leaves', async ({ 
   const action = { ...ROUND_ACTIONS[0], robotId: OTHER_ROBOT_ID, playerId: OTHER_PLAYER_ID,
     instruction: 'TURN_LEFT' as const, resolvedInstruction: 'TURN_LEFT' as const }
   await game.control({ type: 'round', actions: [action, environment, checkpoint()] })
-  await expect(page.locator('.register[data-active]')).toHaveCount(1)
+  await expect(page.getByRole('group', { name: /^Other,/ }).locator('.register-card[data-active]')).toHaveCount(1)
   await game.control({ type: 'player-left', player: { gameId: GAME_ID, playerId: OTHER_PLAYER_ID, robotId: OTHER_ROBOT_ID } })
   const robot = page.locator(`[data-robot-id="${ROBOT_ID}"]`).first()
   const hand = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
   await expect(robot).toHaveAttribute('data-board-tile', '6,4')
   await expect(page.locator(`[data-robot-id="${OTHER_ROBOT_ID}"]`)).toHaveCount(0)
-  await expect(page.locator('.register[data-active]')).toHaveCount(0)
+  await expect(page.locator('.register-card[data-active]')).toHaveCount(0)
   await page.clock.runFor(299)
   await expect(hand.last()).toBeDisabled()
   await expect(page.getByRole('status')).toHaveText('Executing')

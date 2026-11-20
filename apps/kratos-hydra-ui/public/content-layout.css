@@ -1,117 +1,77 @@
-/* on content layouts we want the background to be surface instead of canvas */
-body {
-  background-color: var(--ory-theme-background-surface);
-}
-
-/* only manage the content next to the nav */
-.container {
-  display: flex;
-  flex-direction: column;
-  /* on mobile we have a padding top of 2rem */
-  padding: 2rem 2rem;
-  /* on mobile we dont want the content hidden under the nav */
-  margin-top: 5.125rem;
-  height: auto;
-}
-
-/* manage nav and content */
 .app-container {
-  display: flex;
-  flex-direction: row;
-  min-height: 100vh;
-  min-width: 100%;
-  /* we need this padding since the footer will hide content at the bottom of the container */
-  padding-bottom: 5.5rem;
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+  width: min(100% - 32px, 860px);
+  margin: 32px auto;
 }
 
-.wrap-content {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
+.main-nav {
+  position: sticky;
+  top: 16px;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--theme-border);
+  border-radius: var(--theme-panel-radius);
+  background: var(--theme-surface);
 }
 
-body:before {
+.main-nav a {
+  color: var(--theme-text);
+}
+
+.main-nav a:hover {
+  color: var(--theme-accent);
+}
+
+.container {
+  min-width: 0;
+}
+
+.settings-header > :first-child {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.content h3 {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.content hr {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--theme-border);
+}
+
+/* Settings includes empty sections for authentication methods that are disabled. */
+.content .spacing-32:empty {
   display: none;
-  visibility: hidden;
 }
 
-.traits-box {
-  display: flex;
-  flex: 1 1 auto;
-  padding: 0.5rem;
-  max-width: calc(50% - 2rem);
-}
-
-.traits-box-divider {
-  border-top: 1px solid var(--ory-theme-border-def);
-}
-
-.session-code-box > pre {
-  white-space: pre-wrap; /* Since CSS 2.1 */
-  white-space: -moz-pre-wrap; /* Mozilla, since 1999 */
-  white-space: -pre-wrap; /* Opera 4-6 */
-  white-space: -o-pre-wrap; /* Opera 7 */
-  word-wrap: break-word; /* Internet Explorer 5.5+ */
-}
-
-.session-code-box {
-  display: flex;
-  flex: 1 1 auto;
-  max-width: calc(50% - 2rem);
-  margin-bottom: auto;
-}
-
-.content {
-  width: auto;
-}
-
-/* wide-screen vieport */
-@media screen and (min-width: 90em) {
-  .content {
-    display: flex;
-    width: 100%;
-    flex: 1 1 auto;
-    gap: 2rem;
-    max-width: 90em;
-  }
-  body:before {
-    content: "large";
-  }
-}
-
-/* laptop viewport */
-@media screen and (min-width: 48em) {
-  /* only on desktop we don't want the content to be under the nav */
-  .container {
-    /* remove mobile top margin */
-    margin-top: 0;
-    margin-left: 18.75rem;
-    padding-top: 4rem;
-  }
-  /* only on desktop we have nav the full height of the viewport */
-  .main-nav {
-    padding-top: 4rem;
-    min-height: 100vh;
-  }
-  body:before {
-    content: "medium";
-  }
-}
-
-/* when we are on mobile/tablet we want the content to be under the nav */
-@media screen and (min-width: 0) and (max-width: 48em) {
+@media (max-width: 48em) {
   .app-container {
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 560px;
+    margin-block: 24px;
   }
-  .container {
-    margin-left: 0;
+
+  .main-nav {
+    position: static;
   }
-  body:before {
-    content: "small";
+
+  /* Keep settings links available without Ory's checkbox menu on narrow screens. */
+  .main-nav > div label {
+    display: none;
   }
-  .session-code-box,
-  .traits-box {
-    max-width: 100%;
-    width: 100%;
+
+  .app-container .main-nav > input:not(:checked) ~ ul {
+    display: flex;
+    min-height: 0;
   }
 }
