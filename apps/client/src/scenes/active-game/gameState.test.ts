@@ -57,13 +57,12 @@ const publicState: PublicGameState = {
     { playerId: '50000000-0000-4000-8000-000000000002', lastCheckpoint: 0, username: 'Second', connected: true, programSubmitted: false, registers: [{ status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }, { status: 'EMPTY' }] },
   ],
   antenna: { x: 2, y: 0, angle: Math.PI / 2 },
-  rebootTiles: [{ x: 0, y: 0 }],
   board: {
     width: 5,
     height: 5,
     tiles: Array.from({ length: 25 }, (_, index) => ({
       position: { x: index % 5, y: Math.floor(index / 5) },
-      type: 'EMPTY',
+      type: index === 0 ? 'REBOOT' : 'EMPTY',
     })),
   },
   robots: [
@@ -107,7 +106,7 @@ describe('join initialization', () => {
   it('initializes assignment, board and hand together and accepts subsequent events', () => {
     const state = gameStateReducer(createClientGameState(), { type: 'joined', result })
     expect(state.board?.antenna).toEqual(publicState.antenna)
-    expect(state.board?.cells.filter((cell) => cell.reboot).map(({ x, y }) => ({ x, y }))).toEqual(publicState.rebootTiles)
+    expect(state.board?.cells.filter((cell) => cell.reboot).map(({ x, y }) => ({ x, y }))).toEqual([{ x: 0, y: 0 }])
     expect(state.assignment).toEqual(result.assignment)
     expect(state.board).not.toBeNull()
     expect(state.hand).toEqual(cards)

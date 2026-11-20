@@ -357,7 +357,7 @@ export function gameStateReducer(
           registers: player.registers,
         })),
         playback: createRobotPlaybackState(snapshot.robots, snapshot.players),
-        board: createBoardFromSnapshot(snapshot.board, snapshot.antenna, snapshot.rebootTiles),
+        board: createBoardFromSnapshot(snapshot.board, snapshot.antenna),
       }
     }
     case 'dealt': {

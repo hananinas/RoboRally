@@ -1,11 +1,7 @@
-import type { Antenna, Board, Coordinate } from '@robo-rally/game-events'
+import type { Antenna, Board } from '@robo-rally/game-events'
 import { createBoardRenderModel, type BoardRenderModel } from './boardModel.ts'
 
-export function createBoardFromSnapshot(
-  board: Board,
-  antenna: Antenna,
-  rebootTiles: readonly Coordinate[],
-): BoardRenderModel {
+export function createBoardFromSnapshot(board: Board, antenna: Antenna): BoardRenderModel {
   return createBoardRenderModel(
     board.width,
     board.height,
@@ -22,7 +18,7 @@ export function createBoardFromSnapshot(
       }] : []),
       checkpoints: board.tiles.flatMap((tile) => tile.checkpointNumber === undefined
         ? [] : [{ ...tile.position, checkpointNumber: tile.checkpointNumber }]),
-      rebootTiles,
+      rebootTiles: board.tiles.filter((tile) => tile.type === 'REBOOT').map((tile) => tile.position),
       walls: board.tiles.map((tile) => ({
         ...tile.position,
         north: tile.walls?.includes('NORTH'),

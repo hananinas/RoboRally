@@ -23,6 +23,9 @@ export const ROBOT_ID = '33333333-3333-4333-8333-333333333333'
 export const OTHER_PLAYER_ID = '22222222-2222-4222-8222-222222222223'
 export const OTHER_ROBOT_ID = '33333333-3333-4333-8333-333333333334'
 
+// Reboot tiles at (1,2), (9,2), (1,9) and (9,9), as indexes into the 11x11 tile list.
+const REBOOT_TILE_INDEXES = [23, 31, 100, 108]
+
 export function createPublicState(): PublicGameState {
   return {
     gameId: GAME_ID,
@@ -35,13 +38,12 @@ export function createPublicState(): PublicGameState {
     checkpointCount: 0,
     winner: null,
     antenna: { x: 5, y: 0, angle: Math.PI / 2 },
-    rebootTiles: [{ x: 1, y: 9 }, { x: 9, y: 9 }, { x: 1, y: 2 }, { x: 9, y: 2 }],
     board: {
       width: 11,
       height: 11,
       tiles: Array.from({ length: 121 }, (_, index) => ({
         position: { x: index % 11, y: Math.floor(index / 11) },
-        type: 'EMPTY',
+        type: REBOOT_TILE_INDEXES.includes(index) ? 'REBOOT' : 'EMPTY',
       })),
     },
     robots: [{
