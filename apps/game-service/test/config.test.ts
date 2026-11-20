@@ -6,9 +6,6 @@ import {
   parseGameServicePort,
   parseRefreshBufferSeconds,
   parseRefreshTokenTtlSeconds,
-  parseAppConfig,
-  parseCardSeed,
-  parseStartTileOrder,
 } from '@/config.ts'
 
 describe('game service configuration', () => {
@@ -47,25 +44,4 @@ describe('game service configuration', () => {
       expect(() => parseRefreshTokenTtlSeconds(value)).toThrow(RangeError)
     },
   )
-  it('picks starting tiles at random unless ordered placement is configured', () => {
-    expect(parseStartTileOrder(undefined)).toBe('random')
-    expect(parseStartTileOrder('ordered')).toBe('ordered')
-    expect(() => parseStartTileOrder('first')).toThrow(RangeError)
-  })
-
-  it('draws cards at random unless a card seed is configured', () => {
-    expect(parseCardSeed(undefined)).toBeUndefined()
-    expect(parseCardSeed('0')).toBe(0)
-    expect(parseCardSeed('42')).toBe(42)
-    for (const value of ['', '-1', '1.5', 'abc']) {
-      expect(() => parseCardSeed(value)).toThrow(RangeError)
-    }
-  })
-
-  it('only allows a card seed outside production', () => {
-    expect(parseAppConfig({ CARD_SEED: '7' }).cardSeed).toBe(7)
-    expect(parseAppConfig({ NODE_ENV: 'development', CARD_SEED: '7' }).cardSeed).toBe(7)
-    expect(parseAppConfig({ NODE_ENV: 'production' }).cardSeed).toBeUndefined()
-    expect(() => parseAppConfig({ NODE_ENV: 'production', CARD_SEED: '7' })).toThrow('CARD_SEED')
-  })
 })

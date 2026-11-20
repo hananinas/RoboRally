@@ -138,7 +138,10 @@ export default function useSessionConnection() {
       dispatch({ type: 'error', error: result.outcome })
       return false
     } catch {
-      if (generation.current === attempt && socket.connected) dispatch({ type: 'error', error: 'TIMEOUT' })
+      if (generation.current === attempt && socket.connected) {
+        dispatch({ type: 'sync-requested' })
+        dispatch({ type: 'error', error: 'TIMEOUT' })
+      }
       return false
     } finally {
       if (generation.current === attempt) {

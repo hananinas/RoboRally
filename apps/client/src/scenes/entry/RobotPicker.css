@@ -129,17 +129,23 @@
 }
 
 .robot-picker__choices {
-  display: grid;
-  grid-template-columns: repeat(3, 52px);
-  justify-content: center;
+  display: flex;
+  justify-content: space-evenly;
+  align-items: center;
+  flex-wrap: nowrap;
+  min-width: 0;
+  max-width: 100%;
   gap: var(--entry-space-2);
   margin: var(--entry-space-4) 0 var(--entry-space-5);
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
 }
 
 .robot-picker__choice {
   display: grid;
   place-items: center;
-  width: 52px;
+  flex: 0 0 52px;
   height: 52px;
   padding: 0;
   border: 1px solid var(--entry-border);

@@ -1,4 +1,4 @@
-import { ROBOT_SPRITE_IDS, type RobotDefinition } from '@robo-rally/game-events'
+import type { RobotDefinition } from '@robo-rally/game-events'
 import RobotPreview from './RobotPreview.tsx'
 import { robotOptionFor } from './robotPreviews.ts'
 import './RobotPicker.css'
@@ -13,14 +13,8 @@ type Props = {
 }
 
 export default function RobotPicker({ robots, selectedRobotId, disabled, onSelect }: Props) {
-  const tank = robots.find((option) => option.id === ROBOT_SPRITE_IDS[0])
   const selectedRobot = robots.find((option) => option.id === selectedRobotId)
-  const availableRobots = tank
-    ? [tank, ...robots.filter((option) => option.id !== tank.id).slice(0, 5)]
-    : robots.slice(0, 6)
-  const choices = selectedRobot && !availableRobots.some((option) => option.id === selectedRobot.id)
-    ? [...availableRobots.slice(0, 5), selectedRobot]
-    : availableRobots
+  const choices = robots
   const robot = selectedRobot && choices.some((option) => option.id === selectedRobot.id)
     ? selectedRobot
     : choices[0]

@@ -87,7 +87,6 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
 }
 
 export function presentPublicGameState(
-  gameId: GameId,
   game: Game,
   programmingTimer: ProgrammingTimer,
   players: readonly PlayerState[] = [],
@@ -98,7 +97,7 @@ export function presentPublicGameState(
   ).flat()
 
   return {
-    gameId,
+    gameId: game.id,
     serverTime: Date.now(),
     programmingTimer,
     checkpointCount: game.board.checkpointCount,
@@ -144,7 +143,6 @@ export function presentProgramFinalized(
 }
 
 export function presentRobotActionResolved(
-  gameId: GameId,
   game: Game,
   result: NextActionResult,
 ): RobotActionResolved {
@@ -152,7 +150,7 @@ export function presentRobotActionResolved(
   const player = game.players.find((candidate) => candidate.robot.id === action.robotId)
   if (!player) throw new Error(`Missing owner for robot ${action.robotId}`)
   return {
-    gameId,
+    gameId: game.id,
     registerIndex,
     robotId: action.robotId,
     playerId: player.id,

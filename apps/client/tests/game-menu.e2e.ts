@@ -131,6 +131,10 @@ test('includes the leave action without trapping keyboard focus', async ({ page 
   await page.keyboard.press('Enter')
   await expect(options).toBeVisible()
 
+  // Cards moving under the pointer must not take focus from the open menu.
+  await page.getByRole('region', { name: 'Programming hand' }).getByRole('button').nth(2).hover()
+  await expect(trigger).toBeFocused()
+
   for (const control of [settings, logout, leave, keybindings]) {
     await page.keyboard.press('Tab')
     await expect(control).toBeFocused()
@@ -159,9 +163,9 @@ test('preserves the program and allows card selection when dismissing the menu',
   await trigger.click()
   await expect(options).toBeVisible()
   await expect(registerCards).toHaveCount(1)
-  await expect(handCards.nth(0)).toBeDisabled()
+  await expect(handCards).toHaveCount(8)
 
-  await handCards.nth(1).click()
+  await handCards.first().click()
   await expect(options).toBeHidden()
   await expect(trigger).toHaveAttribute('aria-expanded', 'false')
   await expect(registerCards).toHaveCount(2)

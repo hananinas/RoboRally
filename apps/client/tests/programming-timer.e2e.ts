@@ -55,7 +55,8 @@ test('corrects delivery delay, ignores stale clock replies and waits for server 
   await game.control({ type: 'timer', timer: { status: 'CLOSED' } })
   await expect(countdown).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()
-  await expect(hand.nth(5)).toBeDisabled()
+  await expect(hand).toHaveCount(cards.length - 5)
+  await expect(hand.and(page.getByRole('button', { disabled: true }))).toHaveCount(cards.length - 5)
 
   // A reply from the closed round must not replace the next round's estimate.
   await game.control({ type: 'round', actions: [] })

@@ -7,7 +7,6 @@ import type { Winner } from '@robo-rally/game-events'
 export type ActionSchedulerDeps = {
   io: GameSocketServer
   game: Game
-  gameId: string
   publicRoom: string
   playerRoom: (playerId: string) => string
   usernameOf: (playerId: string) => string | undefined
@@ -23,7 +22,7 @@ export type ActionScheduler = {
 }
 
 export function createActionScheduler(
-  { io, game, gameId, publicRoom, playerRoom, usernameOf, onProgrammingStarted, onStop }: ActionSchedulerDeps,
+  { io, game, publicRoom, playerRoom, usernameOf, onProgrammingStarted, onStop }: ActionSchedulerDeps,
 ): ActionScheduler {
   let scheduledAction: NodeJS.Immediate | undefined
   let closed = false
@@ -41,12 +40,12 @@ export function createActionScheduler(
   function announceWinner(): void {
     if (winnerAnnounced) return
     winnerAnnounced = true
-    io.to(publicRoom).emit('game.won', { gameId, ...winner()! })
+    io.to(publicRoom).emit('game.won', { gameId: game.id, ...winner()! })
   }
 
   function announceHands(): void {
     for (const player of game.players) {
-      io.to(playerRoom(player.id)).emit('cards.dealt', presentCardsDealt(gameId, player))
+      io.to(playerRoom(player.id)).emit('cards.dealt', presentCardsDealt(game.id, player))
     }
     onProgrammingStarted()
   }
@@ -64,9 +63,9 @@ export function createActionScheduler(
       try {
         const step = game.executeNextStep()
         if (step.type === 'robot') {
-          io.to(publicRoom).emit('robot.actionResolved', presentRobotActionResolved(gameId, game, step.result))
+          io.to(publicRoom).emit('robot.actionResolved', presentRobotActionResolved(game, step.result))
         } else {
-          const result = presentEnvironmentStepResolved(gameId, step.result)
+          const result = presentEnvironmentStepResolved(game.id, step.result)
           const changed = result.kind === 'GEARS' ? result.robots.length > 0 : result.checkpointProgress.length > 0
           if (changed) io.to(publicRoom).emit('environment.stepResolved', result)
         }
@@ -75,13 +74,13 @@ export function createActionScheduler(
       } catch (error) {
         logError('Failed to execute next activation step', error, {
           source: 'actionScheduler',
-          gameId,
+          gameId: game.id,
           phase: game.lastActivePhase,
           registerIndex: game.currentRegister,
         })
         stop()
         game.abort()
-        io.to(publicRoom).emit('game.aborted', { gameId })
+        io.to(publicRoom).emit('game.aborted', { gameId: game.id })
       }
     })
   }

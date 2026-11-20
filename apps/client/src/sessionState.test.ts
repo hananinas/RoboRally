@@ -33,11 +33,11 @@ const joined: GameInitialization = {
   programSubmitted: false,
 }
 
-const robot = { id: 'tank', name: 'Tank', icon: 'data:image/svg+xml;base64,PHN2Zy8+', defaultForLobbyCreation: true }
+const robot = { id: 'fork-clamp1', name: 'Fork Clamp 1', icon: '', defaultForLobbyCreation: true }
 const lobby = {
   lobbyId: 'lobby-1', name: 'Lobby One', mapName: 'test-map' as const, mapDisplayName: 'Test Map',
   mapIcon: 'test-map-icon', ownerUserId: user.userId, playerCount: 1, maxPlayers: 6,
-  players: [{ ...user, robotSpriteId: 'tank' as const }], robots: [robot],
+  players: [{ ...user, robotSpriteId: 'fork-clamp1' as const }], robots: [robot],
 }
 const browsing: SessionState = { status: 'browsing', user, error: null }
 const waiting: SessionState = { status: 'waiting', user, lobby, error: null }

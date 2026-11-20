@@ -18,16 +18,15 @@ test('announces the winner to every player and lets them leave', async ({ browse
   try {
     await startTogether(page, other, 'bence', 'dane')
     // The owner's robot starts at (8, 7) and reaches checkpoint 1 at (10, 6) in round 1
-    // and the final checkpoint at (8, 9) in register 4 of round 2.
-    // The other robot only turns and backs away, so it never blocks that route.
+    // and the final checkpoint at (8, 9) in round 2. The other robot stays well clear
+    // of that route (it never leaves the 2-3,8 area), so it can't block it.
     const rounds = [
-      ['Turn Right', 'Move 2', 'Turn Left', 'Move 1', 'U-Turn'],
-      ['Turn Right', 'Move 2', 'Turn Left', 'Move 3', 'Turn Left'],
+      ['Turn Right', 'Move 2', 'Turn Right', 'Back Up', 'Turn Right'],
+      ['Move 2', 'Turn Left', 'Move 2', 'Move 1', 'Turn Left'],
     ] as const
     const otherPrograms = [
-      ['Turn Left', 'Turn Right', 'U-Turn', 'Turn Left', 'Back Up'],
-      // The second hand has no U-Turn or Back Up, so this round only turns.
-      ['Turn Left', 'Turn Left', 'Turn Right', 'Turn Right', 'Turn Right'],
+      ['Turn Left', 'Turn Right', 'Turn Left', 'Turn Right', 'Turn Right'],
+      ['Turn Left', 'Turn Left', 'U-Turn', 'Again', 'Move 1'],
     ] as const
 
     await program(page, rounds[0])

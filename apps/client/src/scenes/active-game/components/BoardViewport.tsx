@@ -166,9 +166,8 @@ function RobotPiece({
 }>) {
   const component = BOARD_COMPONENTS[componentName]
   if (!component.asset) throw new Error(`Missing robot sprite ${componentName}`)
-  const componentIndex = ROBOT_COMPONENTS.indexOf(componentName)
   const sprite = robotOptionFor(robot.robotSpriteId).sprite
-  const spriteLayer = sprite.layers[componentIndex]
+  const spriteLayer = sprite.layers[0]
   if (spriteLayer === undefined) return null
   const centre = tileCentre(robot.position.coordinate, board, BOARD_CONFIG)
   const height = layer / BOARD_CONFIG.parallaxReferenceLayer
@@ -185,7 +184,7 @@ function RobotPiece({
   return (
     <svg
       aria-hidden="true"
-      className={`board-piece ${component.className} board-piece--test-tank${robot.robotSpriteId === 'tank' ? '' : ' board-piece--selected-robot'}`}
+      className={`board-piece ${component.className} board-piece--selected-robot`}
       data-board-component={componentName}
       data-board-height={height}
       data-board-lift-height={Math.min(
@@ -198,11 +197,9 @@ function RobotPiece({
       data-robot-sprite-id={robot.robotSpriteId}
       preserveAspectRatio="xMidYMid meet"
       style={style}
-      viewBox={robot.robotSpriteId === 'tank' ? component.asset.viewBox : sprite.viewBox}
+      viewBox={sprite.viewBox}
     >
-      {robot.robotSpriteId === 'tank'
-        ? <use href={`#${component.asset.symbol}`} />
-        : <g dangerouslySetInnerHTML={{ __html: spriteLayer }} />}
+      <g dangerouslySetInnerHTML={{ __html: spriteLayer }} />
     </svg>
   )
 }

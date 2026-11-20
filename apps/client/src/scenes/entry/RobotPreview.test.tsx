@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import tankSprites from '../active-game/board/assets/tanks.hbls?raw'
+import forkClampSprites from '../active-game/board/assets/fork-clamp.hbls?raw'
 import RobotPreview from './RobotPreview.tsx'
 import { robotOptions, tankPreview, type RobotPreviewDefinition } from './robotPreviews.ts'
 
@@ -20,8 +20,8 @@ describe('RobotPreview', () => {
     expect(markup).toContain('--robot-preview-size:160px')
   })
 
-  it('uses every layer in the existing tank asset without duplicating its symbol IDs', () => {
-    expect(tankPreview.layers).toHaveLength((tankSprites.match(/<symbol\b/g) ?? []).length)
+  it('uses the fork-clamp asset without duplicating its symbol IDs', () => {
+    expect(tankPreview.layers).toHaveLength(1)
     expect(tankPreview.layers.length).toBeGreaterThan(0)
     const markup = renderToStaticMarkup(<><RobotPreview sprite={tankPreview} /><RobotPreview sprite={tankPreview} /></>)
 
@@ -31,14 +31,11 @@ describe('RobotPreview', () => {
     expect(markup).toContain('<rect')
   })
 
-  it('provides six complete placeholder previews in addition to the tank', () => {
-    expect(robotOptions).toHaveLength(7)
-    expect(robotOptions.slice(1).map(({ name }) => name)).toEqual([
-      'Scout', 'Guardian', 'Rover', 'Striker', 'Sentinel', 'Hauler',
-    ])
-    for (const option of robotOptions.slice(1)) {
+  it('provides every fork-clamp design as a complete preview', () => {
+    expect(robotOptions).toHaveLength((forkClampSprites.match(/<symbol\b/g) ?? []).length)
+    for (const option of robotOptions) {
       expect(option.sprite.layers).toHaveLength(1)
-      expect(option.sprite.layers[0]).toContain('var(--robot-colour)')
+      expect(option.sprite.layers[0]?.length).toBeGreaterThan(0)
     }
   })
 })

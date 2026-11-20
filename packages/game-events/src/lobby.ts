@@ -2,9 +2,12 @@ import { z } from 'zod'
 import type { GameInitialization, User } from './payloads.js'
 
 export const emptyRequestSchema = z.strictObject({}).readonly()
-export const ROBOT_SPRITE_IDS = ['tank', 'scout', 'guardian', 'rover', 'striker', 'sentinel', 'hauler'] as const
+export const ROBOT_SPRITE_IDS = [
+  'fork-clamp1', 'fork-clamp2', 'fork-clamp3', 'fork-clamp4',
+  'fork-clamp5', 'fork-clamp6', 'fork-clamp7', 'fork-clamp8',
+] as const
 export const lobbyRequestSchema = z.strictObject({ lobbyId: z.uuid() }).readonly()
-export const robotSelectionRequestSchema = z.strictObject({
+export const robotSelectionRequestSchema = z.looseObject({
   robotSpriteId: z.string().trim().min(1),
 }).readonly()
 export const createLobbyRequestSchema = z.strictObject({

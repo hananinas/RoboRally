@@ -64,7 +64,7 @@ export function handleSubmitProgram(
 
     if (result.isErr()) {
       const { outcome, detail } = result.error
-      logWarn('Rejected program.submit request', { command: 'program.submit', gameId: ctx.gameId, playerId, outcome, detail, payload })
+      logWarn('Rejected program.submit request', { command: 'program.submit', gameId: ctx.game.id, playerId, outcome, detail, payload })
       ack({ outcome })
       return
     }
@@ -76,7 +76,7 @@ export function handleSubmitProgram(
     ctx.programmingTimer.start()
     if (ctx.game.requirePhase('activation').isOk()) ctx.programmingTimer.close()
   }, (error) => {
-    logError('Failed to process program submission', error, { command: 'program.submit', gameId: ctx.gameId, playerId, payload })
+    logError('Failed to process program submission', error, { command: 'program.submit', gameId: ctx.game.id, playerId, payload })
     return { outcome: 'INTERNAL_ERROR' } as const
   })
 }
@@ -108,14 +108,14 @@ export function handleUpdateRegisters(
 
     ack({ outcome: 'ACCEPTED' })
     ctx.io.to(ctx.publicRoom).emit('game.registersChanged', {
-      gameId: ctx.gameId,
+      gameId: ctx.game.id,
       playerId: player.id,
       // Successful updateRegisters synchronously replaces every slot with EMPTY/HIDDEN.
       // No activation can interleave before this read; snapshots retain their wider type.
       registers: player.registers as RegistersChanged['registers'],
     })
   }, (error) => {
-    logError('Failed to update registers', error, { command: 'game.updateRegisters', gameId: ctx.gameId })
+    logError('Failed to update registers', error, { command: 'game.updateRegisters', gameId: ctx.game.id })
     return { outcome: 'INTERNAL_ERROR' } as const
   })
 }
