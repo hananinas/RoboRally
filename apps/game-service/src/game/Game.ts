@@ -450,7 +450,7 @@ export class Game {
       if (distance > nearestDistance) continue
       const angle = Math.atan2(dy, dx)
       const offset = ((angle - antennaAngle) % fullTurn + fullTurn) % fullTurn
-      if (distance < nearestDistance || offset < smallestOffset) {
+      if (distance < nearestDistance || (distance === nearestDistance && offset < smallestOffset)) {
         nextRobot = robot
         nearestDistance = distance
         smallestOffset = offset
