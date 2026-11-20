@@ -76,7 +76,7 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
 
   if (tile instanceof GearTile) return { ...common, type: tile.kind, rotation: tile.rotation }
 
-  if (tile.kind === 'EMPTY' || tile.kind === 'PIT') {
+  if (tile.kind === 'EMPTY' || tile.kind === 'PIT' || tile.kind === 'REBOOT') {
     return {
       ...common,
       type: tile.kind,
@@ -103,7 +103,7 @@ export function presentPublicGameState(
     checkpointCount: game.board.checkpointCount,
     players,
     antenna: game.board.antenna,
-    rebootTiles: [{ x: game.board.rebootTile.x, y: game.board.rebootTile.y }],
+    rebootTiles: game.board.rebootTiles.map(({ x, y }) => ({ x, y })),
     board: {
       width: game.board.width,
       height: game.board.height,

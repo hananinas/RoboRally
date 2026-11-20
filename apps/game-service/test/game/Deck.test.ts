@@ -5,7 +5,7 @@ import { Card } from '@/game/Card'
 import { Deck, HAND_SIZE, createDeckCards } from '@/game/Deck'
 import { Board, Direction, EmptyTile, createGame } from '@/game/index'
 import { Integer } from '@/numbers'
-import { createTestGame, createTestPlayer, createTestRobot } from '../fixtures.ts'
+import { createTestGame, createTestPlayer, createTestRobot, withRebootTiles } from '../fixtures.ts'
 
 function counts(cards: readonly Card[]): Record<string, number> {
   const result: Record<string, number> = {}
@@ -99,9 +99,8 @@ describe('Game card cycle', () => {
 describe('Again card', () => {
   function run(instructions: Instruction[]) {
     const board = new Board(
-      [Array.from({ length: 9 }, () => new EmptyTile())],
+      withRebootTiles([Array.from({ length: 9 }, () => new EmptyTile())], { x: Integer(0), y: Integer(0) }),
       { x: Integer(8), y: Integer(0), angle: 0 },
-      { x: Integer(0), y: Integer(0) },
     )
     const robot = createTestRobot({ direction: Direction.EAST })
     board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })

@@ -5,7 +5,7 @@ import { createActionScheduler, type ActionScheduler } from '@/actionScheduler'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
 import { createSessionStore } from '@/auth/sessionStore'
 import { Integer } from '@/numbers'
-import { createTestGame, createTestPlayer, createTestRobot } from './fixtures.ts'
+import { createTestGame, createTestPlayer, createTestRobot, withRebootTiles } from './fixtures.ts'
 
 describe('activation scheduler', () => {
   let io: GameSocketServer
@@ -20,11 +20,11 @@ describe('activation scheduler', () => {
   })
 
   function createGame(onGear = false) {
-    const board = new Board([
+    const board = new Board(withRebootTiles([
       [new EmptyTile(), new EmptyTile(), new EmptyTile()],
       [new GearTile('CLOCKWISE'), new EmptyTile([], 1), new EmptyTile()],
       [new EmptyTile(), new EmptyTile([], 2), new EmptyTile()],
-    ], { x: Integer(0), y: Integer(0), angle: 0 }, { x: Integer(2), y: Integer(0) })
+    ], { x: Integer(2), y: Integer(0) }), { x: Integer(0), y: Integer(0), angle: 0 })
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'TURN_LEFT'))
     const robot = createTestRobot({ direction: Direction.NORTH })
     board.placeRobot(robot.id, { x: Integer(onGear ? 0 : 1), y: Integer(1) })

@@ -67,9 +67,15 @@ describe('board factory', () => {
     expect(createBoard('empty-map').antenna).toEqual(boardMaps['empty-map'].antenna)
   })
 
-  it('reads the reboot tile from the map', () => {
-    expect(createBoard('test-map').rebootTile).toEqual(boardMaps['test-map'].rebootTile)
-    expect(createBoard('empty-map').rebootTile).toEqual(boardMaps['empty-map'].rebootTile)
+  it.each(['empty-map', 'test-map'] as const)('places a reboot tile on each of the four %s reboot positions', (mapName) => {
+    const board = createBoard(mapName)
+    const { rebootTiles, startTiles } = boardMaps[mapName]
+    const keys = rebootTiles.map(([x, y]) => `${x},${y}`)
+
+    expect(rebootTiles).toHaveLength(4)
+    expect(board.rebootTiles.map(({ x, y }) => `${x},${y}`).toSorted()).toEqual(keys.toSorted())
+    for (const { x, y } of board.rebootTiles) expect(board.getTile({ x, y })?.kind).toBe('REBOOT')
+    expect(startTiles.filter(([x, y]) => keys.includes(`${x},${y}`))).toEqual([])
   })
 
   it('gives each board its own antenna object', () => {

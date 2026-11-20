@@ -57,7 +57,7 @@ export type Tile = Readonly<{
   checkpointNumber?: number
 }> & (
   | Readonly<{
-      type: 'EMPTY' | 'PIT'
+      type: 'EMPTY' | 'PIT' | 'REBOOT'
     }>
   | Readonly<{ type: 'GEAR'; rotation: GearRotation }>
   | Readonly<{

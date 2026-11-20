@@ -13,24 +13,27 @@ describe('game factory', () => {
     expect(game.board.getTile({ x: Integer(11), y: Integer(8) })).toMatchObject({ kind: 'GEAR', rotation: 'COUNTERCLOCKWISE' })
   })
 
-  it.each(['empty-map', 'test-map'] as const)('reboots at the configured destination after falling off %s', (mapName) => {
+  it.each([
+    { mapName: 'empty-map', closest: { x: 3, y: 3 } },
+    { mapName: 'test-map', closest: { x: 2, y: 6 } },
+  ] as const)('reboots on the closest reboot tile after falling off $mapName', ({ mapName, closest }) => {
     const game = createGame(mapName, 'Test game')
     const player = game.addPlayer('red')._unsafeUnwrap()
     game.board.relocateRobot(player.robot.id, { x: Integer(0), y: Integer(0) })
     game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
 
-    expect(resolveRobotAction(game).action.position).toEqual(boardMaps[mapName].rebootTile)
+    expect(resolveRobotAction(game).action.position).toEqual(closest)
     expect(player.robot.direction).toBe(Direction.NORTH)
     expect(game.board.occupantAt({ x: Integer(0), y: Integer(0) })).toBeUndefined()
   })
 
-  it('uses the map reboot tile when a robot enters a test pit', () => {
+  it('uses the closest map reboot tile when a robot enters a test pit', () => {
     const game = createGame('test-map', 'Test game')
     const player = game.addPlayer('red')._unsafeUnwrap()
     game.board.relocateRobot(player.robot.id, { x: Integer(5), y: Integer(11) })
     game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
 
-    expect(resolveRobotAction(game).action.position).toEqual(boardMaps['test-map'].rebootTile)
+    expect(resolveRobotAction(game).action.position).toEqual({ x: 10, y: 10 })
     expect(player.robot.direction).toBe(Direction.NORTH)
   })
 

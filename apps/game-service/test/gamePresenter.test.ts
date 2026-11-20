@@ -26,7 +26,7 @@ import {
   presentRobotActionResolved,
 } from '@/socket/gamePresenter.ts'
 import { Integer } from '@/numbers'
-import { createTestGame, createTestPlayer, placeTestPlayer } from './fixtures.ts'
+import { createTestGame, createTestPlayer, placeTestPlayer, withRebootTiles } from './fixtures.ts'
 
 function createGameWithPlayer() {
   const game = createGame('empty-map', 'Test game')
@@ -84,19 +84,19 @@ describe('game presenter', () => {
   })
 
   it('serializes pits alongside empty tiles, walls and checkpoints', () => {
-    const board = new Board([[
+    const board = new Board(withRebootTiles([[
       new EmptyTile(),
       new PitTile(),
       new PitTile([Direction.NORTH, Direction.WEST]),
       new EmptyTile([Direction.SOUTH], 1),
-    ]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
+    ]], { x: Integer(0), y: Integer(0) }), { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
     const game = createTestGame({ board, players: [], deck: cards })
     const state = presentPublicGameState(game, { status: 'IDLE' })
 
     expect(state.checkpointCount).toBe(1)
     expect(state.board.tiles).toEqual([
-      { position: { x: 0, y: 0 }, type: 'EMPTY' },
+      { position: { x: 0, y: 0 }, type: 'REBOOT' },
       { position: { x: 1, y: 0 }, type: 'PIT' },
       { position: { x: 2, y: 0 }, type: 'PIT', walls: ['NORTH', 'WEST'] },
       { position: { x: 3, y: 0 }, type: 'EMPTY', walls: ['SOUTH'], checkpointNumber: 1 },
@@ -104,17 +104,17 @@ describe('game presenter', () => {
   })
 
   it('serializes gear directions and walls without adding rotation to other tiles', () => {
-    const board = new Board([[
+    const board = new Board(withRebootTiles([[
       new EmptyTile(),
       new GearTile('CLOCKWISE', [Direction.NORTH]),
       new GearTile('COUNTERCLOCKWISE', [Direction.SOUTH, Direction.WEST]),
       new PitTile(),
-    ]], { x: Integer(3), y: Integer(0), angle: 0 }, { x: Integer(0), y: Integer(0) })
+    ]], { x: Integer(0), y: Integer(0) }), { x: Integer(3), y: Integer(0), angle: 0 })
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
     const game = createTestGame({ board, players: [], deck: cards })
 
     expect(presentPublicGameState(game, { status: 'IDLE' }).board.tiles).toEqual([
-      { position: { x: 0, y: 0 }, type: 'EMPTY' },
+      { position: { x: 0, y: 0 }, type: 'REBOOT' },
       { position: { x: 1, y: 0 }, type: 'GEAR', rotation: 'CLOCKWISE', walls: ['NORTH'] },
       { position: { x: 2, y: 0 }, type: 'GEAR', rotation: 'COUNTERCLOCKWISE', walls: ['SOUTH', 'WEST'] },
       { position: { x: 3, y: 0 }, type: 'PIT' },
@@ -160,12 +160,12 @@ describe('game presenter', () => {
   })
 
   it('maps tile walls and the activation phase to contract values', () => {
-    const board = new Board([
+    const board = new Board(withRebootTiles([
       [
         new EmptyTile([Direction.NORTH, Direction.WEST], 1),
         new EmptyTile(),
       ],
-    ], { x: Integer(1), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
+    ], { x: Integer(0), y: Integer(0) }), { x: Integer(1), y: Integer(0), angle: Math.PI / 2 })
     const cards = Array.from(
       { length: 5 },
       (_, index) => new Card(`card-${index}`, 'MOVE_1'),
@@ -180,7 +180,7 @@ describe('game presenter', () => {
     expect(state.board.tiles).toEqual([
       {
         position: { x: 0, y: 0 },
-        type: 'EMPTY',
+        type: 'REBOOT',
         walls: ['NORTH', 'WEST'],
         checkpointNumber: 1,
       },
@@ -190,9 +190,9 @@ describe('game presenter', () => {
   })
 
   it('presents the winner once a player completes the final checkpoint', () => {
-    const board = new Board([
+    const board = new Board(withRebootTiles([
       [new EmptyTile(), new EmptyTile([], 1), new EmptyTile()],
-    ], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
+    ], { x: Integer(0), y: Integer(0) }), { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
     const player = placeTestPlayer(board, { x: Integer(0), y: Integer(0) }, { direction: Direction.EAST, deck: new Deck(cards) })
     const game = createTestGame({ board, players: [player], deck: cards })

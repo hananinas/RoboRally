@@ -486,7 +486,7 @@ export class Game {
       case undefined:
         return 'continue'
       case 'reboot':
-        this.rebootRobot(robot)
+        this.rebootRobot(robot, position)
         return 'stop'
       default: {
         const unexpectedEffect: never = effect
@@ -495,8 +495,12 @@ export class Game {
     }
   }
 
-  private rebootRobot(robot: Robot): void {
-    const destination = this.board.nearestFreePosition(this.board.rebootTile)
+  // Reboots on the free reboot tile closest to where the robot fell; ties keep board order.
+  private rebootRobot(robot: Robot, fellAt: Position): void {
+    const distance = (tile: Position) => Math.abs(tile.x - fellAt.x) + Math.abs(tile.y - fellAt.y)
+    const closestFirst = [...this.board.rebootTiles].sort((a, b) => distance(a) - distance(b))
+    const destination = closestFirst.find((tile) => this.board.occupantAt(tile) === undefined)
+      ?? this.board.nearestFreePosition(closestFirst[0])
     if (destination === undefined) throw new Error('No safe reboot destination is available')
     this.board.relocateRobot(robot.id, destination)
     // TODO: Add two SPAM cards and cancel this robot's remaining registers.

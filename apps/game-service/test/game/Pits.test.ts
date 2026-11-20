@@ -2,18 +2,18 @@ import { resolveRobotAction } from '../activationTestHelper.js'
 import { Integer } from '@/numbers'
 import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
-import { Board, Card, Direction, EmptyTile, PitTile, type Tile } from '@/game/index'
+import { Board, Card, Direction, EmptyTile, PitTile, type Position, type Tile } from '@/game/index'
 import { Deck } from '@/game/Deck'
-import { addTestPlayer, createEmptyTileGrid, createTestGame, placeTestPlayer, programLeadingWith } from '../fixtures.ts'
+import { addTestPlayer, createEmptyTileGrid, createTestGame, placeTestPlayer, programLeadingWith, withRebootTiles } from '../fixtures.ts'
 
 function createGame(
   pit = { x: Integer(1), y: Integer(1) },
-  rebootTile = { x: Integer(0), y: Integer(2) },
+  rebootTiles: readonly Position[] = [{ x: Integer(0), y: Integer(2) }],
   walls: readonly Direction[] = [],
 ) {
   const tiles: Tile[][] = createEmptyTileGrid(5, 3)
   tiles[pit.y][pit.x] = new PitTile(walls)
-  const board = new Board(tiles, { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, rebootTile)
+  const board = new Board(withRebootTiles(tiles, ...rebootTiles), { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
   const cards = {
     MOVE_1: new Card('move-1', 'MOVE_1'),
     MOVE_2: new Card('move-2', 'MOVE_2'),
@@ -113,7 +113,7 @@ describe('pit entry and rebooting', () => {
   })
 
   it('supports repeated falls without canceling the program or resetting orientation', () => {
-    const { board, robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, { x: Integer(0), y: Integer(1) })
+    const { board, robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, [{ x: Integer(0), y: Integer(1) }])
     const program = [c.MOVE_1, c.MOVE_2, c.MOVE_3, c.TURN_LEFT, c.TURN_RIGHT]
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
@@ -129,8 +129,46 @@ describe('pit entry and rebooting', () => {
     expect(game.lastActivePhase).toBe('programming')
   })
 
+  it('reboots on the reboot tile closest to the pit', () => {
+    const rebootTiles = [{ x: Integer(4), y: Integer(2) }, { x: Integer(0), y: Integer(2) }]
+    const { board, robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, rebootTiles)
+    game.submitProgram(player.id, programLeadingWith(Object.values(c), 'MOVE_1').map((card) => card.id))._unsafeUnwrap()
+
+    expect(resolveRobotAction(game).action.position).toEqual({ x: Integer(0), y: Integer(2) })
+    expect(board.positionOf(robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
+  })
+
+  it('breaks a tie between equally close reboot tiles in reading order', () => {
+    const rebootTiles = [{ x: Integer(2), y: Integer(2) }, { x: Integer(0), y: Integer(0) }]
+    const { player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, rebootTiles)
+    game.submitProgram(player.id, programLeadingWith(Object.values(c), 'MOVE_1').map((card) => card.id))._unsafeUnwrap()
+
+    expect(resolveRobotAction(game).action.position).toEqual({ x: Integer(0), y: Integer(0) })
+  })
+
+  it('uses the next closest reboot tile when the closest one is taken', () => {
+    const rebootTiles = [{ x: Integer(0), y: Integer(2) }, { x: Integer(4), y: Integer(2) }]
+    const { board, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, rebootTiles)
+    board.placeRobot('blocker', { x: Integer(0), y: Integer(2) })
+    game.submitProgram(player.id, programLeadingWith(Object.values(c), 'MOVE_1').map((card) => card.id))._unsafeUnwrap()
+
+    expect(resolveRobotAction(game).action.position).toEqual({ x: Integer(4), y: Integer(2) })
+    expect(board.positionOf('blocker')).toEqual({ x: Integer(0), y: Integer(2) })
+  })
+
+  it('falls back to the nearest free tile when every reboot tile is taken', () => {
+    const rebootTiles = [{ x: Integer(0), y: Integer(2) }, { x: Integer(4), y: Integer(2) }]
+    const { board, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, rebootTiles)
+    board.placeRobot('blocker-1', { x: Integer(0), y: Integer(2) })
+    board.placeRobot('blocker-2', { x: Integer(4), y: Integer(2) })
+    game.submitProgram(player.id, programLeadingWith(Object.values(c), 'MOVE_1').map((card) => card.id))._unsafeUnwrap()
+
+    // Nearest free tile to the closest reboot tile (0,2); (0,1) wins the tie by being higher up.
+    expect(resolveRobotAction(game).action.position).toEqual({ x: Integer(0), y: Integer(1) })
+  })
+
   it('skips the antenna when choosing a fallback for an occupied reboot tile', () => {
-    const { board, robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, { x: Integer(2), y: Integer(1) })
+    const { board, robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, [{ x: Integer(2), y: Integer(1) }])
     const other = addTestPlayer(game)
     other.robot.turn(1)
     game.submitProgram(player.id, [c.MOVE_3, c.MOVE_1, c.TURN_LEFT, c.TURN_RIGHT, c.BACK_UP].map((card) => card.id))._unsafeUnwrap()
@@ -150,11 +188,11 @@ describe('pit entry and rebooting', () => {
     { rebootTile: { x: Integer(0), y: Integer(1) }, expectedProgress: 1 },
     { rebootTile: { x: Integer(1), y: Integer(0) }, expectedProgress: 2 },
   ])('evaluates checkpoints at the reboot destination $rebootTile', ({ rebootTile, expectedProgress }) => {
-    const board = new Board([
+    const board = new Board(withRebootTiles([
       [new EmptyTile(), new EmptyTile([], 2), new PitTile()],
       [new EmptyTile(), new EmptyTile([], 1), new EmptyTile()],
       [new EmptyTile([], 3), new EmptyTile(), new EmptyTile()],
-    ], { x: Integer(2), y: Integer(1), angle: Math.PI / 2 }, rebootTile)
+    ], rebootTile), { x: Integer(2), y: Integer(1), angle: Math.PI / 2 })
     const instructions: Instruction[] = ['MOVE_3', 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'BACK_UP']
     const program = instructions.map((instruction, index) => new Card(`card-${index}`, instruction))
     const player = placeTestPlayer(board, { x: Integer(0), y: Integer(0) }, {
