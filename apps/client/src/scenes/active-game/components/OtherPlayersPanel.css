@@ -122,7 +122,8 @@
   font-size: 0.6875rem;
 }
 
-.other-player__slot.other-player__slot--hidden {
+.other-player__slot.other-player__slot--hidden,
+.other-player__slot--current::after {
   --card-back-dot: color-mix(in srgb, var(--hud-border) 55%, transparent);
 
   background-color: var(--hud-surface-inset);
@@ -142,6 +143,26 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .other-player__slot--current {
+    transform-style: preserve-3d;
+    animation: banner-card-flip 240ms ease-in-out;
+  }
+
+  .other-player__slot--current::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border: 1px solid var(--hud-border);
+    border-radius: inherit;
+    backface-visibility: hidden;
+    transform: rotateY(180deg) translateZ(1px);
+  }
+
+  @keyframes banner-card-flip {
+    0%, 60% { transform: perspective(16rem) rotateY(-180deg); }
+    100% { transform: perspective(16rem) rotateY(0deg); }
+  }
+
   .other-player {
     --register-reveal-delay: calc(var(--hud-opponent-motion-duration) * 0.25);
     --register-fade-duration: calc(var(--hud-opponent-motion-duration) - var(--register-reveal-delay));
