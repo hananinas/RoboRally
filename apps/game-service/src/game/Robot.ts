@@ -25,7 +25,7 @@ export class Robot {
     readonly id: RobotId,
     direction: Direction,
     readonly colour: string = ROBOT_COLOURS[0],
-    readonly robotSpriteId: RobotSpriteId = 'fork-clamp1',
+    readonly robotSpriteId: RobotSpriteId = 'tank',
   ) {
     this.currentDirection = direction
   }

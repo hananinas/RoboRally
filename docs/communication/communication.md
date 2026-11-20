@@ -80,7 +80,7 @@ While waiting in a lobby, a client can select its player's robot with `lobby.sel
 
 The selection is scoped to the authenticated lobby member. The server acknowledges a successful selection with `ROBOT_SELECTED {lobby}`. Other lobby members receive the updated full lobby snapshot through `lobby.updated {lobby}`; the selecting connection is not sent a duplicate event because it receives the snapshot in the acknowledgement. Unknown robot IDs are rejected with `INVALID_REQUEST`; a connection that is not a member of a lobby is rejected with `NOT_LOBBY_MEMBER`.
 
-The robot catalog is authoritative. The server discovers the available fork-clamp robot designs from `fork-clamp.hbls` and returns all entries in `lobby.list`, lobby joins, lobby snapshots, and `session.get`. The client must render the server list and must not independently truncate or substitute it. If a selection acknowledgement times out, the client performs `session.get` to refresh and reconcile the lobby snapshot.
+The robot catalog is authoritative. The server discovers the tank and fork-clamp designs from `tanks.hbls` and `fork-clamp.hbls` and returns one entry per robot asset in `lobby.list`, lobby joins, lobby snapshots, and `session.get`. Each file's SVG symbols form the layers of one robot design. The client must render the server list and must not independently truncate or substitute it. If a selection acknowledgement times out, the client performs `session.get` to refresh and reconcile the lobby snapshot.
 
 The selected sprite is included in each player's lobby roster as `robotSpriteId`. When the lobby starts, the same sprite ID is copied to that player's game robot; the robot's server-assigned colour remains a separate property.
 

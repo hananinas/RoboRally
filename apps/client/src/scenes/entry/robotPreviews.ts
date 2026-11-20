@@ -1,4 +1,5 @@
 import type { RobotSpriteId } from '@robo-rally/game-events'
+import tankSprites from '../active-game/board/assets/tanks.hbls?raw'
 import forkClampSprites from '../active-game/board/assets/fork-clamp.hbls?raw'
 
 export type RobotPreviewDefinition = Readonly<{
@@ -15,21 +16,38 @@ export const placeholderPreview: RobotPreviewDefinition = {
   layers: ['<path d="M50 4 91 28v44L50 96 9 72V28z" fill="var(--robot-colour)"/><path d="m50 17 28 16v34L50 83 22 67V33z" fill="var(--entry-side)"/><circle cx="50" cy="50" r="13" fill="var(--robot-colour)"/>'],
 }
 
-export const forkClampPreviews = Array.from(
-  forkClampSprites.matchAll(/<symbol\b[^>]*\bid=["']([^"']+)["'][^>]*viewBox=["']([^"']+)["'][^>]*>([\s\S]*?)<\/symbol>/g),
-  (match) => ({
-    id: match[1]!,
-    name: `Fork Clamp ${match[1]!.match(/(\d+)$/)?.[1] ?? 'Design'}`,
-    sprite: { viewBox: match[2]!, previewSize: 150, layers: [match[3]!] },
-  }),
-)
+function parseRobotAsset(source: string) {
+  const symbols = Array.from(
+    source.matchAll(/<symbol\b[^>]*\bid=["']([^"']+)["'][^>]*viewBox=["']([^"']+)["'][^>]*>([\s\S]*?)<\/symbol>/g),
+  )
+  const first = symbols[0]
+  if (!first) return undefined
 
-export const robotOptions = forkClampPreviews.map((option) => ({
-  ...option,
-  color: '#4d8deb',
-})) as readonly { id: RobotSpriteId; name: string; sprite: RobotPreviewDefinition; color: string }[]
+  return {
+    viewBox: first[2]!,
+    layers: symbols.map((symbol) => symbol[3]!),
+  }
+}
 
-export const tankPreview = forkClampPreviews[0]?.sprite ?? placeholderPreview
+const tankAsset = parseRobotAsset(tankSprites)
+const forkClampAsset = parseRobotAsset(forkClampSprites)
+
+export const robotOptions = [
+  ...(tankAsset ? [{
+    id: 'tank',
+    name: 'Tank',
+    sprite: { ...tankAsset, previewSize: 175 },
+    color: '#4d8deb',
+  }] : []),
+  ...(forkClampAsset ? [{
+    id: 'fork-clamp',
+    name: 'Fork Clamp',
+    sprite: { ...forkClampAsset, previewSize: 150 },
+    color: '#4d8deb',
+  }] : []),
+] satisfies readonly { id: RobotSpriteId; name: string; sprite: RobotPreviewDefinition; color: string }[]
+
+export const tankPreview = robotOptions.find((option) => option.id === 'tank')?.sprite ?? placeholderPreview
 
 export function robotOptionFor(id: RobotSpriteId) {
   return robotOptions.find((option) => option.id === id) ?? {

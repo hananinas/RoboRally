@@ -107,7 +107,7 @@ describe('lobby lifecycle over Socket.IO', () => {
 
     const updated = new Promise<LobbyState>((resolve) => {
       const receiveUpdate = ({ lobby: state }: { lobby: LobbyState }) => {
-        if (state.players.some((player) => player.robotSpriteId === 'fork-clamp2')) {
+        if (state.players.some((player) => player.robotSpriteId === 'fork-clamp')) {
           owner.off('lobby.updated', receiveUpdate)
           resolve(state)
         }
@@ -116,11 +116,11 @@ describe('lobby lifecycle over Socket.IO', () => {
     })
     const senderUpdates = vi.fn()
     other.on('lobby.updated', senderUpdates)
-    expect(findRobotDefinition('fork-clamp2')).toBeDefined()
-    const result = await other.emitWithAck('lobby.selectRobot', { robotSpriteId: 'fork-clamp2' })
+    expect(findRobotDefinition('fork-clamp')).toBeDefined()
+    const result = await other.emitWithAck('lobby.selectRobot', { robotSpriteId: 'fork-clamp' })
     expect(result).toMatchObject({ outcome: 'ROBOT_SELECTED', lobby: { players: [
-      { userId: lobby.ownerUserId, robotSpriteId: 'fork-clamp1' },
-      { userId: expect.any(String), robotSpriteId: 'fork-clamp2' },
+      { userId: lobby.ownerUserId, robotSpriteId: 'tank' },
+      { userId: expect.any(String), robotSpriteId: 'fork-clamp' },
     ] } })
     if (result.outcome !== 'ROBOT_SELECTED') throw new Error(result.outcome)
     expect(await updated).toEqual(result.lobby)
@@ -129,15 +129,15 @@ describe('lobby lifecycle over Socket.IO', () => {
     other.off('lobby.updated', senderUpdates)
     expect(await other.emitWithAck('session.get', {})).toMatchObject({
       outcome: 'IN_LOBBY',
-      lobby: { players: [{ robotSpriteId: 'fork-clamp1' }, { robotSpriteId: 'fork-clamp2' }] },
+      lobby: { players: [{ robotSpriteId: 'tank' }, { robotSpriteId: 'fork-clamp' }] },
     })
 
     const ownerStarted = started(owner)
     const otherStarted = started(other)
     expect(await owner.emitWithAck('lobby.start', {})).toMatchObject({ outcome: 'STARTED' })
     const [ownerGame, otherGame] = await Promise.all([ownerStarted, otherStarted])
-    expect(ownerGame.state.robots.find(({ robotId }) => robotId === ownerGame.assignment.robotId)?.robotSpriteId).toBe('fork-clamp1')
-    expect(otherGame.state.robots.find(({ robotId }) => robotId === otherGame.assignment.robotId)?.robotSpriteId).toBe('fork-clamp2')
+    expect(ownerGame.state.robots.find(({ robotId }) => robotId === ownerGame.assignment.robotId)?.robotSpriteId).toBe('tank')
+    expect(otherGame.state.robots.find(({ robotId }) => robotId === otherGame.assignment.robotId)?.robotSpriteId).toBe('fork-clamp')
 
     const raw = other.emitWithAck.bind(other) as (event: string, payload: unknown) => Promise<unknown>
     expect(await raw('lobby.selectRobot', { robotSpriteId: 'unknown-robot' })).toEqual({ outcome: 'INVALID_REQUEST' })
@@ -146,7 +146,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     const owner = await connect('Owner')
     const lobby = await create(owner)
     const first = lobby.players[0]!
-    expect(first).toEqual({ userId: lobby.ownerUserId, username: 'Owner', robotSpriteId: 'fork-clamp1' })
+    expect(first).toEqual({ userId: lobby.ownerUserId, username: 'Owner', robotSpriteId: 'tank' })
     expect(lobby.players).toHaveLength(lobby.playerCount)
     const outsider = await connect('Outsider')
     await create(outsider)
@@ -159,7 +159,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     if (result.outcome !== 'LOBBY_JOINED') throw new Error(result.outcome)
     const roster = result.lobby
     expect(await joined).toEqual(roster)
-    expect(roster.players).toEqual([first, { userId: expect.any(String), username: 'Other', robotSpriteId: 'fork-clamp1' }])
+    expect(roster.players).toEqual([first, { userId: expect.any(String), username: 'Other', robotSpriteId: 'tank' }])
     expect(roster.playerCount).toBe(2)
     expect(await other.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })).toEqual(result)
     expect(await other.emitWithAck('session.get', {})).toEqual({ outcome: 'IN_LOBBY', lobby: roster, user: { userId: 'Other', username: 'Other' } })

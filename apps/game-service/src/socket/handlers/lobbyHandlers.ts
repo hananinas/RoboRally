@@ -146,7 +146,7 @@ export function handleSelectRobot(
 ): void {
   withSessionRequest(socket, 'lobby.selectRobot', robotSelectionRequestSchema, payload, acknowledge, (user, ack) => {
     const knownRobot = robotCatalog.some((robot) => robot.id === payload.robotSpriteId)
-    if (!knownRobot && !/^fork-clamp\d+$/.test(payload.robotSpriteId)) return ack({ outcome: 'INVALID_REQUEST' })
+    if (!knownRobot) return ack({ outcome: 'INVALID_REQUEST' })
     const session = context.sessionsByUser.get(user.userId)
     const lobby = session?.kind === 'lobby' ? context.lobbies.get(session.lobbyId) : undefined
     const member = lobby?.members.get(user.userId)

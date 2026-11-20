@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+import tankSprites from '../active-game/board/assets/tanks.hbls?raw'
 import forkClampSprites from '../active-game/board/assets/fork-clamp.hbls?raw'
 import RobotPreview from './RobotPreview.tsx'
 import { robotOptions, tankPreview, type RobotPreviewDefinition } from './robotPreviews.ts'
@@ -20,8 +21,8 @@ describe('RobotPreview', () => {
     expect(markup).toContain('--robot-preview-size:160px')
   })
 
-  it('uses the fork-clamp asset without duplicating its symbol IDs', () => {
-    expect(tankPreview.layers).toHaveLength(1)
+  it('uses every tank layer without duplicating its symbol IDs', () => {
+    expect(tankPreview.layers).toHaveLength((tankSprites.match(/<symbol\b/g) ?? []).length)
     expect(tankPreview.layers.length).toBeGreaterThan(0)
     const markup = renderToStaticMarkup(<><RobotPreview sprite={tankPreview} /><RobotPreview sprite={tankPreview} /></>)
 
@@ -31,11 +32,12 @@ describe('RobotPreview', () => {
     expect(markup).toContain('<rect')
   })
 
-  it('provides every fork-clamp design as a complete preview', () => {
-    expect(robotOptions).toHaveLength((forkClampSprites.match(/<symbol\b/g) ?? []).length)
+  it('provides one layered preview for each robot asset file', () => {
+    expect(robotOptions.map(({ id }) => id)).toEqual(['tank', 'fork-clamp'])
+    expect(robotOptions[0]?.sprite.layers).toHaveLength((tankSprites.match(/<symbol\b/g) ?? []).length)
+    expect(robotOptions[1]?.sprite.layers).toHaveLength((forkClampSprites.match(/<symbol\b/g) ?? []).length)
     for (const option of robotOptions) {
-      expect(option.sprite.layers).toHaveLength(1)
-      expect(option.sprite.layers[0]?.length).toBeGreaterThan(0)
+      expect(option.sprite.layers.every((layer) => layer.length > 0)).toBe(true)
     }
   })
 })

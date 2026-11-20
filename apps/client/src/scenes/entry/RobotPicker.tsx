@@ -68,7 +68,7 @@ export default function RobotPicker({ robots, selectedRobotId, disabled, onSelec
         })}
       </div>
       {robots.length === 0 && <p className="robot-picker__help">No robots are currently available.</p>}
-      <fieldset className="robot-picker__colours" disabled aria-describedby="robot-picker-help">
+      <fieldset className="robot-picker__colours" disabled>
         <legend>Player colour</legend>
         <div className="robot-picker__swatches">
           {PREVIEW_COLOURS.map((colour) => (
@@ -84,7 +84,6 @@ export default function RobotPicker({ robots, selectedRobotId, disabled, onSelec
           ))}
         </div>
       </fieldset>
-      <p className="robot-picker__help" id="robot-picker-help">Player colour selection coming soon.</p>
     </div>
   )
 }

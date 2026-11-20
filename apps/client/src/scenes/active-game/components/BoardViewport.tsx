@@ -167,7 +167,8 @@ function RobotPiece({
   const component = BOARD_COMPONENTS[componentName]
   if (!component.asset) throw new Error(`Missing robot sprite ${componentName}`)
   const sprite = robotOptionFor(robot.robotSpriteId).sprite
-  const spriteLayer = sprite.layers[0]
+  const componentIndex = ROBOT_COMPONENTS.indexOf(componentName)
+  const spriteLayer = sprite.layers[componentIndex]
   if (spriteLayer === undefined) return null
   const centre = tileCentre(robot.position.coordinate, board, BOARD_CONFIG)
   const height = layer / BOARD_CONFIG.parallaxReferenceLayer
@@ -184,7 +185,7 @@ function RobotPiece({
   return (
     <svg
       aria-hidden="true"
-      className={`board-piece ${component.className} board-piece--selected-robot`}
+      className={`board-piece ${component.className} board-piece--selected-robot${robot.robotSpriteId === 'tank' ? ' board-piece--test-tank' : ''}`}
       data-board-component={componentName}
       data-board-height={height}
       data-board-lift-height={Math.min(

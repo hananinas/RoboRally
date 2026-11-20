@@ -187,7 +187,7 @@ export class Game {
     return ok({ ...free[0] })
   }
 
-  addPlayer(colour: string = ROBOT_COLOURS[0], robotSpriteId: RobotSpriteId = 'fork-clamp1'): Result<Player, AddPlayerError> {
+  addPlayer(colour: string = ROBOT_COLOURS[0], robotSpriteId: RobotSpriteId = 'tank'): Result<Player, AddPlayerError> {
     return this.findSpawn().map((position) => {
       const robot = new Robot(randomUUID(), Direction.NORTH, colour, robotSpriteId)
       const player = new Player(randomUUID(), robot, Deck.fromTemplate(this.deck))
