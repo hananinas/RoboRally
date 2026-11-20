@@ -12,14 +12,13 @@ import {
   type ClientGameState , 
   type ProgramCard 
 } from './gameState.ts'
-import { isPlaybackBusy } from './board/robotPlayback.ts'
 import type useGameConnection from './useGameConnection.ts'
-import useOverlayLayout from './useOverlayLayout.ts'
+import LeaveGameButton from './components/LeaveGameButton.tsx'
 import WinnerPopup from './components/WinnerPopup.tsx'
 
 
 function isGameOver(state: ClientGameState): boolean {
-  return state.winner !== null && !isPlaybackBusy(state.playback)
+  return state.winner !== null && !state.playback.active
 }
 
 function getGameStatus(state: ClientGameState): string {
@@ -30,7 +29,7 @@ function getGameStatus(state: ClientGameState): string {
     const names = state.players.filter((player) => !player.connected).map((player) => player.username)
     return names.length > 0 ? `Game paused · Waiting for ${names.join(', ')}` : 'Game paused'
   }
-  if (isPlaybackBusy(state.playback) || state.phase === 'EXECUTING') return 'Executing'
+  if (state.playback.active || state.phase === 'EXECUTING') return 'Executing'
   if (state.phase === 'PROGRAMMING') {
     if (!state.handReady) return 'Waiting for cards…'
     if (state.submission === 'accepted') return 'Program accepted · Waiting for other players'
@@ -48,13 +47,6 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
   onSettings: () => void
 }) {
   const { state, dispatch, submit } = game
-  const {
-    handBelowHud,
-    handRef,
-    hudContentRef,
-    hudFits,
-    overlayRef,
-  } = useOverlayLayout(state.handVersion)
   const disabled = leaving || state.paused || !canProgram(state)
   const handleRemove = (registerIndex: number) => dispatch({ type: 'remove', registerIndex })
   const handleMove = (fromIndex: number, toIndex: number) =>
@@ -67,7 +59,17 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
   const hasHand = state.handVersion > 0
   const status = getGameStatus(state)
   const disconnectedNames = state.players.filter((player) => !player.connected).map((player) => player.username)
+  const { active } = state.playback
+  const activeCard = active && !('kind' in active) ? active : null
+  const lastCheckpoint = state.assignment ? state.playback.checkpoints.get(state.assignment.playerId) ?? 0 : 0
   const player = state.players.find((candidate) => candidate.playerId === state.assignment?.playerId)
+  const displayedRegisters = state.playbackProgram ?? state.registers
+  const publicRegisters = player && (state.playbackRegisters?.get(player.playerId) ?? player.registers)
+  const activeRegister = activeCard && activeCard.playerId === state.assignment?.playerId
+    ? activeCard.registerIndex : null
+  const playedCardIds = new Set(displayedRegisters.flatMap((card, index) =>
+    card && publicRegisters?.[index]?.status === 'REVEALED' && index !== activeRegister ? [card.id] : [],
+  ))
   const showWinner = isGameOver(state) && state.connected
   const robotColour = state.playback.robots.find((robot) => robot.robotId === state.assignment?.robotId)?.colour
   const registeredCardIds = new Set(
@@ -77,26 +79,21 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
     state.hand, registeredCardIds, disabled, handlePlaceCard, handleRemove,
     handleClearRegisters, handleUndo, handleRedo, submit, registersAreFilled(state.registers),
   )
-  const overlayClassName = [
-    'game-overlay',
-    handBelowHud && 'game-overlay--hand-below-hud',
-    hudFits && 'game-overlay--hud-fits',
-  ].filter(Boolean).join(' ')
-
   return (
     <div className="game">
       {state.board && (
         <BoardViewport
           board={state.board}
           robots={state.playback.robots}
-          lasersActive={state.playback.boardElement === 'LASERS'}
+          lasersActive={state.playback.active !== null && 'kind' in state.playback.active &&
+            state.playback.active.kind === 'LASERS'}
         />
       )}
-      <div ref={overlayRef} className={overlayClassName}>
+      <div className="game-overlay">
         <aside className="game-hud" aria-label="Game controls">
-          <div ref={hudContentRef} className="game-hud__content">
+          <div className="game-hud__content">
             <PlayerPanel
-              player={{ name: username, lastCheckpoint: player?.lastCheckpoint ?? 0 }}
+              player={{ name: username, lastCheckpoint }}
               robotColour={robotColour}
               checkpointCount={state.checkpointCount}
               onLeave={onLeave}
@@ -105,10 +102,12 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
               onSettings={onSettings}
             />
             <RegisterPanel
-              registers={state.playbackProgram ?? state.registers}
-              activeRegister={state.playback.active?.registerIndex ?? null}
+              registers={displayedRegisters}
+              activeRegister={activeRegister}
+              playedCardIds={playedCardIds}
               disabled={disabled}
               submission={state.submission}
+              locked={state.phase === 'PROGRAMMING' && !state.playback.active && state.submission === 'accepted'}
               status={status}
               localDeadline={game.localDeadline}
               error={state.error}
@@ -124,18 +123,18 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
           <OtherPlayersPanel
             players={getOtherPlayers(state)}
             checkpointCount={state.checkpointCount}
-            phase={isPlaybackBusy(state.playback) ? 'EXECUTING' : state.phase}
-            activeAction={state.playback.active}
-            queuedActions={state.playback.pending.map(({ action }) => action)}
+            phase={state.playback.active ? 'EXECUTING' : state.phase}
+            activeAction={activeCard}
+            queuedActions={state.playback.pending.flatMap(({ action }) => 'kind' in action ? [] : [action])}
             paused={state.paused || !state.connected}
           />
         )}
         {hasHand && (
           <ProgrammingHand
             key={state.handVersion}
-            containerRef={handRef}
             cards={state.hand}
             registeredCardIds={registeredCardIds}
+            playedCardIds={playedCardIds}
             disabled={disabled}
             highlightedIndex={highlightedIndex}
             onHighlightCard={highlightCard}
@@ -146,7 +145,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
           />
         )}
       </div>
-            {showWinner && (
+      {showWinner && (
         <WinnerPopup
           winnerName={state.winner?.username ?? ''}
           isWinner={state.winner?.playerId === state.assignment?.playerId}
@@ -164,14 +163,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
                     : 'A player has disconnected'}
             </h2>
             <div className="disconnect-spinner" role="status"/>
-            <button
-              className="game-menu__button game-menu__button--leave"
-              type="button"
-              onClick={onLeave}
-              disabled={leaving || !state.connected}
-            >
-              Leave game
-            </button>
+            <LeaveGameButton onLeave={onLeave} disabled={leaving || !state.connected} />
           </div>
         </div>
       )}

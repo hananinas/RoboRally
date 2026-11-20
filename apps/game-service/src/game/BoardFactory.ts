@@ -1,7 +1,7 @@
 import { Board } from '@/game/Board'
 import { boardMaps, type BoardMapName, type MapSpec } from '@/game/boardMaps'
 import type { Direction } from '@/game/spatial'
-import { EmptyTile, PitTile, LaserTile, ConveyorTile, type Tile } from '@/game/Tile'
+import { EmptyTile, PitTile, ConveyorTile, GearTile, LaserTile, type Tile } from '@/game/Tile'
 import { Integer } from '@/numbers'
 export type { BoardMapName } from '@/game/boardMaps'
 
@@ -10,7 +10,7 @@ const MAPS: Readonly<Record<BoardMapName, MapSpec>> = boardMaps
 const DEFAULT_MAP: BoardMapName = 'empty-map'
 
 export function createBoard(mapName: BoardMapName = DEFAULT_MAP): Board {
-  const { width, height, walls, checkpoints, antenna, pits = [], lasers = [], conveyors = [],  startTiles, maxPlayers } = MAPS[mapName]
+  const { width, height, walls, checkpoints, antenna, pits = [], lasers = [], conveyors = [], gears = [], startTiles, maxPlayers } = MAPS[mapName]
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
     throw new RangeError(`Map "${mapName}" must have a positive integer width and height`)
   }
@@ -49,16 +49,17 @@ export function createBoard(mapName: BoardMapName = DEFAULT_MAP): Board {
     boardTiles[y][x] = new PitTile(tiles[y][x])
   }
   for (const { at: [x, y], direction, strength } of lasers) {
-    if (!tiles[y]?.[x] || checkpointNumbers[y][x] !== undefined || boardTiles[y][x].kind !== 'EMPTY') {
+    const tile = boardTiles[y]?.[x]
+    if (!(tile instanceof EmptyTile) || tile.checkpointNumber !== undefined) {
       throw new RangeError(`Laser at (${x}, ${y}) in map "${mapName}" must occupy a plain board tile`)
     }
-    boardTiles[y][x] = new LaserTile(direction, strength, tiles[y][x])
+    boardTiles[y][x] = new LaserTile(direction, strength, tile.walls)
   }
 
   for (const { at: [x, y], sprite, direction } of conveyors) {
     const tile = boardTiles[y]?.[x]
 
-    if (!tile || tile.kind !== 'EMPTY') {
+    if (!(tile instanceof EmptyTile)) {
       throw new RangeError(
         `Conveyor at (${x}, ${y}) in map "${mapName}" must occupy an unused board tile`,
       )
@@ -71,7 +72,15 @@ export function createBoard(mapName: BoardMapName = DEFAULT_MAP): Board {
       tile.checkpointNumber,
     )
   }
-  
+
+  for (const { at: [x, y], rotation } of gears) {
+    const tile = boardTiles[y]?.[x]
+    if (!(tile instanceof EmptyTile) || tile.checkpointNumber !== undefined) {
+      throw new RangeError(`Gear at (${x}, ${y}) in map "${mapName}" must occupy an empty non-checkpoint board tile`)
+    }
+    boardTiles[y][x] = new GearTile(rotation, tile.walls)
+  }
+
   if (startTiles.length < maxPlayers) {
     throw new RangeError(`Map "${mapName}" needs a starting tile for each of its ${maxPlayers} players`)
   }

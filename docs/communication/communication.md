@@ -9,7 +9,7 @@ This document describes the v1.2.0 communication flow. [AsyncAPI](asyncapi.yaml)
 
 Server side Socket.IO rooms scope event broadcasts to only the connections that should receive them. The service uses three kinds:
 
-- `lobby:{lobbyId}` — every connection currently waiting in that lobby. Carries lobby-wide updates such as `lobby.updated`, sent whenever membership or ownership changes.
+- `lobby:{lobbyId}` — every connection currently waiting in that lobby. Carries lobby-wide updates such as `lobby.updated`, sent whenever membership, ownership, or a member's robot selection changes.
 - `game:{gameId}:public` — every connection currently a member of that game. Carries events every player needs to see: resolved robot actions, checkpoint progress, connection and pause state, and the fact that another player has submitted their program for the round.
 - `game:{gameId}:player:{playerId}` — only the connection currently attached to that player. Carries anything that must stay private to that player (eg. their hand of cards).
 
@@ -69,13 +69,20 @@ The client sends `lobby.create`. As of this version there are no options and the
 ### Joining a lobby
 Alternatively, the user can join an existing lobby. Once a lobby has been selected, the clients sends `lobby.join {lobbyId}`. 
 
+### Selecting a robot
+While waiting in a lobby, a client can select its player's robot sprite with `lobby.selectRobot {robotSpriteId}`. The allowed values are `tank`, `scout`, `guardian`, `rover`, `striker`, `sentinel`, and `hauler`. New lobby members start with `tank` selected.
+
+The selection is scoped to the authenticated lobby member. The server acknowledges a successful selection with `ROBOT_SELECTED {lobby}` and broadcasts the updated full lobby snapshot through `lobby.updated {lobby}` to every lobby member. Invalid sprite IDs are rejected with `INVALID_REQUEST`; a connection that is not a member of a lobby is rejected with `NOT_LOBBY_MEMBER`.
+
+The selected sprite is included in each player's lobby roster as `robotSpriteId`. When the lobby starts, the same sprite ID is copied to that player's game robot; the robot's server-assigned colour remains a separate property.
+
 ### Starting a game
 Both `lobby.join` and `lobby.create` acknowledge with `LOBBY_JOINED {lobby}` after which the client enters the waiting screen. All non owner users, then wait for the owner to start the game via `lobby.start {}`. 
 
 Once a game has successfully started , the onber receives `STARTED {gameId}` as the command acknowledgement. How the game is initialised is described in [Initialization](#initialization).
 
 ### Lobby Membership
-`LOBBY_JOINED`, `IN_LOBBY`, and `lobby.updated` include the full `lobby.players` roster (`userId`, `username`) in join order. Clients replace their roster on each snapshot; `lobby.list` returns summaries only.
+`LOBBY_JOINED`, `IN_LOBBY`, and `lobby.updated` include the full `lobby.players` roster (`userId`, `username`, `robotSpriteId`) in join order. Clients replace their roster on each snapshot; `lobby.list` returns summaries only.
 
 While waiting, `lobby.leave {}` or disconnecting removes membership. Leaving returns `LEFT`. Ownership passes to the earliest remaining member, announced to the [lobby room](#rooms) through `lobby.updated {lobby}`. An empty lobby is deleted. A disconnected lobby member returns to browsing after reconnecting.
 
@@ -108,6 +115,8 @@ The service creates a fresh game, moves every member into its public and private
 `game.started {lobbyId, initialization: {outcome: JOINED, assignment, state, hand, programSubmitted}}`
 
 `state` includes `serverTime` and `programmingTimer`. The private `program` contains five register slots, each a card or `null`. Initialization restores the player's current selection or finalized program.
+
+Each robot in the public game state includes the `robotSpriteId` selected by its player in the lobby, alongside the server-assigned `colour`.
 
 Each map has six starting tiles. When the game starts, the service places every robot on a random free starting tile.
 
@@ -229,14 +238,6 @@ Movement resolves one square at a time. Robots entering pits or leaving the boar
 
 The event includes final positions after reboots: `position` for the acting robot and `pushedRobots` for other robots whose positions changed. Clients apply them together when the action plays.
 
-#### Board elements
-
-Once every robot has acted in a register, the board's elements activate one at a time, in a fixed order. For each the service broadcasts to the [public room](#rooms):
-
-`board.elementActivated {gameId, registerIndex, element}`
-
-Clients show the element only while playing this event back, after the register's `robot.actionResolved` events. The register then finishes: checkpoint progress and the next register or hand follow. Elements the board does not have are skipped. Currently the only element is `LASERS`, which has no gameplay effect yet. Each laser tile (see `laserOrientation` and `laserStrength` in the board snapshot) fires 1, 2 or 3 beams; the client draws them for a short time, stopping at the first robot, the priority antenna or a wall.
-
 #### Activation ordering
 
 The antenna is located at the top centre of the board and faces south.
@@ -254,20 +255,16 @@ The priority algorithm calculates the activation order based on the game rules.
 ### Checkpoint progress
 Some tiles hold checkpoints. The demo board places checkpoint 1 at `(10, 6)` and checkpoint 2 at `(8, 9)`.
 
-At the end of each register, the service checks each robot's final position for its next checkpoint. It broadcasts progress to the [public room](#rooms):
-
-`player.checkpointProgress {gameId, playerId, lastCheckpoint, checkpointCount}`
-
-The event follows the related `robot.actionResolved`.
+The `CHECKPOINTS` step of `environment.stepResolved` replaces `player.checkpointProgress`.
 
 ### Winning
-A player wins when their robot completes the final checkpoint, so `lastCheckpoint` reaches `checkpointCount`. Like every checkpoint, this is checked at the end of a register. Robots cannot share a space, so only one robot can win. A board without checkpoints has no winner.
+A player wins when their robot completes the final checkpoint, so `lastCheckpoint` reaches `checkpointCount`. Checkpoints use each robot’s final position. Robots cannot share a space, so only one robot can win. A board without checkpoints has no winner.
 
 This is the `active` → `finished` transition, and it is final. The game ends at once: remaining registers are not resolved and no new hand is dealt. The service broadcasts to the [public room](#rooms):
 
 `game.won {gameId, playerId, username}`
 
-The event follows the final `player.checkpointProgress`. `PublicGameState.winner` holds the winner's `{playerId, username}`, or `null` while the game runs, so reconnecting players also see the result. The service records the username when the game is won, so it is still sent after the winner has left.
+The event follows the final `CHECKPOINTS` step. `PublicGameState.winner` holds the winner's `{playerId, username}`, or `null` while the game runs, so reconnecting players also see the result. The service records the username when the game is won, so it is still sent after the winner has left.
 
 After a win, `program.submit` is rejected with `GAME_FINISHED`. Players leave with `game.leave`, and the game is removed when the last member leaves.
 
@@ -355,3 +352,16 @@ An explicit `game.leave {}` removes the owning connection's player and robot, fr
 Most commands acknowledge failures with a specific outcome string rather than throwing. See [AsyncAPI](asyncapi.yaml), with a [rendered reference](asyncapi.html), for the exact payload shapes and the full set of rejection codes per command.
 
 If an unexpected service failure makes gameplay unrecoverable, members receive `game.aborted {gameId}` through the [public room](#rooms), and the game ends permanently.
+
+## Register-end environment
+
+After all robots execute their cards, the server resolves the implemented board
+effects in rulebook order. Each step uses the board state left by the previous
+step and applies its changes together. The client plays the results in server order.
+
+`Robot actions → Board effects → Next register or hand`
+
+The `LASERS` step carries no data and is skipped on boards without lasers. Each laser
+tile (see `laserOrientation` and `laserStrength` in the board snapshot) fires 1, 2 or 3
+beams; the client draws them for one playback slot, stopping at the first robot, the
+priority antenna or a wall. Lasers have no gameplay effect yet.

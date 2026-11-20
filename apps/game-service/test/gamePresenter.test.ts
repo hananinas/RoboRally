@@ -1,6 +1,8 @@
+import { resolveRobotAction } from './activationTestHelper.js'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import type {
   CardsDealt,
+  EnvironmentStepResolved,
   PublicGameState,
   RobotActionResolved,
   Tile as TilePayload,
@@ -11,6 +13,7 @@ import {
   Direction,
   EmptyTile,
   Game,
+  GearTile,
   PitTile,
   Player,
   Robot,
@@ -19,6 +22,7 @@ import {
 } from '@/game/index.ts'
 import {
   presentCardsDealt,
+  presentEnvironmentStepResolved,
   presentPublicGameState,
   presentRobotActionResolved,
 } from '@/socket/gamePresenter.ts'
@@ -31,6 +35,29 @@ function createGameWithPlayer() {
 }
 
 describe('game presenter', () => {
+  it('presents environment results without a card or domain directions', () => {
+    const resolved = presentEnvironmentStepResolved('game', {
+      roundConcluded: true, kind: 'GEARS',
+      robots: [
+        { robotId: 'robot', position: { x: Integer(2), y: Integer(3) }, direction: Direction.WEST },
+        { robotId: 'other', position: { x: Integer(4), y: Integer(5) }, direction: Direction.EAST },
+      ],
+    })
+    expectTypeOf(resolved).toEqualTypeOf<EnvironmentStepResolved>()
+    expect(resolved).toEqual({
+      gameId: 'game', kind: 'GEARS',
+      robots: [
+        { robotId: 'robot', position: { coordinate: { x: 2, y: 3 }, orientation: 'WEST' } },
+        { robotId: 'other', position: { coordinate: { x: 4, y: 5 }, orientation: 'EAST' } },
+      ],
+    })
+  })
+
+  it('presents a laser step as only its game and kind', () => {
+    expect(presentEnvironmentStepResolved('game', { roundConcluded: false, kind: 'LASERS' }))
+      .toEqual({ gameId: 'game', kind: 'LASERS' })
+  })
+
   it('serializes pushed robot positions and orientations alongside the acting robot', () => {
     const { game, player } = createGameWithPlayer()
     const resolvedInstruction = player.hand[0].instruction === 'AGAIN' ? undefined : player.hand[0].instruction
@@ -78,6 +105,24 @@ describe('game presenter', () => {
       { position: { x: 1, y: 0 }, type: 'PIT' },
       { position: { x: 2, y: 0 }, type: 'PIT', walls: ['NORTH', 'WEST'] },
       { position: { x: 3, y: 0 }, type: 'EMPTY', walls: ['SOUTH'], checkpointNumber: 1 },
+    ])
+  })
+
+  it('serializes gear directions and walls without adding rotation to other tiles', () => {
+    const board = new Board([[
+      new EmptyTile(),
+      new GearTile('CLOCKWISE', [Direction.NORTH]),
+      new GearTile('COUNTERCLOCKWISE', [Direction.SOUTH, Direction.WEST]),
+      new PitTile(),
+    ]], { x: Integer(3), y: Integer(0), angle: 0 })
+    const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
+    const game = new Game({ board, players: [], deck: cards, rebootTile: { x: Integer(0), y: Integer(0) } })
+
+    expect(presentPublicGameState('game', game, { status: 'IDLE' }).board.tiles).toEqual([
+      { position: { x: 0, y: 0 }, type: 'EMPTY' },
+      { position: { x: 1, y: 0 }, type: 'GEAR', rotation: 'CLOCKWISE', walls: ['NORTH'] },
+      { position: { x: 2, y: 0 }, type: 'GEAR', rotation: 'COUNTERCLOCKWISE', walls: ['SOUTH', 'WEST'] },
+      { position: { x: 3, y: 0 }, type: 'PIT' },
     ])
   })
 
@@ -165,7 +210,7 @@ describe('game presenter', () => {
     game.submitProgram(player.id, cards.map((card) => card.id))
     expect(presentPublicGameState('game', game, { status: 'CLOSED' }).winner).toBeNull()
 
-    game.executeNextAction()
+    resolveRobotAction(game)
 
     expect(game.winner).toBe(player.id)
     const winner = { playerId: player.id, username: 'Winner' }

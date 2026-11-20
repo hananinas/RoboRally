@@ -58,7 +58,24 @@ export const BOARD_COMPONENTS: Readonly<
   antenna7: sprite('antenna7', '0 0 84 84', 7 / 6),
   antenna8: sprite('antenna8', '0 0 84 84', 7 / 6),
   antenna9: sprite('antenna9', '0 0 84 84', 7 / 6),
-  antenna10: sprite('antenna10', '0 0 84 84', 7 / 6),
+  antenna10: { ...sprite('antenna10', '0 0 84 84', 7 / 6), label: 'Priority antenna' },
+  gear1: sprite('gear1', '0 0 84 84', 7 / 6),
+  gear2: sprite('gear2', '0 0 84 84', 7 / 6),
+  gear3: sprite('gear3', '0 0 84 84', 7 / 6),
+  gear4: sprite('gear4', '0 0 84 84', 7 / 6),
+  gear5: sprite('gear5', '0 0 84 84', 7 / 6),
+  gear6: sprite('gear6', '0 0 84 84', 7 / 6),
+  gear7: sprite('gear7', '0 0 84 84', 7 / 6),
+  gearClockwise: {
+    ...sprite('gearClockwise', '0 0 84 84', 7 / 6),
+    className: 'board-piece--asset board-piece--gear-clockwise',
+    label: 'Green gear: turn right',
+  },
+  gearCounterclockwise: {
+    ...sprite('gearCounterclockwise', '0 0 84 84', 7 / 6),
+    className: 'board-piece--asset board-piece--gear-counterclockwise',
+    label: 'Red gear: turn left',
+  },
   ground: { className: 'board-piece--ground', width: 1 },
   surface: { className: 'board-piece--surface', width: 1 },
   wallBlack: { className: 'board-piece--wall-black', width: 0.6 },
@@ -99,10 +116,29 @@ const EMPTY_SLICES = [
   { layer: 3, component: 'surface' },
 ] as const
 
+function gearRecipe(direction: 'gearClockwise' | 'gearCounterclockwise'): BoardTileRecipe {
+  return {
+    slices: [
+      { layer: 0, component: 'ground', shadow: true },
+      { layer: 1, component: 'gear1' },
+      { layer: 2, component: 'gear2' },
+      // The mechanism is flush with the surface, below the robots.
+      { layer: 3, component: 'gear3' },
+      { layer: 3, component: 'gear4' },
+      { layer: 3, component: 'gear5' },
+      { layer: 3, component: 'gear6' },
+      { layer: 3, component: 'gear7' },
+      { layer: 3, component: direction },
+    ],
+  }
+}
+
 export const BOARD_RECIPES: Readonly<
   Record<BoardRecipeName, BoardTileRecipe>
 > = {
   empty: { slices: EMPTY_SLICES },
+  gearClockwise: gearRecipe('gearClockwise'),
+  gearCounterclockwise: gearRecipe('gearCounterclockwise'),
   antenna: {
     stackBaseLayer: 3,
     slices: [

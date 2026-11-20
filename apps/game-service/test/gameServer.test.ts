@@ -1,8 +1,9 @@
+import { resolveRobotAction } from './activationTestHelper.js'
 import { Integer } from '@/numbers'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { submitProgramSchema } from '@robo-rally/game-events'
-import type { ClientToServerEvents, CardsDealt, GameWon, RobotActionResolved, GameInitialization, PlayerConnectionChanged, PlayerCheckpointProgress, ServerToClientEvents } from '@robo-rally/game-events'
+import type { ClientToServerEvents, CardsDealt, GameWon, RobotActionResolved, GameInitialization, PlayerConnectionChanged, EnvironmentStepResolved, ServerToClientEvents } from '@robo-rally/game-events'
 import { io, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Board, Card, Direction, EmptyTile, PitTile, Game, type Tile } from '@/game/index'
@@ -173,7 +174,7 @@ describe('started game membership over Socket.IO', () => {
     const { members: [first, second] } = await startGame(['First', 'Second'])
     const ctx = contexts.mock.results[0].value as ReturnType<typeof gameContext.createGameContext>
     for (const player of shared.game.players) shared.game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
-    for (let action = 0; action < 9; action++) shared.game.executeNextAction()
+    for (let action = 0; action < 9; action++) resolveRobotAction(shared.game)
     const execute = vi.spyOn(shared.game, 'executeNextAction')
     const actions: unknown[] = []
     second.on('robot.actionResolved', (payload) => actions.push(payload))
@@ -193,24 +194,6 @@ describe('started game membership over Socket.IO', () => {
     expect(actions).toHaveLength(1)
     expect(shared.game.lastActivePhase).toBe('programming')
     expect(shared.game.paused).toBe(false)
-  })
-  it('activates board elements after the last action of a register', async () => {
-    const contexts = vi.spyOn(gameContext, 'createGameContext')
-    const { members: [, second] } = await startGame(['First', 'Second'])
-    const ctx = contexts.mock.results[0].value as ReturnType<typeof gameContext.createGameContext>
-    vi.spyOn(shared.game.board, 'hasLasers', 'get').mockReturnValue(true)
-    for (const player of shared.game.players) shared.game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
-    const events: string[] = []
-    second.on('robot.actionResolved', () => events.push('action'))
-    second.on('board.elementActivated', (payload) => events.push(`${payload.element}:${payload.registerIndex}`))
-    const activated = new Promise((resolve) => second.once('board.elementActivated', resolve))
-
-    ctx.actionScheduler.scheduleNextAction()
-    await activated
-    await new Promise<void>((resolve) => setImmediate(resolve))
-
-    expect(events.slice(0, 3)).toEqual(['action', 'action', 'LASERS:0'])
-    expect(shared.game.currentRegister).toBeGreaterThan(0)
   })
   it('recovers a game socket and resumes without client session discovery', async () => {
     const { members: [first, second] } = await startGame(['First', 'Second'])
@@ -323,20 +306,22 @@ describe('started game membership over Socket.IO', () => {
     it('announces the winner instead of dealing hands when a departure completes the final checkpoint', async () => {
     const { members: [first, second] } = await startGame(['First', 'Second'])
     for (const player of shared.game.players) shared.game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
-    for (let action = 0; action < 9; action++) shared.game.executeNextAction()
+    for (let action = 0; action < 9; action++) resolveRobotAction(shared.game)
     const player = shared.game.players[0]
     expect(player.lastCheckpoint).toBe(1)
     shared.game.board.removeRobot(player.robot.id)
     shared.game.board.placeRobot(player.robot.id, { x: Integer(8), y: Integer(9) })
     const events: string[] = []
-    first.onAny((name) => { if (['game.playerLeft', 'player.checkpointProgress', 'game.won', 'cards.dealt'].includes(name)) events.push(name) })
-    const progress = new Promise<PlayerCheckpointProgress>((resolve) => first.once('player.checkpointProgress', resolve))
+    first.onAny((name) => { if (['game.playerLeft', 'environment.stepResolved', 'game.won', 'cards.dealt'].includes(name)) events.push(name) })
+    const progress = new Promise<EnvironmentStepResolved>((resolve) => first.on('environment.stepResolved', (step) => {
+      if (step.kind === 'CHECKPOINTS') resolve(step)
+    }))
     const won = new Promise<GameWon>((resolve) => first.once('game.won', resolve))
     await second.emitWithAck('game.leave', {})
-    expect(await progress).toEqual({ gameId: shared.gameId, playerId: player.id, lastCheckpoint: 2, checkpointCount: 2 })
+    expect((await progress).checkpointProgress).toEqual([{ playerId: player.id, lastCheckpoint: 2 }])
     expect(await won).toEqual({ gameId: shared.gameId, playerId: player.id, username: 'First' })
     await getSnapshot(first)
-    expect(events).toEqual(['game.playerLeft', 'player.checkpointProgress', 'game.won'])
+    expect(events).toEqual(['game.playerLeft', 'environment.stepResolved', 'game.won'])
   })
 
   it('announces the winner after the final checkpoint and ends the game', async () => {
@@ -354,7 +339,7 @@ describe('started game membership over Socket.IO', () => {
     const snapshot = await getSnapshot(client)
     expect(events).toEqual([
       'program.finalized', 'game.registersChanged', 'program.submitted',
-      'robot.actionResolved', 'player.checkpointProgress', 'game.won',
+      'robot.actionResolved', 'environment.stepResolved', 'game.won',
     ])
     expect(snapshot.state.winner).toEqual({ playerId: player.id, username: 'First' })
     expect(snapshot.state.phase).toBe('EXECUTING')
@@ -468,11 +453,11 @@ describe('started game membership over Socket.IO', () => {
       const outsideEvents = vi.fn()
       outsider.onAny(outsideEvents)
       const actions: RobotActionResolved[] = []
-      const progress: PlayerCheckpointProgress[] = []
+      const progress: EnvironmentStepResolved[] = []
       const events: string[] = []
       client.onAny((name) => { if (name !== 'program.timerChanged') events.push(name) })
       client.on('robot.actionResolved', (action) => actions.push(action))
-      client.on('player.checkpointProgress', (payload) => progress.push(payload))
+      client.on('environment.stepResolved', (payload) => progress.push(payload))
       const hand = new Promise<CardsDealt>((resolve) => client.once('cards.dealt', resolve))
 
       expect(await client.timeout(1000).emitWithAck('program.submit', program(initial, [2, 0, 4, 5, 3])))
@@ -495,13 +480,14 @@ describe('started game membership over Socket.IO', () => {
           instruction, resolvedInstruction: instruction, position,
         }
       }))
-      expect(progress).toEqual([{
-        gameId: shared.gameId, playerId: initial.assignment.playerId, lastCheckpoint: 1, checkpointCount: 2,
-      }])
+      expect(progress.flatMap((step) => step.checkpointProgress ?? [])).toEqual([
+        { playerId: initial.assignment.playerId, lastCheckpoint: 1 },
+      ])
       expect(events).toEqual([
         'program.finalized', 'game.registersChanged', 'program.submitted',
-        'robot.actionResolved', 'player.checkpointProgress',
-        ...Array.from({ length: 4 }, () => 'robot.actionResolved'), 'cards.dealt',
+        'robot.actionResolved', 'environment.stepResolved',
+        ...Array.from({ length: 4 }, () => 'robot.actionResolved'),
+        'cards.dealt',
       ])
       const snapshot = await getSnapshot(client)
       expect(snapshot.outcome).toBe('JOINED')

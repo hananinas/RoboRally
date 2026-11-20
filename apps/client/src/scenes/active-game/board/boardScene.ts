@@ -105,8 +105,7 @@ export function createBoardScene(
       // Conveyors and lasers pick their artwork from the tile they sit on.
       const symbol = slice.component === 'conveyor' && cell.tile === 'conveyor'
         ? cell.sprite
-        : cell.laserStrength === undefined ? undefined
-          : `${baseComponent.asset?.symbol}-s${cell.laserStrength}`
+        : cell.tile === 'laser' ? `${baseComponent.asset?.symbol}-s${cell.laserStrength}` : undefined
 
       const component: BoardVisualComponent =
         symbol !== undefined && baseComponent.asset
@@ -115,7 +114,7 @@ export function createBoardScene(
 
       const angle = antenna && !slice.wall
         ? antenna.angle * 180 / Math.PI - 90
-        : cell.laserOrientation && component.asset
+        : cell.tile === 'laser' && component.asset
           ? laserAngle(cell.laserOrientation)
           : undefined
       planes[slice.layer].push({

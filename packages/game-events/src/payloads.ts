@@ -49,6 +49,8 @@ export type Robot = Readonly<{
   position: Position
 }>
 
+export type GearRotation = 'CLOCKWISE' | 'COUNTERCLOCKWISE'
+
 // The number of beams a board laser fires.
 export type LaserStrength = 1 | 2 | 3
 
@@ -60,12 +62,8 @@ export type Tile = Readonly<{
   | Readonly<{
       type: 'EMPTY' | 'PIT'
     }>
-  | Readonly<{
-      type: 'LASER'
-      laserOrientation: Orientation
-      // How many beams the laser fires.
-      laserStrength: LaserStrength
-    }>
+  | Readonly<{ type: 'GEAR'; rotation: GearRotation }>
+  | Readonly<{ type: 'LASER'; laserOrientation: Orientation; laserStrength: LaserStrength }>
   | Readonly<{
     type: 'CONVEYOR'
     sprite: string
@@ -92,6 +90,24 @@ export type ProgramTimerChanged = Readonly<{
   serverTime: number
   timer: ProgrammingTimer
 }>
+
+export type EnvironmentStepResolved = Readonly<{
+  gameId: GameId
+}> & (
+  | Readonly<{
+      kind: 'GEARS'
+      robots: readonly Pick<Robot, 'robotId' | 'position'>[]
+      checkpointProgress?: never
+    }>
+  | Readonly<{ kind: 'LASERS'; robots?: never; checkpointProgress?: never }>
+  | Readonly<{
+      kind: 'CHECKPOINTS'
+      checkpointProgress: readonly Pick<PlayerState, 'playerId' | 'lastCheckpoint'>[]
+      robots?: never
+    }>
+)
+
+export type EnvironmentStepKind = EnvironmentStepResolved['kind']
 
 export type PublicGameState = Readonly<{
   gameId: GameId
@@ -123,12 +139,6 @@ export type GameAborted = Readonly<{ gameId: GameId }>
 export type Winner = Readonly<{ playerId: PlayerId; username: string }>
 export type GameWon = Readonly<{ gameId: GameId; playerId: PlayerId; username: string }>
 
-export type PlayerCheckpointProgress = Readonly<{
-  gameId: GameId
-  playerId: PlayerId
-  lastCheckpoint: number
-  checkpointCount: number
-}>
 
 export type PlayerConnectionChanged = Readonly<{
   gameId: GameId
@@ -186,15 +196,6 @@ export type RobotActionResolved = Readonly<{
   resolvedInstruction: ResolvedInstruction | null
   position: Position
   pushedRobots: readonly Pick<Robot, 'robotId' | 'position'>[]
-}>
-
-// Board elements activate after every robot has acted in a register, in the order the game resolves them.
-export type BoardElement = 'LASERS'
-
-export type BoardElementActivated = Readonly<{
-  gameId: GameId
-  registerIndex: number
-  element: BoardElement
 }>
 
 export type PublicRegisterStatus = 'EMPTY' | 'HIDDEN' | 'REVEALED'

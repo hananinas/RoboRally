@@ -1,10 +1,94 @@
 body {
-  margin: auto;
+  --ory-theme-font-family: var(--theme-font);
+  --ory-theme-accent-def: var(--theme-accent);
+  --ory-theme-accent-muted: color-mix(in srgb, var(--theme-accent) 82%, white);
+  --ory-theme-accent-emphasis: color-mix(in srgb, var(--theme-accent) 88%, black);
+  --ory-theme-accent-disabled: var(--theme-border-strong);
+  --ory-theme-accent-subtle: var(--theme-inset);
+  --ory-theme-foreground-def: var(--theme-text);
+  --ory-theme-foreground-muted: var(--theme-muted);
+  --ory-theme-foreground-subtle: var(--theme-muted);
+  --ory-theme-foreground-disabled: var(--theme-muted);
+  --ory-theme-foreground-on-accent: var(--theme-accent-ink);
+  --ory-theme-background-canvas: var(--theme-canvas);
+  --ory-theme-background-surface: var(--theme-surface);
+  --ory-theme-background-subtle: var(--theme-inset);
+  --ory-theme-border-def: var(--theme-border);
+  --ory-theme-text-def: var(--theme-accent-ink);
+  --ory-theme-text-disabled: var(--theme-border-strong);
+  --ory-theme-input-background: var(--theme-input-surface);
+  --ory-theme-input-disabled: var(--theme-border-strong);
+  --ory-theme-input-placeholder: var(--theme-border-strong);
+  --ory-theme-input-text: var(--theme-input-text);
+  --ory-theme-error-def: var(--theme-danger);
+  --ory-theme-error-muted: var(--theme-danger);
+  --ory-theme-error-emphasis: var(--theme-danger);
+  --ory-theme-error-subtle: var(--theme-inset);
+  --ory-theme-success-emphasis: #89d8a6;
+
+  margin: 0;
   min-height: 100vh;
-  min-width: 100%;
-  background: var(--ory-theme-background-canvas);
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  isolation: isolate;
+  background: var(--theme-canvas);
+  color: var(--theme-text);
+  font-family: var(--theme-font);
+}
+
+.account-panel {
+  box-sizing: border-box;
+  padding: var(--theme-panel-padding);
+  border: 1px solid var(--theme-border);
+  border-radius: var(--theme-panel-radius);
+  background: var(--theme-panel);
+  box-shadow: var(--theme-panel-shadow);
+  overflow-wrap: anywhere;
+}
+
+.app-brand {
+  color: var(--theme-accent);
+  font-weight: 700;
+}
+
+/* Ory Elements generates these class names. The prefixes omit its build hashes. */
+main :is(button[class*="ory_elements__button"], a[class*="ory_elements__button__"]) {
+  border-radius: var(--theme-button-radius);
+  font-weight: 700;
+}
+
+main button[name="screen"][value="previous"] {
+  border: 1px solid var(--theme-border-strong);
+  background: transparent;
+  color: var(--theme-text);
+}
+
+main button[name="screen"][value="previous"]:hover {
+  background: var(--theme-inset);
+}
+
+main button[class*="ory_elements__button"]:disabled {
+  color: var(--theme-text);
+  cursor: not-allowed;
+}
+
+main input[class*="ory_elements__input_field__"] {
+  border-radius: var(--theme-input-radius);
+  padding-inline-start: 12px;
+}
+
+main [data-testid="node/input/password"] input {
+  padding-inline-end: 48px;
+}
+
+main [class*="ory_elements__grid__"] {
+  overflow: visible;
+}
+
+body main :is(button, input, a, [tabindex]):focus-visible {
+  outline: 2px solid var(--theme-accent);
+  outline-offset: 2px;
 }
 
 /* the browser adds margins to these elements by default */
@@ -72,14 +156,6 @@ main {
   padding-bottom: 2rem;
 }
 
-/* only manage the nav */
-.main-nav {
-  min-width: 18.75rem;
-  position: fixed;
-  height: auto;
-  z-index: 1;
-}
-
 footer {
   position: fixed;
   bottom: 0;
@@ -109,11 +185,5 @@ footer {
 @media screen and (max-width: 24.375em) {
   .footer-container > div:last-child {
     display: none;
-  }
-}
-
-@media screen and (max-width: 40em) {
-  body {
-    background: var(--ory-theme-background-surface);
   }
 }

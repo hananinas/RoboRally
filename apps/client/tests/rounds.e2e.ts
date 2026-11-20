@@ -101,9 +101,8 @@ test('plays every register of two consecutive programs through the real Game Ser
         await expect(registered).toHaveCount(5)
         for (const card of await hand.all()) await expect(card).toBeDisabled()
         for (const card of await registered.all()) await expect(card).toBeDisabled()
+        await expect(page.locator('.register[data-active]')).toContainText(String(index + 1))
         await expect(beams).toHaveCount(0)
-        // Reduced motion keeps a 200ms playback slot per action and per board
-        // element, without exercising the animations already covered elsewhere.
         await page.clock.runFor(200)
         // The register's lasers show only in their own slot, after the action.
         await expect(beams).not.toHaveCount(0)

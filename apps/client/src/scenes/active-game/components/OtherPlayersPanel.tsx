@@ -1,21 +1,14 @@
 import type { GamePhase, PublicRegisterSlot, RobotActionResolved } from '@robo-rally/game-events'
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useState } from 'react'
 import type { OpponentPlayer } from '../gameState.ts'
 import { cardPresentation } from './cardInstructions.ts'
+import { ProgramCardFace } from './ProgramCard.tsx'
+import CheckpointProgress from './CheckpointProgress.tsx'
 import './OtherPlayersPanel.css'
 
 function slotLabel(slot: PublicRegisterSlot): string {
   return slot.status === 'REVEALED' ? cardPresentation[slot.instruction].label
     : slot.status === 'HIDDEN' ? 'Filled' : 'Empty'
-}
-
-function robotTextColour(colour: string): string {
-  const channels = [1, 3, 5].map((offset) => {
-    const value = parseInt(colour.slice(offset, offset + 2), 16) / 255
-    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
-  })
-  const luminance = channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722
-  return luminance > 0.179 ? '#030609' : '#f8fafc'
 }
 
 type PlaybackProps = {
@@ -32,60 +25,97 @@ function OtherPlayerRow({ player, checkpointCount, phase, activeAction, queuedAc
   const [hovered, setHovered] = useState(false)
   const [focused, setFocused] = useState(false)
   const [dismissed, setDismissed] = useState(false)
-  const expanded = (hovered || focused) && !dismissed
+  const [dismissedAction, setDismissedAction] = useState<RobotActionResolved | null>(null)
+  const active = phase === 'EXECUTING' &&
+    activeAction?.robotId === player.robotId && player.registers[activeAction.registerIndex]?.status === 'REVEALED'
+  const executing = active && !paused && player.connected
+  const expanded = ((hovered || focused) && !dismissed) ||
+    (executing && activeAction !== dismissedAction)
   useEffect(() => {
     if (!expanded) return
     const dismiss = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setDismissed(true)
+      if (event.key === 'Escape') {
+        setDismissed(true)
+        setDismissedAction(activeAction)
+      }
     }
     window.addEventListener('keydown', dismiss)
     return () => window.removeEventListener('keydown', dismiss)
-  }, [expanded])
-  const filled = player.registers.filter((slot) => slot.status !== 'EMPTY').length
-  const executing = phase === 'EXECUTING' && !paused && player.connected &&
-    activeAction?.robotId === player.robotId && player.registers[activeAction.registerIndex]?.status === 'REVEALED'
-  const status = !player.connected ? 'Reconnecting'
-    : executing ? `${cardPresentation[activeAction.instruction].label} · executing`
-      : phase === 'EXECUTING' ? 'Waiting'
-        : player.programSubmitted ? 'Ready' : `${filled}/5 programmed`
+  }, [expanded, activeAction])
   const timing = (slot: PublicRegisterSlot, index: number) => {
-    if (executing && activeAction.registerIndex === index) return 'current'
+    if (active && activeAction.registerIndex === index) return 'current'
     if (phase !== 'EXECUTING') return ''
     if (slot.status !== 'REVEALED' ||
         (activeAction && index > activeAction.registerIndex) ||
         queuedActions.some((action) => action.robotId === player.robotId && action.registerIndex === index)) return 'future'
     return 'past'
   }
-  const registersLabel = player.registers.map((slot, index) => {
-    const state = timing(slot, index)
-    return `Register ${index + 1}: ${slotLabel(slot)}${state ? ` (${state === 'current' ? 'executing' : state})` : ''}`
-  }).join('. ')
+  const slots = player.registers.map((slot, index) => ({
+    slot,
+    filled: slot.status !== 'EMPTY',
+    label: slotLabel(slot),
+    state: timing(slot, index),
+  }))
+  const filled = slots.filter((slot) => slot.filled).length
+  const status = !player.connected ? 'Reconnecting'
+    : executing ? `${cardPresentation[activeAction.instruction].label} · executing`
+      : phase === 'EXECUTING' ? 'Waiting'
+        : player.programSubmitted ? 'Ready' : `${filled}/5 programmed`
+  const registersLabel = slots.map(({ label, state }, index) =>
+    `Register ${index + 1}: ${label}${state ? ` (${state === 'current' ? 'executing' : state})` : ''}`,
+  ).join('. ')
 
   return (
-    <button
-      className="other-player"
-      type="button"
-      style={{ '--robot-colour': player.colour, '--robot-ink': robotTextColour(player.colour) } as CSSProperties}
-      aria-label={`${player.username}, checkpoints ${player.lastCheckpoint}/${checkpointCount}. ${status}. ${registersLabel}. Inspect registers.`}
-      aria-expanded={expanded}
-      onPointerEnter={() => { setHovered(true); setDismissed(false) }}
+    <div
+      className="other-player hud-panel-surface"
+      role="group"
+      tabIndex={0}
+      aria-label={`${player.username}, ${player.lastCheckpoint} of ${checkpointCount} checkpoints collected. ${status}. ${registersLabel}.`}
+      data-expanded={expanded}
+      data-registers-locked={(phase === 'PROGRAMMING' && player.programSubmitted) || undefined}
+      onPointerEnter={(event) => {
+        if (event.pointerType === 'touch') return
+        setHovered(true)
+        setDismissed(false)
+        setDismissedAction(null)
+      }}
+      onMouseDown={(event) => {
+        if (event.button === 0) event.preventDefault()
+      }}
       onPointerLeave={() => setHovered(false)}
-      onFocus={() => { setFocused(true); setDismissed(false) }}
+      onFocus={() => { setFocused(true); setDismissed(false); setDismissedAction(null) }}
       onBlur={() => { setFocused(false); setDismissed(false) }}
-      onClick={() => setDismissed(false)}
     >
-      <strong className="other-player__name">{player.username}</strong>
-      <small className="other-player__checkpoints">CP {player.lastCheckpoint}/{checkpointCount}</small>
-      <span className="other-player__status" title={status}>{status}</span>
+      <div className="other-player__identity">
+        <span className="robot-swatch other-player__colour" style={{ backgroundColor: player.colour }} aria-hidden="true" />
+        <strong className="other-player__name">{player.username}</strong>
+        <span className="other-player__checkpoints">
+          <CheckpointProgress collected={player.lastCheckpoint} total={checkpointCount} />
+        </span>
+        <span className="other-player__dots" aria-hidden="true">
+          {slots.map(({ filled, state }, index) => (
+            <span key={index} data-filled={filled || undefined} data-active={state === 'current' || undefined} />
+          ))}
+        </span>
+        <span className="other-player__status" title={status}>{status}</span>
+      </div>
       <span className="other-player__registers" aria-hidden="true">
-        {player.registers.map((slot, index) => (
-          <span key={index} className={`other-player__slot other-player__slot--${slot.status.toLowerCase()} other-player__slot--${timing(slot, index)}`}>
-            <span className="other-player__slot-number">{index + 1}</span>
-            <span className="other-player__slot-label">{slotLabel(slot)}</span>
+        {slots.map(({ slot, filled, label, state }, index) => (
+          <span
+            key={index}
+            className={`other-player__slot register-card program-card--register other-player__slot--${slot.status.toLowerCase()}${state ? ` other-player__slot--${state}` : ''}`}
+            data-empty={!filled || undefined}
+            data-active={state === 'current' || undefined}
+            data-played={state === 'past' || undefined}
+          >
+            <span className="register-card__number">{index + 1}</span>
+            {slot.status === 'REVEALED'
+              ? <ProgramCardFace instruction={slot.instruction} labelClass="other-player__slot-label" />
+              : <span className="other-player__slot-label">{label}</span>}
           </span>
         ))}
       </span>
-    </button>
+    </div>
   )
 }
 

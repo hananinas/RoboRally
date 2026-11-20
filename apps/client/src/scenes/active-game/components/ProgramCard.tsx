@@ -1,7 +1,5 @@
 import type { ComponentProps } from 'react'
-import type {
-  Card
-} from '@robo-rally/game-events'
+import type { Card, Instruction } from '@robo-rally/game-events'
 import { cardPresentation } from './cardInstructions.ts'
 
 type ProgramCardProps =
@@ -13,6 +11,19 @@ type ProgramCardProps =
     label?: string
   }
 
+
+export function ProgramCardFace({ instruction, labelClass = '' }: {
+  instruction: Instruction
+  labelClass?: string
+}) {
+  const { icon, label } = cardPresentation[instruction]
+  return (
+    <>
+      <img src={icon} alt="" className="program-card__icon" draggable={false} />
+      <span className={`program-card__label ${labelClass}`}>{label}</span>
+    </>
+  )
+}
 
 function ProgramCard({
   card,
@@ -41,15 +52,7 @@ function ProgramCard({
         draggingClassName
       }
     >
-      <img
-        src={cardPresentation[card.instruction].icon}
-        alt=""
-        className="program-card__icon"
-        draggable={false}
-      />
-      <span className="program-card__label">
-        {cardPresentation[card.instruction].label}
-      </span>
+        <ProgramCardFace instruction={card.instruction} />
     </button>
   )
 }

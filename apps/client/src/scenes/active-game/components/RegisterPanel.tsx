@@ -14,10 +14,12 @@ import useCardDrag from './useCardDrag.ts'
 type RegisterPanelProps = {
   registers: Registers
   activeRegister: number | null
+  playedCardIds?: ReadonlySet<string>
   disabled: boolean
   pendingDelete: boolean
   awaitingSubmitConfirm: boolean
   submission: ClientGameState['submission']
+  locked: boolean
   status: string
   localDeadline: number | null
   error: string | null
@@ -30,6 +32,7 @@ type RegisterSlotProps = {
   card: Card | null
   index: number
   active: boolean
+  played: boolean
   disabled: boolean
   pendingDelete: boolean
   dragging: boolean
@@ -42,15 +45,13 @@ function RegisterSlot({
   card,
   index,
   active,
+  played,
   disabled,
   pendingDelete,
   dragging,
   dragHandlers,
   onRemove,
 }: RegisterSlotProps) {
-  const cardClassName = card && !dragging
-    ? 'register__card register__card--filled'
-    : 'register__card'
   const registerIndex = disabled ? undefined : index
 
   return (
@@ -60,13 +61,14 @@ function RegisterSlot({
       data-active={active || undefined}
     >
       <div
-        className={cardClassName}
+        className="register__card register-card"
         data-register-index={registerIndex}
-        style={{
-          outline: pendingDelete ? '3px solid crimson' : undefined,
-          outlineOffset: '3px',
-        }}
+        data-empty={!card || dragging || undefined}
+        data-active={active || undefined}
+        data-played={played || undefined}
+        data-pending-delete={pendingDelete || undefined}
       >
+        <span className="register-card__number">{index + 1}</span>
         {card && (
           <ProgramCard
             card={card}
@@ -82,7 +84,6 @@ function RegisterSlot({
           />
         )}
       </div>
-      <span>{index + 1}</span>
     </li>
   )
 }
@@ -91,10 +92,12 @@ function RegisterSlot({
 function RegisterPanel({
   registers,
   activeRegister,
+  playedCardIds,
   disabled,
   pendingDelete,
   awaitingSubmitConfirm,
   submission,
+  locked,
   status,
   localDeadline,
   error,
@@ -125,13 +128,14 @@ function RegisterPanel({
         )}
         {error && <p role="alert">{error}</p>}
       </div>
-      <ol className="registers">
+      <ol className="registers" data-registers-locked={locked || undefined}>
         {registers.map((card, index) => (
           <RegisterSlot
             key={index}
             card={card}
             index={index}
             active={index === activeRegister}
+            played={card !== null && playedCardIds?.has(card.id) === true}
             disabled={disabled}
             pendingDelete={pendingDelete}
             dragging={card !== null && isDragging(card)}

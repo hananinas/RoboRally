@@ -1,0 +1,8 @@
+:root {
+  --ui-space-xs: 0.25rem;
+  --ui-space-sm: 0.5rem;
+  --ui-space-md: 0.75rem;
+  --ui-space-lg: 1rem;
+  --ui-control-radius: 0.5rem;
+  --ui-control-size: 2.75rem;
+}

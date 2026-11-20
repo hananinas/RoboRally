@@ -1,13 +1,13 @@
-import { useEffect, useRef, type Ref } from 'react'
+import { useEffect, useRef } from 'react'
 import type { ProgramCard as Card } from '../gameState.ts'
 import DraggedCard from './DraggedCard.tsx'
 import ProgramCard from './ProgramCard.tsx'
 import useCardDrag from './useCardDrag.ts'
 
 type ProgrammingHandProps = {
-  containerRef: Ref<HTMLElement>
   cards: readonly Card[]
   registeredCardIds: ReadonlySet<string>
+  playedCardIds?: ReadonlySet<string>
   disabled: boolean
   highlightedIndex: number | null
   onHighlightCard: (cardIndex: number) => void
@@ -17,9 +17,9 @@ type ProgrammingHandProps = {
 
 // Renders and manages the draggable hand.
 function ProgrammingHand({
-  containerRef,
   cards,
   registeredCardIds,
+  playedCardIds,
   disabled,
   highlightedIndex,
   onHighlightCard,
@@ -43,7 +43,6 @@ function ProgrammingHand({
 
   return (
     <section
-      ref={containerRef}
       className="programming-hand"
       aria-label="Programming hand"
     >
@@ -57,6 +56,7 @@ function ProgrammingHand({
             card={card}
             size="hand"
             selected={selected}
+            data-played={playedCardIds?.has(card.id) || undefined}
             disabled={selected || disabled}
             dragging={isDragging(card)}
             onClick={(event) => {

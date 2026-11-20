@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { err, ok, type Result } from 'neverthrow'
 import type { Board } from '@/game/Board'
-import { effects, type BoardElement, type PrivateProgram, type PublicRegisters, type ResolvedInstruction } from '@robo-rally/game-events'
+import { effects, type PrivateProgram, type PublicRegisters, type ResolvedInstruction } from '@robo-rally/game-events'
+import { captureEnvironmentSnapshot, environmentStepsFor, type EnvironmentChanges } from '@/game/environment'
 import { Card } from '@/game/Card'
 import { Deck } from '@/game/Deck'
 import type { CardId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
 import { ROBOT_COLOURS, Robot } from '@/game/Robot'
-import { tileDefinitions } from '@/game/Tile'
 import { Direction, opposite, type Position } from '@/game/spatial'
 import { Integer, PositiveInteger, UnsignedInteger } from '@/numbers'
 import {
@@ -41,11 +41,13 @@ export type NextActionResult = Readonly<{
   roundConcluded: boolean
 }>
 
-export type BoardElementResult = Readonly<{
-  registerIndex: number
-  element: BoardElement
+export type EnvironmentStepResult = EnvironmentChanges & Readonly<{
   roundConcluded: boolean
 }>
+
+export type ActivationStep =
+  | Readonly<{ type: 'robot'; result: NextActionResult }>
+  | Readonly<{ type: 'environment'; result: EnvironmentStepResult }>
 
 export type AddPlayerError = 'NO_SPAWN_AVAILABLE'
 
@@ -87,15 +89,9 @@ export class Game {
   private readonly deck: readonly Card[]
   private readonly lifecycle = new GameLifecycle('programming')
   private registerIndex = 0
+  private environmentStepIndex: number | null = null
   private readonly submittedPlayerIds = new Set<PlayerId>()
   private readonly activatedRobotIds = new Set<RobotId>()
-  // Board elements activate in this order once every robot has acted in a register,
-  // before its checkpoints. Lasers have no gameplay effect yet.
-  private readonly boardElements: readonly Readonly<{ element: BoardElement; onBoard: () => boolean }>[] = [
-    { element: 'LASERS', onBoard: () => this.board.hasLasers },
-  ]
-  // Elements still to activate in the current register.
-  private boardElementQueue: BoardElement[] = []
   private readonly random: () => number
   private readonly drawRandom: () => number
   // What each robot's registers resolved to this round, so Again repeats the real action.
@@ -157,10 +153,6 @@ export class Game {
 
   requirePhase(phase: GamePhase): Result<void, PhaseError> {
     return this.lifecycle.requirePhase(phase)
-  }
-
-  get boardElementsPending(): boolean {
-    return this.boardElementQueue.length > 0
   }
 
   get paused(): boolean {
@@ -330,32 +322,55 @@ export class Game {
     }
   }
 
-  private checkRegisterComplete(): Result<void, 'NOT_COMPLETE'> {
-    return this.roster.length === 0 ||
-      (this.activatedRobotIds.size === this.roster.length && this.boardElementQueue.length === 0)
-      ? ok(undefined)
-      : err('NOT_COMPLETE')
+  get hasPendingEnvironment(): boolean {
+    return this.environmentStepIndex !== null
   }
 
   private recheckActivationPhase(): { roundConcluded: boolean } {
-    return this.requirePhase('activation')
-      .andThen(() => this.checkRegisterComplete())
-      .map(() => this.startBoardElements())
-      .unwrapOr({ roundConcluded: false })
+    if (this.requirePhase('activation').isErr()) {
+      return { roundConcluded: false }
+    }
+    if (this.roster.length === 0) return this.concludeRegister()
+    if (!this.hasPendingEnvironment && this.activatedRobotIds.size === this.roster.length) {
+      this.environmentStepIndex = 0
+    }
+    return { roundConcluded: false }
   }
 
-  private startBoardElements(): { roundConcluded: boolean } {
-    this.boardElementQueue = this.roster.length === 0 ? []
-      : this.boardElements.filter(({ onBoard }) => onBoard()).map(({ element }) => element)
-    return this.boardElementQueue.length === 0 ? this.concludeRegister() : { roundConcluded: false }
+  executeNextStep(): ActivationStep {
+    if (this.requirePhase('activation').isErr()) throw new Error('Game is not executing')
+    const index = this.environmentStepIndex
+    if (index === null) return { type: 'robot', result: this.executeNextAction() }
+
+    const steps = environmentStepsFor(this.board)
+    const changes = steps[index](captureEnvironmentSnapshot(this.board, this.roster))
+    if (changes.kind === 'GEARS') {
+      for (const { robotId, direction } of changes.robots) {
+        const robot = this.roster.find(({ robot }) => robot.id === robotId)!.robot
+        robot.turn(direction - robot.direction)
+      }
+    } else if (changes.kind === 'CHECKPOINTS') {
+      for (const { playerId, lastCheckpoint } of changes.checkpointProgress) {
+        this.roster.find(({ id }) => id === playerId)!.completeCheckpoint(lastCheckpoint)
+        if (lastCheckpoint === this.board.checkpointCount) this.lifecycle.finish(playerId)
+      }
+    }
+
+    this.environmentStepIndex = index + 1
+    const { roundConcluded } = this.environmentStepIndex === steps.length
+      ? this.concludeRegister() : { roundConcluded: false }
+    return {
+      type: 'environment',
+      result: { ...changes, roundConcluded },
+    }
   }
 
   private concludeRegister(): { roundConcluded: boolean } {
+    this.environmentStepIndex = null
     if (this.roster.length === 0) {
       this.finishRound()
       return { roundConcluded: true }
     }
-    this.activateCheckpoints()
     this.finishRegister()
     if (this.winner !== undefined) {
       this.clearRound()
@@ -384,7 +399,7 @@ export class Game {
   }
 
   executeNextAction(): NextActionResult {
-    if (this.requirePhase('activation').isErr()) {
+    if (this.hasPendingEnvironment || this.requirePhase('activation').isErr()) {
       throw new Error('Robot actions can only execute during activation')
     }
 
@@ -415,20 +430,6 @@ export class Game {
 
     const { roundConcluded } = this.recheckActivationPhase()
     return { registerIndex, action, registers, pushedRobots, roundConcluded }
-  }
-
-  // The register concludes with its last element.
-  activateNextBoardElement(): BoardElementResult {
-    if (this.requirePhase('activation').isErr()) {
-      throw new Error('Board elements can only activate during activation')
-    }
-    const element = this.boardElementQueue.shift()
-    if (element === undefined) throw new Error('No board elements remain to activate')
-
-    const registerIndex = this.registerIndex
-    const { roundConcluded } = this.boardElementQueue.length === 0
-      ? this.concludeRegister() : { roundConcluded: false }
-    return { registerIndex, element, roundConcluded }
   }
 
   private dealInitialHands(): void {
@@ -502,7 +503,7 @@ export class Game {
 
   private resolveMovementEntry(robot: Robot, position: Position): 'continue' | 'stop' {
     const tile = this.board.getTile(position)
-    const effect = tile === undefined ? 'reboot' : tileDefinitions[tile.kind].entryEffect
+    const effect = tile === undefined ? 'reboot' : tile.entryEffect
     switch (effect) {
       case undefined:
         return 'continue'
@@ -521,18 +522,6 @@ export class Game {
     if (destination === undefined) throw new Error('No safe reboot destination is available')
     this.board.relocateRobot(robot.id, destination)
     // TODO: Add two SPAM cards and cancel this robot's remaining registers.
-  }
-
-  private activateCheckpoints(): void {
-    for (const player of this.players) {
-      const position = this.board.positionOf(player.robot.id)
-      const checkpoint = this.board.getTile(position)?.checkpointNumber
-      if (checkpoint === undefined || !player.completeCheckpoint(checkpoint)) continue
-      if (checkpoint === this.board.checkpointCount) {
-        this.lifecycle.finish(player.id)
-        break
-      }
-    }
   }
 
   private finishRegister(): void {

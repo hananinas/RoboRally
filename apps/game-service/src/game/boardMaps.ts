@@ -1,4 +1,4 @@
-import type { LaserStrength } from '@robo-rally/game-events'
+import type { GearRotation, LaserStrength } from '@robo-rally/game-events'
 import type { Antenna, BoardMap } from '@/game/Board'
 import { Direction, type Position } from '@/game/spatial'
 import { Integer } from '@/numbers'
@@ -24,16 +24,19 @@ export type WallSpec = Readonly<{
   directions: readonly Direction[]
 }>
 
-export type LaserSpec = Readonly<{
-  at: readonly [x: number, y: number]
-  direction: Direction
-  strength: LaserStrength
-}>
 export type ConveyorSpec = Readonly<{
   at: readonly [x: number, y: number]
   sprite: string
   direction: Direction
 }>
+
+export type LaserSpec = Readonly<{
+  at: readonly [x: number, y: number]
+  direction: Direction
+  strength: LaserStrength
+}>
+
+export type GearSpec = Readonly<{ at: readonly [number, number]; rotation: GearRotation }>
 
 export type MapSpec = BoardMap & Readonly<{
   defaultForLobbyCreation: boolean
@@ -43,6 +46,7 @@ export type MapSpec = BoardMap & Readonly<{
   walls: readonly WallSpec[]
   checkpoints: readonly (readonly [x: number, y: number])[]
   pits?: readonly (readonly [x: number, y: number])[]
+  gears?: readonly GearSpec[]
   lasers?: readonly LaserSpec[]
   conveyors?: readonly ConveyorSpec[]
   startTiles: readonly (readonly [x: number, y: number])[]
@@ -76,6 +80,10 @@ export const boardMaps = {
       { at: [10, 5], direction: N, strength: 2 },
       { at: [15, 10], direction: W, strength: 3 },
       { at: [0, 7], direction: E, strength: 2 },
+    ],
+    gears: [
+      { at: [9, 6], rotation: 'CLOCKWISE' },
+      { at: [11, 8], rotation: 'COUNTERCLOCKWISE' },
     ],
     conveyors: [
       // Conveyor loop

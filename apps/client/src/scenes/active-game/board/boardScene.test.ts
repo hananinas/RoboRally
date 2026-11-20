@@ -45,6 +45,20 @@ describe('createBoardScene', () => {
     )
   })
 
+  it.each(['gearClockwise', 'gearCounterclockwise'] as const)('renders %s flush with the floor and preserves walls', (direction) => {
+    const board = createBoardRenderModel(1, 1, {
+      [direction]: [[0, 0]], walls: [{ x: 0, y: 0, north: true }],
+    })
+    const scene = createBoardScene(board, BOARD_CONFIG, BOARD_COMPONENTS, BOARD_RECIPES)
+    const pieces = scene.planes.flat().filter(({ slice }) => !slice.wall)
+    expect(pieces.map(({ componentName }) => componentName)).toEqual([
+      'ground', 'gear1', 'gear2', 'gear3', 'gear4', 'gear5', 'gear6', 'gear7', direction,
+    ])
+    expect(pieces.every(({ slice }) => slice.layer <= 3)).toBe(true)
+    expect(scene.planes.flat().filter(({ slice }) => slice.wall === 'north')).toHaveLength(8)
+    expect(scene.holes).toEqual([])
+  })
+
   it('adds eight wall slices for every enabled edge', () => {
     const westWall = scene.planes
       .flat()

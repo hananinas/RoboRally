@@ -67,9 +67,9 @@ for (const scenario of scenarios) {
           await expectRobots(client, ids, ['3,3', '2,3', '1,3'], [0, 0, 270])
         }
 
-        // The pusher acts last in register two. Advance five programmed actions;
-        // the sixth must apply the entire push, with no extra playback slots.
-        for (let action = 0; action < 5; action++) {
+        // The pusher acts last in register two. Advance five programmed actions
+        // and register one's laser step; the sixth action must apply the entire push.
+        for (let slot = 0; slot < 6; slot++) {
           for (const client of pages) await client.clock.runFor(200)
         }
         for (const client of pages) {

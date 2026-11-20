@@ -1,19 +1,10 @@
 import type { Dialog, Page } from '@playwright/test'
-import { expect, openGame, test } from './game-fixture.ts'
+import { expect, openGame, pauseClock, test } from './game-fixture.ts'
 import { GAME_ID, OTHER_PLAYER_ID, OTHER_ROBOT_ID, PLAYER_ID, ROBOT_ID, ROUND_ACTIONS } from './game-fixture-data.ts'
 import { gameStatus } from './browserClient.ts'
 async function fillProgram(page: Page, indices = [0, 1, 2, 3, 4]) {
   const cards = page.getByRole('region', { name: 'Programming hand' }).getByRole('button')
   for (const index of indices) await cards.nth(index).click()
-}
-
-// The installed clock keeps ticking with real time until it is paused, so a
-// fixed pause time can already lie in the past after a slow cold-cache load
-// ("Cannot fast-forward to the past"). Pause one second past the current fake
-// time instead — still a small jump, because fast-forwarding past the
-// Socket.IO ping interval expires the heartbeat and disconnects the client.
-async function pauseClock(page: Page) {
-  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
 }
 
 test('renders the programming interface', async ({ page }) => {
@@ -75,19 +66,25 @@ test('shows checkpoint counts from snapshots and broadcasts once queued playback
   await game.control({ type: 'joined-state', state, hand: game.initial.cards, programSubmitted: false })
   await openGame(page)
   const checkpoints = page.getByRole('heading', { name: 'Checkpoints', exact: true }).locator('..')
-  await expect(checkpoints).toContainText('0/2')
+  const progress = checkpoints.locator('.checkpoint-progress')
+  const flags = progress.locator('.checkpoint-progress__flag')
+  await expect(progress).toHaveAccessibleName('0 of 2 checkpoints collected')
+  await expect(flags).toHaveCount(2)
+  await expect(progress.locator(':scope > :last-child')).toHaveText('0/2')
   await fillProgram(page)
   await page.getByRole('button', { name: 'Done', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()
   await pauseClock(page)
-  await game.control({ type: 'checkpoint-progress', progress: {
-    gameId: GAME_ID, playerId: OTHER_PLAYER_ID, lastCheckpoint: 1, checkpointCount: 2,
+  await game.control({ type: 'inject-environment', result: {
+    gameId: GAME_ID, kind: 'CHECKPOINTS',
+    checkpointProgress: [{ playerId: OTHER_PLAYER_ID, lastCheckpoint: 1 }],
   } })
   await game.control({ type: 'round', actions: ROUND_ACTIONS, deferHand: true })
   await expect(page.getByRole('status')).toHaveText('Executing')
   await expect(checkpoints).toContainText('0/2')
-  await game.control({ type: 'checkpoint-progress', progress: {
-    gameId: GAME_ID, playerId: PLAYER_ID, lastCheckpoint: 1, checkpointCount: 2,
+  await game.control({ type: 'inject-environment', result: {
+    gameId: GAME_ID, kind: 'CHECKPOINTS',
+    checkpointProgress: [{ playerId: PLAYER_ID, lastCheckpoint: 1 }],
   } })
   await expect(checkpoints).toContainText('0/2')
   await expect(page.getByRole('button', { name: /remove from register/ })).toHaveCount(5)
@@ -97,7 +94,10 @@ test('shows checkpoint counts from snapshots and broadcasts once queued playback
     await expect(checkpoints).toContainText('0/2')
     await page.clock.runFor(action.instruction === 'TURN_LEFT' ? 300 : 600)
   }
-  await expect(checkpoints).toContainText('1/2')
+  await expect(progress).toHaveAccessibleName('1 of 2 checkpoints collected')
+  await expect(progress.locator(':scope > :last-child')).toHaveText('1/2')
+  await expect(flags.first()).toHaveAttribute('data-collected', 'true')
+  await expect(flags.last()).not.toHaveAttribute('data-collected')
 
   await game.control({ type: 'joined-state', state: {
     ...state, players: state.players.map((player) => ({ ...player, lastCheckpoint: 1 })),
@@ -153,9 +153,13 @@ test('programs, removes, and confirms cards without resetting on a duplicate han
 
   await handCards.nth(2).click()
   await expect(done).toBeEnabled()
+  const lockedSlots = controls.locator('[data-registers-locked] .register__card:not([data-empty])')
+  await expect(lockedSlots).toHaveCount(0)
   await done.click()
 
   await expect(controls.getByRole('button', { name: 'Confirmed' })).toBeDisabled()
+  await expect(lockedSlots).toHaveCount(5)
+  await expect(lockedSlots.first()).toHaveCSS('border-color', 'rgb(243, 201, 77)')
   await expect(handCards.last()).toBeDisabled()
   await expect(registerCards.first()).toBeDisabled()
 })
@@ -418,66 +422,25 @@ test(':w then Enter submits after confirming, only once the program is complete'
   await expect(controls.getByRole('button', { name: 'Confirmed' })).toBeDisabled()
 })
 
-test('adapts the hand and panel overflow to available space', async ({
-  page,
-}) => {
-  await openGame(page, 1000, 600)
-
+test('centres the hand below the edge-aligned HUD and keeps short layouts scrollable', async ({ page }) => {
   const hand = page.getByRole('region', { name: 'Programming hand' })
   const hud = page.getByRole('complementary', { name: 'Game controls' })
-  const initialHandBox = await hand.boundingBox()
-  const initialHudBox = await hud.boundingBox()
 
-  if (!initialHandBox || !initialHudBox) {
-    throw new Error('Layout positions are unavailable')
+  for (const [width, height] of [[1000, 600], [700, 400], [480, 800]]) {
+    await openGame(page, width, height)
+    const handBox = await hand.boundingBox()
+    const panelBox = await hud.locator('.player-panel').boundingBox()
+    const hudBox = await hud.boundingBox()
+    if (!handBox || !panelBox || !hudBox) throw new Error('Layout positions are unavailable')
+
+    expect(handBox.x + handBox.width / 2).toBeCloseTo(width / 2, 0)
+    expect(panelBox.x + panelBox.width).toBeCloseTo(width, 0)
+    expect(hudBox.y + hudBox.height).toBeLessThanOrEqual(handBox.y)
   }
 
-  expect(initialHandBox.x + initialHandBox.width).toBeLessThanOrEqual(
-    initialHudBox.x,
-  )
-
-  await page
-    .getByRole('button', { name: 'Collapse player details' })
-    .click()
-
-  await expect
-    .poll(async () => (await hand.boundingBox())?.width)
-    .toBeGreaterThan(999)
-
-  const fullHand = await hand.evaluate((element) => ({
-    clientWidth: element.clientWidth,
-    paddingInline: Number.parseFloat(getComputedStyle(element).paddingInline),
-    scrollWidth: element.scrollWidth,
-  }))
-  expect(fullHand.scrollWidth).toBeGreaterThan(fullHand.clientWidth)
-  expect(fullHand.paddingInline).toBeGreaterThan(0)
-
+  expect(await hand.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
   await openGame(page, 700, 400)
-  const shortHud = await hud.evaluate((element) => ({
-    clientHeight: element.clientHeight,
-    overflowY: getComputedStyle(element).overflowY,
-    paddingTop: Number.parseFloat(getComputedStyle(element).paddingTop),
-    scrollHeight: element.scrollHeight,
-  }))
-  expect(shortHud.scrollHeight).toBeGreaterThan(shortHud.clientHeight)
-  expect(shortHud.overflowY).toBe('auto')
-  expect(shortHud.paddingTop).toBeGreaterThan(0)
-
-  await openGame(page, 480, 800)
-  const compactHand = await hand.evaluate((element) => ({
-    clientWidth: element.clientWidth,
-    scrollWidth: element.scrollWidth,
-  }))
-  const compactHandBox = await hand.boundingBox()
-  const compactHudBox = await hud.boundingBox()
-
-  if (!compactHandBox || !compactHudBox) {
-    throw new Error('Compact layout positions are unavailable')
-  }
-
-  expect(compactHudBox.y).toBeLessThan(compactHandBox.y)
-  expect(compactHandBox.width).toBe(480)
-  expect(compactHand.scrollWidth).toBeGreaterThan(compactHand.clientWidth)
+  expect(await hud.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)
 })
 
 test('centres registers and cards when space allows', async ({ page }) => {

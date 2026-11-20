@@ -2,10 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { createBoardRenderModel } from './boardModel.ts'
 import { DEMO_ROBOTS } from './demoBoard.ts'
 import {
-  BOARD_ELEMENT_DURATION_MS,
   createRobotPlaybackState,
   findPitEntry,
-  isPlaybackBusy,
   PIT_FALL_DURATION_MS,
   PIT_RESPAWN_DURATION_MS,
   playbackPhases,
@@ -194,7 +192,6 @@ describe('pit entry', () => {
     let state = createRobotPlaybackState(robots)
     state = robotPlaybackReducer(state, { type: 'enqueue', action, board })
     expect(state.active).toBe(action)
-    expect(state.activeSequence).toBe(0)
     expect(state.robots[0]).toMatchObject({ position: { ...start, coordinate: { x: 2, y: 1 } }, phase: 'pit-enter' })
     expect(state.robots[1]).toMatchObject({ position: action.pushedRobots[0].position })
     expect(state.robots[1].phase).toBeUndefined()
@@ -217,8 +214,8 @@ describe('pit entry', () => {
     let state = createRobotPlaybackState(robots)
     state = robotPlaybackReducer(state, { type: 'enqueue', action: { ...first, instruction: 'MOVE_1', position: start }, board })
     state = robotPlaybackReducer(state, { type: 'enqueue', action: move('MOVE_2'), board })
-    expect(state.pending.map((entry) => [entry.sequence, entry.phases[0]?.position.coordinate]))
-      .toEqual([[1, { x: 2, y: 1 }]])
+    expect(state.pending.map((entry) => [entry.phases[0]?.robots[0].position.coordinate]))
+      .toEqual([[{ x: 2, y: 1 }]])
   })
 
   it('does not stall when completed mid sequence or without a board', () => {
@@ -226,7 +223,7 @@ describe('pit entry', () => {
     let state = robotPlaybackReducer(createRobotPlaybackState(robots), { type: 'enqueue', action: move('MOVE_2'), board })
     state = robotPlaybackReducer(state, { type: 'enqueue', action: move('TURN_LEFT'), board })
     state = robotPlaybackReducer(state, { type: 'complete' })
-    expect(state.active?.instruction).toBe('TURN_LEFT')
+    expect(state.active).toMatchObject({ instruction: 'TURN_LEFT' })
     expect(state.phases).toEqual([])
     expect(state.robots[0].phase).toBeUndefined()
     expect(state.robots[0].position).toEqual(reboot)
@@ -253,9 +250,9 @@ describe('pit entry', () => {
       for (const robot of state.robots) {
         shown.push([robot.robotId, robot.phase, `${robot.position.coordinate.x},${robot.position.coordinate.y}`])
       }
-      const sequence = state.activeSequence
+      const active = state.active
       state = robotPlaybackReducer(state, { type: 'advance' })
-      if (state.activeSequence !== sequence) completions++
+      if (state.active !== active) completions++
     }
     return { state, shown, completions }
   }
@@ -313,7 +310,7 @@ describe('pit entry', () => {
 
     const left = robotPlaybackReducer(falling, { type: 'remove', robotId: 'red' })
     expect(left.robots.map((robot) => robot.robotId)).toEqual([DEMO_ROBOTS[0].robotId])
-    expect(left.activeSequence).toBe(1)
+    expect(left.active).toMatchObject({ robotId: DEMO_ROBOTS[0].robotId })
     expect(left.robots[0].phase).toBeUndefined()
     expect(playOut(left).completions).toBe(1)
 
@@ -324,55 +321,12 @@ describe('pit entry', () => {
     ])
     expect(robotPlaybackReducer(reset, { type: 'advance' })).toBe(reset)
   })
-})
 
-describe('board element playback', () => {
-  const enqueueLasers = (state: RobotPlaybackState) =>
-    robotPlaybackReducer(state, { type: 'enqueue-board-element', element: 'LASERS' })
-
-  it('shows at once when no action is playing, then ends', () => {
-    let state = enqueueLasers(createRobotPlaybackState(DEMO_ROBOTS))
-
-    expect(state.boardElement).toBe('LASERS')
-    expect(isPlaybackBusy(state)).toBe(true)
-    state = robotPlaybackReducer(state, { type: 'complete' })
-    expect(state.boardElement).toBeNull()
-    expect(isPlaybackBusy(state)).toBe(false)
-  })
-
-  it('waits for the actions queued before it and holds the next ones until it ends', () => {
-    let state = createRobotPlaybackState(DEMO_ROBOTS)
-    state = robotPlaybackReducer(state, { type: 'enqueue', action: steps[0] })
-    state = robotPlaybackReducer(state, { type: 'enqueue', action: steps[1] })
-    state = enqueueLasers(state)
-    state = robotPlaybackReducer(state, { type: 'enqueue', action: steps[2] })
-
-    expect(state.boardElement).toBeNull()
-    state = robotPlaybackReducer(state, { type: 'complete' })
-    expect(state.active).toBe(steps[1])
-    expect(state.boardElement).toBeNull()
-
-    state = robotPlaybackReducer(state, { type: 'complete' })
-    expect(state.active).toBeNull()
-    expect(state.boardElement).toBe('LASERS')
-    expect(state.pending.map(({ action }) => action)).toEqual([steps[2]])
-
-    state = robotPlaybackReducer(state, { type: 'enqueue', action: steps[3] })
-    expect(state.pending).toHaveLength(2)
-    expect(state.boardElement).toBe('LASERS')
-
-    state = robotPlaybackReducer(state, { type: 'complete' })
-    expect(state.boardElement).toBeNull()
-    expect(state.active).toBe(steps[2])
-  })
-
-  it('shows beams for 600 ms', () => {
-    expect(BOARD_ELEMENT_DURATION_MS.LASERS).toBe(600)
-  })
-
-  it('resets with the playback', () => {
-    const state = enqueueLasers(createRobotPlaybackState(DEMO_ROBOTS))
-
-    expect(isPlaybackBusy(robotPlaybackReducer(state, { type: 'reset', robots: DEMO_ROBOTS }))).toBe(false)
+  it('shows a laser step for a full move, then settles', () => {
+    const lasers = { gameId: 'demo', kind: 'LASERS' } as const
+    const state = robotPlaybackReducer(createRobotPlaybackState(DEMO_ROBOTS), { type: 'enqueue', action: lasers })
+    expect(state.active).toEqual(lasers)
+    expect(robotActionDuration(lasers, false)).toBe(ROBOT_MOVE_DURATION_MS)
+    expect(robotPlaybackReducer(state, { type: 'advance' }).active).toBeNull()
   })
 })

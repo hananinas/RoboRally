@@ -4,10 +4,9 @@ import type {
   GameInitialization,
   GameWon,
   PlayerConnectionChanged,
-  PlayerCheckpointProgress,
+  EnvironmentStepResolved,
   RegistersChanged,
   RobotActionResolved,
-  BoardElementActivated,
   PlayerLeft,
   RegisterCardIds,
   ProgramFinalized,
@@ -144,11 +143,8 @@ export default function useGameConnection(socket: GameSocket) {
       receive({ type: 'player-connection-changed', payload })
     const handleAborted = (_payload: GameAborted) => receive({ type: 'aborted' })
     const handleWon = (payload: GameWon) => receive({ type: 'won', payload })
-    const handleCheckpointProgress = (payload: PlayerCheckpointProgress) =>
-      receive({ type: 'checkpoint-progress', payload })
+    const handleEnvironmentStep = (result: EnvironmentStepResolved) => receive({ type: 'environment', result })
     const handleRegistersChanged = (payload: RegistersChanged) => receive({ type: 'registers-changed', payload })
-    const handleBoardElementActivated = (payload: BoardElementActivated) =>
-      receive({ type: 'board-element-activated', payload })
     const handleProgramSubmitted = (payload: ProgramSubmitted) => receive({ type: 'program-submitted', payload })
 
     socket.on('disconnect', handleDisconnect)
@@ -158,12 +154,11 @@ export default function useGameConnection(socket: GameSocket) {
     socket.on('program.finalized', handleProgramFinalized)
     socket.on('program.timerChanged', handleTimerChanged)
     socket.on('robot.actionResolved', handleActionResolved)
-    socket.on('board.elementActivated', handleBoardElementActivated)
     socket.on('game.playerLeft', handlePlayerLeft)
     socket.on('game.playerConnectionChanged', handlePlayerConnectionChanged)
     socket.on('game.aborted', handleAborted)
     socket.on('game.won', handleWon)
-    socket.on('player.checkpointProgress', handleCheckpointProgress)
+    socket.on('environment.stepResolved', handleEnvironmentStep)
     socket.on('game.registersChanged', handleRegistersChanged)
     socket.on('program.submitted', handleProgramSubmitted)
     return () => {
@@ -175,12 +170,11 @@ export default function useGameConnection(socket: GameSocket) {
       socket.off('program.finalized', handleProgramFinalized)
       socket.off('program.timerChanged', handleTimerChanged)
       socket.off('robot.actionResolved', handleActionResolved)
-      socket.off('board.elementActivated', handleBoardElementActivated)
       socket.off('game.playerLeft', handlePlayerLeft)
       socket.off('game.playerConnectionChanged', handlePlayerConnectionChanged)
       socket.off('game.aborted', handleAborted)
       socket.off('game.won', handleWon)
-      socket.off('player.checkpointProgress', handleCheckpointProgress)
+      socket.off('environment.stepResolved', handleEnvironmentStep)
       socket.off('game.registersChanged', handleRegistersChanged)
       socket.off('program.submitted', handleProgramSubmitted)
     }

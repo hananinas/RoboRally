@@ -1,3 +1,4 @@
+import { resolveRobotAction } from '../activationTestHelper.ts'
 import { describe, expect, it } from 'vitest'
 import { Deck, Direction, Card, Player, Robot, createGame } from '@/game/index'
 
@@ -133,7 +134,7 @@ describe('Player', () => {
 
     for (let round = 0; round < 2; round++) {
       game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
-      for (let register = 0; register < 5; register++) game.executeNextAction()
+      for (let register = 0; register < 5; register++) resolveRobotAction(game)
 
       expect(game.lastActivePhase).toBe('programming')
       expect(player.robot.program).toEqual([])

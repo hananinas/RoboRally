@@ -1,5 +1,5 @@
 import type { Game } from '@/game/index'
-import { presentCardsDealt, presentRobotActionResolved } from '@/socket/gamePresenter'
+import { presentCardsDealt, presentEnvironmentStepResolved, presentRobotActionResolved } from '@/socket/gamePresenter'
 import type { GameSocketServer } from '@/socket/gameServer'
 import { logError } from '@/logger'
 import type { Winner } from '@robo-rally/game-events'
@@ -27,26 +27,10 @@ export function createActionScheduler(
 ): ActionScheduler {
   let scheduledAction: NodeJS.Immediate | undefined
   let closed = false
-  let checkpointProgress = new Map(game.players.map((player) => [player.id, player.lastCheckpoint]))
   let winnerAnnounced = false
   let recordedWinner: Winner | null = null
 
-  function broadcastCheckpointProgress(): void {
-    const nextProgress = new Map<string, number>()
-    for (const player of game.players) {
-      nextProgress.set(player.id, player.lastCheckpoint)
-      if (player.lastCheckpoint === (checkpointProgress.get(player.id) ?? 0)) continue
-      io.to(publicRoom).emit('player.checkpointProgress', {
-        gameId,
-        playerId: player.id,
-        lastCheckpoint: player.lastCheckpoint,
-        checkpointCount: game.board.checkpointCount,
-      })
-    }
-    checkpointProgress = nextProgress
-  }
-
-    // Record the winner's name while they are still a member; they may leave later.
+  // Record the winner before they can leave.
   function winner(): Winner | null {
     if (recordedWinner === null && game.winner !== undefined) {
       recordedWinner = { playerId: game.winner, username: usernameOf(game.winner) ?? '' }
@@ -68,7 +52,6 @@ export function createActionScheduler(
   }
 
   function announceProgress(result: { roundConcluded: boolean }): void {
-    broadcastCheckpointProgress()
     if (game.winner !== undefined) announceWinner()
     if (result.roundConcluded) announceHands()
   }
@@ -79,21 +62,19 @@ export function createActionScheduler(
       scheduledAction = undefined
       if (closed || game.requirePhase('activation').isErr()) return
       try {
-        if (game.boardElementsPending) {
-          const { registerIndex, element, roundConcluded } = game.activateNextBoardElement()
-          io.to(publicRoom).emit('board.elementActivated', { gameId, registerIndex, element })
-          announceProgress({ roundConcluded })
+        const step = game.executeNextStep()
+        if (step.type === 'robot') {
+          io.to(publicRoom).emit('robot.actionResolved', presentRobotActionResolved(gameId, game, step.result))
         } else {
-          const result = game.executeNextAction()
-          io.to(publicRoom).emit(
-            'robot.actionResolved',
-            presentRobotActionResolved(gameId, game, result),
-          )
-          announceProgress(result)
+          const result = presentEnvironmentStepResolved(gameId, step.result)
+          const changed = result.kind === 'GEARS' ? result.robots.length > 0
+            : result.kind === 'LASERS' || result.checkpointProgress.length > 0
+          if (changed) io.to(publicRoom).emit('environment.stepResolved', result)
         }
+        announceProgress(step.result)
         scheduleNextAction()
       } catch (error) {
-        logError('Failed to execute next robot action', error, {
+        logError('Failed to execute next activation step', error, {
           source: 'actionScheduler',
           gameId,
           phase: game.lastActivePhase,

@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import { KEYBINDS } from './useGameKeybinds.ts'
-import '../ActiveGame.css'
+import './GameMenu.css'
 
 // Uses a native popover for Escape, outside-click dismissal, and top-layer display.
 function GameMenu({ onLeave, leaveDisabled, onLogout, onSettings }: {
@@ -23,7 +23,7 @@ function GameMenu({ onLeave, leaveDisabled, onLogout, onSettings }: {
         popoverTarget={menuId}
         title="Game options"
       >
-        <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+        <svg className="game-menu__trigger-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="5" cy="12" r="2" fill="currentColor" />
           <circle cx="12" cy="12" r="2" fill="currentColor" />
           <circle cx="19" cy="12" r="2" fill="currentColor" />

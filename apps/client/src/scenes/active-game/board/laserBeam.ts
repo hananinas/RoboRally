@@ -78,7 +78,7 @@ export function traceBeams(
 ): readonly LaserBeam[] {
   const blockers = board.antenna ? [...robots, board.antenna] : robots
   return board.cells.flatMap((cell) =>
-    cell.laserOrientation && cell.laserStrength
+    cell.tile === 'laser'
       ? [{
           ...traceBeam(board, { x: cell.x, y: cell.y, orientation: cell.laserOrientation }, blockers),
           strength: cell.laserStrength,

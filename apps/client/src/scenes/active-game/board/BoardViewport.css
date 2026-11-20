@@ -196,6 +196,14 @@
   overflow: visible;
 }
 
+.board-piece--gear-clockwise {
+  color: #4caf70;
+}
+
+.board-piece--gear-counterclockwise {
+  color: #c74f4f;
+}
+
 .board-piece--hole {
   overflow: hidden;
   box-shadow: var(--board-hole-shadow);

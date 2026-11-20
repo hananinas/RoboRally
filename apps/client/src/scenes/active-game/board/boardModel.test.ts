@@ -26,12 +26,7 @@ describe('createBoardRenderModel', () => {
       { x: 2, y: 1, tile: 'laser' },
     ])
     expect(board.cells.every((cell) => Object.values(cell.walls).every((wall) => !wall))).toBe(true)
-    expect(board.cells.map((cell) => cell.laserOrientation)).toEqual([
-      undefined, undefined, undefined, undefined, undefined, 'WEST',
-    ])
-    expect(board.cells.map((cell) => cell.laserStrength)).toEqual([
-      undefined, undefined, undefined, undefined, undefined, 2,
-    ])
+    expect(board.cells[5]).toMatchObject({ laserOrientation: 'WEST', laserStrength: 2 })
   })
 
   it('copies antenna configuration and rejects off-board positions or invalid facing', () => {
@@ -42,6 +37,25 @@ describe('createBoardRenderModel', () => {
     expect(Object.isFrozen(board.antenna)).toBe(true)
     expect(() => createBoardRenderModel(1, 1, { antenna: { ...antenna, x: 1 } })).toThrow(RangeError)
     expect(() => createBoardRenderModel(1, 1, { antenna: { ...antenna, angle: NaN } })).toThrow(RangeError)
+  })
+
+  it('keeps both gear directions alongside their walls', () => {
+    const board = createBoardRenderModel(3, 1, {
+      gearClockwise: [[0, 0]], gearCounterclockwise: [[1, 0]],
+      walls: [{ x: 0, y: 0, north: true }],
+    })
+    expect(board.cells.map(({ tile }) => tile)).toEqual(['gearClockwise', 'gearCounterclockwise', 'empty'])
+    expect(board.cells[0].walls.north).toBe(true)
+  })
+
+  it('rejects gears outside the board and conflicting tile assignments', () => {
+    expect(() => createBoardRenderModel(1, 1, { gearClockwise: [[1, 0]] })).toThrow(/outside the board/)
+    expect(() => createBoardRenderModel(1, 1, {
+      gearClockwise: [[0, 0]], gearCounterclockwise: [[0, 0]],
+    })).toThrow(/assigned twice/)
+    expect(() => createBoardRenderModel(1, 1, {
+      hole: [[0, 0]], gearCounterclockwise: [[0, 0]],
+    })).toThrow(/assigned twice/)
   })
 
   it('rejects invalid dimensions and assignments', () => {

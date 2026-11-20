@@ -28,7 +28,7 @@ describe('game event payload types', () => {
     const tile = { position: coordinate, type: 'EMPTY' } satisfies Tile
     const pit = { position: coordinate, type: 'PIT', walls: ['NORTH'] } satisfies Tile
 
-    expectTypeOf<Tile['type']>().toEqualTypeOf<'EMPTY' | 'PIT' | 'LASER'>()
+    expectTypeOf<Tile['type']>().toEqualTypeOf<'EMPTY' | 'PIT' | 'GEAR' | 'LASER'>()
     expectTypeOf<Tile['position']>().toEqualTypeOf<Coordinate>()
     expectTypeOf<Position['coordinate']>().toEqualTypeOf<Coordinate>()
     expectTypeOf<Position>().not.toMatchTypeOf<Coordinate>()
