@@ -1,5 +1,5 @@
 import type { GearRotation } from '@robo-rally/game-events'
-import type { Antenna, BoardMap } from '@/game/Board'
+import type { Antenna } from '@/game/Board'
 import { Direction, type Position } from '@/game/spatial'
 import { Integer } from '@/numbers'
 
@@ -32,7 +32,10 @@ export type ConveyorSpec = Readonly<{
 
 export type GearSpec = Readonly<{ at: readonly [number, number]; rotation: GearRotation }>
 
-export type MapSpec = BoardMap & Readonly<{
+export type MapSpec = Readonly<{
+  name: string
+  icon: string
+  maxPlayers: number
   defaultForLobbyCreation: boolean
   width: number
   height: number

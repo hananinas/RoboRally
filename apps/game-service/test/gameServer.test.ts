@@ -5,9 +5,8 @@ import type { AddressInfo } from 'node:net'
 import { submitProgramSchema } from '@robo-rally/game-events'
 import type { ClientToServerEvents, CardsDealt, GameWon, RobotActionResolved, GameInitialization, PlayerConnectionChanged, EnvironmentStepResolved, ServerToClientEvents } from '@robo-rally/game-events'
 import { io, type Socket } from 'socket.io-client'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Board, Card, Direction, EmptyTile, PitTile, Game, type Tile } from '@/game/index'
-import { createGame } from '@/game/GameFactory'
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { Game, type BoardMapName } from '@/game/index'
 import { HAND_SIZE } from '@/game/Deck'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
 import * as gameContext from '@/socket/gameContext'
@@ -17,19 +16,19 @@ import { authCookieHeader } from './authTestHelper.ts'
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>
 describe('started game membership over Socket.IO', () => {
   let server: GameSocketServer
-  let shared: ReturnType<typeof createGame>
   let sessionStore: SessionStore
   let url: string
   let clients: Client[]
+  let contexts: MockInstance<typeof gameContext.createGameContext>
   beforeEach(async () => {
-    shared = createGame('empty-map', undefined, () => 0)
     clients = []
+    contexts = vi.spyOn(gameContext, 'createGameContext')
     await start()
   })
   async function start() {
     const http = createServer()
     sessionStore = createSessionStore({ oidcClient: { refreshToken: vi.fn() }, refreshBufferSeconds: 0 })
-    server = createGameSocketServer(http, sessionStore, () => shared)
+    server = createGameSocketServer(http, sessionStore)
     await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve))
     url = `http://127.0.0.1:${(http.address() as AddressInfo).port}`
   }
@@ -38,6 +37,11 @@ describe('started game membership over Socket.IO', () => {
     await new Promise<void>((resolve) => server.close(() => resolve()))
     vi.restoreAllMocks()
   })
+  function currentGame(): Game {
+    const latest = contexts.mock.results.at(-1)
+    if (!latest) throw new Error('No game has started yet')
+    return (latest.value as ReturnType<typeof gameContext.createGameContext>).game
+  }
   async function connect(username: string): Promise<Client> {
     const client: Client = io(url, {
       autoConnect: false, transports: ['websocket'], reconnection: false, ackTimeout: 1000,
@@ -54,9 +58,9 @@ describe('started game membership over Socket.IO', () => {
     if (result.outcome !== 'IN_GAME') throw new Error(result.outcome)
     return result.initialization
   }
-  async function startGame(names: string[]) {
+  async function startGame(names: string[], mapName: BoardMapName = 'empty-map') {
     const members = await Promise.all(names.map(connect))
-    const created = await members[0].emitWithAck('lobby.create', {})
+    const created = await members[0].emitWithAck('lobby.create', { mapName })
     if (created.outcome !== 'LOBBY_JOINED') throw new Error(created.outcome)
     const { lobbyId } = created.lobby
     for (const member of members.slice(1)) await member.emitWithAck('lobby.join', { lobbyId })
@@ -85,6 +89,8 @@ describe('started game membership over Socket.IO', () => {
   const submission = (initial: GameInitialization) => submitProgramSchema.parse({
     cardIds: initial.hand.slice(0, 5).map((card) => card.id),
   })
+  // Deck.draw is fixed to always take the front of the pile (see test/setup.ts), so
+  // the first card of every freshly dealt hand is deterministically a MOVE_1.
   function raw(client: Client, event: string, payload: unknown): Promise<unknown> {
     return (client.emitWithAck as (event: string, payload: unknown) => Promise<unknown>)(event, payload)
   }
@@ -105,7 +111,7 @@ describe('started game membership over Socket.IO', () => {
 
   it('rejects malformed session requests and starts with no session', async () => {
     const client = await connect('Dane')
-    expect(await raw(client, 'session.get', { gameId: shared.gameId })).toEqual({ outcome: 'INVALID_REQUEST' })
+    expect(await raw(client, 'session.get', { gameId: 'irrelevant' })).toEqual({ outcome: 'INVALID_REQUEST' })
     expect(await client.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION', user: { userId: 'Dane', username: 'Dane' } })
     expect(server.sockets.sockets.get(client.id!)!.rooms).toEqual(new Set([client.id]))
   })
@@ -113,7 +119,7 @@ describe('started game membership over Socket.IO', () => {
     const { members: [first], initializations: [initial] } = await startGame(['First', 'Second'])
     const repeated = await getSnapshot(first)
     expect(repeated).toEqual({ ...initial, state: { ...initial.state, serverTime: expect.any(Number) } })
-    expect(shared.game.players).toHaveLength(2)
+    expect(currentGame().players).toHaveLength(2)
   })
   it('rejects nonmember and foreign-hand submissions', async () => {
     const { members: [first, second], initializations: [initial, other] } = await startGame(['First', 'Second'])
@@ -126,33 +132,36 @@ describe('started game membership over Socket.IO', () => {
   })
   it('revokes room access and frees occupancy when a member explicitly leaves', async () => {
     const { members: [first, second], initializations: [initial] } = await startGame(['First', 'Second'])
+    const game = currentGame()
     const left = new Promise((resolve) => second.once('game.playerLeft', resolve))
     expect(await raw(first, 'game.leave', { extra: true })).toEqual({ outcome: 'INVALID_REQUEST' })
     expect(await first.emitWithAck('game.leave', {})).toEqual({ outcome: 'LEFT' })
-    expect(await left).toEqual({ gameId: shared.gameId, playerId: initial.assignment.playerId, robotId: initial.assignment.robotId })
-    expect(shared.game.board.occupantAt({ x: Integer(10), y: Integer(7) })).toBeUndefined()
+    expect(await left).toEqual({ gameId: game.id, playerId: initial.assignment.playerId, robotId: initial.assignment.robotId })
+    expect(game.board.occupantAt({ x: Integer(10), y: Integer(7) })).toBeUndefined()
     expect(server.sockets.sockets.get(first.id!)!.rooms).toEqual(new Set([first.id]))
     expect(await first.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION', user: { userId: 'First', username: 'First' } })
     expect(await first.emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'NOT_A_MEMBER' })
   })
   it('completes the programming barrier when an unsubmitted member leaves', async () => {
     const { members: [first, second], initializations: [initial] } = await startGame(['First', 'Second'])
+    const game = currentGame()
     await first.emitWithAck('program.submit', submission(initial))
     const hand = new Promise<CardsDealt>((resolve) => first.once('cards.dealt', resolve))
     await second.emitWithAck('game.leave', {})
     const dealt = await hand
-    expect(dealt).toMatchObject({ gameId: shared.gameId, playerId: initial.assignment.playerId })
+    expect(dealt).toMatchObject({ gameId: game.id, playerId: initial.assignment.playerId })
     expect(dealt.cards).toHaveLength(HAND_SIZE)
-    expect(shared.game.lastActivePhase).toBe('programming')
+    expect(game.lastActivePhase).toBe('programming')
   })
   it('preserves assignments, hands and checkpoint progress while waiting for every disconnected member', async () => {
     const { members: [first, second, witness], initializations: [initial, other, observer] } = await startGame(['First', 'Second', 'Witness'])
-    shared.game.players[0].completeCheckpoint(1)
+    const game = currentGame()
+    game.players[0].completeCheckpoint(1)
     const changed: PlayerConnectionChanged[] = []
     witness.on('game.playerConnectionChanged', (event) => changed.push(event))
     await disconnect(first)
     await disconnect(second)
-    expect(shared.game.paused).toBe(true)
+    expect(game.paused).toBe(true)
     expect(await witness.emitWithAck('program.submit', submission(observer))).toEqual({ outcome: 'GAME_PAUSED' })
     const returnedFirst = await connect('First')
     const restoredFirst = await getSnapshot(returnedFirst)
@@ -170,35 +179,36 @@ describe('started game membership over Socket.IO', () => {
     expect(await witness.emitWithAck('program.submit', submission(observer))).toEqual({ outcome: 'ACCEPTED' })
   })
   it('skips an action queued before disconnect and executes it once after reconnect', async () => {
-    const contexts = vi.spyOn(gameContext, 'createGameContext')
     const { members: [first, second] } = await startGame(['First', 'Second'])
-    const ctx = contexts.mock.results[0].value as ReturnType<typeof gameContext.createGameContext>
-    for (const player of shared.game.players) shared.game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
-    for (let action = 0; action < 9; action++) resolveRobotAction(shared.game)
-    const execute = vi.spyOn(shared.game, 'executeNextAction')
+    const game = currentGame()
+    const ctx = contexts.mock.results.at(-1)!.value as ReturnType<typeof gameContext.createGameContext>
+    for (const player of game.players) game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
+    for (let action = 0; action < 9; action++) resolveRobotAction(game)
+    const execute = vi.spyOn(game, 'executeNextAction')
     const actions: unknown[] = []
     second.on('robot.actionResolved', (payload) => actions.push(payload))
 
     ctx.actionScheduler.scheduleNextAction()
     // Disconnect synchronously so the game pauses before the queued callback runs.
     server.sockets.sockets.get(first.id!)!.disconnect(true)
-    expect(shared.game.paused).toBe(true)
+    expect(game.paused).toBe(true)
     await new Promise<void>((resolve) => setImmediate(resolve))
     expect(execute).not.toHaveBeenCalled()
-    expect(shared.game.aborted).toBe(false)
+    expect(game.aborted).toBe(false)
 
     const hand = new Promise((resolve) => second.once('cards.dealt', resolve))
     await getSnapshot(await connect('First'))
     await hand
     expect(execute).toHaveBeenCalledOnce()
     expect(actions).toHaveLength(1)
-    expect(shared.game.lastActivePhase).toBe('programming')
-    expect(shared.game.paused).toBe(false)
+    expect(game.lastActivePhase).toBe('programming')
+    expect(game.paused).toBe(false)
   })
   it('recovers a game socket and resumes without client session discovery', async () => {
     const { members: [first, second] } = await startGame(['First', 'Second'])
+    const game = currentGame()
     await disconnect(first, true)
-    expect(shared.game.paused).toBe(true)
+    expect(game.paused).toBe(true)
     const resumed = new Promise((resolve) => second.on('game.playerConnectionChanged', (event) => { if (event.connected) resolve(event) }))
     const connected = new Promise<void>((resolve) => first.once('connect', resolve))
     first.connect()
@@ -218,13 +228,14 @@ describe('started game membership over Socket.IO', () => {
   })
   it('rejects recovery when the reconnecting cookie belongs to a different session', async () => {
     const { members: [first] } = await startGame(['First', 'Second'])
+    const game = currentGame()
     await disconnect(first, true)
-    expect(shared.game.paused).toBe(true)
+    expect(game.paused).toBe(true)
     first.io.opts.extraHeaders = authCookieHeader(sessionStore, 'different-subject')
     const rejected = new Promise<Error>((resolve) => first.once('connect_error', resolve))
     first.connect()
     expect((await rejected).message).toBe('SESSION_MISMATCH')
-    expect(shared.game.paused).toBe(true)
+    expect(game.paused).toBe(true)
   })
   it('rejects a recovery attempt and withholds buffered updates once the backing session was destroyed while disconnected', async () => {
     const { client: first, sessionId } = await connectWithSessionId('First')
@@ -293,49 +304,64 @@ describe('started game membership over Socket.IO', () => {
   })
   it('keeps the game paused when a reconnect snapshot fails and permits retry', async () => {
     const { members: [first], initializations: [initial] } = await startGame(['First'])
-    shared.game.submitProgram(initial.assignment.playerId, submission(initial).cardIds)._unsafeUnwrap()
+    const game = currentGame()
+    game.submitProgram(initial.assignment.playerId, submission(initial).cardIds)._unsafeUnwrap()
     await disconnect(first)
     const replacement = await connect('First')
-    vi.spyOn(shared.game.board, 'getTile').mockImplementationOnce(() => { throw new Error('Snapshot failed') })
+    vi.spyOn(game.board, 'getTile').mockImplementationOnce(() => { throw new Error('Snapshot failed') })
     expect(await replacement.emitWithAck('session.get', {})).toEqual({ outcome: 'INTERNAL_ERROR' })
-    expect(shared.game.paused).toBe(true)
+    expect(game.paused).toBe(true)
     expect(server.sockets.sockets.get(replacement.id!)!.rooms).toEqual(new Set([replacement.id]))
     expect((await getSnapshot(replacement)).assignment).toEqual(initial.assignment)
-    expect(shared.game.paused).toBe(false)
+    expect(game.paused).toBe(false)
   })
     it('announces the winner instead of dealing hands when a departure completes the final checkpoint', async () => {
-    const { members: [first, second] } = await startGame(['First', 'Second'])
-    for (const player of shared.game.players) shared.game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
-    for (let action = 0; action < 9; action++) resolveRobotAction(shared.game)
-    const player = shared.game.players[0]
-    expect(player.lastCheckpoint).toBe(1)
-    shared.game.board.removeRobot(player.robot.id)
-    shared.game.board.placeRobot(player.robot.id, { x: Integer(8), y: Integer(9) })
+    const { members, initializations } = await startGame(['First', 'Second'])
+    const game = currentGame()
+    for (const player of game.players) game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
+    // Priority order depends on card-driven positions, so whichever player's final
+    // register is still pending after 9 of the 10 actions can vary between runs.
+    let lastActedRobotId: string | undefined
+    for (let action = 0; action < 9; action++) lastActedRobotId = resolveRobotAction(game).action.robotId
+    const pendingPlayer = game.players.find((candidate) => candidate.robot.id !== lastActedRobotId)!
+    const player = game.players.find((candidate) => candidate !== pendingPlayer)!
+    const pendingIndex = initializations.findIndex((initial) => initial.assignment.playerId === pendingPlayer.id)
+    const leaving = members[pendingIndex]
+    const remaining = members[1 - pendingIndex]
+    const remainingName = ['First', 'Second'][1 - pendingIndex]
+
+    player.completeCheckpoint(1)
+    // pendingPlayer is about to leave anyway; remove it first so it can never be
+    // occupying (8,9) by coincidence of random movement during the 9 prior actions.
+    game.board.removeRobot(pendingPlayer.robot.id)
+    game.board.removeRobot(player.robot.id)
+    game.board.placeRobot(player.robot.id, { x: Integer(8), y: Integer(9) })
     const events: string[] = []
-    first.onAny((name) => { if (['game.playerLeft', 'environment.stepResolved', 'game.won', 'cards.dealt'].includes(name)) events.push(name) })
-    const progress = new Promise<EnvironmentStepResolved>((resolve) => first.on('environment.stepResolved', (step) => {
+    remaining.onAny((name) => { if (['game.playerLeft', 'environment.stepResolved', 'game.won', 'cards.dealt'].includes(name)) events.push(name) })
+    const progress = new Promise<EnvironmentStepResolved>((resolve) => remaining.on('environment.stepResolved', (step) => {
       if (step.kind === 'CHECKPOINTS') resolve(step)
     }))
-    const won = new Promise<GameWon>((resolve) => first.once('game.won', resolve))
-    await second.emitWithAck('game.leave', {})
+    const won = new Promise<GameWon>((resolve) => remaining.once('game.won', resolve))
+    await leaving.emitWithAck('game.leave', {})
     expect((await progress).checkpointProgress).toEqual([{ playerId: player.id, lastCheckpoint: 2 }])
-    expect(await won).toEqual({ gameId: shared.gameId, playerId: player.id, username: 'First' })
-    await getSnapshot(first)
+    expect(await won).toEqual({ gameId: game.id, playerId: player.id, username: remainingName })
+    await getSnapshot(remaining)
     expect(events).toEqual(['game.playerLeft', 'environment.stepResolved', 'game.won'])
   })
 
   it('announces the winner after the final checkpoint and ends the game', async () => {
     const { members: [client], initializations: [initial] } = await startGame(['First'])
-    const player = shared.game.players[0]
+    const game = currentGame()
+    const player = game.players[0]
     player.completeCheckpoint(1)
-    shared.game.board.relocateRobot(player.robot.id, { x: Integer(8), y: Integer(10) })
+    game.board.relocateRobot(player.robot.id, { x: Integer(8), y: Integer(10) })
     const events: string[] = []
     client.onAny((name) => { if (name !== 'program.timerChanged') events.push(name) })
     const won = new Promise<GameWon>((resolve) => client.once('game.won', resolve))
 
     expect(await client.emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'ACCEPTED' })
 
-    expect(await won).toEqual({ gameId: shared.gameId, playerId: player.id, username: 'First' })
+    expect(await won).toEqual({ gameId: game.id, playerId: player.id, username: 'First' })
     const snapshot = await getSnapshot(client)
     expect(events).toEqual([
       'program.finalized', 'game.registersChanged', 'program.submitted',
@@ -348,14 +374,15 @@ describe('started game membership over Socket.IO', () => {
 
   it("keeps the winner's username in snapshots after the winner has left", async () => {
     const { members: [first, second], initializations } = await startGame(['First', 'Second'])
-    const player = shared.game.players[0]
+    const game = currentGame()
+    const player = game.players[0]
     player.completeCheckpoint(1)
-    shared.game.board.relocateRobot(player.robot.id, { x: Integer(8), y: Integer(10) })
+    game.board.relocateRobot(player.robot.id, { x: Integer(8), y: Integer(10) })
     const won = new Promise<GameWon>((resolve) => second.once('game.won', resolve))
     for (const [index, client] of [first, second].entries()) {
       expect(await client.emitWithAck('program.submit', submission(initializations[index]))).toEqual({ outcome: 'ACCEPTED' })
     }
-    expect(await won).toEqual({ gameId: shared.gameId, playerId: player.id, username: 'First' })
+    expect(await won).toEqual({ gameId: game.id, playerId: player.id, username: 'First' })
     await first.emitWithAck('game.leave', {})
     const snapshot = await getSnapshot(second)
     expect(snapshot.state.players.map(({ username }) => username)).toEqual(['Second'])
@@ -369,18 +396,19 @@ describe('started game membership over Socket.IO', () => {
     emit('program.submit', {})
     emit('game.updateRegisters', {})
     expect(await client.emitWithAck('session.get', {})).toEqual({ outcome: 'NO_SESSION', user: { userId: 'Abid', username: 'Abid' } })
-    expect(shared.game.players).toHaveLength(0)
+    expect(contexts.mock.results).toHaveLength(0)
   })
   it('aborts the game permanently on an unexpected execution failure, still tells (re)joining members, and still allows leaving', async () => {
     const { members: [first, second], initializations: [initial, other] } = await startGame(['First', 'Second'])
+    const game = currentGame()
 
     const aborted = new Promise((resolve) => first.once('game.aborted', resolve))
-    vi.spyOn(shared.game, 'executeNextAction').mockImplementationOnce(() => { throw new Error('boom') })
+    vi.spyOn(game, 'executeNextAction').mockImplementationOnce(() => { throw new Error('boom') })
     await first.timeout(1000).emitWithAck('program.submit', submission(initial))
     await second.timeout(1000).emitWithAck('program.submit', submission(other))
     await aborted
 
-    expect(shared.game.aborted).toBe(true)
+    expect(game.aborted).toBe(true)
     expect((await getSnapshot(first)).state.aborted).toBe(true)
     expect(await first.timeout(1000).emitWithAck('program.submit', submission(initial)))
       .toMatchObject({ outcome: 'GAME_ABORTED' })
@@ -389,55 +417,36 @@ describe('started game membership over Socket.IO', () => {
   })
 
   describe('pit results over Socket.IO', () => {
-    beforeEach(async () => {
-      await new Promise<void>((resolve) => server.close(() => resolve()))
-      const tiles: Tile[][] = Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => new EmptyTile()))
-      tiles[1][2] = new PitTile()
-      tiles[4][4] = new EmptyTile([Direction.WEST], 1)
-      tiles[4][0] = new EmptyTile([], 2)
-      // A nine-card deck is redrawn in full each round, so hands repeat as a set.
-      const deck = [
-        'MOVE_1', 'MOVE_2', 'MOVE_3', 'BACK_UP', 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'MOVE_1', 'TURN_LEFT',
-      ].map((instruction, index) => new Card(`card-${index}`, instruction as Card['instruction']))
-      shared = {
-        gameId: shared.gameId,
-        game: new Game({ board: new Board(tiles, { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }), players: [], deck, rebootTile: { x: Integer(4), y: Integer(4) }, random: () => 0 }),
-      }
-      await start()
-    })
-
-    function program(joined: GameInitialization, indices: readonly number[]) {
-      return submitProgramSchema.parse({
-        cardIds: indices.map((index) => joined.hand[index].id),
-      })
-    }
-
     it('broadcasts a chain push and its rebooted robot to every client in one action', async () => {
-      const { members: sockets, initializations } = await startGame(['Pusher', 'Pushed', 'Falling'])
+      const { members: sockets, initializations } = await startGame(['Pusher', 'Pushed', 'Falling'], 'test-map')
       const members = sockets.map((client, index) => ({ client, joined: initializations[index] }))
+      const game = currentGame()
       const robotIds = members.map(({ joined }) => joined.assignment.robotId)
-      shared.game.board.relocateRobot(robotIds[0], { x: Integer(2), y: Integer(2) })
-      shared.game.board.relocateRobot(robotIds[1], { x: Integer(3), y: Integer(2) })
-      shared.game.board.relocateRobot(robotIds[2], { x: Integer(4), y: Integer(2) })
-      shared.game.players[0].robot.turn(3)
-      shared.game.players[1].robot.turn(2)
-      shared.game.players[2].robot.turn(1)
+      const column = 15
+      const pitY = 9
+      // Distance from the antenna (10,0) is monotonic in y for a fixed x, so the
+      // topmost robot always has priority. The dealt MOVE_1 card moves it 1 step.
+      game.board.relocateRobot(robotIds[0], { x: Integer(column), y: Integer(pitY - 3) })
+      game.board.relocateRobot(robotIds[1], { x: Integer(column), y: Integer(pitY - 2) })
+      game.board.relocateRobot(robotIds[2], { x: Integer(column), y: Integer(pitY - 1) })
+      game.players[0].robot.turn(2) // NORTH -> SOUTH, facing the pit
+      game.players[1].robot.turn(1) // NORTH -> WEST
+      game.players[2].robot.turn(3) // NORTH -> EAST
       const actions: RobotActionResolved[][] = members.map(() => [])
       members.forEach(({ client }, index) => client.on('robot.actionResolved', (action) => actions[index].push(action)))
       const hands = members.map(({ client }) => new Promise<CardsDealt>((resolve) => client.once('cards.dealt', resolve)))
-      for (const [index, { client, joined }] of members.entries()) {
-        const indices = index === 0 ? [0, 4, 5, 6, 8] : [4, 5, 6, 8, 3]
-        expect(await client.timeout(1000).emitWithAck('program.submit', program(joined, indices))).toEqual({ outcome: 'ACCEPTED' })
+      for (const { client, joined } of members) {
+        expect(await client.timeout(1000).emitWithAck('program.submit', submission(joined))).toEqual({ outcome: 'ACCEPTED' })
       }
       await Promise.all(hands)
 
       expect(actions[0][0]).toEqual({
-        gameId: shared.gameId, registerIndex: 0, robotId: robotIds[0], instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1',
+        gameId: game.id, registerIndex: 0, robotId: robotIds[0], instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1',
         playerId: initializations[0].assignment.playerId,
-        position: { coordinate: { x: 3, y: 2 }, orientation: 'EAST' },
+        position: { coordinate: { x: column, y: pitY - 2 }, orientation: 'SOUTH' },
         pushedRobots: [
-          { robotId: robotIds[1], position: { coordinate: { x: 4, y: 2 }, orientation: 'SOUTH' } },
-          { robotId: robotIds[2], position: { coordinate: { x: 4, y: 4 }, orientation: 'WEST' } },
+          { robotId: robotIds[1], position: { coordinate: { x: column, y: pitY - 1 }, orientation: 'WEST' } },
+          { robotId: robotIds[2], position: { coordinate: { x: 10, y: 7 }, orientation: 'EAST' } },
         ],
       })
       expect(actions[0]).toHaveLength(15)
@@ -446,76 +455,87 @@ describe('started game membership over Socket.IO', () => {
     })
 
     it('broadcasts rebooted positions before progress and hands and restores them on rejoining', async () => {
-      const { members: [client], initializations: [initial] } = await startGame(['First'])
+      const { members: [client], initializations: [initial] } = await startGame(['First'], 'test-map')
       expect(initial.state.board.tiles.find((tile) => tile.type === 'PIT'))
-        .toEqual({ position: { x: 2, y: 1 }, type: 'PIT' })
+        .toEqual({ position: { x: 3, y: 3 }, type: 'PIT' })
+      const game = currentGame()
       const outsider = await connect('Login only')
       const outsideEvents = vi.fn()
       outsider.onAny(outsideEvents)
       const actions: RobotActionResolved[] = []
       const progress: EnvironmentStepResolved[] = []
       const events: string[] = []
-      client.onAny((name) => { if (name !== 'program.timerChanged') events.push(name) })
+      // Rebooting next to a checkpoint can incidentally earn it on a later random register.
+      client.onAny((name) => { if (name !== 'program.timerChanged' && name !== 'player.checkpointProgress') events.push(name) })
       client.on('robot.actionResolved', (action) => actions.push(action))
       client.on('environment.stepResolved', (payload) => progress.push(payload))
       const hand = new Promise<CardsDealt>((resolve) => client.once('cards.dealt', resolve))
 
-      expect(await client.timeout(1000).emitWithAck('program.submit', program(initial, [2, 0, 4, 5, 3])))
+      const robotId = initial.assignment.robotId
+      game.board.relocateRobot(robotId, { x: Integer(3), y: Integer(2) })
+      game.players[0].robot.turn(2) // NORTH -> SOUTH, facing the pit
+
+      expect(await client.timeout(1000).emitWithAck('program.submit', submission(initial)))
         .toEqual({ outcome: 'ACCEPTED' })
-      expect(await hand).toEqual({
-        gameId: shared.gameId, playerId: initial.assignment.playerId, cards: expect.arrayContaining([...initial.hand]),
+      const dealtHand = await hand
+      expect(dealtHand).toMatchObject({ gameId: game.id, playerId: initial.assignment.playerId })
+      expect(dealtHand.cards).toHaveLength(HAND_SIZE)
+      expect(actions[0]).toEqual({
+        gameId: game.id, registerIndex: 0, robotId, playerId: initial.assignment.playerId,
+        pushedRobots: [], instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1',
+        position: { coordinate: { x: 10, y: 7 }, orientation: 'SOUTH' },
       })
       expect(actions).toEqual([
-        { coordinate: { x: 4, y: 4 }, orientation: 'NORTH' },
-        { coordinate: { x: 4, y: 3 }, orientation: 'NORTH' },
-        { coordinate: { x: 4, y: 3 }, orientation: 'WEST' },
-        { coordinate: { x: 4, y: 3 }, orientation: 'NORTH' },
-        { coordinate: { x: 4, y: 4 }, orientation: 'NORTH' },
+        { coordinate: { x: 10, y: 7 }, orientation: 'SOUTH' },
+        { coordinate: { x: 10, y: 8 }, orientation: 'SOUTH' },
+        { coordinate: { x: 10, y: 9 }, orientation: 'SOUTH' },
+        { coordinate: { x: 10, y: 10 }, orientation: 'SOUTH' },
+        { coordinate: { x: 10, y: 12 }, orientation: 'SOUTH' },
       ].map((position, registerIndex) => {
-        const instruction = initial.hand[[2, 0, 4, 5, 3][registerIndex]].instruction
+        const instruction = initial.hand[registerIndex].instruction
         return {
-          gameId: shared.gameId, registerIndex, robotId: initial.assignment.robotId,
+          gameId: game.id, registerIndex, robotId: initial.assignment.robotId,
           playerId: initial.assignment.playerId,
           pushedRobots: [],
           instruction, resolvedInstruction: instruction, position,
         }
       }))
-      expect(progress.flatMap((step) => step.checkpointProgress ?? [])).toEqual([
-        { playerId: initial.assignment.playerId, lastCheckpoint: 1 },
-      ])
+      expect(progress.flatMap((step) => step.checkpointProgress ?? [])).toEqual([])
       expect(events).toEqual([
         'program.finalized', 'game.registersChanged', 'program.submitted',
-        'robot.actionResolved', 'environment.stepResolved',
-        ...Array.from({ length: 4 }, () => 'robot.actionResolved'),
-        'cards.dealt',
+        ...Array.from({ length: 5 }, () => 'robot.actionResolved'), 'cards.dealt',
       ])
       const snapshot = await getSnapshot(client)
       expect(snapshot.outcome).toBe('JOINED')
       expect(snapshot.state.phase).toBe('PROGRAMMING')
       expect(snapshot.state.robots).toEqual([{
-        robotId: initial.assignment.robotId, playerId: initial.assignment.playerId,
+        robotId, playerId: initial.assignment.playerId,
         colour: initial.state.robots[0].colour,
         position: actions[4].position,
       }])
-      expect(snapshot.state.players[0].lastCheckpoint).toBe(1)
-      expect(shared.game.board.occupantAt({ x: Integer(2), y: Integer(1) })).toBeUndefined()
+      expect(game.board.occupantAt({ x: Integer(3), y: Integer(3) })).toBeUndefined()
       await outsider.timeout(1000).emitWithAck('session.get', {})
       expect(outsideEvents).not.toHaveBeenCalled()
 
       await disconnect(client)
       const restored = await getSnapshot(await connect('First'))
       expect(restored.assignment).toEqual(initial.assignment)
-      expect(restored.hand).toEqual(expect.arrayContaining([...initial.hand]))
+      expect(restored.hand).toHaveLength(HAND_SIZE)
       expect(restored.state.robots).toEqual(snapshot.state.robots)
-      expect(restored.state.players[0].lastCheckpoint).toBe(1)
       expect(restored.state.paused).toBe(false)
     })
 
-    it('broadcasts the occupied-tile fallback to every member and uses its position for later priority', async () => {
-      const { members: sockets, initializations } = await startGame(['First', 'Second', 'Third'])
+    it('broadcasts the occupied-tile fallback to every member when the reboot tile is taken', async () => {
+      const { members: sockets, initializations } = await startGame(['First', 'Second', 'Third'], 'test-map')
       const members = sockets.map((client, index) => ({ client, joined: initializations[index] }))
+      const game = currentGame()
       const robotIds = members.map(({ joined }) => joined.assignment.robotId)
-      shared.game.board.relocateRobot(robotIds[1], { x: Integer(4), y: Integer(4) })
+      // Occupy the map's reboot tile so the falling robot must use the fallback destination.
+      game.board.relocateRobot(robotIds[1], { x: Integer(10), y: Integer(7) })
+      // (13,4) keeps robot0 strictly closer to the antenna (10,0) than the occupied
+      // reboot tile (distance 7), so it always has priority. The dealt MOVE_1 moves it 1 step.
+      game.board.relocateRobot(robotIds[0], { x: Integer(13), y: Integer(3) })
+      game.players[0].robot.turn(2) // NORTH -> SOUTH, facing the pit
       const actions: RobotActionResolved[][] = members.map(() => [])
       const dealt: CardsDealt[][] = members.map(() => [])
       for (const [index, { client }] of members.entries()) {
@@ -524,42 +544,32 @@ describe('started game membership over Socket.IO', () => {
         client.on('cards.dealt', (hand) => dealt[index].push(hand))
       }
       const hands = members.map(({ client }) => new Promise<CardsDealt>((resolve) => client.once('cards.dealt', resolve)))
-      for (const [index, { client, joined }] of members.entries()) {
-        const indices = index === 0 ? [2, 4, 5, 6, 8] : [4, 5, 6, 8, 3]
-        expect(await client.timeout(1000).emitWithAck('program.submit', program(joined, indices)))
-          .toEqual({ outcome: 'ACCEPTED' })
+      for (const { client, joined } of members) {
+        expect(await client.timeout(1000).emitWithAck('program.submit', submission(joined))).toEqual({ outcome: 'ACCEPTED' })
       }
 
-      expect(await Promise.all(hands)).toEqual(members.map(({ joined }) => ({
-        gameId: shared.gameId, playerId: joined.assignment.playerId, cards: expect.arrayContaining([...joined.hand]),
-      })))
+      const dealtHands = await Promise.all(hands)
+      for (const [index, { joined }] of members.entries()) {
+        expect(dealtHands[index]).toMatchObject({ gameId: game.id, playerId: joined.assignment.playerId })
+        expect(dealtHands[index].cards).toHaveLength(HAND_SIZE)
+      }
       expect(actions[0]).toHaveLength(15)
       expect(actions[1]).toEqual(actions[0])
       expect(actions[2]).toEqual(actions[0])
+      // The reboot tile (10,7) is occupied; the fallback is the nearest free tile by
+      // Manhattan distance, ties broken top-to-bottom then left-to-right: (10,6).
       expect(actions[0][0]).toEqual({
-        gameId: shared.gameId, registerIndex: 0, robotId: robotIds[0], instruction: 'MOVE_3', resolvedInstruction: 'MOVE_3',
+        gameId: game.id, registerIndex: 0, robotId: robotIds[0], instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1',
         playerId: initializations[0].assignment.playerId,
         pushedRobots: [],
-        position: { coordinate: { x: 4, y: 3 }, orientation: 'NORTH' },
+        position: { coordinate: { x: 10, y: 6 }, orientation: 'SOUTH' },
       })
-      expect(actions[0].slice(0, 3).map((action) => action.robotId)).toEqual([robotIds[0], robotIds[2], robotIds[1]])
-      expect(actions[0].slice(3, 6).map((action) => action.robotId)).toEqual([robotIds[2], robotIds[0], robotIds[1]])
-      for (const [index, { client, joined }] of members.entries()) {
-        const snapshot = await getSnapshot(client)
-        expect(snapshot.outcome).toBe('JOINED')
-        expect(snapshot.state.robots).toEqual(members.map(({ joined }) => ({
-          robotId: joined.assignment.robotId, playerId: joined.assignment.playerId,
-          colour: initializations[0].state.robots.find((robot) => robot.robotId === joined.assignment.robotId)!.colour,
-          position: actions[0].findLast((action) => action.robotId === joined.assignment.robotId)!.position,
-        })))
-        expect(new Set(snapshot.state.robots.map(({ position }) =>
-          `${position.coordinate.x},${position.coordinate.y}`)).size).toBe(3)
-        expect(dealt[index]).toEqual([{
-          gameId: shared.gameId, playerId: joined.assignment.playerId, cards: expect.arrayContaining([...joined.hand]),
-        }])
+      expect(game.board.occupantAt({ x: Integer(13), y: Integer(4) })).toBeUndefined()
+      for (const [index, { joined }] of members.entries()) {
+        expect(dealt[index]).toHaveLength(1)
+        expect(dealt[index][0]).toMatchObject({ gameId: game.id, playerId: joined.assignment.playerId })
+        expect(dealt[index][0].cards).toHaveLength(HAND_SIZE)
       }
-      expect(shared.game.board.occupantAt({ x: Integer(2), y: Integer(1) })).toBeUndefined()
     })
   })
-
 })

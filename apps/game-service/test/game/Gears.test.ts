@@ -1,33 +1,45 @@
 import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
-import { Board, Card, Deck, Direction, EmptyTile, Game, GearTile, Player, Robot, type Tile } from '@/game/index'
-import { Integer, PositiveInteger } from '@/numbers'
+import { Board, Card, Deck, Direction, EmptyTile, GearTile, type Position, type Tile } from '@/game/index'
+import { Integer } from '@/numbers'
+import { createTestGame, createTestPlayer, createTestRobot, placeTestPlayer } from '../fixtures.ts'
 
 describe('gear tiles', () => {
   it.each(['CLOCKWISE', 'COUNTERCLOCKWISE'] as const)(
     'allows placement and movement through a %s gear without rotating on entry',
     (rotation) => {
-      const board = new Board([
+      const gearPosition = { x: Integer(1), y: Integer(0) }
+      const robot = createTestRobot({ direction: Direction.EAST })
+      const placementBoard = new Board([
         [new EmptyTile(), new GearTile(rotation), new EmptyTile()],
         [new EmptyTile(), new EmptyTile(), new EmptyTile()],
-      ], { x: Integer(2), y: Integer(1), angle: 0 })
-      const robot = new Robot('robot', Direction.EAST)
-      const gearPosition = { x: Integer(1), y: Integer(0) }
-      board.placeRobot(robot.id, gearPosition)
-      const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
-      const game = new Game({ board, players: [new Player('player', robot, new Deck(cards))], deck: cards, rebootTile: gearPosition })
-      expect(board.positionOf(robot.id)).toEqual(gearPosition)
+      ], { x: Integer(2), y: Integer(1), angle: 0 }, { x: Integer(0), y: Integer(1) })
+      placementBoard.placeRobot(robot.id, gearPosition)
+      expect(placementBoard.positionOf(robot.id)).toEqual(gearPosition)
       expect(robot.direction).toBe(Direction.EAST)
 
-      board.relocateRobot(robot.id, { x: Integer(0), y: Integer(0) })
-      game.moveRobot(robot, Direction.EAST, PositiveInteger(1))
-      expect(board.positionOf(robot.id)).toEqual(gearPosition)
-      expect(robot.direction).toBe(Direction.EAST)
+      // Each check gets a fresh game so that an earlier register's end-of-register
+      // gear rotation can't bleed into the next movement-entry check.
+      function crossGear(instruction: Instruction, start: Position) {
+        const board = new Board([
+          [new EmptyTile(), new GearTile(rotation), new EmptyTile()],
+          [new EmptyTile(), new EmptyTile(), new EmptyTile()],
+        ], { x: Integer(2), y: Integer(1), angle: 0 }, { x: Integer(0), y: Integer(1) })
+        const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, instruction))
+        const player = placeTestPlayer(board, start, { direction: Direction.EAST, deck: new Deck(cards) })
+        const game = createTestGame({ board, players: [player], deck: cards })
+        game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
+        game.executeNextAction()
+        return { board, robot: player.robot }
+      }
 
-      board.relocateRobot(robot.id, { x: Integer(0), y: Integer(0) })
-      game.moveRobot(robot, Direction.EAST, PositiveInteger(2))
-      expect(board.positionOf(robot.id)).toEqual({ x: 2, y: 0 })
-      expect(robot.direction).toBe(Direction.EAST)
+      const onto = crossGear('MOVE_1', { x: Integer(0), y: Integer(0) })
+      expect(onto.board.positionOf(onto.robot.id)).toEqual(gearPosition)
+      expect(onto.robot.direction).toBe(Direction.EAST)
+
+      const through = crossGear('MOVE_2', { x: Integer(0), y: Integer(0) })
+      expect(through.board.positionOf(through.robot.id)).toEqual({ x: 2, y: 0 })
+      expect(through.robot.direction).toBe(Direction.EAST)
     },
   )
 })
@@ -36,14 +48,11 @@ function createGearGame(tiles: readonly Tile[], directions: readonly Direction[]
   const board = new Board([
     tiles.map(() => new EmptyTile()),
     tiles,
-  ], { x: Integer(0), y: Integer(0), angle: 0 })
+  ], { x: Integer(0), y: Integer(0), angle: 0 }, { x: Integer(0), y: Integer(1) })
   const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, instruction))
-  const players = directions.map((direction, index) => {
-    const robot = new Robot(`robot-${index}`, direction)
-    board.placeRobot(robot.id, { x: Integer(index), y: Integer(1) })
-    return new Player(`player-${index}`, robot, new Deck(cards))
-  })
-  const game = new Game({ board, players, deck: cards, rebootTile: { x: Integer(0), y: Integer(1) }, drawRandom: () => 0 })
+  const players = directions.map((direction, index) =>
+    placeTestPlayer(board, { x: Integer(index), y: Integer(1) }, { direction, deck: new Deck(cards) }))
+  const game = createTestGame({ board, players, deck: cards })
   for (const player of players) game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
   return { game, board, players, cards }
 }
@@ -139,19 +148,19 @@ describe('gear activation', () => {
   })
 
   it.each([false, true])('resolves a push and both gear turns with reversed roster = %s', (reverse) => {
+    const position = (x: number) => ({ x: Integer(x), y: Integer(1) })
     const board = new Board([
       [new EmptyTile(), new EmptyTile(), new EmptyTile(), new EmptyTile()],
       [new EmptyTile(), new GearTile('COUNTERCLOCKWISE', [N]), new GearTile('CLOCKWISE'), new EmptyTile()],
-    ], { x: Integer(2), y: Integer(0), angle: 0 })
+    ], { x: Integer(2), y: Integer(0), angle: 0 }, position(0))
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`move-${index}`, 'MOVE_1'))
-    const position = (x: number) => ({ x: Integer(x), y: Integer(1) })
-    const pushed = new Robot('pushed', N)
-    const pusher = new Robot('pusher', E)
+    const pushed = createTestRobot({ direction: N })
+    const pusher = createTestRobot({ direction: E })
     board.placeRobot(pushed.id, position(1))
     board.placeRobot(pusher.id, position(0))
-    const players = [pushed, pusher].map((robot) => new Player(robot.id, robot, new Deck(cards)))
+    const players = [pushed, pusher].map((robot) => createTestPlayer({ id: robot.id, robot, deck: new Deck(cards) }))
     if (reverse) players.reverse()
-    const game = new Game({ board, players, deck: cards, rebootTile: position(0) })
+    const game = createTestGame({ board, players, deck: cards })
     for (const player of players) game.submitProgram(player.id, cards.map(({ id }) => id))._unsafeUnwrap()
 
     expect(game.executeNextStep()).toMatchObject({ type: 'robot', result: { action: { robotId: pushed.id } } })

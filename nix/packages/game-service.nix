@@ -1,7 +1,7 @@
 { pkgs }:
 
 let
-  nodejs = pkgs.nodejs_24;
+  nodejs = pkgs.nodejs_26;
   pnpm = pkgs.pnpm_10;
 in
 pkgs.stdenvNoCC.mkDerivation (finalAttrs: {

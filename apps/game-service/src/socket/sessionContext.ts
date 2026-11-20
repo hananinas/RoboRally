@@ -1,6 +1,6 @@
 import type { User } from '@robo-rally/game-events'
 import type { BoardMapName } from '@/game/boardMaps'
-import type { GameSession, GameSocket, GameSocketServer } from '@/socket/gameServer'
+import type { GameSocket, GameSocketServer } from '@/socket/gameServer'
 import type { MembershipContext } from '@/socket/handlers/membershipHandlers'
 
 export type Lobby = {
@@ -17,7 +17,6 @@ export type SessionContext = {
   games: Map<string, MembershipContext>
   lobbies: Map<string, Lobby>
   sessionsByUser: Map<string, UserSession>
-  createGame: (mapName: BoardMapName) => GameSession
 }
 
 export function currentGame(context: SessionContext, socket: GameSocket): MembershipContext | undefined {

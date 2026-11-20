@@ -2,8 +2,8 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { ClientToServerEvents, GameInitialization, LobbyState, ServerToClientEvents } from '@robo-rally/game-events'
 import { io, type Socket } from 'socket.io-client'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createDefaultGame } from '@/game/GameFactory'
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import * as GameFactory from '@/game/GameFactory'
 import { boardMaps } from '@/game/boardMaps'
 import type { BoardMapName } from '@/game/boardMaps'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
@@ -16,19 +16,20 @@ describe('lobby lifecycle over Socket.IO', () => {
   let sessionStore: SessionStore
   let url: string
   let clients: Client[]
-  const factory = vi.fn((mapName: BoardMapName) => createDefaultGame(undefined, undefined, mapName))
+  let createGame: MockInstance<typeof GameFactory.createGame>
   beforeEach(async () => {
     clients = []
-    factory.mockReset().mockImplementation((mapName) => createDefaultGame(undefined, undefined, mapName))
+    createGame = vi.spyOn(GameFactory, 'createGame')
     const http = createServer()
     sessionStore = createSessionStore({ oidcClient: { refreshToken: vi.fn() }, refreshBufferSeconds: 0 })
-    server = createGameSocketServer(http, sessionStore, factory)
+    server = createGameSocketServer(http, sessionStore)
     await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve))
     url = `http://127.0.0.1:${(http.address() as AddressInfo).port}`
   })
   afterEach(async () => {
     for (const client of clients) client.disconnect()
     await new Promise<void>((resolve) => server.close(() => resolve()))
+    vi.restoreAllMocks()
   })
   async function connect(username: string): Promise<Client> {
     const client: Client = io(url, {
@@ -69,7 +70,7 @@ describe('lobby lifecycle over Socket.IO', () => {
       mapName, name: map.name, icon: map.icon, defaultForLobbyCreation: map.defaultForLobbyCreation,
     })))
     expect(listed.maps.filter((map) => map.defaultForLobbyCreation)).toHaveLength(1)
-    expect(factory).not.toHaveBeenCalled()
+    expect(createGame).not.toHaveBeenCalled()
     expect(server.sockets.sockets.get(client.id!)!.rooms).toEqual(new Set([client.id]))
   })
   it('creates only a waiting room, accepts duplicate creates/joins, and restricts the owning connection', async () => {
@@ -84,7 +85,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(await duplicate.emitWithAck('lobby.create', {})).toEqual({ outcome: 'USER_ALREADY_IN_SESSION' })
     expect(await duplicate.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })).toEqual({ outcome: 'USER_ALREADY_IN_SESSION' })
     expect(await duplicate.emitWithAck('lobby.start', {})).toEqual({ outcome: 'NOT_LOBBY_MEMBER' })
-    expect(factory).not.toHaveBeenCalled()
+    expect(createGame).not.toHaveBeenCalled()
   })
   it('uses the creator-provided lobby name', async () => {
     const owner = await connect('Owner')
@@ -176,7 +177,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(await outsider.emitWithAck('program.submit', {
       cardIds: first.hand.slice(0, 5).map((card) => card.id) as [string, string, string, string, string],
     })).toEqual({ outcome: 'NOT_A_MEMBER' })
-    expect(factory).toHaveBeenCalledTimes(1)
+    expect(createGame).toHaveBeenCalledTimes(1)
   })
   it('creates the game on the map selected when its lobby was created', async () => {
     const owner = await connect('Map Owner')
@@ -188,7 +189,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     const ready = started(owner)
     expect((await owner.emitWithAck('lobby.start', {})).outcome).toBe('STARTED')
     const initialization = await ready
-    expect(factory).toHaveBeenCalledWith('empty-map')
+    expect(createGame).toHaveBeenCalledWith('empty-map', expect.any(String))
     expect(initialization.state.board.width).toBe(21)
     expect(initialization.state.board.height).toBe(15)
   })
@@ -203,7 +204,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     try {
       expect(await owner.emitWithAck('lobby.start', {}))
         .toEqual({ outcome: 'LOBBY_MEMBER_DISCONNECTED' })
-      expect(factory).not.toHaveBeenCalled()
+      expect(createGame).not.toHaveBeenCalled()
       expect(await owner.emitWithAck('session.get', {}))
         .toMatchObject({ outcome: 'IN_LOBBY', lobby: { lobbyId: lobby.lobbyId, playerCount: 2 } })
       expect([...server.sockets.adapter.rooms.keys()].some((room) => room.startsWith('game:'))).toBe(false)
@@ -235,7 +236,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     const lobby = await create(owner)
     const events = vi.fn()
     owner.on('game.started', events)
-    factory.mockImplementationOnce(() => { throw new Error('Cannot construct game') })
+    createGame.mockImplementationOnce(() => { throw new Error('Cannot construct game') })
     expect(await owner.emitWithAck('lobby.start', {})).toEqual({ outcome: 'INTERNAL_ERROR' })
     expect(server.sockets.sockets.get(owner.id!)!.rooms).toEqual(new Set([owner.id, `lobby:${lobby.lobbyId}`]))
     expect(events).not.toHaveBeenCalled()
@@ -273,7 +274,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(session.outcome).toBe('IN_GAME')
     if (session.outcome !== 'IN_GAME') throw new Error(session.outcome)
     expect(session.initialization.hand).toHaveLength(9)
-    expect(factory).toHaveBeenCalledTimes(1)
+    expect(createGame).toHaveBeenCalledTimes(1)
     const duplicate = await connect('Owner')
     expect(await duplicate.emitWithAck('session.get', {})).toEqual({ outcome: 'USER_ALREADY_IN_SESSION' })
     await disconnect(owner)
@@ -348,7 +349,7 @@ describe('lobby lifecycle over Socket.IO', () => {
   it('keeps a lobby available for retry after game creation fails', async () => {
     const owner = await connect('Owner')
     const lobby = await create(owner)
-    factory.mockImplementationOnce(() => { throw new Error('Factory failure') })
+    createGame.mockImplementationOnce(() => { throw new Error('Factory failure') })
     expect(await owner.emitWithAck('lobby.start', {})).toEqual({ outcome: 'INTERNAL_ERROR' })
     expect(await owner.emitWithAck('session.get', {})).toEqual({ outcome: 'IN_LOBBY', lobby, user: { userId: 'Owner', username: 'Owner' } })
     const ready = started(owner)
