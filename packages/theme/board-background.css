@@ -1,0 +1,47 @@
+.roborally-board-background {
+  --board-cell-size: 96px;
+  --board-tile-depth: 4px;
+  --board-tile-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect x='4' y='4' width='88' height='88' rx='10'/%3E%3C/svg%3E");
+  --board-pan-duration: 40s;
+
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.roborally-board-background::before,
+.roborally-board-background::after {
+  position: absolute;
+  top: calc(-1 * var(--board-cell-size));
+  left: calc(-1 * var(--board-cell-size));
+  right: 0;
+  bottom: 0;
+  content: "";
+  mask-image: var(--board-tile-mask);
+  mask-size: var(--board-cell-size) var(--board-cell-size);
+  animation: roborally-board-pan var(--board-pan-duration) linear infinite;
+}
+
+.roborally-board-background::before {
+  background-color: color-mix(in srgb, var(--theme-canvas) 80%, black);
+  mask-position: 0 var(--board-tile-depth);
+}
+
+.roborally-board-background::after {
+  background-color: var(--theme-surface);
+}
+
+@keyframes roborally-board-pan {
+  to {
+    transform: translate(var(--board-cell-size), var(--board-cell-size));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roborally-board-background::before,
+  .roborally-board-background::after {
+    animation: none;
+  }
+}
