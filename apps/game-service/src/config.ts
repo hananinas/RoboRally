@@ -63,39 +63,18 @@ export function parseKratosSettingsUrl(value: string | undefined): URL {
   return parseUrlEnv(value, DEFAULT_KRATOS_SETTINGS_URL)
 }
 
-export type StartTileOrder = 'random' | 'ordered'
-
-export function parseStartTileOrder(value: string | undefined): StartTileOrder {
-  if (value === undefined || value === 'random' || value === 'ordered') return value ?? 'random'
-  throw new RangeError('START_TILE_ORDER must be "random" or "ordered"')
-}
-
-// Test-only: makes card draws deterministic. parseAppConfig rejects it in production.
-export function parseCardSeed(value: string | undefined): number | undefined {
-  if (value === undefined) return undefined
-  if (!/^\d+$/.test(value)) throw new RangeError('CARD_SEED must be a non-negative integer')
-  return Number(value)
-}
-
 export type AppConfig = Readonly<{
   port: number
   kratosSettingsUrl: URL
   oidc: OidcConfig
   refreshTokenTtlSeconds: number
-  startTileOrder: StartTileOrder
-  cardSeed: number | undefined
 }>
 
 export function parseAppConfig(env: NodeJS.ProcessEnv): AppConfig {
-  if (env.NODE_ENV === 'production' && env.CARD_SEED !== undefined) {
-    throw new Error('CARD_SEED is test-only and must not be set in production')
-  }
   return {
     port: parseGameServicePort(env.PORT),
     kratosSettingsUrl: parseKratosSettingsUrl(env.KRATOS_SETTINGS_URL),
     oidc: parseOidcConfig(env),
     refreshTokenTtlSeconds: parseRefreshTokenTtlSeconds(env.REFRESH_TOKEN_TTL_SECONDS),
-    startTileOrder: parseStartTileOrder(env.START_TILE_ORDER),
-    cardSeed: parseCardSeed(env.CARD_SEED),
   }
 }
