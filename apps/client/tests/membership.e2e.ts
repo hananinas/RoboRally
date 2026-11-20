@@ -43,12 +43,12 @@ test('a lobby robot selection is used by every client during gameplay', async ({
     await other.getByRole('button', { name: 'Join game', exact: true }).click()
     await other.getByRole('group', { name: 'Choose a robot' }).getByRole('button', { name: 'Robot option 2' }).click()
     await expect(other.getByRole('group', { name: 'Choose a robot' }).getByRole('button', { name: 'Robot option 2' })).toHaveAttribute('aria-pressed', 'true')
-    await expect(page.getByRole('list', { name: 'Connected players' }).getByRole('img', { name: 'Scout robot' })).toBeVisible()
+    await expect(page.getByRole('list', { name: 'Connected players' }).getByRole('img', { name: 'Fork Clamp robot' })).toBeVisible()
     await page.getByRole('button', { name: 'Start', exact: true }).click()
 
     for (const client of [page, other]) {
       await expect(client.getByRole('main', { name: 'Game board' })).toBeVisible()
-      await expect(client.locator('svg[data-robot-sprite-id="scout"]')).toHaveCount(1)
+      await expect(client.locator('svg[data-robot-sprite-id="fork-clamp"]')).toHaveCount(8)
     }
   } finally {
     await context.close()
@@ -84,8 +84,8 @@ for (const departure of ['leaves', 'disconnects'] as const) {
       for (const client of [page, other]) await expect(client.getByText('2/6 connected', { exact: true })).toBeVisible()
       await expect(other.getByRole('button', { name: 'Start', exact: true })).toHaveCount(0)
       await other.getByRole('group', { name: 'Choose a robot' }).getByRole('button', { name: 'Robot option 2' }).click()
-      await expect(other.getByRole('heading', { name: 'Scout', exact: true })).toBeVisible()
-      await expect(ownerRoster.getByRole('img', { name: 'Scout robot' })).toBeVisible()
+      await expect(other.getByRole('heading', { name: 'Fork Clamp', exact: true })).toBeVisible()
+      await expect(ownerRoster.getByRole('img', { name: 'Fork Clamp robot' })).toBeVisible()
       if (departure === 'leaves') await page.getByRole('button', { name: 'Leave lobby', exact: true }).click()
       else await page.close()
       await expectRoster(otherRoster, ['dane'], 'dane', 'dane')
