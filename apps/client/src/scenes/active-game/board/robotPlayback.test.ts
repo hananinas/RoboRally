@@ -144,11 +144,9 @@ describe('pit entry', () => {
   const start = { coordinate: { x: 2, y: 3 }, orientation: 'NORTH' as const }
   const reboot = { coordinate: { x: 0, y: 0 }, orientation: 'NORTH' as const }
   const move = (
-    instruction: ResolvedRobotAction['instruction'],
-    position: ResolvedRobotAction['position'] = reboot,
+    instruction: NonNullable<ResolvedRobotAction['resolvedInstruction']>, position: ResolvedRobotAction['position'] = reboot,
   ): ResolvedRobotAction => ({
-    gameId: 'demo', playerId: 'red-player', registerIndex: 0, pushedRobots: [], robotId: 'red', instruction,
-    resolvedInstruction: instruction === 'AGAIN' ? null : instruction, position,
+    gameId: 'demo', playerId: 'red-player', registerIndex: 0, pushedRobots: [], robotId: 'red', instruction, resolvedInstruction: instruction, position,
   })
 
   it('finds the hole reached by a straight move', () => {
