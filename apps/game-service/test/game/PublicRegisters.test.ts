@@ -1,3 +1,4 @@
+import { resolveRobotAction } from '../activationTestHelper.js'
 import { describe, expect, it } from 'vitest'
 import type { Game, UpdateRegistersError } from '@/game/Game'
 import type { Player } from '@/game/Player'
@@ -133,7 +134,7 @@ describe('public register lifecycle', () => {
     game.updateRegisters(player.id, hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(player.id, hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
     for (let index = 0; index < 5; index++) {
-      const result = game.executeNextAction()
+      const result = resolveRobotAction(game)
       expect(result.action.robotId).toBe(player.robot.id)
       expect(result.registers).toEqual(Array.from({ length: 5 }, (_, slot) => slot <= index
         ? { status: 'REVEALED', instruction: hand[slot].instruction }

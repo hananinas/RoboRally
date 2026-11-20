@@ -1,14 +1,16 @@
 import { Board } from '@/game/Board'
 import { boardMaps, type BoardMapName, type MapSpec } from '@/game/boardMaps'
 import type { Direction } from '@/game/spatial'
-import { EmptyTile, PitTile, ConveyorTile, type Tile } from '@/game/Tile'
+import { EmptyTile, PitTile, ConveyorTile, GearTile, type Tile } from '@/game/Tile'
 import { Integer } from '@/numbers'
 export type { BoardMapName } from '@/game/boardMaps'
 
 const MAPS: Readonly<Record<BoardMapName, MapSpec>> = boardMaps
 
-export function createBoard(mapName: BoardMapName): Board {
-  const { width, height, walls, checkpoints, antenna, rebootTile, pits = [],  conveyors = [],  startTiles, maxPlayers } = MAPS[mapName]
+const DEFAULT_MAP: BoardMapName = 'empty-map'
+
+export function createBoard(mapName: BoardMapName = DEFAULT_MAP): Board {
+  const { width, height, walls, checkpoints, antenna, rebootTile, pits = [], conveyors = [], gears = [], startTiles, maxPlayers } = MAPS[mapName]
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
     throw new RangeError(`Map "${mapName}" must have a positive integer width and height`)
   }
@@ -50,7 +52,7 @@ export function createBoard(mapName: BoardMapName): Board {
   for (const { at: [x, y], sprite, direction } of conveyors) {
     const tile = boardTiles[y]?.[x]
 
-    if (!tile || tile.kind !== 'EMPTY') {
+    if (!(tile instanceof EmptyTile)) {
       throw new RangeError(
         `Conveyor at (${x}, ${y}) in map "${mapName}" must occupy an unused board tile`,
       )
@@ -63,7 +65,15 @@ export function createBoard(mapName: BoardMapName): Board {
       tile.checkpointNumber,
     )
   }
-  
+
+  for (const { at: [x, y], rotation } of gears) {
+    const tile = boardTiles[y]?.[x]
+    if (!(tile instanceof EmptyTile) || tile.checkpointNumber !== undefined) {
+      throw new RangeError(`Gear at (${x}, ${y}) in map "${mapName}" must occupy an empty non-checkpoint board tile`)
+    }
+    boardTiles[y][x] = new GearTile(rotation, tile.walls)
+  }
+
   if (startTiles.length < maxPlayers) {
     throw new RangeError(`Map "${mapName}" needs a starting tile for each of its ${maxPlayers} players`)
   }

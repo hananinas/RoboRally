@@ -25,19 +25,25 @@ function OtherPlayerRow({ player, checkpointCount, phase, activeAction, queuedAc
   const [hovered, setHovered] = useState(false)
   const [focused, setFocused] = useState(false)
   const [dismissed, setDismissed] = useState(false)
-  const expanded = (hovered || focused) && !dismissed
+  const [dismissedAction, setDismissedAction] = useState<RobotActionResolved | null>(null)
+  const active = phase === 'EXECUTING' &&
+    activeAction?.robotId === player.robotId && player.registers[activeAction.registerIndex]?.status === 'REVEALED'
+  const executing = active && !paused && player.connected
+  const expanded = ((hovered || focused) && !dismissed) ||
+    (executing && activeAction !== dismissedAction)
   useEffect(() => {
     if (!expanded) return
     const dismiss = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setDismissed(true)
+      if (event.key === 'Escape') {
+        setDismissed(true)
+        setDismissedAction(activeAction)
+      }
     }
     window.addEventListener('keydown', dismiss)
     return () => window.removeEventListener('keydown', dismiss)
-  }, [expanded])
-  const executing = phase === 'EXECUTING' && !paused && player.connected &&
-    activeAction?.robotId === player.robotId && player.registers[activeAction.registerIndex]?.status === 'REVEALED'
+  }, [expanded, activeAction])
   const timing = (slot: PublicRegisterSlot, index: number) => {
-    if (executing && activeAction.registerIndex === index) return 'current'
+    if (active && activeAction.registerIndex === index) return 'current'
     if (phase !== 'EXECUTING') return ''
     if (slot.status !== 'REVEALED' ||
         (activeAction && index > activeAction.registerIndex) ||
@@ -71,12 +77,13 @@ function OtherPlayerRow({ player, checkpointCount, phase, activeAction, queuedAc
         if (event.pointerType === 'touch') return
         setHovered(true)
         setDismissed(false)
+        setDismissedAction(null)
       }}
       onMouseDown={(event) => {
         if (event.button === 0) event.preventDefault()
       }}
       onPointerLeave={() => setHovered(false)}
-      onFocus={() => { setFocused(true); setDismissed(false) }}
+      onFocus={() => { setFocused(true); setDismissed(false); setDismissedAction(null) }}
       onBlur={() => { setFocused(false); setDismissed(false) }}
     >
       <div className="other-player__identity">
@@ -99,6 +106,7 @@ function OtherPlayerRow({ player, checkpointCount, phase, activeAction, queuedAc
             className={`other-player__slot register-card program-card--register other-player__slot--${slot.status.toLowerCase()}${state ? ` other-player__slot--${state}` : ''}`}
             data-empty={!filled || undefined}
             data-active={state === 'current' || undefined}
+            data-played={state === 'past' || undefined}
           >
             <span className="register-card__number">{index + 1}</span>
             {slot.status === 'REVEALED'

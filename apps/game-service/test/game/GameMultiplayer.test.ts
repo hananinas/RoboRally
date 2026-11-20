@@ -1,3 +1,4 @@
+import { resolveRobotAction } from '../activationTestHelper.js'
 import { describe, expect, it } from 'vitest'
 import { Board, Card, Deck, Direction, EmptyTile, Player, Robot } from '@/game/index.ts'
 import type { Antenna, Position, RobotId } from '@/game/index.ts'
@@ -29,7 +30,7 @@ describe('Game fixed-roster programming', () => {
     expect(game.hasSubmittedProgram(players[0].id)).toBe(true)
     expect(game.hasSubmittedProgram(players[1].id)).toBe(false)
     expect(game.hasSubmittedProgram('unknown')).toBe(false)
-    expect(() => game.executeNextAction()).toThrow()
+    expect(() => resolveRobotAction(game)).toThrow()
     expect(game.submitProgram(players[0].id, secondProgramIds)._unsafeUnwrapErr()).toBe('ALREADY_SUBMITTED')
     expect(game.submitProgram(players[1].id, [...deck.slice(0, 4).map((card) => card.id), 'foreign'])._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
     expect(game.submitProgram(players[1].id, [deck[0].id, ...deck.slice(0, 4).map((card) => card.id)])._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
@@ -43,8 +44,8 @@ describe('Game fixed-roster programming', () => {
     game.submitProgram(players[1].id, secondProgramIds)
     expect(game.lastActivePhase).toBe('activation')
     expect(players[1].robot.program).toEqual(secondProgram)
-    game.executeNextAction()
-    expect(game.executeNextAction().action.robotId).toBe(players[1].robot.id)
+    resolveRobotAction(game)
+    expect(resolveRobotAction(game).action.robotId).toBe(players[1].robot.id)
   })
 
   it('copies the fixed roster and keeps an empty roster idle', () => {
@@ -83,13 +84,16 @@ describe('Game multiplayer activation', () => {
   it('advances the register when the only robot still waiting to act leaves', () => {
     const { players, deck, game } = createMultiplayerGame([{ x: Integer(4), y: Integer(5) }, { x: Integer(5), y: Integer(4) }])
     for (const player of players) game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
-    expect(game.executeNextAction().action.robotId).toBe(players[0].robot.id)
+    expect(resolveRobotAction(game).action.robotId).toBe(players[0].robot.id)
 
     const { roundConcluded } = game.removePlayer(players[1].id)
 
     expect(roundConcluded).toBe(false)
+    expect(game.currentRegister).toBe(0)
+    game.executeNextStep()
+    game.executeNextStep()
     expect(game.currentRegister).toBe(1)
-    expect(game.executeNextAction().action.robotId).toBe(players[0].robot.id)
+    expect(resolveRobotAction(game).action.robotId).toBe(players[0].robot.id)
     expect(game.currentRegister).toBe(2)
   })
 
@@ -128,7 +132,7 @@ describe('Game multiplayer activation', () => {
       for (let registerIndex = 0; registerIndex < 5; registerIndex++) {
         for (let robotIndex = 0; robotIndex < expectedOrder.length; robotIndex++) {
           const player = expectedOrder[robotIndex]
-          const result = game.executeNextAction()
+          const result = resolveRobotAction(game)
           expect(result.registerIndex).toBe(registerIndex)
           expect(result.action.robotId).toBe(player.robot.id)
           expect(result.action.card).toBe(programs[players.indexOf(player)][registerIndex])
@@ -149,7 +153,7 @@ describe('Game multiplayer activation', () => {
         expect(game.hasSubmittedProgram(player.id)).toBe(false)
       }
       expect(game.lastActivePhase).toBe('programming')
-      expect(() => game.executeNextAction()).toThrow()
+      expect(() => resolveRobotAction(game)).toThrow()
     }
   })
 
@@ -163,7 +167,7 @@ describe('Game multiplayer activation', () => {
       { x: Integer(6), y: Integer(4) },
     ], { x: Integer(4), y: Integer(4), angle: 7 * Math.PI / 4 })
     for (const player of players) game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
-    const order = players.map(() => game.executeNextAction().action.robotId)
+    const order = players.map(() => resolveRobotAction(game).action.robotId)
     // The distance-three robot precedes the Euclidean-nearer distance-four robot.
     // At distance two, east wraps past 2π before west and then north.
     expect(order).toEqual([
@@ -189,8 +193,8 @@ describe('Game multiplayer activation', () => {
       [{ x: Integer(4), y: Integer(5) }, { x: Integer(5), y: Integer(4) }], antenna, board,
     )
     for (const player of [...players].reverse()) game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
-    expect(game.executeNextAction().action.robotId).toBe(players[0].robot.id)
-    expect(game.executeNextAction().action.robotId).toBe(players[1].robot.id)
+    expect(resolveRobotAction(game).action.robotId).toBe(players[0].robot.id)
+    expect(resolveRobotAction(game).action.robotId).toBe(players[1].robot.id)
   })
 
   it('recalculates pending priority from positions changed by an earlier action', () => {
@@ -202,10 +206,10 @@ describe('Game multiplayer activation', () => {
     )
     players[0].robot.turn(3)
     for (const player of players) game.submitProgram(player.id, deck.map((card) => card.id))
-    expect(game.executeNextAction().action.robotId).toBe(players[0].robot.id)
+    expect(resolveRobotAction(game).action.robotId).toBe(players[0].robot.id)
     expect(board.positionOf(players[1].robot.id)).toEqual({ x: 4, y: 7 })
-    expect(game.executeNextAction().action.robotId).toBe(players[2].robot.id)
-    expect(game.executeNextAction().action.robotId).toBe(players[1].robot.id)
+    expect(resolveRobotAction(game).action.robotId).toBe(players[2].robot.id)
+    expect(resolveRobotAction(game).action.robotId).toBe(players[1].robot.id)
     expect(game.currentRegister).toBe(1)
   })
 
@@ -219,12 +223,12 @@ describe('Game multiplayer activation', () => {
       [{ x: Integer(7), y: Integer(4) }, { x: Integer(6), y: Integer(4) }], antenna, board, deck,
     )
     for (const player of players) game.submitProgram(player.id, deck.map((card) => card.id))
-    const first = game.executeNextAction()
+    const first = resolveRobotAction(game)
     expect(first.action.position).toEqual({ x: 8, y: 4 })
-    expect(game.executeNextAction().action.position).toEqual({ x: 7, y: 4 })
-    const wallBlocked = game.executeNextAction()
+    expect(resolveRobotAction(game).action.position).toEqual({ x: 7, y: 4 })
+    const wallBlocked = resolveRobotAction(game)
     expect(wallBlocked.action).toMatchObject({ robotId: players[0].robot.id, card: deck[1], position: { x: 8, y: 4 } })
-    const robotBlocked = game.executeNextAction()
+    const robotBlocked = resolveRobotAction(game)
     expect(robotBlocked.action).toMatchObject({ robotId: players[1].robot.id, card: deck[1], position: { x: 7, y: 4 } })
     expect(game.currentRegister).toBe(2)
 

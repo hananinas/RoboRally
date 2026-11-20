@@ -363,6 +363,12 @@ describe('public registers over Socket.IO', () => {
         slot < (revealedSlots.get(joined.assignment.playerId) ?? 0)
           ? { status: 'REVEALED', instruction: joined.hand[slot].instruction }
           : { status: 'HIDDEN' }))
+      if (index === 9) {
+        const nextHand = new Promise<void>((resolve) => first.once('cards.dealt', () => resolve()))
+        game.resume()
+        scheduler!.scheduleNextAction()
+        await nextHand
+      }
       const current = await snapshot(first)
       executionStates.push(current.state)
       expect(current.state.phase).toBe(index < 9 ? 'EXECUTING' : 'PROGRAMMING')
@@ -397,7 +403,7 @@ describe('public registers over Socket.IO', () => {
       gameId: own.assignment.gameId, playerId: own.assignment.playerId, registers: hidden,
     })))
     for (const [index, events] of observed.entries()) {
-      expect(events.filter((event) => event.name !== 'player.checkpointProgress').map((event) => event.name)).toEqual([
+      expect(events.filter((event) => event.name !== 'environment.stepResolved').map((event) => event.name)).toEqual([
         ...finalizationEvents[index],
         ...Array.from({ length: 10 }, () => 'robot.actionResolved'),
         'cards.dealt',
@@ -484,6 +490,12 @@ describe('public registers over Socket.IO', () => {
   })
 
   it('resets registers once resumed after a departure completes the final register', async () => {
+    const createScheduler = actionScheduler.createActionScheduler
+    let scheduler: actionScheduler.ActionScheduler | undefined
+    vi.spyOn(actionScheduler, 'createActionScheduler').mockImplementation((deps) => {
+      scheduler = createScheduler(deps)
+      return scheduler
+    })
     const first = await connect('A')
     const second = await connect('B')
     const joined = await start([first, second])
@@ -510,7 +522,10 @@ describe('public registers over Socket.IO', () => {
     const remaining = [first, second][remainingIndex]
     const departing = [first, second][1 - remainingIndex]
     expect(await departing.timeout(1000).emitWithAck('game.leave', {})).toEqual({ outcome: 'LEFT' })
+    const nextHand = new Promise<void>((resolve) => remaining.once('cards.dealt', () => resolve()))
     game.resume()
+    scheduler!.scheduleNextAction()
+    await nextHand
     const restored = await snapshot(remaining)
     expect(restored.state.players.map((player) => player.registers)).toEqual([empty])
     expect(count).toBe(9)

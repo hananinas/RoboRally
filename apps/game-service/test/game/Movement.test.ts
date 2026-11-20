@@ -1,8 +1,9 @@
+import { resolveRobotAction } from '../activationTestHelper.ts'
 import { describe, expect, it } from 'vitest'
 import { Board, Card, Direction, EmptyTile, PitTile, type Tile } from '@/game/index'
 import { Deck } from '@/game/Deck'
 import { Integer } from '@/numbers'
-import { addTestPlayer, createEmptyTileGrid, createTestGame, placeTestPlayer, programLeadingWith } from '../fixtures.ts'
+import { addTestPlayer, createEmptyTileGrid, createTestGame, createTestRobot, placeTestPlayer, programLeadingWith } from '../fixtures.ts'
 
 function createGame(
   pitWalls: readonly Direction[] = [],
@@ -75,6 +76,46 @@ describe('shared gameplay movement', () => {
     expect(board.occupantAt(reboot)).toBeUndefined()
   })
 
+  it('uses the nearest safe tile and deterministic tie order when the reboot tile is occupied', () => {
+    const { board, robot, player, program, game, pit, reboot } = createGame([], [], Direction.EAST)
+    const other = createTestRobot()
+    board.placeRobot(other.id, reboot)
+    const fallback = { x: Integer(3), y: Integer(1) }
+    game.submitProgram(player.id, programLeadingWith(program, 'MOVE_3').map((card) => card.id))._unsafeUnwrap()
+
+    resolveRobotAction(game)
+
+    expect(board.positionOf(robot.id)).toEqual(fallback)
+    expect(board.positionOf(other.id)).toEqual(reboot)
+    expect(board.occupantAt(reboot)).toBe(other.id)
+    expect(board.occupantAt(fallback)).toBe(robot.id)
+    expect(board.occupantAt(pit)).toBeUndefined()
+    expect(robot.direction).toBe(Direction.EAST)
+    expect(game.hasSubmittedProgram(other.id)).toBe(false)
+  })
+
+  it.each(['walking', 'rebooting'] as const)('defers checkpoints reached by %s until the register completes', (movement) => {
+    const { board, robot, player, program, game, reboot } = createGame()
+    const initialProgress = movement === 'walking' ? 0 : 1
+    const destination = movement === 'walking' ? { x: Integer(4), y: Integer(0) } : reboot
+    board.relocateRobot(robot.id, destination)
+    if (movement === 'rebooting') player.completeCheckpoint(1)
+
+    expect(board.positionOf(robot.id)).toEqual(destination)
+    expect(player.lastCheckpoint).toBe(initialProgress)
+    expect(game.currentRegister).toBe(0)
+    expect(game.lastActivePhase).toBe('programming')
+
+    game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
+    expect(player.lastCheckpoint).toBe(initialProgress)
+    const { registerIndex, action } = resolveRobotAction(game)
+    expect(registerIndex).toBe(0)
+    expect(action.card.instruction).toBe('TURN_LEFT')
+    expect(action.position).toEqual(destination)
+    expect(player.lastCheckpoint).toBe(initialProgress + 1)
+    expect(game.currentRegister).toBe(1)
+  })
+
   it('preserves an accepted program while waiting for another player to submit', () => {
     const { board, robot, player, program, game, start } = createGame()
     const other = addTestPlayer(game)
@@ -115,18 +156,18 @@ describe('shared gameplay movement', () => {
     game.submitProgram(mover.id, moverProgram.map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(bystander.id, bystanderProgram.map((card) => card.id))._unsafeUnwrap()
 
-    const pushResult = game.executeNextAction()
+    const pushResult = resolveRobotAction(game)
     expect(pushResult.pushedRobots).toEqual([{ robotId: bystander.robot.id, position: reboot, direction: Direction.EAST }])
     expect(board.positionOf(bystander.robot.id)).toEqual(reboot)
 
-    const ownAction = game.executeNextAction()
+    const ownAction = resolveRobotAction(game)
     expect(ownAction.action.robotId).toBe(bystander.robot.id)
     expect(ownAction.action.card).toBe(bystanderProgram[0])
     expect(ownAction.action.position).toEqual(reboot)
     expect(game.currentRegister).toBe(1)
     expect(bystander.robot.program).toEqual(bystanderProgram)
 
-    const register1Actions = [game.executeNextAction(), game.executeNextAction()]
+    const register1Actions = [resolveRobotAction(game), resolveRobotAction(game)]
     const bystanderAction = register1Actions.find((result) => result.action.robotId === bystander.robot.id)
     expect(bystanderAction?.registerIndex).toBe(1)
     expect(bystanderAction?.action.card).toBe(bystanderProgram[1])

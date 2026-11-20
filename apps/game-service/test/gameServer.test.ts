@@ -1,8 +1,9 @@
+import { resolveRobotAction } from './activationTestHelper.js'
 import { Integer } from '@/numbers'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { submitProgramSchema } from '@robo-rally/game-events'
-import type { ClientToServerEvents, CardsDealt, GameWon, RobotActionResolved, GameInitialization, PlayerConnectionChanged, PlayerCheckpointProgress, ServerToClientEvents } from '@robo-rally/game-events'
+import type { ClientToServerEvents, CardsDealt, GameWon, RobotActionResolved, GameInitialization, PlayerConnectionChanged, EnvironmentStepResolved, ServerToClientEvents } from '@robo-rally/game-events'
 import { io, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { Game, type BoardMapName } from '@/game/index'
@@ -182,7 +183,7 @@ describe('started game membership over Socket.IO', () => {
     const game = currentGame()
     const ctx = contexts.mock.results.at(-1)!.value as ReturnType<typeof gameContext.createGameContext>
     for (const player of game.players) game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
-    for (let action = 0; action < 9; action++) game.executeNextAction()
+    for (let action = 0; action < 9; action++) resolveRobotAction(game)
     const execute = vi.spyOn(game, 'executeNextAction')
     const actions: unknown[] = []
     second.on('robot.actionResolved', (payload) => actions.push(payload))
@@ -321,7 +322,7 @@ describe('started game membership over Socket.IO', () => {
     // Priority order depends on card-driven positions, so whichever player's final
     // register is still pending after 9 of the 10 actions can vary between runs.
     let lastActedRobotId: string | undefined
-    for (let action = 0; action < 9; action++) lastActedRobotId = game.executeNextAction().action.robotId
+    for (let action = 0; action < 9; action++) lastActedRobotId = resolveRobotAction(game).action.robotId
     const pendingPlayer = game.players.find((candidate) => candidate.robot.id !== lastActedRobotId)!
     const player = game.players.find((candidate) => candidate !== pendingPlayer)!
     const pendingIndex = initializations.findIndex((initial) => initial.assignment.playerId === pendingPlayer.id)
@@ -336,14 +337,16 @@ describe('started game membership over Socket.IO', () => {
     game.board.removeRobot(player.robot.id)
     game.board.placeRobot(player.robot.id, { x: Integer(8), y: Integer(9) })
     const events: string[] = []
-    remaining.onAny((name) => { if (['game.playerLeft', 'player.checkpointProgress', 'game.won', 'cards.dealt'].includes(name)) events.push(name) })
-    const progress = new Promise<PlayerCheckpointProgress>((resolve) => remaining.once('player.checkpointProgress', resolve))
+    remaining.onAny((name) => { if (['game.playerLeft', 'environment.stepResolved', 'game.won', 'cards.dealt'].includes(name)) events.push(name) })
+    const progress = new Promise<EnvironmentStepResolved>((resolve) => remaining.on('environment.stepResolved', (step) => {
+      if (step.kind === 'CHECKPOINTS') resolve(step)
+    }))
     const won = new Promise<GameWon>((resolve) => remaining.once('game.won', resolve))
     await leaving.emitWithAck('game.leave', {})
-    expect(await progress).toEqual({ gameId: game.id, playerId: player.id, lastCheckpoint: 2, checkpointCount: 2 })
+    expect((await progress).checkpointProgress).toEqual([{ playerId: player.id, lastCheckpoint: 2 }])
     expect(await won).toEqual({ gameId: game.id, playerId: player.id, username: remainingName })
     await getSnapshot(remaining)
-    expect(events).toEqual(['game.playerLeft', 'player.checkpointProgress', 'game.won'])
+    expect(events).toEqual(['game.playerLeft', 'environment.stepResolved', 'game.won'])
   })
 
   it('announces the winner after the final checkpoint and ends the game', async () => {
@@ -362,7 +365,7 @@ describe('started game membership over Socket.IO', () => {
     const snapshot = await getSnapshot(client)
     expect(events).toEqual([
       'program.finalized', 'game.registersChanged', 'program.submitted',
-      'robot.actionResolved', 'player.checkpointProgress', 'game.won',
+      'robot.actionResolved', 'environment.stepResolved', 'game.won',
     ])
     expect(snapshot.state.winner).toEqual({ playerId: player.id, username: 'First' })
     expect(snapshot.state.phase).toBe('EXECUTING')
@@ -460,10 +463,12 @@ describe('started game membership over Socket.IO', () => {
       const outsideEvents = vi.fn()
       outsider.onAny(outsideEvents)
       const actions: RobotActionResolved[] = []
+      const progress: EnvironmentStepResolved[] = []
       const events: string[] = []
       // Rebooting next to a checkpoint can incidentally earn it on a later random register.
       client.onAny((name) => { if (name !== 'program.timerChanged' && name !== 'player.checkpointProgress') events.push(name) })
       client.on('robot.actionResolved', (action) => actions.push(action))
+      client.on('environment.stepResolved', (payload) => progress.push(payload))
       const hand = new Promise<CardsDealt>((resolve) => client.once('cards.dealt', resolve))
 
       const robotId = initial.assignment.robotId
@@ -480,7 +485,22 @@ describe('started game membership over Socket.IO', () => {
         pushedRobots: [], instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1',
         position: { coordinate: { x: 10, y: 7 }, orientation: 'SOUTH' },
       })
-      expect(actions).toHaveLength(5)
+      expect(actions).toEqual([
+        { coordinate: { x: 10, y: 7 }, orientation: 'SOUTH' },
+        { coordinate: { x: 10, y: 8 }, orientation: 'SOUTH' },
+        { coordinate: { x: 10, y: 9 }, orientation: 'SOUTH' },
+        { coordinate: { x: 10, y: 10 }, orientation: 'SOUTH' },
+        { coordinate: { x: 10, y: 12 }, orientation: 'SOUTH' },
+      ].map((position, registerIndex) => {
+        const instruction = initial.hand[registerIndex].instruction
+        return {
+          gameId: game.id, registerIndex, robotId: initial.assignment.robotId,
+          playerId: initial.assignment.playerId,
+          pushedRobots: [],
+          instruction, resolvedInstruction: instruction, position,
+        }
+      }))
+      expect(progress.flatMap((step) => step.checkpointProgress ?? [])).toEqual([])
       expect(events).toEqual([
         'program.finalized', 'game.registersChanged', 'program.submitted',
         ...Array.from({ length: 5 }, () => 'robot.actionResolved'), 'cards.dealt',

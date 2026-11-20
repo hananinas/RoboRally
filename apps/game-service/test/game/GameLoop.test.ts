@@ -1,3 +1,4 @@
+import { resolveRobotAction } from '../activationTestHelper.ts'
 import type { Instruction } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'
 import { Board, Direction, EmptyTile, Card } from '@/game/index'
@@ -16,10 +17,10 @@ function createGame(deck: Card[]) {
 }
 
 describe('Game activation loop', () => {
-  it('executes one action per call and returns to programming after five registers', () => {
+  it('resolves robot actions and register-end steps across five registers', () => {
     const deck = Array.from({ length: 5 }, (_, index) => new Card(`left-${index}`, 'TURN_LEFT'))
     const { robot, player, game } = createGame(deck)
-    expect(() => game.executeNextAction()).toThrow()
+    expect(() => resolveRobotAction(game)).toThrow()
     game.submitProgram(player.id, deck.map((card) => card.id))
 
     const directions = [
@@ -30,7 +31,7 @@ describe('Game activation loop', () => {
       Direction.NORTH,
     ]
     for (let registerIndex = 0; registerIndex < 5; registerIndex++) {
-      const result = game.executeNextAction()
+      const result = resolveRobotAction(game)
       expect(result).toEqual({
         registerIndex,
         pushedRobots: [],
@@ -51,12 +52,11 @@ describe('Game activation loop', () => {
     }
 
     expect(robot.program).toEqual([])
-    expect(player.hand).toHaveLength(deck.length)
-    expect(player.hand).toEqual(expect.arrayContaining(deck))
-    expect(() => game.executeNextAction()).toThrow()
+    expect(player.hand).toEqual(deck)
+    expect(() => resolveRobotAction(game)).toThrow()
 
     game.submitProgram(player.id, deck.map((card) => card.id))
-    expect(game.executeNextAction()).toMatchObject({ registerIndex: 0 })
+    expect(resolveRobotAction(game)).toMatchObject({ registerIndex: 0 })
     expect(robot.direction).toBe(Direction.WEST)
   })
 
@@ -71,14 +71,14 @@ describe('Game activation loop', () => {
     const { board, player, game } = createGame(deck)
     game.submitProgram(player.id, deck.map((card) => card.id))
 
-    game.executeNextAction()
-    const result = game.executeNextAction()
+    resolveRobotAction(game)
+    const result = resolveRobotAction(game)
 
     expect(result.action.position).toEqual({ x: 1, y: 0 })
     expect(board.positionOf('robot-1')).toEqual({ x: 1, y: 0 })
     expect(result.action.card).toBe(deck[1])
     expect(result.action.direction).toBe(Direction.NORTH)
-    expect(game.executeNextAction().action.direction).toBe(Direction.WEST)
+    expect(resolveRobotAction(game).action.direction).toBe(Direction.WEST)
   })
 
   it('reports the position reached by movement', () => {
@@ -86,7 +86,7 @@ describe('Game activation loop', () => {
     const { board, player, game } = createGame(deck)
     game.submitProgram(player.id, deck.map((card) => card.id))
 
-    const result = game.executeNextAction()
+    const result = resolveRobotAction(game)
 
     expect(result.action.position).toEqual({ x: 2, y: 1 })
     expect(board.positionOf('robot-1')).toEqual({ x: 2, y: 1 })
@@ -99,7 +99,7 @@ function resolveCard(instruction: Instruction, direction: Direction, tiles: Empt
   const player = placeTestPlayer(board, { x: Integer(3), y: Integer(3) }, { direction, deck: new Deck(cards) })
   const game = createTestGame({ board, players: [player], deck: cards })
   game.submitProgram(player.id, cards.map((card) => card.id))
-  return game.executeNextAction().action
+  return resolveRobotAction(game).action
 }
 
 function tiles() {

@@ -10,9 +10,9 @@ import type {
   ProgramFinalized,
   ProgramTimerChanged,
   RobotActionResolved,
+  EnvironmentStepResolved,
   PlayerLeft,
   PlayerConnectionChanged,
-  PlayerCheckpointProgress,
   LeaveResult,
   RegistersChanged,
   UpdateRegisters,
@@ -42,13 +42,13 @@ export interface ServerToClientEvents {
   'lobby.updated': (payload: { lobby: LobbyState }) => void
   'game.started': (payload: { lobbyId: string; initialization: GameInitialization }) => void
   'game.registersChanged': (payload: RegistersChanged) => void
-  'player.checkpointProgress': (payload: PlayerCheckpointProgress) => void
   'game.playerLeft': (payload: PlayerLeft) => void
   'game.playerConnectionChanged': (payload: PlayerConnectionChanged) => void
   'cards.dealt': (payload: CardsDealt) => void
   'program.submitted': (payload: ProgramSubmitted) => void
   'program.finalized': (payload: ProgramFinalized) => void
   'program.timerChanged': (payload: ProgramTimerChanged) => void
+  'environment.stepResolved': (payload: EnvironmentStepResolved) => void
   'robot.actionResolved': (payload: RobotActionResolved) => void
   'game.aborted': (payload: GameAborted) => void
   'game.won': (payload: GameWon) => void

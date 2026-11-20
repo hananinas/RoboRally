@@ -22,6 +22,8 @@ channels:
         $ref: '#/components/messages/LobbyCreate'
       joinLobby:
         $ref: '#/components/messages/LobbyJoin'
+      selectRobot:
+        $ref: '#/components/messages/LobbySelectRobot'
       leaveLobby:
         $ref: '#/components/messages/LobbyLeave'
       startLobby:
@@ -57,6 +59,13 @@ channels:
     messages:
       result:
         $ref: '#/components/messages/LobbyJoinReply'
+
+  lobbySelectRobotReplies:
+    address: null
+    description: Socket.IO acknowledgement of lobby.selectRobot.
+    messages:
+      result:
+        $ref: '#/components/messages/LobbySelectRobotReply'
 
   lobbyLeaveReplies:
     address: null
@@ -142,10 +151,10 @@ channels:
         $ref: '#/components/messages/ProgramTimerChanged'
       robotActionResolved:
         $ref: '#/components/messages/RobotActionResolved'
+      environmentStepResolved:
+        $ref: '#/components/messages/EnvironmentStepResolved'
       registersChanged:
         $ref: '#/components/messages/RegistersChanged'
-      playerCheckpointProgress:
-        $ref: '#/components/messages/PlayerCheckpointProgress'
       playerLeft:
         $ref: '#/components/messages/PlayerLeft'
       playerConnectionChanged:
@@ -257,6 +266,20 @@ operations:
       x-socketio:
         acknowledgement: true
 
+  handleLobbySelectRobot:
+    action: receive
+    channel:
+      $ref: '#/channels/commands'
+    messages:
+      - $ref: '#/channels/commands/messages/selectRobot'
+    reply:
+      channel:
+        $ref: '#/channels/lobbySelectRobotReplies'
+      messages:
+        - $ref: '#/channels/lobbySelectRobotReplies/messages/result'
+      x-socketio:
+        acknowledgement: true
+
   handleLobbyLeave:
     action: receive
     channel:
@@ -347,6 +370,20 @@ components:
       description: Delivered only through the request acknowledgement.
       payload:
         $ref: '#/components/schemas/LobbyJoinResult'
+    LobbySelectRobot:
+      name: lobby.selectRobot
+      description: Selects a robot sprite for the authenticated lobby member.
+      payload:
+        $ref: '#/components/schemas/RobotSelectionRequest'
+      examples:
+        - name: selectScout
+          payload:
+            robotSpriteId: scout
+    LobbySelectRobotReply:
+      name: lobby.selectRobotResult
+      description: Delivered only through the request acknowledgement.
+      payload:
+        $ref: '#/components/schemas/RobotSelectionResult'
     LobbyLeave:
       name: lobby.leave
       description: >-
@@ -419,6 +456,7 @@ components:
                 robots:
                   - robotId: 00000000-0000-4000-8000-000000000003
                     playerId: 00000000-0000-4000-8000-000000000002
+                    robotSpriteId: tank
                     colour: red
                     position:
                       coordinate:
@@ -825,34 +863,21 @@ components:
                 y: 6
               orientation: NORTH
 
-    PlayerCheckpointProgress:
-      name: player.checkpointProgress
+    EnvironmentStepResolved:
+      name: environment.stepResolved
       description: >-
-        Broadcasts changed player checkpoint progress to game:{gameId}:public after the
-        related robot.actionResolved, or game.playerLeft when a departure finishes a
-        register, and before subsequent actions or private hands. Unchanged progress
-        produces no event. Clients apply progress on receipt without changing movement
-        playback or programming availability. Replayed events must not reduce progress.
+        Reports changed robots or checkpoint progress. Apply changes together after
+        the register's robot actions. Steps without changes produce no event.
       payload:
-        type: object
-        additionalProperties: false
-        required: [ gameId, playerId, lastCheckpoint, checkpointCount ]
-        properties:
-          gameId:
-            $ref: '#/components/schemas/GameId'
-          playerId:
-            $ref: '#/components/schemas/PlayerId'
-          lastCheckpoint:
-            $ref: '#/components/schemas/LastCheckpoint'
-          checkpointCount:
-            $ref: '#/components/schemas/CheckpointCount'
+        $ref: '#/components/schemas/EnvironmentStepResolved'
       examples:
-        - name: firstCheckpoint
+        - name: firstCheckpointStep
           payload:
             gameId: 00000000-0000-4000-8000-000000000001
-            playerId: 00000000-0000-4000-8000-000000000002
-            lastCheckpoint: 1
-            checkpointCount: 2
+            kind: CHECKPOINTS
+            checkpointProgress:
+              - playerId: 00000000-0000-4000-8000-000000000002
+                lastCheckpoint: 1
 
     CardsDealt:
       name: cards.dealt
@@ -939,7 +964,7 @@ components:
     GameWon:
       name: game.won
       description: >-
-        Announces the winner to game:{gameId}:public after the player.checkpointProgress
+        Announces the winner to game:{gameId}:public after the CHECKPOINTS step
         that completed the final checkpoint. The game ends: no further actions are resolved
         and no new hands are dealt.
       payload:
@@ -1001,6 +1026,14 @@ components:
         lobbyId:
           type: string
           format: uuid
+    RobotSelectionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - robotSpriteId
+      properties:
+        robotSpriteId:
+          $ref: '#/components/schemas/RobotSpriteId'
     LobbySummary:
       type: object
       additionalProperties: false
@@ -1033,6 +1066,7 @@ components:
           players:
             - userId: 00000000-0000-4000-8000-000000000004
               username: Dane
+              robotSpriteId: tank
       required:
         - lobbyId
         - name
@@ -1057,10 +1091,10 @@ components:
           format: uuid
         players:
           type: array
-          description: Members in join order, with unique userIds. Length equals playerCount; ownerUserId identifies the first member.
+          description: Members in join order, with unique userIds and their selected robot sprites. Length equals playerCount; ownerUserId identifies the first member.
           minItems: 1
           items:
-            $ref: '#/components/schemas/User'
+            $ref: '#/components/schemas/LobbyPlayer'
     LobbyFailure:
       type: object
       additionalProperties: false
@@ -1101,6 +1135,19 @@ components:
           properties:
             outcome:
               const: LOBBY_JOINED
+            lobby:
+              $ref: '#/components/schemas/LobbyState'
+        - $ref: '#/components/schemas/LobbyFailure'
+    RobotSelectionResult:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - outcome
+            - lobby
+          properties:
+            outcome:
+              const: ROBOT_SELECTED
             lobby:
               $ref: '#/components/schemas/LobbyState'
         - $ref: '#/components/schemas/LobbyFailure'
@@ -1178,7 +1225,7 @@ components:
     LobbyUpdated:
       type: object
       additionalProperties: false
-      description: Full lobby snapshot sent to existing members after a join and to remaining members after a leave or disconnect.
+      description: Full lobby snapshot sent to lobby members after a join, robot selection, or ownership change, and to remaining members after a leave or disconnect.
       required:
         - lobby
       properties:
@@ -1214,6 +1261,18 @@ components:
           $ref: '#/components/schemas/UserId'
         username:
           $ref: '#/components/schemas/Username'
+
+    LobbyPlayer:
+      type: object
+      additionalProperties: false
+      required: [ userId, username, robotSpriteId ]
+      properties:
+        userId:
+          $ref: '#/components/schemas/UserId'
+        username:
+          $ref: '#/components/schemas/Username'
+        robotSpriteId:
+          $ref: '#/components/schemas/RobotSpriteId'
 
     # Membership
     PlayerAssignment:
@@ -1487,6 +1546,55 @@ components:
         The player's private register selection. Each slot contains a card or
         null. A finalized program contains five cards with distinct IDs.
 
+    EnvironmentStepResolved:
+      oneOf:
+        - $ref: '#/components/schemas/GearsResolved'
+        - $ref: '#/components/schemas/CheckpointsResolved'
+
+    GearsResolved:
+      type: object
+      additionalProperties: false
+      required: [gameId, kind, robots]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+        kind:
+          const: GEARS
+        robots:
+          type: array
+          description: Final positions of changed robots. Apply together; each robotId appears at most once.
+          items:
+            type: object
+            additionalProperties: false
+            required: [ robotId, position ]
+            properties:
+              robotId:
+                $ref: '#/components/schemas/RobotId'
+              position:
+                $ref: '#/components/schemas/Position'
+
+    CheckpointsResolved:
+      type: object
+      additionalProperties: false
+      required: [gameId, kind, checkpointProgress]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+        kind:
+          const: CHECKPOINTS
+        checkpointProgress:
+          type: array
+          description: Changed checkpoint progress. Each playerId appears at most once; checkpointCount comes from the public state.
+          items:
+            type: object
+            additionalProperties: false
+            required: [ playerId, lastCheckpoint ]
+            properties:
+              playerId:
+                $ref: '#/components/schemas/PlayerId'
+              lastCheckpoint:
+                $ref: '#/components/schemas/LastCheckpoint'
+
     LastCheckpoint:
       type: integer
       minimum: 0
@@ -1524,6 +1632,11 @@ components:
     RobotId:
       type: string
       format: uuid
+
+    RobotSpriteId:
+      type: string
+      description: Robot sprite selected by a lobby member.
+      enum: [ tank, scout, guardian, rover, striker, sentinel, hauler ]
 
     CardId:
       type: string
@@ -1570,12 +1683,14 @@ components:
 
     Robot:
       type: object
-      required: [ robotId, playerId, colour, position ]
+      required: [ robotId, playerId, robotSpriteId, colour, position ]
       properties:
         robotId:
           $ref: '#/components/schemas/RobotId'
         playerId:
           $ref: '#/components/schemas/PlayerId'
+        robotSpriteId:
+          $ref: '#/components/schemas/RobotSpriteId'
         colour:
           type: string
           description: Server-assigned colour, fixed for the lifetime of this robot.
@@ -1605,7 +1720,7 @@ components:
           $ref: '#/components/schemas/Coordinate'
         type:
           type: string
-          enum: [ EMPTY, PIT ]
+          enum: [ EMPTY, PIT, CONVEYOR, GEAR ]
           description: >-
             PIT triggers an immediate server-side reboot on entry during movement,
             discarding the remaining steps of that instruction. Walls can block entry.
@@ -1621,6 +1736,28 @@ components:
             Optional checkpoint on an EMPTY tile, independent of its walls.
             Omit when absent. Numbers are unique and consecutive from 1 on a board.
             Checkpoints stay at their fixed positions and are available to every player.
+        sprite:
+          type: string
+        direction:
+          $ref: '#/components/schemas/Orientation'
+        rotation:
+          enum: [ CLOCKWISE, COUNTERCLOCKWISE ]
+      allOf:
+        - if:
+            properties:
+              type:
+                const: GEAR
+          then:
+            required: [ rotation ]
+          else:
+            not:
+              required: [ rotation ]
+        - if:
+            properties:
+              type:
+                const: CONVEYOR
+          then:
+            required: [ sprite, direction ]
     Antenna:
       type: object
       additionalProperties: false

@@ -1,3 +1,4 @@
+import { resolveRobotAction } from '../activationTestHelper.ts'
 import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
 import { Board, Card, Direction, EmptyTile, type Position } from '@/game/index'
@@ -38,7 +39,7 @@ describe('board-edge falls', () => {
     robot.turn([Direction.EAST, Direction.NORTH, Direction.WEST, Direction.SOUTH].indexOf(direction))
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
-    const result = game.executeNextAction()
+    const result = resolveRobotAction(game)
 
     expect(result.action.position).toEqual(reboot)
     expect(board.positionOf(robot.id)).toEqual(reboot)
@@ -55,7 +56,7 @@ describe('board-edge falls', () => {
     robot.turn([Direction.EAST, Direction.NORTH, Direction.WEST, Direction.SOUTH].indexOf(direction))
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
-    game.executeNextAction()
+    resolveRobotAction(game)
 
     expect(board.positionOf(robot.id)).toEqual(start)
     expect(board.occupantAt(start)).toBe(robot.id)
@@ -77,7 +78,7 @@ describe('board-edge falls', () => {
     const direction = robot.direction
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
-    const result = game.executeNextAction()
+    const result = resolveRobotAction(game)
 
     expect(result).toMatchObject({
       registerIndex: 0,
@@ -93,7 +94,7 @@ describe('board-edge falls', () => {
     expect(game.currentRegister).toBe(1)
     expect(game.lastActivePhase).toBe('activation')
 
-    expect(game.executeNextAction().action.card).toBe(program[1])
+    expect(resolveRobotAction(game).action.card).toBe(program[1])
     expect(board.positionOf(robot.id)).toEqual(reboot)
     expect(robot.program).toEqual(program)
     expect(game.currentRegister).toBe(2)
@@ -109,7 +110,7 @@ describe('board-edge falls', () => {
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
     for (let register = 0; register < 5; register++) {
-      expect(game.executeNextAction().action.position).toEqual(reboot)
+      expect(resolveRobotAction(game).action.position).toEqual(reboot)
       expect(board.occupantAt(reboot)).toBe(robot.id)
       expect(robot.direction).toBe(Direction.WEST)
     }
