@@ -1,11 +1,13 @@
 import type {
   Card as CardPayload,
   CardsDealt,
+  EnvironmentStepResolved,
   ProgramFinalized,
   ProgrammingTimer,
   ProgramTimerChanged,
   GamePhase as GamePhasePayload,
   Orientation,
+  Position as PositionPayload,
   PublicGameState,
   Winner,
   RobotActionResolved,
@@ -21,9 +23,11 @@ import {
   type GamePhase,
   type NextActionResult,
   type Player,
+  type Position,
 } from '@/game/index'
 import { Integer } from '@/numbers'
-import { ConveyorTile } from '@/game/Tile'
+import type { EnvironmentStepResult } from '@/game/Game'
+import { ConveyorTile, GearTile } from '@/game/Tile'
 
 const orientations: Record<Direction, Orientation> = {
   [Direction.NORTH]: 'NORTH',
@@ -35,6 +39,10 @@ const orientations: Record<Direction, Orientation> = {
 const phases: Record<GamePhase, GamePhasePayload> = {
   programming: 'PROGRAMMING',
   activation: 'EXECUTING',
+}
+
+function presentPosition(coordinate: Position, direction: Direction): PositionPayload {
+  return { coordinate, orientation: orientations[direction] }
 }
 
 function presentCard(card: Card): CardPayload {
@@ -65,6 +73,8 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
       direction: orientations[tile.direction],
     }
   }
+
+  if (tile instanceof GearTile) return { ...common, type: tile.kind, rotation: tile.rotation }
 
   if (tile.kind === 'EMPTY' || tile.kind === 'PIT') {
     return {
@@ -103,10 +113,7 @@ export function presentPublicGameState(
       robotId: player.robot.id,
       playerId: player.id,
       colour: player.robot.colour,
-      position: {
-        coordinate: game.board.positionOf(player.robot.id),
-        orientation: orientations[player.robot.direction],
-      },
+      position: presentPosition(game.board.positionOf(player.robot.id), player.robot.direction),
     })),
     phase: phases[game.lastActivePhase],
     paused: game.paused,
@@ -150,13 +157,22 @@ export function presentRobotActionResolved(
     playerId: player.id,
     instruction: action.card.instruction,
     resolvedInstruction: action.resolvedInstruction ?? null,
-    position: {
-      coordinate: action.position,
-      orientation: orientations[action.direction],
-    },
+    position: presentPosition(action.position, action.direction),
     pushedRobots: result.pushedRobots.map((robot) => ({
       robotId: robot.robotId,
-      position: { coordinate: robot.position, orientation: orientations[robot.direction] },
+      position: presentPosition(robot.position, robot.direction),
+    })),
+  }
+}
+
+export function presentEnvironmentStepResolved(gameId: GameId, result: EnvironmentStepResult): EnvironmentStepResolved {
+  const { kind } = result
+  if (kind === 'CHECKPOINTS') return { gameId, kind, checkpointProgress: result.checkpointProgress }
+  return {
+    gameId, kind,
+    robots: result.robots.map(({ robotId, position, direction }) => ({
+      robotId,
+      position: presentPosition(position, direction),
     })),
   }
 }

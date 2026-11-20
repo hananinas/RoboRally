@@ -2,6 +2,7 @@ import { useMemo, useRef, type CSSProperties } from 'react'
 import antennaSprites from '../board/assets/antenna.hbls?raw'
 import laserSprites from '../board/assets/lasers.hbls?raw'
 import tankSprites from '../board/assets/tanks.hbls?raw'
+import gearSprites from '../board/assets/gears.hbls?raw'
 import conveyorSprites from '../board/assets/conveyors.hbls?raw'
 import {
   BOARD_COMPONENTS,
@@ -121,9 +122,9 @@ function BoardPiece({ piece }: Readonly<{ piece: BoardScenePiece }>) {
     return (
       <svg
         {...sharedProps}
-        aria-hidden={piece.componentName === 'antenna10' ? undefined : true}
-        role={piece.componentName === 'antenna10' ? 'img' : undefined}
-        aria-label={piece.componentName === 'antenna10' ? 'Priority antenna' : undefined}
+        aria-hidden={piece.component.label ? undefined : true}
+        role={piece.component.label ? 'img' : undefined}
+        aria-label={piece.component.label}
         preserveAspectRatio="xMidYMid meet"
         viewBox={viewBox}
       >
@@ -234,7 +235,7 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
       >
         <div
           aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: `${laserSprites}${antennaSprites}${tankSprites}${conveyorSprites}` }}
+          dangerouslySetInnerHTML={{ __html: `${laserSprites}${antennaSprites}${tankSprites}${conveyorSprites}${gearSprites}` }}
         />
         {scene.planes.map((pieces, layer) => {
           const robotComponent = ROBOT_COMPONENTS[layer - 3]

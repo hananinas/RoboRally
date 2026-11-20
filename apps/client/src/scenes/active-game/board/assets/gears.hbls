@@ -42,15 +42,15 @@
   </symbol>
   <symbol id="gearClockwise" viewBox="0 0 84 84">
     <g transform="translate(42 42)">
-      <path d="M-6.24 4.80 A8 8 0 1 1 8 0" fill="none" stroke="#e5c04d" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round" />
-      <path d="M4 -1 L8 5 L12 -1 Z" fill="#e5c04d" />
+      <path d="M-6.24 4.80 A8 8 0 1 1 8 0" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M4 -1 L8 5 L12 -1 Z" fill="currentColor" />
     </g>
   </symbol>
   <symbol id="gearCounterclockwise" viewBox="0 0 84 84">
     <g transform="translate(42 42)">
       <g transform="scale(-1 1)">
-        <path d="M-6.24 4.80 A8 8 0 1 1 8 0" fill="none" stroke="#e5c04d" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round" />
-        <path d="M4 -1 L8 5 L12 -1 Z" fill="#e5c04d" />
+        <path d="M-6.24 4.80 A8 8 0 1 1 8 0" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M4 -1 L8 5 L12 -1 Z" fill="currentColor" />
       </g>
     </g>
   </symbol>
