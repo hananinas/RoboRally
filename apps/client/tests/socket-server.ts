@@ -334,8 +334,32 @@ io.on('connection', (socket) => {
       defaultForLobbyCreation: true,
     },
     {
+      id: 'scout',
+      name: 'Scout',
+      icon: mapIcons['empty-map'],
+      defaultForLobbyCreation: false,
+    },
+    {
+      id: 'rover',
+      name: 'Rover',
+      icon: mapIcons['test-map'],
+      defaultForLobbyCreation: false,
+    },
+    {
       id: 'fork-clamp',
       name: 'Fork Clamp',
+      icon: mapIcons['test-map'],
+      defaultForLobbyCreation: false,
+    },
+    {
+      id: 'hammer',
+      name: 'Hammer',
+      icon: mapIcons['empty-map'],
+      defaultForLobbyCreation: false,
+    },
+    {
+      id: 'whirlwind',
+      name: 'Whirlwind',
       icon: mapIcons['test-map'],
       defaultForLobbyCreation: false,
     },

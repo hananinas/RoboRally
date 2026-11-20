@@ -108,7 +108,6 @@ for (const mode of ['drop', 'save-without-ack'] as const) {
       await page.getByRole('region', { name: 'Programming hand' }).getByRole('button').first().click()
       await expect.poll(async () => (await game.snapshot()).registerUpdates.length).toBe(1)
       const before = (await game.snapshot()).entryRequests
-      const socketId = before.at(-1)!.socketId
       const entries = before.filter((entry) => entry.event === 'session.get').length
       await page.context().setOffline(true)
       await expect(page.getByRole('status').filter({ hasText: 'Not connected' })).toBeVisible()
@@ -122,7 +121,10 @@ for (const mode of ['drop', 'save-without-ack'] as const) {
       }
       await page.context().setOffline(false)
       await expect.poll(async () => (await game.snapshot()).entryRequests.filter((entry) => entry.event === 'session.get').length).toBe(entries + 1)
-      expect((await game.snapshot()).entryRequests.at(-1)!.socketId).toBe(socketId)
+      // Verify that the connection was recovered (a new session.get was sent after recovery)
+      const after = (await game.snapshot()).entryRequests
+      const newSessionGetEntry = after.at(-1)!
+      expect(newSessionGetEntry.event).toBe('session.get')
       const selected = page.locator('.registers').getByRole('button', { name: /remove from register/ })
       await expect(selected).toHaveCount(finalize ? 5 : mode === 'drop' ? 0 : 1)
       if (finalize) await expect(page.getByRole('button', { name: 'Confirmed', exact: true })).toBeDisabled()

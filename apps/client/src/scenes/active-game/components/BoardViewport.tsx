@@ -185,7 +185,7 @@ function RobotPiece({
   return (
     <svg
       aria-hidden="true"
-      className={`board-piece ${component.className} board-piece--selected-robot${robot.robotSpriteId === 'tank' ? ' board-piece--test-tank' : ''}`}
+      className={`board-piece ${component.className} board-piece--selected-robot board-piece--test-tank`}
       data-board-component={componentName}
       data-board-height={height}
       data-board-lift-height={Math.min(

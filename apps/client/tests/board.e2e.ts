@@ -32,6 +32,8 @@ test('renders sprite artwork at its configured aspect ratio', async ({ page }) =
       const viewBox = element.viewBox.baseVal
       const symbol = element.querySelector('use')?.getAttribute('href')
       const robotSpriteId = element.getAttribute('data-robot-sprite-id')
+      const component = element.getAttribute('data-board-component')
+      
       const expectedWidth = symbol?.startsWith('#laser')
         ? { rendered: 59.04, viewBox: 72 }
         : symbol?.startsWith('#antenna')
@@ -40,7 +42,9 @@ test('renders sprite artwork at its configured aspect ratio', async ({ page }) =
             ? { rendered: 46.8, viewBox: 57 }
             : robotSpriteId && robotSpriteId !== 'tank'
               ? { rendered: 46.8, viewBox: 100 }
-              : undefined
+              : component?.startsWith('testTank')
+                ? { rendered: 46.8, viewBox: 57 }
+                : undefined
       const valid = (
         expectedWidth !== undefined &&
         viewBox.width === expectedWidth.viewBox &&

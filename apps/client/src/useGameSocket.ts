@@ -11,6 +11,10 @@ export default function useGameSocket() {
   const [socket, setSocket] = useState<GameSocket>(() => io({
     autoConnect: false,
     transports: ['polling'],
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    reconnectionAttempts: Infinity,
   }))
   const [status, setStatus] = useState<SocketStatus>('connecting')
   const [error, setError] = useState<string | null>(null)
