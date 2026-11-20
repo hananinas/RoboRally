@@ -1034,12 +1034,45 @@ components:
       properties:
         robotSpriteId:
           $ref: '#/components/schemas/RobotSpriteId'
+          description: ID of a robot returned in the lobby's robot catalog.
+    RobotDefinition:
+      type: object
+      additionalProperties: false
+      required: [ id, name, icon, defaultForLobbyCreation ]
+      properties:
+        id:
+          $ref: '#/components/schemas/RobotSpriteId'
+        name:
+          type: string
+        icon:
+          type: string
+          format: uri
+        defaultForLobbyCreation:
+          type: boolean
+    BoardMapSummary:
+      type: object
+      additionalProperties: false
+      required: [ mapName, name, icon, defaultForLobbyCreation ]
+      properties:
+        mapName:
+          type: string
+          minLength: 1
+        name:
+          type: string
+        icon:
+          type: string
+          format: uri
+        defaultForLobbyCreation:
+          type: boolean
     LobbySummary:
       type: object
       additionalProperties: false
       required:
         - lobbyId
         - name
+        - mapName
+        - mapDisplayName
+        - mapIcon
         - playerCount
         - maxPlayers
       properties:
@@ -1048,6 +1081,13 @@ components:
           format: uuid
         name:
           type: string
+        mapName:
+          type: string
+        mapDisplayName:
+          type: string
+        mapIcon:
+          type: string
+          format: uri
         playerCount:
           type: integer
           minimum: 0
@@ -1067,6 +1107,11 @@ components:
             - userId: 00000000-0000-4000-8000-000000000004
               username: Dane
               robotSpriteId: tank
+          robots:
+            - id: tank
+              name: Tank
+              icon: data:image/svg+xml;base64,PHN2Zy8+
+              defaultForLobbyCreation: true
       required:
         - lobbyId
         - name
@@ -1074,6 +1119,7 @@ components:
         - maxPlayers
         - ownerUserId
         - players
+        - robots
       properties:
         lobbyId:
           type: string
@@ -1095,6 +1141,11 @@ components:
           minItems: 1
           items:
             $ref: '#/components/schemas/LobbyPlayer'
+        robots:
+          type: array
+          description: Backend-owned robot catalog used to display and select robot types.
+          items:
+            $ref: '#/components/schemas/RobotDefinition'
     LobbyFailure:
       type: object
       additionalProperties: false
@@ -1117,6 +1168,8 @@ components:
           required:
             - outcome
             - lobbies
+            - maps
+            - robots
           properties:
             outcome:
               const: LOBBIES_FOUND
@@ -1124,6 +1177,14 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/LobbySummary'
+            maps:
+              type: array
+              items:
+                $ref: '#/components/schemas/BoardMapSummary'
+            robots:
+              type: array
+              items:
+                $ref: '#/components/schemas/RobotDefinition'
         - $ref: '#/components/schemas/LobbyFailure'
     LobbyJoinResult:
       oneOf:
@@ -1225,7 +1286,7 @@ components:
     LobbyUpdated:
       type: object
       additionalProperties: false
-      description: Full lobby snapshot sent to lobby members after a join, robot selection, or ownership change, and to remaining members after a leave or disconnect.
+      description: Full lobby snapshot sent to other lobby members after a join or robot selection, and to remaining members after a leave or disconnect. The initiating socket receives the updated snapshot through its acknowledgement.
       required:
         - lobby
       properties:
@@ -1635,8 +1696,8 @@ components:
 
     RobotSpriteId:
       type: string
-      description: Robot sprite selected by a lobby member.
-      enum: [ tank, scout, guardian, rover, striker, sentinel, hauler ]
+      minLength: 1
+      description: ID of a robot in the backend-provided robot catalog.
 
     CardId:
       type: string

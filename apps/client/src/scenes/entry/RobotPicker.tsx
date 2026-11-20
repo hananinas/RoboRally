@@ -1,12 +1,29 @@
+import type { RobotDefinition } from '@robo-rally/game-events'
 import RobotPreview from './RobotPreview.tsx'
-import { tankPreview } from './robotPreviews.ts'
+import { robotOptionFor } from './robotPreviews.ts'
 import './RobotPicker.css'
 
-const PREVIEW_MODELS = ['Tank', 'Model 02', 'Model 03', 'Model 04'] as const
 const PREVIEW_COLOURS = ['Blue', 'Red', 'Yellow', 'Green', 'Purple', 'Pink'] as const
 
-/** Presentational only: selection and readiness are separate feature work. */
-export default function RobotPicker() {
+type Props = {
+  robots: readonly RobotDefinition[]
+  selectedRobotId: string
+  disabled: boolean
+  onSelect: (robotSpriteId: string) => Promise<boolean>
+}
+
+export default function RobotPicker({ robots, selectedRobotId, disabled, onSelect }: Props) {
+  const selectedRobot = robots.find((option) => option.id === selectedRobotId)
+  const choices = robots
+  const robot = selectedRobot && choices.some((option) => option.id === selectedRobot.id)
+    ? selectedRobot
+    : choices[0]
+  const preview = robot ? robotOptionFor(robot.id) : undefined
+
+  function chooseRobot(robotSpriteId: string) {
+    if (!disabled && robotSpriteId !== robot?.id) void onSelect(robotSpriteId)
+  }
+
   return (
     <div className="robot-picker">
       <header className="robot-picker__heading">
@@ -24,24 +41,34 @@ export default function RobotPicker() {
             </svg>
           </span>
         </div>
-        <RobotPreview sprite={tankPreview} />
+        {robot && preview && <RobotPreview sprite={preview.sprite} />}
       </div>
-      <div className="robot-picker__carousel">
-        <button className="robot-picker__arrow" type="button" disabled aria-label="Previous robot model" title="Robot selection is coming soon.">‹</button>
-        <div>
-          <h3>{PREVIEW_MODELS[0]}</h3>
-          <p>01 / {String(PREVIEW_MODELS.length).padStart(2, '0')}</p>
+      <div aria-live="polite">
+        <div className="robot-picker__selected">
+          <h3>{robot?.name ?? 'No robot selected'}</h3>
+          <p>Choose your robot</p>
         </div>
-        <button className="robot-picker__arrow" type="button" disabled aria-label="Next robot model" title="Robot selection is coming soon.">›</button>
       </div>
-      <ol className="robot-picker__positions" aria-label="Robot model previews">
-        {PREVIEW_MODELS.map((model, index) => (
-          <li key={model}>
-            <button type="button" aria-label={model} aria-pressed={index === 0} disabled />
-          </li>
-        ))}
-      </ol>
-      <fieldset className="robot-picker__colours" disabled aria-describedby="robot-picker-help">
+      <div className="robot-picker__choices" role="group" aria-label="Choose a robot">
+        {choices.map((option, choiceIndex) => {
+          const selected = option.id === robot?.id
+          return (
+            <button
+              className="robot-picker__choice"
+              type="button"
+              key={option.id}
+              aria-label={`Robot option ${choiceIndex + 1}`}
+              aria-pressed={selected}
+              disabled={disabled}
+              onClick={() => chooseRobot(option.id)}
+            >
+              <RobotPreview sprite={robotOptionFor(option.id).sprite} />
+            </button>
+          )
+        })}
+      </div>
+      {robots.length === 0 && <p className="robot-picker__help">No robots are currently available.</p>}
+      <fieldset className="robot-picker__colours" disabled>
         <legend>Player colour</legend>
         <div className="robot-picker__swatches">
           {PREVIEW_COLOURS.map((colour) => (
@@ -57,7 +84,6 @@ export default function RobotPicker() {
           ))}
         </div>
       </fieldset>
-      <p className="robot-picker__help" id="robot-picker-help">Robot and colour selection coming soon.</p>
     </div>
   )
 }

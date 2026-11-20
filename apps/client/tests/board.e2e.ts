@@ -19,36 +19,49 @@ test.beforeEach(async ({ page }) => {
 test('renders sprite artwork at its configured aspect ratio', async ({ page }) => {
   const assets = page.locator('.board-piece--asset')
   await expect(assets.first()).toBeVisible()
-  for (const robotId of ['red', 'blue', 'green']) {
-    await expect(page.locator(`[data-robot-id="${robotId}"]`)).toHaveCount(8)
+  for (const [robotId, layerCount] of [['red', 1], ['blue', 8], ['green', 1]] as const) {
+    await expect(page.locator(`[data-robot-id="${robotId}"]`)).toHaveCount(layerCount)
   }
 
-  expect(
-    await assets.evaluateAll((elements) =>
-      elements.every((element) => {
-        if (!(element instanceof SVGSVGElement)) return false
-        const style = getComputedStyle(element)
-        const renderedWidth = Number.parseFloat(style.width)
-        const renderedHeight = Number.parseFloat(style.height)
-        const viewBox = element.viewBox.baseVal
-        const symbol = element.querySelector('use')?.getAttribute('href')
-        const expectedWidth = symbol?.startsWith('#laser')
-          ? { rendered: 59.04, viewBox: 72 }
-          : symbol?.startsWith('#antenna')
-            ? { rendered: 84, viewBox: 84 }
-            : symbol?.startsWith('#testTank')
-              ? { rendered: 46.8, viewBox: 57 }
-              : undefined
-        return (
-          expectedWidth !== undefined &&
-          viewBox.width === expectedWidth.viewBox &&
-          Math.abs(renderedWidth - expectedWidth.rendered) < 0.02 &&
-          Math.abs(renderedHeight / renderedWidth - viewBox.height / viewBox.width) <
-            0.001
-        )
-      }),
-    ),
-  ).toBe(true)
+  const invalidAssets = await assets.evaluateAll((elements) =>
+    elements.flatMap((element) => {
+      if (!(element instanceof SVGSVGElement)) throw new Error('Board asset is not an SVG')
+      const style = getComputedStyle(element)
+      const renderedWidth = Number.parseFloat(style.width)
+      const renderedHeight = Number.parseFloat(style.height)
+      const viewBox = element.viewBox.baseVal
+      const symbol = element.querySelector('use')?.getAttribute('href')
+      const robotSpriteId = element.getAttribute('data-robot-sprite-id')
+      const component = element.getAttribute('data-board-component')
+      
+      const expectedWidth = symbol?.startsWith('#laser')
+        ? { rendered: 59.04, viewBox: 72 }
+        : symbol?.startsWith('#antenna')
+          ? { rendered: 84, viewBox: 84 }
+          : symbol?.startsWith('#testTank')
+            ? { rendered: 46.8, viewBox: 57 }
+            : robotSpriteId && robotSpriteId !== 'tank'
+              ? { rendered: 46.8, viewBox: 100 }
+              : component?.startsWith('testTank')
+                ? { rendered: 46.8, viewBox: 57 }
+                : undefined
+      const valid = (
+        expectedWidth !== undefined &&
+        viewBox.width === expectedWidth.viewBox &&
+        Math.abs(renderedWidth - expectedWidth.rendered) < 0.02 &&
+        Math.abs(renderedHeight / renderedWidth - viewBox.height / viewBox.width) <
+          0.001
+      )
+      return valid ? [] : [{
+        component: element.getAttribute('data-board-component'),
+        symbol,
+        renderedWidth,
+        renderedHeight,
+        viewBox: `${viewBox.width} ${viewBox.height}`,
+      }]
+    }),
+  )
+  expect(invalidAssets).toEqual([])
 })
 
 test('plays rapid server results one robot at a time without replacing its sprite', async ({ page }) => {
@@ -82,7 +95,7 @@ test('plays rapid server results one robot at a time without replacing its sprit
       `${step.position.coordinate.x},${step.position.coordinate.y}`,
     )
     expect(await red.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-board-tile'))))
-      .toEqual(Array(8).fill(`${step.position.coordinate.x},${step.position.coordinate.y}`))
+      .toEqual([`${step.position.coordinate.x},${step.position.coordinate.y}`])
     expect(await red.first().evaluate((element, first) => element === first, original)).toBe(true)
     await expect(blue.first()).toHaveAttribute('data-board-tile', '9,7')
     if (index === 0) {

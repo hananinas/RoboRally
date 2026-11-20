@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { err, ok, type Result } from 'neverthrow'
 import type { Board } from '@/game/Board'
-import { effects, type PrivateProgram, type PublicRegisters, type ResolvedInstruction } from '@robo-rally/game-events'
 import { captureEnvironmentSnapshot, environmentSteps, type EnvironmentChanges } from '@/game/environment'
+import { effects, type PrivateProgram, type PublicRegisters, type ResolvedInstruction, type RobotSpriteId } from '@robo-rally/game-events'
 import { Card } from '@/game/Card'
 import { Deck } from '@/game/Deck'
 import type { CardId, GameId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
-import { Robot } from '@/game/Robot'
+import { ROBOT_COLOURS, Robot } from '@/game/Robot'
 import { Direction, opposite, type Position } from '@/game/spatial'
 import { Integer, PositiveInteger, UnsignedInteger } from '@/numbers'
 import {
@@ -187,9 +187,9 @@ export class Game {
     return ok({ ...free[0] })
   }
 
-  addPlayer(colour: string): Result<Player, AddPlayerError> {
+  addPlayer(colour: string = ROBOT_COLOURS[0], robotSpriteId: RobotSpriteId = 'tank'): Result<Player, AddPlayerError> {
     return this.findSpawn().map((position) => {
-      const robot = new Robot(randomUUID(), Direction.NORTH, colour)
+      const robot = new Robot(randomUUID(), Direction.NORTH, colour, robotSpriteId)
       const player = new Player(randomUUID(), robot, Deck.fromTemplate(this.deck))
       player.drawHand()
       this.board.placeRobot(robot.id, position)
@@ -450,7 +450,7 @@ export class Game {
       if (distance > nearestDistance) continue
       const angle = Math.atan2(dy, dx)
       const offset = ((angle - antennaAngle) % fullTurn + fullTurn) % fullTurn
-      if (distance < nearestDistance || offset < smallestOffset) {
+      if (distance < nearestDistance || (distance === nearestDistance && offset < smallestOffset)) {
         nextRobot = robot
         nearestDistance = distance
         smallestOffset = offset
