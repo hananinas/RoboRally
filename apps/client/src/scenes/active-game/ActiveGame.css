@@ -240,7 +240,7 @@
 
 [data-registers-locked] .register-card:not([data-empty]) {
   border-color: var(--hud-accent);
-  background: var(--hud-register-locked-surface);
+  background-color: var(--hud-register-locked-surface);
 }
 
 .register-card[data-active] {
