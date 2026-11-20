@@ -37,20 +37,6 @@ body {
   font-family: var(--theme-font);
 }
 
-body::before {
-  position: fixed;
-  z-index: -1;
-  inset: 0;
-  pointer-events: none;
-  content: "";
-  background:
-    linear-gradient(to right, var(--theme-canvas) 10px, transparent 10px),
-    linear-gradient(to bottom, var(--theme-canvas) 10px, var(--theme-surface) 10px);
-  background-size: calc(100% / 9) calc(100% / 7);
-  border: 10px solid var(--theme-canvas);
-  border-width: 0 10px 10px 0;
-}
-
 .account-panel {
   box-sizing: border-box;
   padding: var(--theme-panel-padding);

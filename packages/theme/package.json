@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "exports": {
+    "./board-background.css": "./board-background.css",
     "./tokens.css": "./tokens.css"
   },
-  "files": ["tokens.css"]
+  "files": ["board-background.css", "tokens.css"]
 }

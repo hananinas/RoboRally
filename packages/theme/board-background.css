@@ -1,0 +1,37 @@
+.roborally-board-background {
+  --board-cell-size: 96px;
+  --board-gap: 8px;
+  --board-pan-duration: 120s;
+
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.roborally-board-background::before {
+  position: absolute;
+  top: calc(-1 * var(--board-cell-size));
+  left: calc(-1 * var(--board-cell-size));
+  right: 0;
+  bottom: 0;
+  content: "";
+  background:
+    linear-gradient(to right, var(--theme-canvas) var(--board-gap), transparent var(--board-gap)),
+    linear-gradient(to bottom, var(--theme-canvas) var(--board-gap), var(--theme-surface) var(--board-gap));
+  background-size: var(--board-cell-size) var(--board-cell-size);
+  animation: roborally-board-pan var(--board-pan-duration) linear infinite;
+}
+
+@keyframes roborally-board-pan {
+  to {
+    transform: translate(var(--board-cell-size), var(--board-cell-size));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roborally-board-background::before {
+    animation: none;
+  }
+}
