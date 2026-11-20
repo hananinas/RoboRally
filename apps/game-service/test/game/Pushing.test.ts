@@ -1,3 +1,4 @@
+import { resolveRobotAction } from '../activationTestHelper.ts'
 import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
 import { Board, Card, Direction, EmptyTile, Game, PitTile, Player, Robot, type Antenna, type Position, type Tile } from '@/game/index'
@@ -40,7 +41,7 @@ describe('robot pushing', () => {
     const program = [move, ...cards.filter((card) => card !== move).slice(0, 4)]
     for (const player of players) game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
-    const result = game.executeNextAction()
+    const result = resolveRobotAction(game)
     const expected = [
       { robotId: robots[1].id, position: position(0, 4), direction: Direction.NORTH },
       { robotId: robots[2].id, position: reboot, direction: Direction.WEST },
@@ -120,18 +121,18 @@ describe('robot pushing', () => {
     const program = [first, ...cards.filter((card) => card !== first).slice(0, 4)]
     for (const player of players) game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
-    expect(game.executeNextAction().action.robotId).toBe(robots[0].id)
+    expect(resolveRobotAction(game).action.robotId).toBe(robots[0].id)
 
     expect(robots.map((robot) => board.positionOf(robot.id))).toEqual([position(1 + steps), position(2 + steps), position(3 + steps)])
     expect(robots.map((robot) => robot.direction)).toEqual(facing)
     expect(robots.map((robot) => robot.program)).toEqual(players.map(() => program))
     expect(game.currentRegister).toBe(0)
-    expect(game.executeNextAction().action).toMatchObject({
+    expect(resolveRobotAction(game).action).toMatchObject({
       robotId: robots[1].id,
       position: position(2 + steps, instruction === 'BACK_UP' ? 4 : 3 - steps),
       direction: Direction.NORTH,
     })
-    expect(game.executeNextAction().action.robotId).toBe(robots[2].id)
+    expect(resolveRobotAction(game).action.robotId).toBe(robots[2].id)
     expect(game.currentRegister).toBe(1)
   })
 
@@ -172,11 +173,11 @@ describe('robot pushing', () => {
     const program = cards.slice(0, 5)
     for (const player of players) game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
-    expect(game.executeNextAction().action.robotId).toBe(robots[0].id)
+    expect(resolveRobotAction(game).action.robotId).toBe(robots[0].id)
     expect(board.positionOf(robots[1].id)).toEqual(reboot)
     expect(robots[1].program).toEqual(program)
     expect(game.currentRegister).toBe(0)
-    expect(game.executeNextAction().action).toMatchObject({
+    expect(resolveRobotAction(game).action).toMatchObject({
       robotId: robots[1].id, card: program[0], position: position(0, 4), direction: Direction.NORTH,
     })
     expect(game.currentRegister).toBe(1)
@@ -206,8 +207,8 @@ describe('robot pushing', () => {
     game.submitProgram(players[0].id, turnsFirst.map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(players[1].id, movesFirst.map((card) => card.id))._unsafeUnwrap()
 
-    expect(game.executeNextAction().action.robotId).toBe(robots[0].id)
-    expect(game.executeNextAction().action.robotId).toBe(robots[1].id)
+    expect(resolveRobotAction(game).action.robotId).toBe(robots[0].id)
+    expect(resolveRobotAction(game).action.robotId).toBe(robots[1].id)
 
     expect(board.positionOf(robots[0].id)).toEqual(position(1))
     expect(board.positionOf(robots[1].id)).toEqual(position(2))
@@ -226,10 +227,10 @@ describe('robot pushing', () => {
     game.submitProgram(players[0].id, cards.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(players[1].id, turnsFirst.map((card) => card.id))._unsafeUnwrap()
 
-    game.executeNextAction()
+    resolveRobotAction(game)
     expect(board.positionOf(players[1].robot.id)).toEqual(position(3))
     expect(players[1].lastCheckpoint).toBe(0)
-    game.executeNextAction()
+    resolveRobotAction(game)
     expect(players[1].lastCheckpoint).toBe(1)
     expect(game.currentRegister).toBe(1)
   })

@@ -1,3 +1,4 @@
+import { resolveRobotAction } from '../activationTestHelper.js'
 import { describe, expect, it } from 'vitest'
 import { Board, Deck, Direction, EmptyTile, PitTile, Game, Card, Player, Robot } from '@/game/index'
 import { Integer } from '@/numbers'
@@ -42,7 +43,7 @@ describe('Game programming', () => {
     const game = new Game({ board, players: [player], deck, rebootTiles: [{ x: Integer(0), y: Integer(0) }] })
     game.submitProgram(player.id, deck.map((card) => card.id))
 
-    const actions = Array.from({ length: 5 }, () => game.executeNextAction())
+    const actions = Array.from({ length: 5 }, () => resolveRobotAction(game))
     expect(actions.map(({ registerIndex, action }) => ({
       registerIndex,
       position: action.position,
@@ -167,7 +168,7 @@ describe('Game programming', () => {
     game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
 
     game.pause()
-    expect(() => game.executeNextAction()).toThrow()
+    expect(() => resolveRobotAction(game)).toThrow()
     expect(game.currentRegister).toBe(0)
   })
 

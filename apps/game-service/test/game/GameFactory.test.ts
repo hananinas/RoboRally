@@ -1,3 +1,4 @@
+import { resolveRobotAction } from '../activationTestHelper.js'
 import { Integer } from '@/numbers'
 import { submitProgramSchema } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'
@@ -6,6 +7,12 @@ import { boardMaps } from '@/game/boardMaps'
 import { Direction, createGame, createPlayer } from '@/game/index'
 
 describe('game factory', () => {
+  it('includes both gear directions in the test map', () => {
+    const { game } = createGame('test-map')
+    expect(game.board.getTile({ x: Integer(9), y: Integer(6) })).toMatchObject({ kind: 'GEAR', rotation: 'CLOCKWISE' })
+    expect(game.board.getTile({ x: Integer(11), y: Integer(8) })).toMatchObject({ kind: 'GEAR', rotation: 'COUNTERCLOCKWISE' })
+  })
+
   it.each([
     { mapName: 'empty-map', closest: { x: 3, y: 3 } },
     { mapName: 'test-map', closest: { x: 2, y: 6 } },
@@ -15,7 +22,7 @@ describe('game factory', () => {
     game.board.relocateRobot(player.robot.id, { x: Integer(0), y: Integer(0) })
     game.submitProgram(player.id, [0, 1, 2, 3, 4].map((index) => player.hand[index].id))._unsafeUnwrap()
 
-    expect(game.executeNextAction().action.position).toEqual(closest)
+    expect(resolveRobotAction(game).action.position).toEqual(closest)
     expect(player.robot.direction).toBe(Direction.NORTH)
     expect(game.board.occupantAt({ x: Integer(0), y: Integer(0) })).toBeUndefined()
   })
@@ -26,7 +33,7 @@ describe('game factory', () => {
     game.board.relocateRobot(player.robot.id, { x: Integer(5), y: Integer(11) })
     game.submitProgram(player.id, [0, 1, 2, 3, 4].map((index) => player.hand[index].id))._unsafeUnwrap()
 
-    expect(game.executeNextAction().action.position).toEqual({ x: 10, y: 10 })
+    expect(resolveRobotAction(game).action.position).toEqual({ x: 10, y: 10 })
     expect(player.robot.direction).toBe(Direction.NORTH)
   })
 

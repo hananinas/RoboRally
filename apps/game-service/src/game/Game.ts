@@ -2,12 +2,12 @@ import { randomUUID } from 'node:crypto'
 import { err, ok, type Result } from 'neverthrow'
 import type { Board } from '@/game/Board'
 import { effects, type PrivateProgram, type PublicRegisters, type ResolvedInstruction } from '@robo-rally/game-events'
+import { captureEnvironmentSnapshot, environmentSteps, type EnvironmentChanges } from '@/game/environment'
 import { Card } from '@/game/Card'
 import { Deck } from '@/game/Deck'
 import type { CardId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
 import { ROBOT_COLOURS, Robot } from '@/game/Robot'
-import { tileDefinitions } from '@/game/Tile'
 import { Direction, opposite, type Position } from '@/game/spatial'
 import { Integer, PositiveInteger, UnsignedInteger } from '@/numbers'
 import {
@@ -40,6 +40,14 @@ export type NextActionResult = Readonly<{
   }>[]
   roundConcluded: boolean
 }>
+
+export type EnvironmentStepResult = EnvironmentChanges & Readonly<{
+  roundConcluded: boolean
+}>
+
+export type ActivationStep =
+  | Readonly<{ type: 'robot'; result: NextActionResult }>
+  | Readonly<{ type: 'environment'; result: EnvironmentStepResult }>
 
 export type AddPlayerError = 'NO_SPAWN_AVAILABLE'
 
@@ -81,6 +89,7 @@ export class Game {
   private readonly deck: readonly Card[]
   private readonly lifecycle = new GameLifecycle('programming')
   private registerIndex = 0
+  private environmentStepIndex: number | null = null
   private readonly submittedPlayerIds = new Set<PlayerId>()
   private readonly activatedRobotIds = new Set<RobotId>()
   private readonly random: () => number
@@ -316,25 +325,54 @@ export class Game {
     }
   }
 
-  private checkRegisterComplete(): Result<void, 'NOT_COMPLETE'> {
-    return this.roster.length === 0 || this.activatedRobotIds.size === this.roster.length
-      ? ok(undefined)
-      : err('NOT_COMPLETE')
+  get hasPendingEnvironment(): boolean {
+    return this.environmentStepIndex !== null
   }
 
   private recheckActivationPhase(): { roundConcluded: boolean } {
-    return this.requirePhase('activation')
-      .andThen(() => this.checkRegisterComplete())
-      .map(() => this.concludeRegister())
-      .unwrapOr({ roundConcluded: false })
+    if (this.requirePhase('activation').isErr()) {
+      return { roundConcluded: false }
+    }
+    if (this.roster.length === 0) return this.concludeRegister()
+    if (!this.hasPendingEnvironment && this.activatedRobotIds.size === this.roster.length) {
+      this.environmentStepIndex = 0
+    }
+    return { roundConcluded: false }
+  }
+
+  executeNextStep(): ActivationStep {
+    if (this.requirePhase('activation').isErr()) throw new Error('Game is not executing')
+    const index = this.environmentStepIndex
+    if (index === null) return { type: 'robot', result: this.executeNextAction() }
+
+    const changes = environmentSteps[index](captureEnvironmentSnapshot(this.board, this.roster))
+    if (changes.kind === 'GEARS') {
+      for (const { robotId, direction } of changes.robots) {
+        const robot = this.roster.find(({ robot }) => robot.id === robotId)!.robot
+        robot.turn(direction - robot.direction)
+      }
+    } else {
+      for (const { playerId, lastCheckpoint } of changes.checkpointProgress) {
+        this.roster.find(({ id }) => id === playerId)!.completeCheckpoint(lastCheckpoint)
+        if (lastCheckpoint === this.board.checkpointCount) this.lifecycle.finish(playerId)
+      }
+    }
+
+    this.environmentStepIndex = index + 1
+    const { roundConcluded } = this.environmentStepIndex === environmentSteps.length
+      ? this.concludeRegister() : { roundConcluded: false }
+    return {
+      type: 'environment',
+      result: { ...changes, roundConcluded },
+    }
   }
 
   private concludeRegister(): { roundConcluded: boolean } {
+    this.environmentStepIndex = null
     if (this.roster.length === 0) {
       this.finishRound()
       return { roundConcluded: true }
     }
-    this.activateBoardElements()
     this.finishRegister()
     if (this.winner !== undefined) {
       this.clearRound()
@@ -363,7 +401,7 @@ export class Game {
   }
 
   executeNextAction(): NextActionResult {
-    if (this.requirePhase('activation').isErr()) {
+    if (this.hasPendingEnvironment || this.requirePhase('activation').isErr()) {
       throw new Error('Robot actions can only execute during activation')
     }
 
@@ -467,7 +505,7 @@ export class Game {
 
   private resolveMovementEntry(robot: Robot, position: Position): 'continue' | 'stop' {
     const tile = this.board.getTile(position)
-    const effect = tile === undefined ? 'reboot' : tileDefinitions[tile.kind].entryEffect
+    const effect = tile === undefined ? 'reboot' : tile.entryEffect
     switch (effect) {
       case undefined:
         return 'continue'
@@ -490,18 +528,6 @@ export class Game {
     if (destination === undefined) throw new Error('No safe reboot destination is available')
     this.board.relocateRobot(robot.id, destination)
     // TODO: Add two SPAM cards and cancel this robot's remaining registers.
-  }
-
-  private activateBoardElements(): void {
-    for (const player of this.players) {
-      const position = this.board.positionOf(player.robot.id)
-      const checkpoint = this.board.getTile(position)?.checkpointNumber
-      if (checkpoint === undefined || !player.completeCheckpoint(checkpoint)) continue
-      if (checkpoint === this.board.checkpointCount) {
-        this.lifecycle.finish(player.id)
-        break
-      }
-    }
   }
 
   private finishRegister(): void {

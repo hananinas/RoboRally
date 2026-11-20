@@ -240,12 +240,24 @@
 
 [data-registers-locked] .register-card:not([data-empty]) {
   border-color: var(--hud-accent);
-  background: var(--hud-register-locked-surface);
+  background-color: var(--hud-register-locked-surface);
 }
 
 .register-card[data-active] {
   border-color: var(--hud-accent);
   box-shadow: 0 0 0 1px var(--hud-accent);
+}
+
+.register-card[data-played],
+.program-card--hand[data-played] {
+  opacity: 0.4;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .register-card,
+  .program-card--hand:disabled {
+    transition: opacity var(--hud-card-motion-duration) ease-out;
+  }
 }
 
 .register-card[data-pending-delete] {

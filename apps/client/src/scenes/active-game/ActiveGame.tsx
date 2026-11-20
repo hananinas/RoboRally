@@ -59,7 +59,17 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
   const hasHand = state.handVersion > 0
   const status = getGameStatus(state)
   const disconnectedNames = state.players.filter((player) => !player.connected).map((player) => player.username)
+  const { active } = state.playback
+  const activeCard = active && !('kind' in active) ? active : null
+  const lastCheckpoint = state.assignment ? state.playback.checkpoints.get(state.assignment.playerId) ?? 0 : 0
   const player = state.players.find((candidate) => candidate.playerId === state.assignment?.playerId)
+  const displayedRegisters = state.playbackProgram ?? state.registers
+  const publicRegisters = player && (state.playbackRegisters?.get(player.playerId) ?? player.registers)
+  const activeRegister = activeCard && activeCard.playerId === state.assignment?.playerId
+    ? activeCard.registerIndex : null
+  const playedCardIds = new Set(displayedRegisters.flatMap((card, index) =>
+    card && publicRegisters?.[index]?.status === 'REVEALED' && index !== activeRegister ? [card.id] : [],
+  ))
   const showWinner = isGameOver(state) && state.connected
   const robotColour = state.playback.robots.find((robot) => robot.robotId === state.assignment?.robotId)?.colour
   const registeredCardIds = new Set(
@@ -76,7 +86,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
         <aside className="game-hud" aria-label="Game controls">
           <div className="game-hud__content">
             <PlayerPanel
-              player={{ name: username, lastCheckpoint: player?.lastCheckpoint ?? 0 }}
+              player={{ name: username, lastCheckpoint }}
               robotColour={robotColour}
               checkpointCount={state.checkpointCount}
               onLeave={onLeave}
@@ -85,8 +95,9 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
               onSettings={onSettings}
             />
             <RegisterPanel
-              registers={state.playbackProgram ?? state.registers}
-              activeRegister={state.playback.active?.registerIndex ?? null}
+              registers={displayedRegisters}
+              activeRegister={activeRegister}
+              playedCardIds={playedCardIds}
               disabled={disabled}
               submission={state.submission}
               locked={state.phase === 'PROGRAMMING' && !state.playback.active && state.submission === 'accepted'}
@@ -106,8 +117,8 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
             players={getOtherPlayers(state)}
             checkpointCount={state.checkpointCount}
             phase={state.playback.active ? 'EXECUTING' : state.phase}
-            activeAction={state.playback.active}
-            queuedActions={state.playback.pending.map(({ action }) => action)}
+            activeAction={activeCard}
+            queuedActions={state.playback.pending.flatMap(({ action }) => 'kind' in action ? [] : [action])}
             paused={state.paused || !state.connected}
           />
         )}
@@ -116,6 +127,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
             key={state.handVersion}
             cards={state.hand}
             registeredCardIds={registeredCardIds}
+            playedCardIds={playedCardIds}
             disabled={disabled}
             highlightedIndex={highlightedIndex}
             onHighlightCard={highlightCard}

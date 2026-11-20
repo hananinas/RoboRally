@@ -7,7 +7,7 @@ export type BoardTileWalls = Readonly<Record<BoardWallSide, boolean>>
 
 export type BoardTile =
   | Readonly<{
-      tile: 'empty' | 'hole' | 'laser'
+      tile: 'empty' | 'hole' | 'laser' | 'gearClockwise' | 'gearCounterclockwise'
     }>
   | Readonly<{
       tile: 'conveyor'
@@ -36,6 +36,9 @@ export type BoardRenderModel = Readonly<{
 
 export type BoardComponentName =
   | 'conveyor'
+  | `gear${1 | 2 | 3 | 4 | 5 | 6 | 7}`
+  | 'gearClockwise'
+  | 'gearCounterclockwise'
   | `antenna${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10}`
   | 'ground'
   | 'laser1'
@@ -75,6 +78,7 @@ export type BoardSpriteAsset = Readonly<{
 }>
 
 export type BoardVisualComponent = Readonly<{
+  label?: string
   asset?: BoardSpriteAsset
   className: string
   width: number
@@ -118,6 +122,8 @@ export type BoardRenderConfig = Readonly<{
 type BoardWallAssignment = BoardPoint & Partial<BoardTileWalls>
 type BoardAssignments = Readonly<{
   antenna?: Antenna
+  gearClockwise?: readonly (readonly [number, number])[]
+  gearCounterclockwise?: readonly (readonly [number, number])[]
   hole?: readonly (readonly [number, number])[]
   laser?: readonly (readonly [number, number])[]
   conveyor?: readonly (BoardPoint & Readonly<{
@@ -185,7 +191,7 @@ export function createBoardRenderModel(
   }
 
   const tiles = new Map<string, BoardTile>()
-  for (const tile of ['hole', 'laser'] as const) {
+  for (const tile of ['hole', 'laser', 'gearClockwise', 'gearCounterclockwise'] as const) {
     const positions = assignments[tile] ?? []
     for (const [x, y] of positions) {
       const key = positionKey(x, y)
