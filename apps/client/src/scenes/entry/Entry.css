@@ -30,11 +30,11 @@
 
 .entry-panel {
   min-width: 0;
-  padding: var(--entry-space-6) var(--entry-space-5);
+  padding: var(--theme-panel-padding);
   border: 1px solid var(--entry-border);
   border-radius: var(--entry-radius-lg);
   background: var(--entry-panel);
-  box-shadow: 0 20px 60px rgb(0 0 0 / 35%);
+  box-shadow: var(--theme-panel-shadow);
 }
 
 .entry-panel h1 {

@@ -13,6 +13,10 @@ export const registerStaticRoutes: RouteRegistrator = (
   createHelpers = defaultConfig,
 ) => {
   RegisterOryElementsExpress(app, defaultLightTheme, createHelpers)
+  const themePath = require.resolve("@robo-rally/theme/tokens.css")
+  app.get("/assets/roborally-theme.css", (_req, res) => {
+    res.sendFile(themePath)
+  })
   app.use("/", express.static(`${__dirname}/../../public`))
   app.use("/.well-known/ory/webauthn.js", (req, res) => {
     res.contentType("text/javascript")

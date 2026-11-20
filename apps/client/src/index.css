@@ -1,7 +1,8 @@
+@import "@robo-rally/theme/tokens.css";
 @import "./ui-tokens.css";
 
 :root {
-  font-family: system-ui, sans-serif;
+  font-family: var(--theme-font);
   color: #111;
   background: #d8d8d8;
 }

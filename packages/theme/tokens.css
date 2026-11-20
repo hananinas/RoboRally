@@ -1,0 +1,21 @@
+:root {
+  --theme-font: system-ui, sans-serif;
+  --theme-canvas: #2b323b;
+  --theme-surface: #3a424c;
+  --theme-panel: rgb(58 66 76 / 92%);
+  --theme-inset: #323a44;
+  --theme-border: #4c5560;
+  --theme-border-strong: #657181;
+  --theme-text: #eef1f4;
+  --theme-muted: #9aa4b0;
+  --theme-accent: #e0bb1f;
+  --theme-accent-ink: #241f0a;
+  --theme-danger: #e8786e;
+  --theme-input-surface: #fff;
+  --theme-input-text: #17202a;
+  --theme-panel-radius: 16px;
+  --theme-input-radius: 8px;
+  --theme-button-radius: 9px;
+  --theme-panel-shadow: 0 20px 60px rgb(0 0 0 / 35%);
+  --theme-panel-padding: 32px 24px;
+}
