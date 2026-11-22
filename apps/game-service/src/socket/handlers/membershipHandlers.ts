@@ -37,22 +37,6 @@ export function handleGetMembership(
   })
 }
 
-export function validateSocketSession(context: SocketContext, socket: GameSocket, next: (error?: Error) => void): void {
-  if (socket.recovered) {
-    const gameSession = context.registry.getCurrentGame(socket.data.user.userId)
-    const seat = gameSession?.getSeat(socket.data.user.userId)
-    if (seat?.connectionId && seat.connectionId !== socket.id) {
-      return next(new Error('USER_ALREADY_IN_GAME'))
-    }
-    const expectedRooms = new Set(seat && gameSession
-      ? [socket.id, gameSession.publicRoom, gameSession.playerRoom(seat.player.id)] : [socket.id])
-    if ([...socket.rooms].some((room) => !expectedRooms.has(room))) {
-      return next(new Error('SOCKET_SESSION_EXPIRED'))
-    }
-  }
-  next()
-}
-
 export function recoverSocketSession(context: SocketContext, socket: GameSocket): void {
   const gameSession = context.registry.getCurrentGame(socket.data.user.userId)
   if (gameSession) gameSession.reconnectIfRecovered(socket)
