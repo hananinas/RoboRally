@@ -1,9 +1,24 @@
 import { err, ok } from 'neverthrow'
-import { emptyRequestSchema, type EmptyRequest, type MembershipResult, type LeaveResult } from '@robo-rally/game-events'
+import { emptyRequestSchema, type EmptyRequest, type MembershipResult, type LeaveResult, type User } from '@robo-rally/game-events'
 import type { GameSocket, SocketContext } from '@/socket/gameServer'
 import { leaveLobby } from '@/socket/handlers/lobbyHandlers'
 import { presentLobby } from '@/socket/presenters/lobbyPresenter'
 import { withValidatedRequest } from '@/socket/utilities/withValidatedRequest'
+
+function resolveLobbyMembership(context: SocketContext, socket: GameSocket, user: User): MembershipResult {
+  const lobbySession = context.registry.getCurrentLobby(user.userId)
+  if (!lobbySession) throw new Error('Membership references a missing lobby')
+  return lobbySession.isMember(socket).isOk()
+    ? { outcome: 'IN_LOBBY', lobby: presentLobby(lobbySession.lobby), user }
+    : { outcome: 'ALREADY_HAS_MEMBERSHIP' }
+}
+
+function resolveGameMembership(context: SocketContext, socket: GameSocket, user: User): MembershipResult {
+  const gameSession = context.registry.getCurrentGame(user.userId)
+  if (!gameSession) throw new Error('Membership references a missing game')
+  const result = gameSession.reattach(socket)
+  return result.isOk() ? { outcome: 'IN_GAME', initialization: result.value, user } : { outcome: result.error }
+}
 
 export function handleGetMembership(
   context: SocketContext,
@@ -17,17 +32,7 @@ export function handleGetMembership(
     run: (user, ack) => {
       const membership = context.registry.getActiveMembership(user.userId)
       if (!membership) return ack({ outcome: 'NO_MEMBERSHIP', user })
-      if (membership.kind === 'lobby') {
-        const lobbySession = context.registry.getCurrentLobby(user.userId)
-        if (!lobbySession) throw new Error('Membership references a missing lobby')
-        return ack(lobbySession.isMember(socket).isOk()
-          ? { outcome: 'IN_LOBBY', lobby: presentLobby(lobbySession.lobby), user }
-          : { outcome: 'ALREADY_HAS_MEMBERSHIP' })
-      }
-      const gameSession = context.registry.getCurrentGame(user.userId)
-      if (!gameSession) throw new Error('Membership references a missing game')
-      const result = gameSession.reattach(socket)
-      ack(result.isOk() ? { outcome: 'IN_GAME', initialization: result.value, user } : { outcome: result.error })
+      ack(membership.kind === 'lobby' ? resolveLobbyMembership(context, socket, user) : resolveGameMembership(context, socket, user))
     },
   })
 }
