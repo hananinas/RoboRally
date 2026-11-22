@@ -81,7 +81,7 @@ export class GameSession {
   }
 
   isMember(socket: GameSocket): Result<Seat, 'NOT_A_MEMBER'> {
-    const seat = this.seats.get(socket.data.user.userId)
+    const seat = this.seatFor(socket)
     return seat?.connectionId === socket.id ? ok(seat) : err('NOT_A_MEMBER')
   }
 
@@ -95,7 +95,7 @@ export class GameSession {
 
   reconnectIfRecovered(socket: GameSocket): void {
     if (!socket.recovered) return
-    const seat = this.seats.get(socket.data.user.userId)
+    const seat = this.seatFor(socket)
     if (seat && this.reattachSeat(seat, socket.id)) {
       this.resumeUnlessStillDisconnected()
       this.notifyReconnected(seat.player)
@@ -139,7 +139,7 @@ export class GameSession {
   }
 
   reattach(socket: GameSocket): Result<GameInitialization, 'ALREADY_HAS_MEMBERSHIP' | 'INTERNAL_ERROR'> {
-    const seat = this.seats.get(socket.data.user.userId)
+    const seat = this.seatFor(socket)
     if (!seat) return err('INTERNAL_ERROR')
     if (seat.connectionId && seat.connectionId !== socket.id) return err('ALREADY_HAS_MEMBERSHIP')
 
@@ -162,6 +162,10 @@ export class GameSession {
       if (wasPaused) this.game.pause()
       return err('INTERNAL_ERROR')
     }
+  }
+
+  private seatFor(socket: GameSocket): Seat | undefined {
+    return this.seats.get(socket.data.user.userId)
   }
 
   private reattachSeat(seat: Seat, socketId: string): boolean {
