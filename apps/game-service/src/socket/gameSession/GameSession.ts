@@ -20,7 +20,7 @@ export class GameSession {
   readonly io: GameSocketServer
   readonly game: Game
   readonly publicRoom: string
-  readonly seats = new Map<string, Seat>()
+  private readonly seats = new Map<string, Seat>()
   readonly actionScheduler: ActionScheduler
   readonly programmingTimer: ProgrammingTimer
   private recordedWinner: Winner | null = null
@@ -83,6 +83,14 @@ export class GameSession {
   isMember(socket: GameSocket): Result<Seat, 'NOT_A_MEMBER'> {
     const seat = this.seats.get(socket.data.user.userId)
     return seat?.connectionId === socket.id ? ok(seat) : err('NOT_A_MEMBER')
+  }
+
+  getSeat(userId: string): Seat | undefined {
+    return this.seats.get(userId)
+  }
+
+  get seatCount(): number {
+    return this.seats.size
   }
 
   reconnectIfRecovered(socket: GameSocket): void {

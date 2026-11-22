@@ -49,7 +49,7 @@ export function handleGetMembership(
 export function validateSocketSession(context: SocketContext, socket: GameSocket, next: (error?: Error) => void): void {
   if (socket.recovered) {
     const gameSession = context.registry.getCurrentGame(socket.data.user.userId)
-    const seat = gameSession?.seats.get(socket.data.user.userId)
+    const seat = gameSession?.getSeat(socket.data.user.userId)
     if (seat?.connectionId && seat.connectionId !== socket.id) {
       return next(new Error('USER_ALREADY_IN_GAME'))
     }
@@ -84,7 +84,7 @@ export function handleLeaveGame(
       if (result.isErr()) return ack({ outcome: 'GAME_NOT_FOUND' })
       context.registry.clearActiveMembership(user.userId)
       ack({ outcome: 'LEFT' })
-      if (gameSession.seats.size === 0) {
+      if (gameSession.seatCount === 0) {
         gameSession.actionScheduler.stop()
         context.registry.removeGame(gameSession.game.id)
       }

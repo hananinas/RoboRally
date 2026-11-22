@@ -124,7 +124,7 @@ function startGame(io: GameSocketServer, lobby: Lobby, connectedMembers: Connect
   }
   const state = gameSession.publicState()
   const seatedMembers = connectedMembers.map(({ user, socket }) => {
-    const { player } = gameSession.seats.get(user.userId)!
+    const { player } = gameSession.getSeat(user.userId)!
     return { user, player, socket, initialization: presentInitialization(gameSession.game, player, state) }
   })
   for (const seatedMember of seatedMembers) {
