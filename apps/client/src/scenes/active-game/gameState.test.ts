@@ -824,6 +824,7 @@ describe('pit playback', () => {
   const fall: RobotActionResolved = {
     ...actions[0],
     instruction: 'MOVE_2', resolvedInstruction: 'MOVE_2', position: { coordinate: { x: 0, y: 4 }, orientation: 'NORTH' },
+    reboots: [{ robotId: actions[0].robotId, fellAt: { x: 2, y: 1 }, landedAt: { x: 0, y: 4 } }],
   }
 
   const progress = (playerId: string) => ({ type: 'environment' as const, result: {

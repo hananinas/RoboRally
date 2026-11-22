@@ -1,7 +1,6 @@
 import { effects } from '@robo-rally/game-events'
 import type {
   Card,
-  Coordinate,
   EnvironmentStepResolved,
   Orientation,
   PlayerId,
@@ -11,7 +10,7 @@ import type {
   RobotActionResolved,
 } from '@robo-rally/game-events'
 import { useCallback, useEffect, useReducer } from 'react'
-import type { BoardRenderModel, BoardWallSide } from './boardModel.ts'
+import type { BoardRenderModel } from './boardModel.ts'
 
 export type { Orientation }
 export type RobotPosition = Position
@@ -72,78 +71,29 @@ export const orientationAngle: Record<Orientation, number> = {
   WEST: -90,
 }
 
-const stepOffset: Record<Orientation, Coordinate> = {
-  NORTH: { x: 0, y: -1 },
-  EAST: { x: 1, y: 0 },
-  SOUTH: { x: 0, y: 1 },
-  WEST: { x: -1, y: 0 },
-}
-
-const oppositeOrientation: Record<Orientation, Orientation> = {
-  NORTH: 'SOUTH',
-  EAST: 'WEST',
-  SOUTH: 'NORTH',
-  WEST: 'EAST',
-}
-
-const wallSide: Record<Orientation, BoardWallSide> = {
-  NORTH: 'north',
-  EAST: 'east',
-  SOUTH: 'south',
-  WEST: 'west',
-}
-
-// The first hole on the movement path before the resolved position, if any.
-export function findPitEntry(
-  board: BoardRenderModel,
-  start: Position,
-  action: ResolvedRobotAction,
-): Coordinate | null {
-  const effect = action.resolvedInstruction === null
-    ? null : effects[action.resolvedInstruction]
-  if (!effect || effect.kind !== 'move') return null
-  const direction = effect.steps < 0
-    ? oppositeOrientation[start.orientation] : start.orientation
-  const cellAt = ({ x, y }: Coordinate) =>
-    x >= 0 && x < board.columns && y >= 0 && y < board.rows
-      ? board.cells[y * board.columns + x] : undefined
-  let current = start.coordinate
-  for (let step = 0; step < Math.abs(effect.steps); step++) {
-    const next = { x: current.x + stepOffset[direction].x, y: current.y + stepOffset[direction].y }
-    const nextCell = cellAt(next)
-    if (!nextCell || cellAt(current)?.walls[wallSide[direction]] ||
-      nextCell.walls[wallSide[oppositeOrientation[direction]]] ||
-      (board.antenna?.x === next.x && board.antenna.y === next.y)) return null
-    if (next.x === action.position.coordinate.x && next.y === action.position.coordinate.y) return null
-    if (nextCell.tile === 'hole') return next
-    current = next
-  }
-  return null
-}
-
-// Moving onto the pit, sinking into it, then appearing at the reboot position.
-function pitPhases(
-  action: ResolvedRobotAction,
-  board: BoardRenderModel,
-  start: Position,
-): readonly PlaybackPhase[] {
-  const pit = findPitEntry(board, start, action)
-  if (!pit) return []
-  const inPit = { ...start, coordinate: pit }
-  return [
-    { kind: 'pit-enter', durationMs: ROBOT_MOVE_DURATION_MS, robots: [{ robotId: action.robotId, position: inPit }] },
-    { kind: 'pit-fall', durationMs: PIT_FALL_DURATION_MS, robots: [{ robotId: action.robotId, position: inPit }] },
-    { kind: 'pit-respawn', durationMs: PIT_RESPAWN_DURATION_MS, robots: [{ robotId: action.robotId, position: action.position }] },
-  ]
-}
-
-// Each effect (pit, laser, board edge) contributes its phases here.
+// The server reports each reboot in order. For each one the robot drives to where it fell,
+// sinks there, then appears on its reboot tile. Robots that reboot later in the same action
+// wait where they started until their turn.
 export function playbackPhases(
   action: ResolvedRobotAction,
-  board: BoardRenderModel,
-  start: Position,
+  startOf: (robotId: string) => Position | undefined,
 ): readonly PlaybackPhase[] {
-  return pitPhases(action, board, start)
+  return action.reboots.flatMap(({ robotId, fellAt, landedAt }, index) => {
+    const start = startOf(robotId)
+    const final = affectedPosition(action, robotId)
+    if (!start || !final) return []
+    const waiting = action.reboots.slice(index + 1).flatMap((later) => {
+      const position = later.robotId === robotId ? undefined : startOf(later.robotId)
+      return position ? [{ robotId: later.robotId, position }] : []
+    })
+    const inPit = { robotId, position: { coordinate: fellAt, orientation: start.orientation } }
+    const landed = { robotId, position: { coordinate: landedAt, orientation: final.orientation } }
+    return [
+      { kind: 'pit-enter', durationMs: ROBOT_MOVE_DURATION_MS, robots: [inPit, ...waiting] },
+      { kind: 'pit-fall', durationMs: PIT_FALL_DURATION_MS, robots: [inPit, ...waiting] },
+      { kind: 'pit-respawn', durationMs: PIT_RESPAWN_DURATION_MS, robots: [landed, ...waiting] },
+    ]
+  })
 }
 
 // Where the robot stands once every action already in playback has finished.
@@ -269,10 +219,11 @@ export function robotPlaybackReducer(
   if (event.type === 'advance') return advance(state)
 
   const action = event.action
-  const start = 'kind' in action ? undefined : settledPosition(state, action.robotId)
   const entry: PlaybackAction = {
     action,
-    phases: event.board && start && !('kind' in action) ? playbackPhases(action, event.board, start) : [],
+    // Without a board on screen (or with reduced motion) the action jumps to its result.
+    phases: event.board && !('kind' in action)
+      ? playbackPhases(action, (robotId) => settledPosition(state, robotId)) : [],
   }
   const queued = { ...state, pending: [...state.pending, entry] }
   return state.active ? queued : startNext(queued)

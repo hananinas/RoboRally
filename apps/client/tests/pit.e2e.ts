@@ -9,9 +9,17 @@ const ROUND = [
   },
   {
     gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 1, robotId: ROBOT_ID, instruction: 'MOVE_2', resolvedInstruction: 'MOVE_2',
-    position: { coordinate: { x: 1, y: 9 }, orientation: 'EAST' }, pushedRobots: [], reboots: [],
+    position: { coordinate: { x: 1, y: 9 }, orientation: 'EAST' }, pushedRobots: [],
+    reboots: [{ robotId: ROBOT_ID, fellAt: { x: 5, y: 3 }, landedAt: { x: 1, y: 9 } }],
   },
 ] as const
+
+// MOVE_3 north from (5,5) falls into the pit at (5,3) and reboots on (5,4), a tile it drove over.
+const REBOOT_ON_PATH = [{
+  gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 0, robotId: ROBOT_ID, instruction: 'MOVE_3', resolvedInstruction: 'MOVE_3',
+  position: { coordinate: { x: 5, y: 4 }, orientation: 'NORTH' }, pushedRobots: [],
+  reboots: [{ robotId: ROBOT_ID, fellAt: { x: 5, y: 3 }, landedAt: { x: 5, y: 4 } }],
+}] as const
 
 type Game = Readonly<{ initial: FixtureSnapshot; control: (control: FixtureControl) => Promise<FixtureSnapshot> }>
 
@@ -97,6 +105,29 @@ test('falls into the pit and respawns in place at the reboot tile', async ({ pag
   await expect(tank).toHaveAttribute('data-board-tile', '1,9')
   await expect.poll(() => opacity(tank)).toBe('1')
   await expect(page.locator('[data-pit-active]')).toHaveCount(0)
+})
+
+test('shows the fall when the robot reboots on a tile it drove over', async ({ page, game }) => {
+  await openPitBoard(page, game)
+  const tank = page.locator(`[data-robot-id="${ROBOT_ID}"]`).first()
+  const hole = page.locator('[data-board-tile-type="hole"][data-board-tile="5,3"]')
+  await game.control({ type: 'round', actions: [...REBOOT_ON_PATH] })
+
+  await expect(tank).toHaveAttribute('data-playback-phase', 'pit-enter')
+  await expect(tank).toHaveAttribute('data-board-tile', '5,3')
+  await expectDriving(tank)
+  await page.clock.runFor(600)
+
+  await expect(tank).toHaveAttribute('data-playback-phase', 'pit-fall')
+  await expect(hole).toHaveAttribute('data-pit-active', 'true')
+  await page.clock.runFor(450)
+
+  await expect(tank).toHaveAttribute('data-playback-phase', 'pit-respawn')
+  await expect(tank).toHaveAttribute('data-board-tile', '5,4')
+  await page.clock.runFor(300)
+
+  await expect(tank).not.toHaveAttribute('data-playback-phase')
+  await expect(tank).toHaveAttribute('data-board-tile', '5,4')
 })
 
 test('skips every pit phase with reduced motion', async ({ page, game }) => {
