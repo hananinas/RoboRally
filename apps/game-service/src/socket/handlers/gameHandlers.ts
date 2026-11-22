@@ -36,7 +36,7 @@ function resolveActiveMember(context: SocketContext, socket: GameSocket, user: U
     .mapErr(() => ({ outcome: 'NOT_A_MEMBER' as const }))
 }
 
-export function handleCurrentGameProgram(
+export function handleSubmitProgram(
   context: SocketContext,
   socket: GameSocket,
   payload: SubmitProgram,
@@ -85,7 +85,7 @@ export function handleLeaveGame(
   })
 }
 
-export function handleCurrentGameRegisters(
+export function handleUpdateRegisters(
   context: SocketContext,
   socket: GameSocket,
   payload: UpdateRegisters,
