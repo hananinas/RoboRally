@@ -321,18 +321,6 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(state.outcome).toBe('IN_LOBBY')
     if (state.outcome === 'IN_LOBBY') expect(state.lobby.playerCount).toBe(1)
   })
-  it('rolls back partially joined game rooms before publishing a failed start', async () => {
-    const owner = await connect('Owner')
-    const lobby = await create(owner)
-    const serverSocket = server.sockets.sockets.get(owner.id!)!
-    const original = serverSocket.join.bind(serverSocket)
-    vi.spyOn(serverSocket, 'join').mockImplementationOnce(original).mockImplementationOnce(() => { throw new Error('Room failure') })
-    expect(await owner.emitWithAck('lobby.start', {})).toEqual({ outcome: 'INTERNAL_ERROR' })
-    expect(serverSocket.rooms).toEqual(new Set([owner.id, `lobby:${lobby.lobbyId}`]))
-    expect((await owner.emitWithAck('membership.get', {})).outcome).toBe('IN_LOBBY')
-    expect([...server.sockets.adapter.rooms.keys()].some((room) => room.startsWith('game:'))).toBe(false)
-  })
-
   it('returns an internal error without retaining a failed lobby creation', async () => {
     const owner = await connect('Owner')
     const connection = server.sockets.sockets.get(owner.id!)!

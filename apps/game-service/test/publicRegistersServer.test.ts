@@ -11,7 +11,6 @@ import * as actionScheduler from '@/socket/gameSession/actionScheduler'
 import type { Game } from '@/domain/game/Game'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
 import * as gameSessionModule from '@/socket/gameSession/GameSession'
-import { handleUpdateRegisters } from '@/socket/gameSession/gameplay'
 import { createSessionStore, type SessionStore } from '@/auth/sessionStore'
 import { authCookieHeader } from './authTestHelper.ts'
 
@@ -220,11 +219,9 @@ describe('public registers over Socket.IO', () => {
     expect(await raw(first, update(a, [null, null, null, null, null]))).toEqual({ outcome: 'ACCEPTED' })
     await snapshot(first)
     events.length = 0
-    // Session routing selects the caller's own game; exercise the foreign-context guard directly.
-    const acknowledge = vi.fn()
-    handleUpdateRegisters(contexts.mock.results[0].value,
-      server.sockets.sockets.get(outsider.id!)!, { cardIds: [null, null, null, null, null] }, acknowledge)
-    expect(acknowledge.mock.calls).toEqual([[{ outcome: 'NOT_A_MEMBER' }]])
+    // Session routing selects the caller's own game; the per-session membership guard rejects a foreign socket directly.
+    const foreignGame = contexts.mock.results[0].value as gameSessionModule.GameSession
+    expect(foreignGame.isMember(server.sockets.sockets.get(outsider.id!)!).isErr()).toBe(true)
     expect(await raw(outsider, update(other))).toEqual({ outcome: 'ACCEPTED' })
     expect((await snapshot(outsider)).state.players[0].registers).toEqual([
       { status: 'HIDDEN' }, { status: 'EMPTY' }, { status: 'HIDDEN' },

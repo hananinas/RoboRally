@@ -1,10 +1,8 @@
-import { ok } from 'neverthrow'
-import { emptyRequestSchema, type ClockResult, type EmptyRequest, type MembershipResult, type LeaveResult, type SubmitProgram, type ProgramResult, type UpdateRegisters, type UpdateRegistersResult } from '@robo-rally/game-events'
+import { err, ok } from 'neverthrow'
+import { emptyRequestSchema, type ClockResult, type EmptyRequest, type MembershipResult, type LeaveResult } from '@robo-rally/game-events'
 import type { GameSocket, SocketContext } from '@/socket/gameServer'
 import { leaveLobby } from '@/socket/handlers/lobbyHandlers'
 import { presentLobby } from '@/socket/presenters/lobbyPresenter'
-import { handleReattachGame, handleLeave, markDisconnected, reconnectIfRecovered } from '@/socket/gameSession/gameMembership'
-import { handleSubmitProgram, handleUpdateRegisters } from '@/socket/gameSession/gameplay'
 import { withValidatedRequest } from '@/socket/utilities/withValidatedRequest'
 
 export function handleClockGet(
@@ -34,28 +32,29 @@ export function handleGetMembership(
       const membership = context.registry.getActiveMembership(user.userId)
       if (!membership) return ack({ outcome: 'NO_MEMBERSHIP', user })
       if (membership.kind === 'lobby') {
-        const session = context.registry.getCurrentLobby(user.userId)
-        if (!session) throw new Error('Membership references a missing lobby')
-        return ack(session.isMember(socket).isOk()
-          ? { outcome: 'IN_LOBBY', lobby: presentLobby(session.lobby), user }
+        const lobbySession = context.registry.getCurrentLobby(user.userId)
+        if (!lobbySession) throw new Error('Membership references a missing lobby')
+        return ack(lobbySession.isMember(socket).isOk()
+          ? { outcome: 'IN_LOBBY', lobby: presentLobby(lobbySession.lobby), user }
           : { outcome: 'ALREADY_HAS_MEMBERSHIP' })
       }
-      const game = context.registry.getCurrentGame(user.userId)
-      if (!game) throw new Error('Membership references a missing game')
-      handleReattachGame(game, socket, ack)
+      const gameSession = context.registry.getCurrentGame(user.userId)
+      if (!gameSession) throw new Error('Membership references a missing game')
+      const result = gameSession.reattach(socket)
+      ack(result.isOk() ? { outcome: 'IN_GAME', initialization: result.value, user } : { outcome: result.error })
     },
   })
 }
 
 export function validateSocketSession(context: SocketContext, socket: GameSocket, next: (error?: Error) => void): void {
   if (socket.recovered) {
-    const ctx = context.registry.getCurrentGame(socket.data.user.userId)
-    const membership = ctx?.memberships.get(socket.data.user.userId)
-    if (membership?.connectionId && membership.connectionId !== socket.id) {
+    const gameSession = context.registry.getCurrentGame(socket.data.user.userId)
+    const seat = gameSession?.seats.get(socket.data.user.userId)
+    if (seat?.connectionId && seat.connectionId !== socket.id) {
       return next(new Error('USER_ALREADY_IN_GAME'))
     }
-    const expectedRooms = new Set(membership && ctx
-      ? [socket.id, ctx.publicRoom, ctx.playerRoom(membership.player.id)] : [socket.id])
+    const expectedRooms = new Set(seat && gameSession
+      ? [socket.id, gameSession.publicRoom, gameSession.playerRoom(seat.player.id)] : [socket.id])
     if ([...socket.rooms].some((room) => !expectedRooms.has(room))) {
       return next(new Error('SOCKET_SESSION_EXPIRED'))
     }
@@ -64,8 +63,8 @@ export function validateSocketSession(context: SocketContext, socket: GameSocket
 }
 
 export function recoverSocketSession(context: SocketContext, socket: GameSocket): void {
-  const game = context.registry.getCurrentGame(socket.data.user.userId)
-  if (game) reconnectIfRecovered(game, socket)
+  const gameSession = context.registry.getCurrentGame(socket.data.user.userId)
+  if (gameSession) gameSession.reconnectIfRecovered(socket)
 }
 
 export function handleLeaveGame(
@@ -74,45 +73,26 @@ export function handleLeaveGame(
   payload: EmptyRequest,
   acknowledge: (result: LeaveResult) => void,
 ): void {
-  if (typeof acknowledge !== 'function') return
-  const game = context.registry.getCurrentGame(socket.data.user.userId)
-  if (!game) return acknowledge({ outcome: 'GAME_NOT_FOUND' })
-  handleLeave(game, socket, payload, (result) => {
-    if (result.outcome === 'LEFT') context.registry.clearActiveMembership(socket.data.user.userId)
-    acknowledge(result)
+  withValidatedRequest({
+    socket, command: 'game.leave', schema: emptyRequestSchema, payload, acknowledge,
+    resolve: (user) => {
+      const gameSession = context.registry.getCurrentGame(user.userId)
+      return gameSession ? ok({ user, gameSession }) : err({ outcome: 'GAME_NOT_FOUND' as const })
+    },
+    run: ({ user, gameSession }, ack) => {
+      const result = gameSession.leave(socket)
+      if (result.isOk()) context.registry.clearActiveMembership(user.userId)
+      ack(result.isOk() ? { outcome: 'LEFT' } : { outcome: 'GAME_NOT_FOUND' })
+      if (gameSession.seats.size === 0) {
+        gameSession.actionScheduler.stop()
+        context.registry.removeGame(gameSession.game.id)
+      }
+    },
   })
-  if (game.memberships.size === 0) {
-    game.actionScheduler.stop()
-    context.registry.removeGame(game.game.id)
-  }
 }
 
 export function handleSocketDisconnect(context: SocketContext, socket: GameSocket): void {
   leaveLobby(context, socket)
-  const game = context.registry.getCurrentGame(socket.data.user.userId)
-  if (game) markDisconnected(game, socket)
-}
-
-export function handleCurrentGameProgram(
-  context: SocketContext,
-  socket: GameSocket,
-  payload: SubmitProgram,
-  acknowledge: (result: ProgramResult) => void,
-): void {
-  if (typeof acknowledge !== 'function') return
-  const game = context.registry.getCurrentGame(socket.data.user.userId)
-  if (game) handleSubmitProgram(game, socket, payload, acknowledge)
-  else acknowledge({ outcome: 'NOT_A_MEMBER' })
-}
-
-export function handleCurrentGameRegisters(
-  context: SocketContext,
-  socket: GameSocket,
-  payload: UpdateRegisters,
-  acknowledge: (result: UpdateRegistersResult) => void,
-): void {
-  if (typeof acknowledge !== 'function') return
-  const game = context.registry.getCurrentGame(socket.data.user.userId)
-  if (game) handleUpdateRegisters(game, socket, payload, acknowledge)
-  else acknowledge({ outcome: 'NOT_A_MEMBER' })
+  const gameSession = context.registry.getCurrentGame(socket.data.user.userId)
+  if (gameSession) gameSession.markDisconnected(socket)
 }
