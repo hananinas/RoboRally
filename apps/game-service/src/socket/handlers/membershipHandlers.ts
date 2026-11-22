@@ -81,8 +81,9 @@ export function handleLeaveGame(
     },
     run: ({ user, gameSession }, ack) => {
       const result = gameSession.leave(socket)
-      if (result.isOk()) context.registry.clearActiveMembership(user.userId)
-      ack(result.isOk() ? { outcome: 'LEFT' } : { outcome: 'GAME_NOT_FOUND' })
+      if (result.isErr()) return ack({ outcome: 'GAME_NOT_FOUND' })
+      context.registry.clearActiveMembership(user.userId)
+      ack({ outcome: 'LEFT' })
       if (gameSession.seats.size === 0) {
         gameSession.actionScheduler.stop()
         context.registry.removeGame(gameSession.game.id)
