@@ -30,7 +30,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.5",
     "oxlint": "^1.89.0",
-    "oxlint-tsgolint": "^7.0.2004",
+    "oxlint-tsgolint": "^7.0.2007",
     "socket.io-client": "^4.8.4",
     "tsc-alias": "^1.9.8",
     "tsx": "^4.23.15",
