@@ -116,14 +116,14 @@ export function handleLeaveLobby(
   })
 }
 
-function startGame(io: GameSocketServer, lobby: Lobby, connected: ConnectedLobbyMember[]) {
+function startGame(io: GameSocketServer, lobby: Lobby, connectedMembers: ConnectedLobbyMember[]) {
   const gameSession = new GameSession(io, createGame(lobby.mapName, lobby.name))
-  for (const { user, connectionId } of connected) {
+  for (const { user, connectionId } of connectedMembers) {
     const result = gameSession.addSeat(user, connectionId)
     if (result.isErr()) throw new Error(result.error)
   }
   const state = gameSession.publicState()
-  const seatedMembers = connected.map(({ user, socket }) => {
+  const seatedMembers = connectedMembers.map(({ user, socket }) => {
     const { player } = gameSession.seats.get(user.userId)!
     return { user, player, socket, initialization: presentInitialization(gameSession.game, player, state) }
   })
@@ -148,13 +148,13 @@ export function handleStartLobby(
       const lobbySession = context.registry.getCurrentLobby(user.userId)
       if (!lobbySession || lobbySession.isMember(socket).isErr()) return err({ outcome: 'NOT_A_MEMBER' as const })
       if (lobbySession.lobby.ownerUserId !== user.userId) return err({ outcome: 'NOT_LOBBY_OWNER' as const })
-      const connected = lobbySession.resolveConnectedMembers(context.io)
-      if (connected.isErr()) return err({ outcome: connected.error })
-      return ok({ lobbySession, connected: connected.value })
+      const connectedResult = lobbySession.resolveConnectedMembers(context.io)
+      if (connectedResult.isErr()) return err({ outcome: connectedResult.error })
+      return ok({ lobbySession, connectedMembers: connectedResult.value })
     },
-    run: ({ lobbySession, connected }, ack) => {
+    run: ({ lobbySession, connectedMembers }, ack) => {
       const { lobby } = lobbySession
-      const { gameSession, seatedMembers } = startGame(io, lobby, connected)
+      const { gameSession, seatedMembers } = startGame(io, lobby, connectedMembers)
       for (const seatedMember of seatedMembers) lobbySession.disconnect(seatedMember.socket)
       context.registry.promoteLobbyToGame(lobbySession, gameSession, seatedMembers.map((seatedMember) => seatedMember.user.userId))
       for (const seatedMember of seatedMembers) {
