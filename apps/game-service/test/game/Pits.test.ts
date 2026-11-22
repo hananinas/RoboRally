@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
 import { Board, Card, Direction, EmptyTile, PitTile, type Position, type Tile } from '@/game/index'
 import { Deck } from '@/game/Deck'
+import { createBoard } from '@/game/BoardFactory'
 import { addTestPlayer, createEmptyTileGrid, createTestGame, placeTestPlayer, programLeadingWith, withRebootTiles } from '../fixtures.ts'
 
 function createGame(
@@ -205,5 +206,76 @@ describe('pit entry and rebooting', () => {
     expect(resolveRobotAction(game).action.position).toEqual(rebootTile)
     expect(player.lastCheckpoint).toBe(expectedProgress)
     expect(player.robot.program).toEqual(program)
+  })
+})
+
+describe('reboots reported in action results', () => {
+  const moveCards = () => [
+    new Card('move-3', 'MOVE_3'), new Card('move-1', 'MOVE_1'), new Card('left', 'TURN_LEFT'),
+    new Card('right', 'TURN_RIGHT'), new Card('uturn', 'U_TURN'),
+  ]
+
+  // Regression: the reboot tile (13,2) is on the path, so the final position alone hides the fall.
+  it('reports the fall when MOVE_3 crosses a reboot tile into a pit on Test Map', () => {
+    const board = createBoard('test-map')
+    const cards = moveCards()
+    const player = placeTestPlayer(board, { x: Integer(13), y: Integer(1) }, {
+      id: 'robot', direction: Direction.SOUTH, deck: new Deck(cards),
+    })
+    const game = createTestGame({ board, players: [player], deck: cards })
+    game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
+
+    const result = resolveRobotAction(game)
+
+    expect(result.action.position).toEqual({ x: 13, y: 2 })
+    expect(result.reboots).toEqual([{ robotId: 'robot', fellAt: { x: 13, y: 4 }, landedAt: { x: 13, y: 2 } }])
+  })
+
+  it('reports the square just outside the board when a robot drives off the edge', () => {
+    const { robot, player, cards: c, game } = createGame()
+    robot.turn(2) // EAST -> WEST, facing the edge
+    game.submitProgram(player.id, programLeadingWith(Object.values(c), 'MOVE_1').map((card) => card.id))._unsafeUnwrap()
+
+    expect(resolveRobotAction(game).reboots).toEqual([
+      { robotId: robot.id, fellAt: { x: -1, y: 1 }, landedAt: { x: 0, y: 2 } },
+    ])
+  })
+
+  it('reports a pushed robot and the acting robot in the order they fell', () => {
+    const tiles = createEmptyTileGrid(5, 3)
+    tiles[1][2] = new PitTile()
+    const board = new Board(
+      withRebootTiles(tiles, { x: Integer(0), y: Integer(2) }, { x: Integer(4), y: Integer(2) }),
+      { x: Integer(0), y: Integer(0), angle: Math.PI / 2 },
+    )
+    const pusherCards = moveCards()
+    const pushedCards = moveCards().map((card) => new Card(`pushed-${card.id}`, card.instruction))
+    // The pusher at (0,1) is closer to the antenna (0,0), so it acts first.
+    const pusher = placeTestPlayer(board, { x: Integer(0), y: Integer(1) }, {
+      id: 'pusher', direction: Direction.EAST, deck: new Deck(pusherCards),
+    })
+    const pushed = placeTestPlayer(board, { x: Integer(1), y: Integer(1) }, {
+      id: 'pushed', direction: Direction.NORTH, deck: new Deck(pushedCards),
+    })
+    const game = createTestGame({ board, players: [pusher, pushed], deck: [...pusherCards, ...pushedCards] })
+    game.submitProgram(pusher.id, pusherCards.map((card) => card.id))._unsafeUnwrap()
+    game.submitProgram(pushed.id, programLeadingWith(pushedCards, 'TURN_LEFT').map((card) => card.id))._unsafeUnwrap()
+
+    const result = resolveRobotAction(game)
+
+    // Both fall at (2,1). The pushed robot takes (0,2), first in reading order of the
+    // equally close tiles, so the pusher lands on (4,2).
+    expect(result.action.robotId).toBe('pusher')
+    expect(result.reboots).toEqual([
+      { robotId: 'pushed', fellAt: { x: 2, y: 1 }, landedAt: { x: 0, y: 2 } },
+      { robotId: 'pusher', fellAt: { x: 2, y: 1 }, landedAt: { x: 4, y: 2 } },
+    ])
+  })
+
+  it('reports no reboots when nobody falls', () => {
+    const { player, cards: c, game } = createGame()
+    game.submitProgram(player.id, programLeadingWith(Object.values(c), 'TURN_LEFT').map((card) => card.id))._unsafeUnwrap()
+
+    expect(resolveRobotAction(game).reboots).toEqual([])
   })
 })

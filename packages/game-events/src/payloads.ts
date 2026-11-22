@@ -183,6 +183,13 @@ export type ProgramFinalized = Readonly<{
   cards: readonly [Card, Card, Card, Card, Card]
 }>
 
+// One robot rebooting during an action; fellAt can be just outside the board.
+export type RebootEffect = Readonly<{
+  robotId: RobotId
+  fellAt: Coordinate
+  landedAt: Coordinate
+}>
+
 export type RobotActionResolved = Readonly<{
   gameId: GameId
   registerIndex: number
@@ -193,6 +200,8 @@ export type RobotActionResolved = Readonly<{
   resolvedInstruction: ResolvedInstruction | null
   position: Position
   pushedRobots: readonly Pick<Robot, 'robotId' | 'position'>[]
+  // Every reboot the action caused, in order.
+  reboots: readonly RebootEffect[]
 }>
 
 export type PublicRegisterStatus = 'EMPTY' | 'HIDDEN' | 'REVEALED'

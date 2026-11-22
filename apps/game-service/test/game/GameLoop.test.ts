@@ -35,6 +35,7 @@ describe('Game activation loop', () => {
       expect(result).toEqual({
         registerIndex,
         pushedRobots: [],
+        reboots: [],
         registers: Array.from({ length: 5 }, (_, index) => index <= registerIndex
           ? { status: 'REVEALED', instruction: 'TURN_LEFT' }
           : { status: 'HIDDEN' }),

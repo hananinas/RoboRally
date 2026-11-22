@@ -161,6 +161,11 @@ export function presentRobotActionResolved(
       robotId: robot.robotId,
       position: presentPosition(robot.position, robot.direction),
     })),
+    reboots: result.reboots.map(({ robotId, fellAt, landedAt }) => ({
+      robotId,
+      fellAt: { x: fellAt.x, y: fellAt.y },
+      landedAt: { x: landedAt.x, y: landedAt.y },
+    })),
   }
 }
 

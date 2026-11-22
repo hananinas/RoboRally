@@ -53,7 +53,7 @@ describe('game presenter', () => {
     })
   })
 
-  it('serializes pushed robot positions and orientations alongside the acting robot', () => {
+  it('serializes pushed robots and reboots, in order, alongside the acting robot', () => {
     const { game, player } = createGameWithPlayer()
     const resolvedInstruction = player.hand[0].instruction === 'AGAIN' ? undefined : player.hand[0].instruction
     const resolved = presentRobotActionResolved(game, {
@@ -70,12 +70,20 @@ describe('game presenter', () => {
         { robotId: 'pushed', position: { x: Integer(3), y: Integer(3) }, direction: Direction.NORTH },
         { robotId: 'rebooted', position: { x: Integer(0), y: Integer(0) }, direction: Direction.WEST },
       ],
+      reboots: [
+        { robotId: 'rebooted', fellAt: { x: Integer(-1), y: Integer(3) }, landedAt: { x: Integer(0), y: Integer(0) } },
+        { robotId: player.robot.id, fellAt: { x: Integer(2), y: Integer(4) }, landedAt: { x: Integer(2), y: Integer(3) } },
+      ],
       roundConcluded: false,
     })
 
     expect(resolved.pushedRobots).toEqual([
       { robotId: 'pushed', position: { coordinate: { x: 3, y: 3 }, orientation: 'NORTH' } },
       { robotId: 'rebooted', position: { coordinate: { x: 0, y: 0 }, orientation: 'WEST' } },
+    ])
+    expect(resolved.reboots).toEqual([
+      { robotId: 'rebooted', fellAt: { x: -1, y: 3 }, landedAt: { x: 0, y: 0 } },
+      { robotId: player.robot.id, fellAt: { x: 2, y: 4 }, landedAt: { x: 2, y: 3 } },
     ])
   })
 
@@ -237,7 +245,7 @@ describe('game presenter', () => {
       direction: Direction.SOUTH,
     }
 
-    const resolved = presentRobotActionResolved(game, { registerIndex: 4, action, pushedRobots: [], registers: player.registers, roundConcluded: false })
+    const resolved = presentRobotActionResolved(game, { registerIndex: 4, action, pushedRobots: [], reboots: [], registers: player.registers, roundConcluded: false })
 
     expectTypeOf(resolved).toEqualTypeOf<RobotActionResolved>()
     expect(resolved).toEqual({
@@ -248,6 +256,7 @@ describe('game presenter', () => {
       instruction,
       resolvedInstruction: resolvedInstruction ?? null,
       pushedRobots: [],
+      reboots: [],
       position: {
         coordinate: { x: 4, y: 5 },
         orientation: 'SOUTH',

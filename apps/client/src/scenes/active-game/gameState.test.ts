@@ -83,11 +83,11 @@ const publicState: PublicGameState = {
   ],
 }
 const actions: readonly RobotActionResolved[] = [
-  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 0, pushedRobots: [], robotId, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 2, y: 2 }, orientation: 'NORTH' } },
-  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 1, pushedRobots: [], robotId, instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 2, y: 2 }, orientation: 'WEST' } },
-  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 2, pushedRobots: [], robotId, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 1, y: 2 }, orientation: 'WEST' } },
-  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 3, pushedRobots: [], robotId, instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 1, y: 2 }, orientation: 'SOUTH' } },
-  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 4, pushedRobots: [], robotId, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 1, y: 3 }, orientation: 'SOUTH' } },
+  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 0, pushedRobots: [], reboots: [], robotId, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 2, y: 2 }, orientation: 'NORTH' } },
+  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 1, pushedRobots: [], reboots: [], robotId, instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 2, y: 2 }, orientation: 'WEST' } },
+  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 2, pushedRobots: [], reboots: [], robotId, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 1, y: 2 }, orientation: 'WEST' } },
+  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 3, pushedRobots: [], reboots: [], robotId, instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 1, y: 2 }, orientation: 'SOUTH' } },
+  { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, registerIndex: 4, pushedRobots: [], reboots: [], robotId, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 1, y: 3 }, orientation: 'SOUTH' } },
 ]
 const hand = { gameId: publicState.gameId, playerId: publicState.robots[0].playerId, cards }
 

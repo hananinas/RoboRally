@@ -449,6 +449,7 @@ describe('started game membership over Socket.IO', () => {
           // (10,10) is the reboot tile closest to the pit at (15,9).
           { robotId: robotIds[2], position: { coordinate: { x: 10, y: 10 }, orientation: 'EAST' } },
         ],
+        reboots: [{ robotId: robotIds[2], fellAt: { x: column, y: pitY }, landedAt: { x: 10, y: 10 } }],
       })
       expect(actions[0]).toHaveLength(15)
       expect(actions[1]).toEqual(actions[0])
@@ -486,6 +487,7 @@ describe('started game membership over Socket.IO', () => {
         pushedRobots: [], instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1',
         // (2,6) is the reboot tile closest to the pit at (3,3).
         position: { coordinate: { x: 2, y: 6 }, orientation: 'SOUTH' },
+        reboots: [{ robotId, fellAt: { x: 3, y: 3 }, landedAt: { x: 2, y: 6 } }],
       })
       expect(actions).toEqual([
         { coordinate: { x: 2, y: 6 }, orientation: 'SOUTH' },
@@ -499,6 +501,9 @@ describe('started game membership over Socket.IO', () => {
           gameId: game.id, registerIndex, robotId: initial.assignment.robotId,
           playerId: initial.assignment.playerId,
           pushedRobots: [],
+          // Only the first register falls into the pit at (3,3).
+          reboots: registerIndex === 0
+            ? [{ robotId: initial.assignment.robotId, fellAt: { x: 3, y: 3 }, landedAt: { x: 2, y: 6 } }] : [],
           instruction, resolvedInstruction: instruction, position,
         }
       }))
@@ -569,6 +574,7 @@ describe('started game membership over Socket.IO', () => {
         playerId: initializations[0].assignment.playerId,
         pushedRobots: [],
         position: { coordinate: { x: 13, y: 2 }, orientation: 'SOUTH' },
+        reboots: [{ robotId: robotIds[0], fellAt: { x: 3, y: 3 }, landedAt: { x: 13, y: 2 } }],
       })
       expect(game.board.occupantAt({ x: Integer(3), y: Integer(3) })).toBeUndefined()
       expect(game.board.positionOf(robotIds[1])).not.toEqual({ x: 13, y: 2 })

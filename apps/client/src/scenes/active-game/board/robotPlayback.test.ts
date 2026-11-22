@@ -15,11 +15,11 @@ import {
 } from './robotPlayback.ts'
 
 const steps: readonly ResolvedRobotAction[] = [
-  { gameId: 'demo', playerId: 'red-player', registerIndex: 0, pushedRobots: [], robotId: 'red', instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 10, y: 6 }, orientation: 'NORTH' } },
-  { gameId: 'demo', playerId: 'red-player', registerIndex: 1, pushedRobots: [], robotId: 'red', instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 10, y: 5 }, orientation: 'NORTH' } },
-  { gameId: 'demo', playerId: 'red-player', registerIndex: 2, pushedRobots: [], robotId: 'red', instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 10, y: 5 }, orientation: 'WEST' } },
-  { gameId: 'demo', playerId: 'red-player', registerIndex: 3, pushedRobots: [], robotId: 'red', instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 9, y: 5 }, orientation: 'WEST' } },
-  { gameId: 'demo', playerId: 'red-player', registerIndex: 4, pushedRobots: [], robotId: 'red', instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 9, y: 5 }, orientation: 'SOUTH' } },
+  { gameId: 'demo', playerId: 'red-player', registerIndex: 0, pushedRobots: [], reboots: [], robotId: 'red', instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 10, y: 6 }, orientation: 'NORTH' } },
+  { gameId: 'demo', playerId: 'red-player', registerIndex: 1, pushedRobots: [], reboots: [], robotId: 'red', instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 10, y: 5 }, orientation: 'NORTH' } },
+  { gameId: 'demo', playerId: 'red-player', registerIndex: 2, pushedRobots: [], reboots: [], robotId: 'red', instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 10, y: 5 }, orientation: 'WEST' } },
+  { gameId: 'demo', playerId: 'red-player', registerIndex: 3, pushedRobots: [], reboots: [], robotId: 'red', instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 9, y: 5 }, orientation: 'WEST' } },
+  { gameId: 'demo', playerId: 'red-player', registerIndex: 4, pushedRobots: [], reboots: [], robotId: 'red', instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 9, y: 5 }, orientation: 'SOUTH' } },
 ]
 
 describe('robot playback', () => {
@@ -147,7 +147,7 @@ describe('pit entry', () => {
     instruction: ResolvedRobotAction['instruction'],
     position: ResolvedRobotAction['position'] = reboot,
   ): ResolvedRobotAction => ({
-    gameId: 'demo', playerId: 'red-player', registerIndex: 0, pushedRobots: [], robotId: 'red', instruction,
+    gameId: 'demo', playerId: 'red-player', registerIndex: 0, pushedRobots: [], reboots: [], robotId: 'red', instruction,
     resolvedInstruction: instruction === 'AGAIN' ? null : instruction, position,
   })
 
