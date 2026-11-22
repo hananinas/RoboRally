@@ -1,23 +1,9 @@
 import { err, ok } from 'neverthrow'
-import { emptyRequestSchema, type ClockResult, type EmptyRequest, type MembershipResult, type LeaveResult } from '@robo-rally/game-events'
+import { emptyRequestSchema, type EmptyRequest, type MembershipResult, type LeaveResult } from '@robo-rally/game-events'
 import type { GameSocket, SocketContext } from '@/socket/gameServer'
 import { leaveLobby } from '@/socket/handlers/lobbyHandlers'
 import { presentLobby } from '@/socket/presenters/lobbyPresenter'
 import { withValidatedRequest } from '@/socket/utilities/withValidatedRequest'
-
-export function handleClockGet(
-  socket: GameSocket,
-  payload: EmptyRequest,
-  acknowledge: (result: ClockResult) => void,
-): void {
-  withValidatedRequest({
-    socket, command: 'clock.get', schema: emptyRequestSchema, payload, acknowledge,
-    resolve: (user) => ok(user),
-    run: (_user, ack) => {
-      ack({ outcome: 'CLOCK', serverTime: Date.now() })
-    },
-  })
-}
 
 export function handleGetMembership(
   context: SocketContext,

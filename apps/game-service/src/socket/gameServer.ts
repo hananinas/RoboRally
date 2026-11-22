@@ -1,6 +1,7 @@
 import { handleListLobbies, handleCreateLobby, handleJoinLobby, handleLeaveLobby, handleStartLobby } from '@/socket/handlers/lobbyHandlers'
-import { handleClockGet, handleGetMembership, handleLeaveGame, handleSocketDisconnect, recoverSocketSession, validateSocketSession } from '@/socket/handlers/membershipHandlers'
+import { handleGetMembership, handleLeaveGame, handleSocketDisconnect, recoverSocketSession, validateSocketSession } from '@/socket/handlers/membershipHandlers'
 import { handleCurrentGameProgram, handleCurrentGameRegisters } from '@/socket/handlers/gameplayHandlers'
+import { handleClockGet } from '@/socket/handlers/clockHandlers'
 import { MembershipRegistry } from '@/membership/MembershipRegistry'
 import type { Server as HttpServer } from 'node:http'
 import type {
