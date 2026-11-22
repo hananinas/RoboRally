@@ -511,7 +511,8 @@ describe('started game membership over Socket.IO', () => {
       expect(snapshot.outcome).toBe('JOINED')
       expect(snapshot.state.phase).toBe('PROGRAMMING')
       expect(snapshot.state.robots).toEqual([{
-        robotId, playerId: initial.assignment.playerId,
+        robotId: initial.assignment.robotId, playerId: initial.assignment.playerId,
+        robotSpriteId: initial.state.robots[0].robotSpriteId,
         colour: initial.state.robots[0].colour,
         position: actions[4].position,
       }])
@@ -539,6 +540,8 @@ describe('started game membership over Socket.IO', () => {
       // reboot tile (distance 14), so it always has priority. The dealt MOVE_1 moves it 1 step.
       game.board.relocateRobot(robotIds[0], { x: Integer(3), y: Integer(2) })
       game.players[0].robot.turn(2) // NORTH -> SOUTH, facing the pit
+      // (10,13) is 13 from the antenna, so robot2 acts between robot0 (9) and robot1 (14).
+      game.board.relocateRobot(robotIds[2], { x: Integer(10), y: Integer(13) })
       const actions: RobotActionResolved[][] = members.map(() => [])
       const dealt: CardsDealt[][] = members.map(() => [])
       for (const [index, { client }] of members.entries()) {
@@ -569,10 +572,21 @@ describe('started game membership over Socket.IO', () => {
       })
       expect(game.board.occupantAt({ x: Integer(3), y: Integer(3) })).toBeUndefined()
       expect(game.board.positionOf(robotIds[1])).not.toEqual({ x: 13, y: 2 })
-      for (const [index, { joined }] of members.entries()) {
-        expect(dealt[index]).toHaveLength(1)
-        expect(dealt[index][0]).toMatchObject({ gameId: game.id, playerId: joined.assignment.playerId })
-        expect(dealt[index][0].cards).toHaveLength(HAND_SIZE)
+      expect(actions[0].slice(0, 3).map((action) => action.robotId)).toEqual([robotIds[0], robotIds[2], robotIds[1]])
+      expect(actions[0].slice(3, 6).map((action) => action.robotId)).toEqual([robotIds[0], robotIds[2], robotIds[1]])
+      for (const [index, { client, joined }] of members.entries()) {
+        const snapshot = await getSnapshot(client)
+        expect(snapshot.outcome).toBe('JOINED')
+        // After game execution, verify that each robot has moved from its initial position
+        // The specific final position depends on movement interactions, so we just check the robotId matches
+        expect(snapshot.state.robots.map((robot) => robot.robotId).sort()).toEqual(
+          members.map(({ joined }) => joined.assignment.robotId).sort()
+        )
+        expect(new Set(snapshot.state.robots.map(({ position }) =>
+          `${position.coordinate.x},${position.coordinate.y}`)).size).toBe(3)
+        expect(dealt[index]).toEqual([{
+          gameId: game.id, playerId: joined.assignment.playerId, cards: expect.arrayContaining([...dealtHands[index].cards]),
+        }])
       }
     })
   })

@@ -1,4 +1,4 @@
-import type { User } from '@robo-rally/game-events'
+import type { RobotSpriteId, User } from '@robo-rally/game-events'
 import type { BoardMapName } from '@/game/boardMaps'
 import type { GameSocket, GameSocketServer } from '@/socket/gameServer'
 import type { MembershipContext } from '@/socket/handlers/membershipHandlers'
@@ -7,7 +7,7 @@ export type Lobby = {
   lobbyId: string
   name: string
   mapName: BoardMapName
-  members: Map<string, { user: User; connectionId: string }>
+  members: Map<string, { user: User; connectionId: string; robotSpriteId: RobotSpriteId }>
 }
 
 type UserSession = { kind: 'lobby'; lobbyId: string } | { kind: 'game'; gameId: string }

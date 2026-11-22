@@ -7,6 +7,7 @@ import type {
   PlayerId,
   PublicRegisters,
   Position,
+  RobotSpriteId,
   RobotActionResolved,
 } from '@robo-rally/game-events'
 import { useCallback, useEffect, useReducer } from 'react'
@@ -16,6 +17,7 @@ export type { Orientation }
 export type RobotPosition = Position
 export type Robot = Readonly<{
   robotId: string
+  robotSpriteId: RobotSpriteId
   colour: string
   position: RobotPosition
   playerId?: PlayerId

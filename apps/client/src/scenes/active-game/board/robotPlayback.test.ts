@@ -186,7 +186,7 @@ describe('pit entry', () => {
   })
 
   it('plays the move, fall and respawn before the action completes', () => {
-    const robots = [{ robotId: 'red', colour: '#E55F5F', position: start }, DEMO_ROBOTS[0]]
+    const robots = [{ robotId: 'red', robotSpriteId: 'tank' as const, colour: '#E55F5F', position: start }, DEMO_ROBOTS[0]]
     const action = { ...move('MOVE_2', { coordinate: { x: 0, y: 0 }, orientation: 'EAST' }),
       pushedRobots: [{ robotId: 'blue', position: { coordinate: { x: 2, y: 0 }, orientation: 'WEST' as const } }] }
     let state = createRobotPlaybackState(robots)
@@ -209,7 +209,7 @@ describe('pit entry', () => {
   })
 
   it('derives a queued pit from the position after earlier queued actions', () => {
-    const robots = [{ robotId: 'red', colour: '#E55F5F', position: { ...start, coordinate: { x: 2, y: 4 } } }]
+    const robots = [{ robotId: 'red', robotSpriteId: 'tank' as const, colour: '#E55F5F', position: { ...start, coordinate: { x: 2, y: 4 } } }]
     const first = move('TURN_LEFT', { coordinate: { x: 2, y: 4 }, orientation: 'NORTH' })
     let state = createRobotPlaybackState(robots)
     state = robotPlaybackReducer(state, { type: 'enqueue', action: { ...first, instruction: 'MOVE_1', position: start }, board })
@@ -219,7 +219,7 @@ describe('pit entry', () => {
   })
 
   it('does not stall when completed mid sequence or without a board', () => {
-    const robots = [{ robotId: 'red', colour: '#E55F5F', position: start }]
+    const robots = [{ robotId: 'red', robotSpriteId: 'tank' as const, colour: '#E55F5F', position: start }]
     let state = robotPlaybackReducer(createRobotPlaybackState(robots), { type: 'enqueue', action: move('MOVE_2'), board })
     state = robotPlaybackReducer(state, { type: 'enqueue', action: move('TURN_LEFT'), board })
     state = robotPlaybackReducer(state, { type: 'complete' })
@@ -260,8 +260,8 @@ describe('pit entry', () => {
   it('plays two robots falling in one round one after the other', () => {
     const blueStart = { coordinate: { x: 1, y: 1 }, orientation: 'EAST' as const }
     const robots = [
-      { robotId: 'red', colour: '#E55F5F', position: start },
-      { robotId: 'blue', colour: '#5F8FE5', position: blueStart },
+      { robotId: 'red', robotSpriteId: 'tank' as const, colour: '#E55F5F', position: start },
+      { robotId: 'blue', robotSpriteId: 'tank' as const, colour: '#5F8FE5', position: blueStart },
     ]
     const blueReboot = { coordinate: { x: 4, y: 4 }, orientation: 'EAST' as const }
     let state = createRobotPlaybackState(robots)
@@ -281,7 +281,7 @@ describe('pit entry', () => {
   })
 
   it('plays back-to-back pit moves of one robot from its reboot position', () => {
-    const robots = [{ robotId: 'red', colour: '#E55F5F', position: start }]
+    const robots = [{ robotId: 'red', robotSpriteId: 'tank' as const, colour: '#E55F5F', position: start }]
     const rebootSouth = { coordinate: { x: 2, y: 3 }, orientation: 'SOUTH' as const }
     const final = { coordinate: { x: 0, y: 0 }, orientation: 'SOUTH' as const }
     let state = createRobotPlaybackState(robots)
@@ -299,7 +299,7 @@ describe('pit entry', () => {
 
   it('completes once when a fall is cut short by reset or the robot leaving', () => {
     const robots = [
-      { robotId: 'red', colour: '#E55F5F', position: start },
+      { robotId: 'red', robotSpriteId: 'tank' as const, colour: '#E55F5F', position: start },
       DEMO_ROBOTS[0],
     ]
     let falling = createRobotPlaybackState(robots)
