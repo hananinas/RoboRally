@@ -1,5 +1,5 @@
-import { err, ok } from 'neverthrow'
-import { emptyRequestSchema, type EmptyRequest, type MembershipResult, type LeaveResult, type User } from '@robo-rally/game-events'
+import { ok } from 'neverthrow'
+import { emptyRequestSchema, type EmptyRequest, type MembershipResult, type User } from '@robo-rally/game-events'
 import type { GameSocket, SocketContext } from '@/socket/gameServer'
 import { leaveLobby } from '@/socket/handlers/lobbyHandlers'
 import { presentLobby } from '@/socket/presenters/lobbyPresenter'
@@ -33,31 +33,6 @@ export function handleGetMembership(
       const membership = context.registry.getActiveMembership(user.userId)
       if (!membership) return ack({ outcome: 'NO_MEMBERSHIP', user })
       ack(membership.kind === 'lobby' ? resolveLobbyMembership(context, socket, user) : resolveGameMembership(context, socket, user))
-    },
-  })
-}
-
-export function handleLeaveGame(
-  context: SocketContext,
-  socket: GameSocket,
-  payload: EmptyRequest,
-  acknowledge: (result: LeaveResult) => void,
-): void {
-  withValidatedRequest({
-    socket, command: 'game.leave', schema: emptyRequestSchema, payload, acknowledge,
-    resolve: (user) => {
-      const gameSession = context.registry.getCurrentGame(user.userId)
-      return gameSession ? ok({ user, gameSession }) : err({ outcome: 'GAME_NOT_FOUND' as const })
-    },
-    run: ({ user, gameSession }, ack) => {
-      const result = gameSession.leave(socket)
-      if (result.isErr()) return ack({ outcome: 'GAME_NOT_FOUND' })
-      context.registry.clearActiveMembership(user.userId)
-      ack({ outcome: 'LEFT' })
-      if (gameSession.seatCount === 0) {
-        gameSession.actionScheduler.stop()
-        context.registry.removeGame(gameSession.game.id)
-      }
     },
   })
 }

@@ -1,6 +1,9 @@
 import {
+  emptyRequestSchema,
   submitProgramSchema,
   updateRegistersSchema,
+  type EmptyRequest,
+  type LeaveResult,
   type ProgramResult,
   type SubmitProgram,
   type UpdateRegisters,
@@ -50,6 +53,31 @@ export function handleCurrentGameProgram(
       publishProgramFinalized(gameSession, { playerId: player.id, cards: player.robot.program }, 'SUBMITTED')
       gameSession.programmingTimer.start()
       if (gameSession.game.requirePhase('activation').isOk()) gameSession.programmingTimer.close()
+    },
+  })
+}
+
+export function handleLeaveGame(
+  context: SocketContext,
+  socket: GameSocket,
+  payload: EmptyRequest,
+  acknowledge: (result: LeaveResult) => void,
+): void {
+  withValidatedRequest({
+    socket, command: 'game.leave', schema: emptyRequestSchema, payload, acknowledge,
+    resolve: (user) => {
+      const gameSession = context.registry.getCurrentGame(user.userId)
+      return gameSession ? ok({ user, gameSession }) : err({ outcome: 'GAME_NOT_FOUND' as const })
+    },
+    run: ({ user, gameSession }, ack) => {
+      const result = gameSession.leave(socket)
+      if (result.isErr()) return ack({ outcome: 'GAME_NOT_FOUND' })
+      context.registry.clearActiveMembership(user.userId)
+      ack({ outcome: 'LEFT' })
+      if (gameSession.seatCount === 0) {
+        gameSession.actionScheduler.stop()
+        context.registry.removeGame(gameSession.game.id)
+      }
     },
   })
 }
