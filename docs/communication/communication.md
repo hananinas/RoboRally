@@ -248,6 +248,8 @@ Each map has four reboot tiles, sent as tiles with type `REBOOT` in the board. A
 
 The event includes final positions after reboots: `position` for the acting robot and `pushedRobots` for other robots whose positions changed. Clients apply them together when the action plays.
 
+`reboots` lists every reboot the instruction caused, in order: the robot, `fellAt` (the pit, or the square just off the board edge) and `landedAt` (the reboot tile). Clients play each fall from it instead of guessing from the path, because a reboot tile can be on the path itself: on Test Map, `MOVE_3` south from (13,1) passes (13,2), falls into the pit at (13,4) and lands back on the reboot tile at (13,2).
+
 #### Activation ordering
 
 The antenna is located at the top centre of the board and faces south.

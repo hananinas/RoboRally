@@ -809,6 +809,7 @@ components:
           - gameId
           - registerIndex
           - pushedRobots
+          - reboots
           - resolvedInstruction
         properties:
           robotId:
@@ -835,6 +836,15 @@ components:
                   $ref: "#/components/schemas/RobotId"
                 position:
                   $ref: "#/components/schemas/Position"
+          reboots:
+            type: array
+            description: >-
+              Every reboot this instruction caused, in the order it happened, for the
+              acting robot and pushed robots alike. Use it to show each fall before
+              the robot appears on its reboot tile. Empty when no robot rebooted.
+              position and pushedRobots still give the final states.
+            items:
+              $ref: "#/components/schemas/RebootEffect"
           gameId:
             $ref: "#/components/schemas/GameId"
           registerIndex:
@@ -857,11 +867,34 @@ components:
             instruction: MOVE_1
             resolvedInstruction: MOVE_1
             pushedRobots: []
+            reboots: []
             position:
               coordinate:
                 x: 10
                 y: 6
               orientation: NORTH
+        - name: fallIntoPit
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            registerIndex: 0
+            robotId: 00000000-0000-4000-8000-000000000003
+            playerId: 00000000-0000-4000-8000-000000000002
+            instruction: MOVE_3
+            resolvedInstruction: MOVE_3
+            pushedRobots: []
+            reboots:
+              - robotId: 00000000-0000-4000-8000-000000000003
+                fellAt:
+                  x: 13
+                  y: 4
+                landedAt:
+                  x: 13
+                  y: 2
+            position:
+              coordinate:
+                x: 13
+                y: 2
+              orientation: SOUTH
 
     EnvironmentStepResolved:
       name: environment.stepResolved
@@ -1732,6 +1765,32 @@ components:
         y:
           type: integer
           minimum: 0
+
+    RebootEffect:
+      type: object
+      additionalProperties: false
+      description: >-
+        One robot rebooting during an instruction. The robot keeps its facing
+        direction.
+      required: [ robotId, fellAt, landedAt ]
+      properties:
+        robotId:
+          $ref: "#/components/schemas/RobotId"
+        fellAt:
+          type: object
+          description: >-
+            The pit the robot entered, or the square just outside the board where
+            it left the board, so x or y can be -1, width or height.
+          required: [ x, y ]
+          properties:
+            x:
+              type: integer
+              minimum: -1
+            y:
+              type: integer
+              minimum: -1
+        landedAt:
+          $ref: "#/components/schemas/Coordinate"
 
     Position:
       type: object
