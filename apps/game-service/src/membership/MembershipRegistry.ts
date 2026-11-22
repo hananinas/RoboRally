@@ -44,9 +44,9 @@ export class MembershipRegistry {
   }
 
   addLobby(lobby: Lobby): LobbySession {
-    const session = new LobbySession(lobby)
-    this.lobbiesById.set(lobby.lobbyId, session)
-    return session
+    const lobbySession = new LobbySession(lobby)
+    this.lobbiesById.set(lobby.lobbyId, lobbySession)
+    return lobbySession
   }
 
   removeLobby(lobbyId: string): void {

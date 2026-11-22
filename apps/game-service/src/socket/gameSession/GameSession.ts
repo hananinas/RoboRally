@@ -1,18 +1,26 @@
-import type { PublicGameState, Winner } from '@robo-rally/game-events'
-import type { GameSocketServer } from '@/socket/gameServer'
-import type { Game } from '@/domain/game/index'
-import { presentProgrammingTimer, presentPublicGameState, presentWinner } from '@/socket/presenters/gamePresenter'
+import type { GameInitialization, PublicGameState, User, Winner } from '@robo-rally/game-events'
+import { err, ok, type Result } from 'neverthrow'
+import type { GameSocket, GameSocketServer } from '@/socket/gameServer'
+import type { AddPlayerError, Game, Player } from '@/domain/game/index'
+import {
+  presentInitialization, presentPlayerConnectionChanged, presentProgrammingTimer, presentPublicGameState, presentWinner,
+} from '@/socket/presenters/gamePresenter'
 import { createActionScheduler, type ActionScheduler } from '@/socket/gameSession/actionScheduler'
 import { createProgrammingTimer, type ProgrammingTimer } from '@/programmingTimer'
 import { publishProgramFinalized } from '@/socket/gameSession/programFinalization'
 import { logError } from '@/logger'
-import type { GameMembership } from '@/socket/gameSession/gameMembership'
+
+export type Seat = {
+  user: User
+  player: Player
+  connectionId: string | null
+}
 
 export class GameSession {
   readonly io: GameSocketServer
   readonly game: Game
   readonly publicRoom: string
-  readonly memberships = new Map<string, GameMembership>()
+  readonly seats = new Map<string, Seat>()
   readonly actionScheduler: ActionScheduler
   readonly programmingTimer: ProgrammingTimer
   private recordedWinner: Winner | null = null
@@ -31,7 +39,7 @@ export class GameSession {
     })
     this.programmingTimer = createProgrammingTimer({
       onExpire: () => {
-        if (game.aborted || game.winner !== undefined || this.memberships.size === 0) {
+        if (game.aborted || game.winner !== undefined || this.seats.size === 0) {
           this.programmingTimer.stop()
           return
         }
@@ -62,13 +70,111 @@ export class GameSession {
 
   winner(): Winner | null {
     if (this.recordedWinner === null && this.game.winner !== undefined) {
-      const membership = [...this.memberships.values()].find(({ player }) => player.id === this.game.winner)
-      this.recordedWinner = presentWinner(this.game.winner, membership?.user.username ?? '')
+      const seat = [...this.seats.values()].find(({ player }) => player.id === this.game.winner)
+      this.recordedWinner = presentWinner(this.game.winner, seat?.user.username ?? '')
     }
     return this.recordedWinner
   }
 
   publicState(): PublicGameState {
-    return presentPublicGameState(this.game, this.programmingTimer.state(), this.memberships.values(), this.winner())
+    return presentPublicGameState(this.game, this.programmingTimer.state(), this.seats.values(), this.winner())
+  }
+
+  isMember(socket: GameSocket): Result<Seat, 'NOT_A_MEMBER'> {
+    const seat = this.seats.get(socket.data.user.userId)
+    return seat?.connectionId === socket.id ? ok(seat) : err('NOT_A_MEMBER')
+  }
+
+  reconnectIfRecovered(socket: GameSocket): void {
+    if (!socket.recovered) return
+    const seat = this.seats.get(socket.data.user.userId)
+    if (seat && this.reattachSeat(seat, socket.id)) {
+      this.resumeUnlessStillDisconnected()
+      this.notifyReconnected(seat.player)
+    }
+  }
+
+  markDisconnected(socket: GameSocket): void {
+    const result = this.isMember(socket)
+    if (result.isErr()) return
+    const seat = result.value
+
+    try {
+      seat.connectionId = null
+      this.game.pause()
+      this.io.to(this.publicRoom).emit('game.playerConnectionChanged', presentPlayerConnectionChanged(this.game, seat.player, false))
+    } catch (error) {
+      logError('Failed to process player disconnect', error, { command: 'disconnect', gameId: this.game.id, playerId: seat.player.id })
+    }
+  }
+
+  addSeat(user: User, connectionId: string): Result<Player, AddPlayerError> {
+    return this.game.addPlayer().map((player) => {
+      this.seats.set(user.userId, { user, player, connectionId })
+      return player
+    })
+  }
+
+  leave(socket: GameSocket): Result<void, 'NOT_A_MEMBER'> {
+    return this.isMember(socket).map(({ player, user }) => {
+      const { roundConcluded } = this.game.removePlayer(player.id)
+      this.seats.delete(user.userId)
+      void socket.leave(this.publicRoom)
+      void socket.leave(this.playerRoom(player.id))
+      this.io.to(this.publicRoom).emit('game.playerLeft', {
+        gameId: this.game.id, playerId: player.id, robotId: player.robot.id,
+      })
+      if (this.game.requirePhase('activation').isOk()) this.programmingTimer.close()
+      this.actionScheduler.announceProgress({ roundConcluded })
+      this.actionScheduler.scheduleNextAction()
+    })
+  }
+
+  reattach(socket: GameSocket): Result<GameInitialization, 'ALREADY_HAS_MEMBERSHIP' | 'INTERNAL_ERROR'> {
+    const seat = this.seats.get(socket.data.user.userId)
+    if (!seat) return err('INTERNAL_ERROR')
+    if (seat.connectionId && seat.connectionId !== socket.id) return err('ALREADY_HAS_MEMBERSHIP')
+
+    const previousRooms = new Set(socket.rooms)
+    const previousConnectionId = seat.connectionId
+    const wasPaused = this.game.paused
+    const reconnected = this.reattachSeat(seat, socket.id)
+    this.resumeUnlessStillDisconnected()
+    try {
+      const initialization = presentInitialization(this.game, seat.player, this.publicState())
+      void socket.join([this.publicRoom, this.playerRoom(seat.player.id)])
+      if (reconnected) this.notifyReconnected(seat.player)
+      return ok(initialization)
+    } catch (error) {
+      for (const room of [this.publicRoom, this.playerRoom(seat.player.id)]) {
+        if (!previousRooms.has(room)) void socket.leave(room)
+      }
+      logError('Failed to reattach game membership', error, { command: 'membership.get', gameId: this.game.id })
+      seat.connectionId = previousConnectionId
+      if (wasPaused) this.game.pause()
+      return err('INTERNAL_ERROR')
+    }
+  }
+
+  private reattachSeat(seat: Seat, socketId: string): boolean {
+    const wasDisconnected = seat.connectionId === null
+    seat.connectionId = socketId
+    return wasDisconnected
+  }
+
+  private resumeUnlessStillDisconnected(): void {
+    if (this.anyDisconnected()) return
+    const result = this.game.resume()
+    if (result.isOk()) this.actionScheduler.announceProgress(result.value)
+  }
+
+  private notifyReconnected(player: Player): void {
+    this.io.to(this.publicRoom).emit('game.playerConnectionChanged', presentPlayerConnectionChanged(this.game, player, true))
+    this.io.to(this.playerRoom(player.id)).emit('program.timerChanged', presentProgrammingTimer(this.game.id, this.programmingTimer.state()))
+    this.actionScheduler.scheduleNextAction()
+  }
+
+  private anyDisconnected(): boolean {
+    return [...this.seats.values()].some((seat) => seat.connectionId === null)
   }
 }

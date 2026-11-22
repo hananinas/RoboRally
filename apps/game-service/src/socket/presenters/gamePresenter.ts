@@ -109,7 +109,7 @@ export function presentWinner(playerId: PlayerId, username: string): Winner {
 export function presentPublicGameState(
   game: Game,
   programmingTimer: ProgrammingTimer,
-  memberships: Iterable<{ user: User; player: Player; connectionId: string | null }> = [],
+  seats: Iterable<{ user: User; player: Player; connectionId: string | null }> = [],
   winner: Winner | null = null,
 ): PublicGameState {
   const tiles = Array.from({ length: game.board.height }, (_, y) =>
@@ -121,7 +121,7 @@ export function presentPublicGameState(
     serverTime: Date.now(),
     programmingTimer,
     checkpointCount: game.board.checkpointCount,
-    players: [...memberships].map(({ user, player, connectionId }) =>
+    players: [...seats].map(({ user, player, connectionId }) =>
       presentPlayerState(game, player, user.username, connectionId !== null)),
     antenna: game.board.antenna,
     board: {
