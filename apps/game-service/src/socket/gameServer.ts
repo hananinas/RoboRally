@@ -1,7 +1,8 @@
 import { handleListLobbies, handleCreateLobby, handleJoinLobby, handleLeaveLobby, handleStartLobby } from '@/socket/handlers/lobbyHandlers'
-import { handleGetMembership, handleLeaveGame, handleSocketDisconnect, recoverSocketSession } from '@/socket/handlers/membershipHandlers'
+import { handleGetMembership, handleLeaveGame, handleSocketDisconnect } from '@/socket/handlers/membershipHandlers'
 import { handleCurrentGameProgram, handleCurrentGameRegisters } from '@/socket/handlers/gameplayHandlers'
 import { handleClockGet } from '@/socket/handlers/clockHandlers'
+import { authenticateSocket, rejectExpiredSession, validateSocketSession, recoverSocketSession } from '@/socket/connection/socketConnection'
 import { MembershipRegistry } from '@/membership/MembershipRegistry'
 import type { Server as HttpServer } from 'node:http'
 import type {
@@ -10,9 +11,8 @@ import type {
   User,
 } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
-import { parseCookie } from 'cookie'
-import { SESSION_COOKIE_NAME, type Session, type SessionStore } from '@/auth/sessionStore'
-import { createAuthGatedAdapter } from '@/socket/authGatedAdapter'
+import type { Session, SessionStore } from '@/auth/sessionStore'
+import { createAuthGatedAdapter } from '@/socket/connection/authGatedAdapter'
 
 export type GameSocketData = { user: User; authSession: Session; sessionId: string }
 
@@ -26,53 +26,6 @@ export type GameSocketServer = Server<
 export type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents, {}, GameSocketData>
 
 export type SocketContext = { io: GameSocketServer; registry: MembershipRegistry }
-
-function authenticateSocket(sessionStore: SessionStore, socket: GameSocket, next: (error?: Error) => void): void {
-  const cookies = parseCookie(socket.handshake.headers.cookie ?? '')
-  const sessionId = cookies[SESSION_COOKIE_NAME]
-  if (!sessionId) {
-    next(new Error('UNAUTHENTICATED'))
-    return
-  }
-  const authSession = sessionStore.get(sessionId)
-  if (!authSession) {
-    next(new Error('UNAUTHENTICATED'))
-    return
-  }
-  if (socket.recovered && socket.data.authSession?.sub !== authSession.sub) {
-    next(new Error('SESSION_MISMATCH'))
-    return
-  }
-  socket.data.sessionId = sessionId
-  socket.data.authSession = authSession
-  socket.data.user = { userId: authSession.sub, username: authSession.username }
-  next()
-}
-
-function rejectExpiredSession(sessionStore: SessionStore, socket: GameSocket, next: (error?: Error) => void): void {
-  if (sessionStore.get(socket.data.sessionId)) {
-    next()
-    return
-  }
-  socket.disconnect(true)
-  next(new Error('UNAUTHENTICATED'))
-}
-
-function validateSocketSession(context: SocketContext, socket: GameSocket, next: (error?: Error) => void): void {
-  if (socket.recovered) {
-    const gameSession = context.registry.getCurrentGame(socket.data.user.userId)
-    const seat = gameSession?.getSeat(socket.data.user.userId)
-    if (seat?.connectionId && seat.connectionId !== socket.id) {
-      return next(new Error('USER_ALREADY_IN_GAME'))
-    }
-    const expectedRooms = new Set(seat && gameSession
-      ? [socket.id, gameSession.publicRoom, gameSession.playerRoom(seat.player.id)] : [socket.id])
-    if ([...socket.rooms].some((room) => !expectedRooms.has(room))) {
-      return next(new Error('SOCKET_SESSION_EXPIRED'))
-    }
-  }
-  next()
-}
 
 export function createGameSocketServer(
   httpServer: HttpServer,

@@ -37,11 +37,6 @@ export function handleGetMembership(
   })
 }
 
-export function recoverSocketSession(context: SocketContext, socket: GameSocket): void {
-  const gameSession = context.registry.getCurrentGame(socket.data.user.userId)
-  if (gameSession) gameSession.reconnectIfRecovered(socket)
-}
-
 export function handleLeaveGame(
   context: SocketContext,
   socket: GameSocket,
