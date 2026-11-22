@@ -8,6 +8,7 @@ import {
   type SubmitProgram,
   type UpdateRegisters,
   type UpdateRegistersResult,
+  type User,
 } from '@robo-rally/game-events'
 import { err, ok, type Result } from 'neverthrow'
 import { withValidatedRequest } from '@/socket/utilities/withValidatedRequest'
@@ -27,6 +28,14 @@ function expireProgrammingIfDue(gameSession: GameSession): Result<void, 'WRONG_P
   return expired ? err('WRONG_PHASE') : ok(undefined)
 }
 
+function resolveActiveMember(context: SocketContext, socket: GameSocket, user: User) {
+  const gameSession = context.registry.getCurrentGame(user.userId)
+  if (!gameSession) return err({ outcome: 'NOT_A_MEMBER' as const })
+  return gameSession.isMember(socket)
+    .map((seat) => ({ gameSession, player: seat.player }))
+    .mapErr(() => ({ outcome: 'NOT_A_MEMBER' as const }))
+}
+
 export function handleCurrentGameProgram(
   context: SocketContext,
   socket: GameSocket,
@@ -35,13 +44,7 @@ export function handleCurrentGameProgram(
 ): void {
   withValidatedRequest({
     socket, command: 'program.submit', schema: submitProgramSchema, payload, acknowledge,
-    resolve: (user) => {
-      const gameSession = context.registry.getCurrentGame(user.userId)
-      if (!gameSession) return err({ outcome: 'NOT_A_MEMBER' as const })
-      return gameSession.isMember(socket)
-        .map((seat) => ({ gameSession, player: seat.player }))
-        .mapErr(() => ({ outcome: 'NOT_A_MEMBER' as const }))
-    },
+    resolve: (user) => resolveActiveMember(context, socket, user),
     run: ({ gameSession, player }, ack) => {
       const result = expireProgrammingIfDue(gameSession).andThen(() => gameSession.game.submitProgram(player.id, payload.cardIds))
       if (result.isErr()) {
@@ -90,13 +93,7 @@ export function handleCurrentGameRegisters(
 ): void {
   withValidatedRequest({
     socket, command: 'game.updateRegisters', schema: updateRegistersSchema, payload, acknowledge,
-    resolve: (user) => {
-      const gameSession = context.registry.getCurrentGame(user.userId)
-      if (!gameSession) return err({ outcome: 'NOT_A_MEMBER' as const })
-      return gameSession.isMember(socket)
-        .map((seat) => ({ gameSession, player: seat.player }))
-        .mapErr(() => ({ outcome: 'NOT_A_MEMBER' as const }))
-    },
+    resolve: (user) => resolveActiveMember(context, socket, user),
     run: ({ gameSession, player }, ack) => {
       const result = expireProgrammingIfDue(gameSession).andThen(() => gameSession.game.updateRegisters(player.id, payload.cardIds))
       if (result.isErr()) {
