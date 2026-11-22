@@ -10,23 +10,12 @@ import {
   type UpdateRegistersResult,
   type User,
 } from '@robo-rally/game-events'
-import { err, ok, type Result } from 'neverthrow'
+import { err, ok } from 'neverthrow'
 import { withValidatedRequest } from '@/socket/utilities/withValidatedRequest'
 import type { GameSocket, SocketContext } from '@/socket/gameServer'
 import { logWarn } from '@/logger'
-import type { GameSession } from '@/socket/gameSession/GameSession'
 import { publishProgramFinalized } from '@/socket/gameSession/programFinalization'
 import { presentRegistersChanged } from '@/socket/presenters/gamePresenter'
-
-function expireProgrammingIfDue(gameSession: GameSession): Result<void, 'WRONG_PHASE'> {
-  if (gameSession.game.aborted || gameSession.game.winner !== undefined || gameSession.game.paused) return ok(undefined)
-
-  const expired = gameSession.programmingTimer.expireIfDue()
-  // Let the game operation report GAME_ABORTED if automatic completion failed.
-  if (gameSession.game.aborted) return ok(undefined)
-
-  return expired ? err('WRONG_PHASE') : ok(undefined)
-}
 
 function resolveActiveMember(context: SocketContext, socket: GameSocket, user: User) {
   const gameSession = context.registry.getCurrentGame(user.userId)
@@ -46,7 +35,7 @@ export function handleSubmitProgram(
     socket, command: 'program.submit', schema: submitProgramSchema, payload, acknowledge,
     resolve: (user) => resolveActiveMember(context, socket, user),
     run: ({ gameSession, player }, ack) => {
-      const result = expireProgrammingIfDue(gameSession).andThen(() => gameSession.game.submitProgram(player.id, payload.cardIds))
+      const result = gameSession.expireProgrammingIfDue().andThen(() => gameSession.game.submitProgram(player.id, payload.cardIds))
       if (result.isErr()) {
         logWarn('Rejected program.submit request', { command: 'program.submit', gameId: gameSession.game.id, playerId: player.id, outcome: result.error, payload })
         ack({ outcome: result.error })
@@ -95,7 +84,7 @@ export function handleUpdateRegisters(
     socket, command: 'game.updateRegisters', schema: updateRegistersSchema, payload, acknowledge,
     resolve: (user) => resolveActiveMember(context, socket, user),
     run: ({ gameSession, player }, ack) => {
-      const result = expireProgrammingIfDue(gameSession).andThen(() => gameSession.game.updateRegisters(player.id, payload.cardIds))
+      const result = gameSession.expireProgrammingIfDue().andThen(() => gameSession.game.updateRegisters(player.id, payload.cardIds))
       if (result.isErr()) {
         ack({ outcome: result.error })
         return

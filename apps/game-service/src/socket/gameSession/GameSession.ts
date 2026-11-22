@@ -85,6 +85,16 @@ export class GameSession {
     return seat?.connectionId === socket.id ? ok(seat) : err('NOT_A_MEMBER')
   }
 
+  expireProgrammingIfDue(): Result<void, 'WRONG_PHASE'> {
+    if (this.game.aborted || this.game.winner !== undefined || this.game.paused) return ok(undefined)
+
+    const expired = this.programmingTimer.expireIfDue()
+    // Let the game operation report GAME_ABORTED if automatic completion failed.
+    if (this.game.aborted) return ok(undefined)
+
+    return expired ? err('WRONG_PHASE') : ok(undefined)
+  }
+
   getSeat(userId: string): Seat | undefined {
     return this.seats.get(userId)
   }
