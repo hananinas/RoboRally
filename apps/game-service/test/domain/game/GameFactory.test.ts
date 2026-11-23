@@ -1,4 +1,4 @@
-import { resolveRobotAction } from '../activationTestHelper.js'
+import { resolveRobotAction } from '../../activationTestHelper.js'
 import { Integer } from '@/numbers'
 import { submitProgramSchema } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'

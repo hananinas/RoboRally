@@ -19,7 +19,7 @@ export class Board {
     tiles: readonly (readonly Tile[])[],
     antenna: Antenna,
     rebootTile: Position,
-    startTiles: readonly Position[] = [],
+    startTiles: readonly Position[],
   ) {
     const width = tiles[0]?.length ?? 0
     if (width === 0 || tiles.some((row) => row.length !== width)) {
@@ -48,6 +48,9 @@ export class Board {
     }
     this.rebootTile = Object.freeze({ ...rebootTile })
 
+    if (startTiles.length === 0) {
+      throw new RangeError('A board must have at least one starting tile')
+    }
     const startKeys = new Set(startTiles.map(({ x, y }) => `${x},${y}`))
     if (startKeys.size !== startTiles.length) {
       throw new RangeError('Starting tiles must be distinct')

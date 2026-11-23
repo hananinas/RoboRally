@@ -1,14 +1,14 @@
-import { resolveRobotAction } from '../activationTestHelper.js'
+import { resolveRobotAction } from '../../activationTestHelper.js'
 import { describe, expect, it } from 'vitest'
 import { Board, Card, Deck, Direction, EmptyTile, Player, Robot } from '@/domain/game/index.ts'
 import type { Antenna, Position, RobotId } from '@/domain/game/index.ts'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestGame, placeTestPlayer } from '../../fixtures.ts'
+import { createEmptyTileGrid, createTestBoard, createTestGame, placeTestPlayer } from '../../fixtures.ts'
 
 function createMultiplayerGame(
   positions: readonly Position[],
   antenna: Antenna = { x: Integer(4), y: Integer(4), angle: Math.PI / 2 },
-  board = new Board(createEmptyTileGrid(9, 9), antenna, { x: Integer(0), y: Integer(0) }),
+  board = createTestBoard(createEmptyTileGrid(9, 9), antenna, { x: Integer(0), y: Integer(0) }),
   deck: readonly Card[] = Array.from({ length: 6 }, (_, index) => new Card(`left-${index}`, 'TURN_LEFT')),
 ) {
   const players = positions.map((position) =>
@@ -188,7 +188,7 @@ describe('Game multiplayer activation', () => {
       }
     }
     const antenna = { x: Integer(4), y: Integer(4), angle: Math.PI / 2 }
-    const board = new TiedPositionBoard(createEmptyTileGrid(9, 9), antenna, { x: Integer(0), y: Integer(0) })
+    const board = new TiedPositionBoard(createEmptyTileGrid(9, 9), antenna, { x: Integer(0), y: Integer(0) }, [{ x: Integer(0), y: Integer(0) }])
     const { players, deck, game } = createMultiplayerGame(
       [{ x: Integer(4), y: Integer(5) }, { x: Integer(5), y: Integer(4) }], antenna, board,
     )
@@ -199,7 +199,7 @@ describe('Game multiplayer activation', () => {
 
   it('recalculates pending priority from positions changed by an earlier action', () => {
     const antenna = { x: Integer(4), y: Integer(4), angle: Math.PI / 2 }
-    const board = new Board(createEmptyTileGrid(9, 9), antenna, { x: Integer(0), y: Integer(0) })
+    const board = createTestBoard(createEmptyTileGrid(9, 9), antenna, { x: Integer(0), y: Integer(0) })
     const deck = Array.from({ length: 5 }, (_, index) => new Card(`move-${index}`, 'MOVE_1'))
     const { players, game } = createMultiplayerGame(
       [{ x: Integer(4), y: Integer(5) }, { x: Integer(4), y: Integer(6) }, { x: Integer(3), y: Integer(5) }], antenna, board, deck,
@@ -218,7 +218,7 @@ describe('Game multiplayer activation', () => {
     const tiles = createEmptyTileGrid(9, 9)
     tiles[4][8] = new EmptyTile([Direction.EAST])
     const antenna = { x: Integer(8), y: Integer(2), angle: 0 }
-    const board = new Board(tiles, antenna, { x: Integer(0), y: Integer(0) })
+    const board = createTestBoard(tiles, antenna, { x: Integer(0), y: Integer(0) })
     const { players, game } = createMultiplayerGame(
       [{ x: Integer(7), y: Integer(4) }, { x: Integer(6), y: Integer(4) }], antenna, board, deck,
     )

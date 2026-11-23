@@ -1,19 +1,20 @@
-import { resolveRobotAction } from '../activationTestHelper.js'
+import { resolveRobotAction } from '../../activationTestHelper.js'
 import { Integer } from '@/numbers'
 import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
-import { Board, Card, Direction, EmptyTile, PitTile, type Tile } from '@/domain/game/index'
+import { Card, Direction, EmptyTile, PitTile, type Position, type Tile } from '@/domain/game/index'
 import { Deck } from '@/domain/game/Deck'
-import { addTestPlayer, createEmptyTileGrid, createTestGame, placeTestPlayer, programLeadingWith } from '../../fixtures.ts'
+import { addTestPlayer, createEmptyTileGrid, createTestBoard, createTestGame, placeTestPlayer, programLeadingWith } from '../../fixtures.ts'
 
 function createGame(
   pit = { x: Integer(1), y: Integer(1) },
   rebootTile = { x: Integer(0), y: Integer(2) },
   walls: readonly Direction[] = [],
+  startTiles?: Position[],
 ) {
   const tiles: Tile[][] = createEmptyTileGrid(5, 3)
   tiles[pit.y][pit.x] = new PitTile(walls)
-  const board = new Board(tiles, { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, rebootTile)
+  const board = createTestBoard(tiles, { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, rebootTile, startTiles)
   const cards = {
     MOVE_1: new Card('move-1', 'MOVE_1'),
     MOVE_2: new Card('move-2', 'MOVE_2'),
@@ -68,7 +69,12 @@ describe('pit entry and rebooting', () => {
   })
 
   it('pushes another robot into a pit and resolves a later fall during the same move', () => {
-    const { board, robot, player, cards: c, game } = createGame({ x: Integer(3), y: Integer(1) })
+    const { board, robot, player, cards: c, game } = createGame(
+      { x: Integer(3), y: Integer(1) },
+      undefined,
+      undefined,
+      [{ x: Integer(2), y: Integer(1) }],
+    )
     const other = addTestPlayer(game)
     game.submitProgram(player.id, [c.MOVE_3, c.MOVE_1, c.TURN_LEFT, c.TURN_RIGHT, c.BACK_UP].map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(other.id, programLeadingWith(other.hand, 'TURN_LEFT').map((card) => card.id))._unsafeUnwrap()
@@ -150,7 +156,7 @@ describe('pit entry and rebooting', () => {
     { rebootTile: { x: Integer(0), y: Integer(1) }, expectedProgress: 1 },
     { rebootTile: { x: Integer(1), y: Integer(0) }, expectedProgress: 2 },
   ])('evaluates checkpoints at the reboot destination $rebootTile', ({ rebootTile, expectedProgress }) => {
-    const board = new Board([
+    const board = createTestBoard([
       [new EmptyTile(), new EmptyTile([], 2), new PitTile()],
       [new EmptyTile(), new EmptyTile([], 1), new EmptyTile()],
       [new EmptyTile([], 3), new EmptyTile(), new EmptyTile()],

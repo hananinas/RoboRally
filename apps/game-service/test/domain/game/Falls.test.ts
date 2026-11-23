@@ -1,4 +1,4 @@
-import { resolveRobotAction } from '../activationTestHelper.ts'
+import { resolveRobotAction } from '../../activationTestHelper.ts'
 import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
 import { Board, Card, Direction, EmptyTile, type Position } from '@/domain/game/index'
@@ -16,7 +16,7 @@ function createGame(
   tiles[2][1] = new EmptyTile([], 1)
   tiles[4][0] = new EmptyTile([], 2)
   const reboot = { x: Integer(1), y: Integer(2) }
-  const board = new Board(tiles, { x: Integer(0), y: Integer(0), angle: 0 }, reboot)
+  const board = new Board(tiles, { x: Integer(0), y: Integer(0), angle: 0 }, reboot, [start])
   const direction = instruction === 'BACK_UP' ? Direction.WEST : Direction.EAST
   const instructions: Instruction[] = [instruction, 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'MOVE_1']
   const program = instructions.map((instr, index) => new Card(`card-${index}`, instr))
@@ -102,7 +102,7 @@ describe('board-edge falls', () => {
 
   it('can reboot onto the only safe square after vacating it', () => {
     const reboot = { x: Integer(0), y: Integer(0) }
-    const board = new Board([[new EmptyTile(), new EmptyTile()]], { x: Integer(1), y: Integer(0), angle: 0 }, reboot)
+    const board = new Board([[new EmptyTile(), new EmptyTile()]], { x: Integer(1), y: Integer(0), angle: 0 }, reboot, [reboot])
     const program = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_3'))
     const player = placeTestPlayer(board, reboot, { direction: Direction.WEST, deck: new Deck(program) })
     const robot = player.robot

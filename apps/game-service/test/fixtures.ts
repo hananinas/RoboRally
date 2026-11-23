@@ -3,7 +3,7 @@ import type { Instruction } from '@robo-rally/game-events'
 import type { Card } from '@/domain/game/Card'
 import { Deck, createDeckCards } from '@/domain/game/Deck'
 import { Game } from '@/domain/game/Game'
-import type { Board } from '@/domain/game/Board'
+import { Board, type Antenna } from '@/domain/game/Board'
 import { Player } from '@/domain/game/Player'
 import { Robot, ROBOT_COLOURS } from '@/domain/game/Robot'
 import { Direction, type Position } from '@/domain/game/spatial'
@@ -65,6 +65,15 @@ export function addTestPlayer(game: Game, colour?: string): Player {
 
 export function createEmptyTileGrid(width: number, height: number): Tile[][] {
   return Array.from({ length: height }, () => Array.from({ length: width }, () => new EmptyTile()))
+}
+
+export function createTestBoard(
+  tiles: readonly (readonly Tile[])[],
+  antenna: Antenna,
+  rebootTile: Position,
+  startTiles: Position[] = [rebootTile],
+): Board {
+  return new Board(tiles, antenna, rebootTile, startTiles)
 }
 
 export function programLeadingWith(cards: readonly Card[], instruction: Instruction): Card[] {

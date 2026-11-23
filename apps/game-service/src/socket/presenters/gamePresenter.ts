@@ -109,8 +109,8 @@ export function presentWinner(playerId: PlayerId, username: string): Winner {
 export function presentPublicGameState(
   game: Game,
   programmingTimer: ProgrammingTimer,
-  seats: Iterable<{ user: User; player: Player; connectionId: string | null }> = [],
-  winner: Winner | null = null,
+  seats: Iterable<{ user: User; player: Player; connectionId: string | null }>,
+  winner: Winner | null,
 ): PublicGameState {
   const tiles = Array.from({ length: game.board.height }, (_, y) =>
     Array.from({ length: game.board.width }, (_, x) => presentTile(game, x, y)),

@@ -1,4 +1,4 @@
-import { resolveRobotAction } from '../activationTestHelper.js'
+import { resolveRobotAction } from '../../activationTestHelper.js'
 import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
 import { Card } from '@/domain/game/Card'
@@ -102,6 +102,7 @@ describe('Again card', () => {
       [Array.from({ length: 9 }, () => new EmptyTile())],
       { x: Integer(8), y: Integer(0), angle: 0 },
       { x: Integer(0), y: Integer(0) },
+      [{ x: Integer(4), y: Integer(0) }],
     )
     const robot = createTestRobot({ direction: Direction.EAST })
     board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })

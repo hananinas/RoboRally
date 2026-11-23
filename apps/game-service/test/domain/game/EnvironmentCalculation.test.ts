@@ -14,7 +14,7 @@ function createBoard(tiles?: readonly Tile[]) {
   return new Board([
     Array.from({ length: 5 }, () => new EmptyTile()),
     tiles ?? Array.from({ length: 5 }, () => new EmptyTile()),
-  ], { ...position(0, 0), angle: 0 }, position(4, 0))
+  ], { ...position(0, 0), angle: 0 }, position(4, 0), [position(2, 0)])
 }
 
 describe('environment calculations', () => {

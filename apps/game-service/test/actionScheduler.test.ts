@@ -1,11 +1,11 @@
 import { createServer } from 'node:http'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Board, Card, Deck, Direction, EmptyTile, GearTile } from '@/game/index'
-import { createActionScheduler, type ActionScheduler } from '@/actionScheduler'
+import { Card, Deck, Direction, EmptyTile, GearTile } from '@/domain/game/index'
+import { createActionScheduler, type ActionScheduler } from '@/socket/gameSession/actionScheduler'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
 import { createSessionStore } from '@/auth/sessionStore'
 import { Integer } from '@/numbers'
-import { createTestGame, createTestPlayer, createTestRobot } from './fixtures.ts'
+import { createTestBoard, createTestGame, createTestPlayer, createTestRobot } from './fixtures.ts'
 
 describe('activation scheduler', () => {
   let io: GameSocketServer
@@ -20,7 +20,7 @@ describe('activation scheduler', () => {
   })
 
   function createGame(onGear = false) {
-    const board = new Board([
+    const board = createTestBoard([
       [new EmptyTile(), new EmptyTile(), new EmptyTile()],
       [new GearTile('CLOCKWISE'), new EmptyTile([], 1), new EmptyTile()],
       [new EmptyTile(), new EmptyTile([], 2), new EmptyTile()],
@@ -33,7 +33,7 @@ describe('activation scheduler', () => {
     game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
     io = createGameSocketServer(createServer(), createSessionStore({ oidcClient: { refreshToken: vi.fn() }, refreshBufferSeconds: 0 }))
     const broadcast = vi.spyOn(io.of('/').adapter, 'broadcast')
-    scheduler = createActionScheduler({ io, game, publicRoom: 'public', playerRoom: (id) => `private:${id}`, usernameOf: () => undefined,
+    scheduler = createActionScheduler({ io, game, publicRoom: 'public', playerRoom: (id) => `private:${id}`, announceWinnerIfConcluded: vi.fn(),
       onProgrammingStarted: vi.fn(), onStop: vi.fn() })
     const events = () => broadcast.mock.calls.map(([packet, options]) => ({
       name: packet.data[0], payload: packet.data[1], rooms: [...options.rooms],

@@ -1,4 +1,4 @@
-import { resolveRobotAction } from './activationTestHelper.js'
+import { resolveRobotAction } from '../../activationTestHelper.js'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
 import type {
@@ -9,7 +9,6 @@ import type {
   Tile as TilePayload,
 } from '@robo-rally/game-events'
 import {
-  Board,
   Card,
   Deck,
   Direction,
@@ -26,7 +25,7 @@ import {
   presentRobotActionResolved,
 } from '@/socket/presenters/gamePresenter.ts'
 import { Integer } from '@/numbers'
-import { createTestGame, createTestPlayer, placeTestPlayer } from '../../fixtures.ts'
+import { createTestBoard, createTestGame, createTestPlayer, placeTestPlayer } from '../../fixtures.ts'
 
 function createGameWithPlayer() {
   const game = createGame('empty-map', 'Test game')
@@ -84,7 +83,7 @@ describe('game presenter', () => {
   })
 
   it('serializes pits alongside empty tiles, walls and checkpoints', () => {
-    const board = new Board([[
+    const board = createTestBoard([[
       new EmptyTile(),
       new PitTile(),
       new PitTile([Direction.NORTH, Direction.WEST]),
@@ -92,7 +91,7 @@ describe('game presenter', () => {
     ]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
     const game = createTestGame({ board, players: [], deck: cards })
-    const state = presentPublicGameState(game, { status: 'IDLE' })
+    const state = presentPublicGameState(game, { status: 'IDLE' }, [], null)
 
     expect(state.checkpointCount).toBe(1)
     expect(state.board.tiles).toEqual([
@@ -104,7 +103,7 @@ describe('game presenter', () => {
   })
 
   it('serializes gear directions and walls without adding rotation to other tiles', () => {
-    const board = new Board([[
+    const board = createTestBoard([[
       new EmptyTile(),
       new GearTile('CLOCKWISE', [Direction.NORTH]),
       new GearTile('COUNTERCLOCKWISE', [Direction.SOUTH, Direction.WEST]),
@@ -113,7 +112,7 @@ describe('game presenter', () => {
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
     const game = createTestGame({ board, players: [], deck: cards })
 
-    expect(presentPublicGameState(game, { status: 'IDLE' }).board.tiles).toEqual([
+    expect(presentPublicGameState(game, { status: 'IDLE' }, [], null).board.tiles).toEqual([
       { position: { x: 0, y: 0 }, type: 'EMPTY' },
       { position: { x: 1, y: 0 }, type: 'GEAR', rotation: 'CLOCKWISE', walls: ['NORTH'] },
       { position: { x: 2, y: 0 }, type: 'GEAR', rotation: 'COUNTERCLOCKWISE', walls: ['SOUTH', 'WEST'] },
@@ -123,7 +122,7 @@ describe('game presenter', () => {
 
   it('presents a complete public programming state in row-major order', () => {
     const { gameId, game, player } = createGameWithPlayer()
-    const state = presentPublicGameState(game, { status: 'IDLE' })
+    const state = presentPublicGameState(game, { status: 'IDLE' }, [], null)
 
     expectTypeOf(state).toEqualTypeOf<PublicGameState>()
     expect(state).toMatchObject({
@@ -160,7 +159,7 @@ describe('game presenter', () => {
   })
 
   it('maps tile walls and the activation phase to contract values', () => {
-    const board = new Board([
+    const board = createTestBoard([
       [
         new EmptyTile([Direction.NORTH, Direction.WEST], 1),
         new EmptyTile(),
@@ -174,7 +173,7 @@ describe('game presenter', () => {
     const game = createTestGame({ board, players: [player], deck: cards })
     game.submitProgram(player.id, cards.map((card) => card.id))
 
-    const state = presentPublicGameState(game, { status: 'CLOSED' })
+    const state = presentPublicGameState(game, { status: 'CLOSED' }, [], null)
 
     expect(state.phase).toBe('EXECUTING')
     expect(state.board.tiles).toEqual([
@@ -190,14 +189,14 @@ describe('game presenter', () => {
   })
 
   it('presents the winner once a player completes the final checkpoint', () => {
-    const board = new Board([
+    const board = createTestBoard([
       [new EmptyTile(), new EmptyTile([], 1), new EmptyTile()],
     ], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
     const player = placeTestPlayer(board, { x: Integer(0), y: Integer(0) }, { direction: Direction.EAST, deck: new Deck(cards) })
     const game = createTestGame({ board, players: [player], deck: cards })
     game.submitProgram(player.id, cards.map((card) => card.id))
-    expect(presentPublicGameState(game, { status: 'CLOSED' }).winner).toBeNull()
+    expect(presentPublicGameState(game, { status: 'CLOSED' }, [], null).winner).toBeNull()
 
     resolveRobotAction(game)
 

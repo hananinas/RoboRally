@@ -10,7 +10,7 @@ import { Player } from '@/domain/game/Player'
 import { Robot, ROBOT_COLOURS } from '@/domain/game/Robot'
 import { tileDefinitions } from '@/domain/game/Tile'
 import { Direction, opposite, type Position } from '@/domain/game/spatial'
-import { Integer, PositiveInteger, UnsignedInteger } from '@/numbers'
+import { PositiveInteger, UnsignedInteger } from '@/numbers'
 import {
   GameLifecycle,
   type AbortError,
@@ -168,21 +168,6 @@ export class Game {
   }
 
   private findSpawn(): Result<Position, 'NO_SPAWN_AVAILABLE'> {
-    if (this.board.startTiles.length > 0) return this.findFreeStartTile()
-
-    const { width, height } = this.board
-    const y = Math.floor(height / 2)
-    let x = Math.floor(width / 2)
-    while (x >= 0) {
-      const position = { x: Integer(x), y: Integer(y) }
-      if (this.board.allowsPlacement(position) &&
-          this.board.occupantAt(position) === undefined) return ok(position)
-      x--
-    }
-    return err('NO_SPAWN_AVAILABLE')
-  }
-
-  private findFreeStartTile(): Result<Position, 'NO_SPAWN_AVAILABLE'> {
     const free = this.board.startTiles.filter((position) => this.board.occupantAt(position) === undefined)
     if (free.length === 0) return err('NO_SPAWN_AVAILABLE')
     return ok({ ...free[0] })

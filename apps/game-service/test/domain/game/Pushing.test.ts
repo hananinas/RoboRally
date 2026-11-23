@@ -1,10 +1,10 @@
-import { resolveRobotAction } from '../activationTestHelper.ts'
+import { resolveRobotAction } from '../../activationTestHelper.ts'
 import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
-import { Board, Card, Direction, EmptyTile, PitTile, type Antenna, type Position, type Tile } from '@/domain/game/index'
+import { Card, Direction, EmptyTile, PitTile, type Antenna, type Position, type Tile } from '@/domain/game/index'
 import { Deck } from '@/domain/game/Deck'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestGame, placeTestPlayer, programLeadingWith } from '../../fixtures.ts'
+import { createEmptyTileGrid, createTestBoard, createTestGame, placeTestPlayer, programLeadingWith } from '../../fixtures.ts'
 
 function position(x: number, y = 3): Position {
   return { x: Integer(x), y: Integer(y) }
@@ -20,7 +20,7 @@ function createGame(
   antenna: Antenna = { ...position(0, 0), angle: 0 },
   reboot = position(0, 5),
 ) {
-  const board = new Board(tiles, antenna, reboot)
+  const board = createTestBoard(tiles, antenna, reboot)
   const directions = [Direction.EAST, Direction.NORTH, Direction.WEST, Direction.SOUTH]
   const instructions: Instruction[] = ['MOVE_1', 'MOVE_2', 'MOVE_3', 'BACK_UP', 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'AGAIN']
   const cards = instructions.map((instruction) => new Card(instruction, instruction))
@@ -206,7 +206,7 @@ describe('robot pushing', () => {
   it('can push a robot again immediately after it has rebooted', () => {
     const tiles = grid()
     tiles[3][3] = new PitTile()
-    const board = new Board(tiles, { x: Integer(0), y: Integer(0), angle: 0 }, position(2))
+    const board = createTestBoard(tiles, { x: Integer(0), y: Integer(0), angle: 0 }, position(2))
     const moverDeck = [
       new Card('move-a', 'MOVE_1'),
       new Card('turn', 'TURN_LEFT'),
