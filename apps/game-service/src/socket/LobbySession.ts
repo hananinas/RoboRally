@@ -24,7 +24,7 @@ export class LobbySession {
     return member?.connectionId === socket.id ? ok(member) : err('NOT_A_MEMBER')
   }
 
-  connect(socket: GameSocket): void {
+  private connect(socket: GameSocket): void {
     void socket.join(this.room)
   }
 
