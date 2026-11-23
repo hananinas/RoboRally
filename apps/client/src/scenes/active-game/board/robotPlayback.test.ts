@@ -171,10 +171,10 @@ describe('reboot playback', () => {
     const from = { coordinate: { x: 13, y: 1 }, orientation: 'SOUTH' as const }
     const landed = { coordinate: { x: 13, y: 2 }, orientation: 'SOUTH' as const }
     const action = fall('MOVE_3', { x: 13, y: 4 }, landed)
-    expect(playbackPhases(action, startAt({ red: from })).map(({ kind, robots }) => [kind, robots])).toEqual([
-      ['pit-enter', [{ robotId: 'red', position: { coordinate: { x: 13, y: 4 }, orientation: 'SOUTH' } }]],
-      ['pit-fall', [{ robotId: 'red', position: { coordinate: { x: 13, y: 4 }, orientation: 'SOUTH' } }]],
-      ['pit-respawn', [{ robotId: 'red', position: landed }]],
+    expect(playbackPhases(action, startAt({ red: from })).map(({ kind, robotId, position }) => [kind, robotId, position])).toEqual([
+      ['pit-enter', 'red', { coordinate: { x: 13, y: 4 }, orientation: 'SOUTH' }],
+      ['pit-fall', 'red', { coordinate: { x: 13, y: 4 }, orientation: 'SOUTH' }],
+      ['pit-respawn', 'red', landed],
     ])
   })
 
@@ -182,44 +182,71 @@ describe('reboot playback', () => {
     const from = { coordinate: { x: 0, y: 1 }, orientation: 'WEST' as const }
     const landed = { coordinate: { x: 0, y: 2 }, orientation: 'WEST' as const }
     const phases = playbackPhases(fall('MOVE_1', { x: -1, y: 1 }, landed), startAt({ red: from }))
-    expect(phases.map(({ kind, robots }) => [kind, robots[0].position.coordinate])).toEqual([
+    expect(phases.map(({ kind, position }) => [kind, position.coordinate])).toEqual([
       ['pit-enter', { x: -1, y: 1 }], ['pit-fall', { x: -1, y: 1 }], ['pit-respawn', { x: 0, y: 2 }],
     ])
   })
 
-  it('plays pushed and pushing robots falling in the order they rebooted', () => {
-    const pusherStart = { coordinate: { x: 0, y: 1 }, orientation: 'EAST' as const }
-    const pushedStart = { coordinate: { x: 1, y: 1 }, orientation: 'NORTH' as const }
-    const action: ResolvedRobotAction = {
-      ...move('MOVE_2', { coordinate: { x: 4, y: 2 }, orientation: 'EAST' }),
-      pushedRobots: [{ robotId: 'blue', position: { coordinate: { x: 0, y: 2 }, orientation: 'NORTH' } }],
-      reboots: [
-        { robotId: 'blue', fellAt: { x: 2, y: 1 }, landedAt: { x: 0, y: 2 } },
-        { robotId: 'red', fellAt: { x: 2, y: 1 }, landedAt: { x: 4, y: 2 } },
-      ],
-    }
-    const phases = playbackPhases(action, startAt({ red: pusherStart, blue: pushedStart }))
-    const at = ({ x, y }: { x: number; y: number }) => `${x},${y}`
-    expect(phases.map(({ kind, robots }) =>
-      [kind, robots.map(({ robotId, position }) => `${robotId}@${at(position.coordinate)}`)])).toEqual([
-      ['pit-enter', ['blue@2,1', 'red@0,1']],
-      ['pit-fall', ['blue@2,1', 'red@0,1']],
-      ['pit-respawn', ['blue@0,2', 'red@0,1']],
-      ['pit-enter', ['red@2,1']],
-      ['pit-fall', ['red@2,1']],
-      ['pit-respawn', ['red@4,2']],
+  // Nathan's multiplayer route: MOVE_3 east from (0,1) pushes blue from (1,1) into the pit at
+  // (3,1). Blue reboots back on (1,1), so pushedRobots leaves it out; red follows it in.
+  const pusherStart = { coordinate: { x: 0, y: 1 }, orientation: 'EAST' as const }
+  const pushedStart = { coordinate: { x: 1, y: 1 }, orientation: 'NORTH' as const }
+  const pushIntoPit: ResolvedRobotAction = {
+    ...move('MOVE_3', { coordinate: { x: 4, y: 2 }, orientation: 'EAST' }),
+    reboots: [
+      { robotId: 'blue', fellAt: { x: 3, y: 1 }, landedAt: { x: 1, y: 1 } },
+      { robotId: 'red', fellAt: { x: 3, y: 1 }, landedAt: { x: 4, y: 2 } },
+    ],
+  }
+  const at = ({ x, y }: { x: number; y: number }) => `${x},${y}`
+
+  it('plays each reboot in order on the robot that rebooted, even without a pushed state', () => {
+    const phases = playbackPhases(pushIntoPit, startAt({ red: pusherStart, blue: pushedStart }))
+    expect(phases.map(({ kind, robotId, position, waiting }) => [
+      kind, `${robotId}@${at(position.coordinate)}`, waiting.map((robot) => `${robot.robotId}@${at(robot.position.coordinate)}`),
+    ])).toEqual([
+      ['pit-enter', 'blue@3,1', ['red@0,1']],
+      ['pit-fall', 'blue@3,1', ['red@0,1']],
+      ['pit-respawn', 'blue@1,1', ['red@0,1']],
+      ['pit-enter', 'red@3,1', []],
+      ['pit-fall', 'red@3,1', []],
+      ['pit-respawn', 'red@4,2', []],
     ])
+    expect(phases[2].position.orientation).toBe('NORTH')
+  })
+
+  it('keeps the waiting robot visible and still while another robot falls', () => {
+    const robots = [
+      { robotId: 'red', robotSpriteId: 'tank' as const, colour: '#E55F5F', position: pusherStart },
+      { robotId: 'blue', robotSpriteId: 'tank' as const, colour: '#5F8FE5', position: pushedStart },
+    ]
+    let state = robotPlaybackReducer(createRobotPlaybackState(robots), { type: 'enqueue', action: pushIntoPit, board })
+    const shown = () => state.robots.map(({ robotId, phase, position }) => `${robotId}:${phase ?? '-'}@${at(position.coordinate)}`)
+    const steps = [shown()]
+    for (let phase = 0; phase < 5; phase++) {
+      state = robotPlaybackReducer(state, { type: 'advance' })
+      steps.push(shown())
+    }
+    expect(steps).toEqual([
+      ['red:-@0,1', 'blue:pit-enter@3,1'],
+      ['red:-@0,1', 'blue:pit-fall@3,1'],
+      ['red:-@0,1', 'blue:pit-respawn@1,1'],
+      ['red:pit-enter@3,1', 'blue:-@1,1'],
+      ['red:pit-fall@3,1', 'blue:-@1,1'],
+      ['red:pit-respawn@4,2', 'blue:-@1,1'],
+    ])
+    state = robotPlaybackReducer(state, { type: 'advance' })
+    expect(state.active).toBeNull()
+    expect(shown()).toEqual(['red:-@4,2', 'blue:-@1,1'])
   })
 
   it('skips a reboot for a robot it cannot place', () => {
     expect(playbackPhases(fall('MOVE_2', { x: 2, y: 1 }), startAt({}))).toEqual([])
-    const stranger = { ...fall('MOVE_2', { x: 2, y: 1 }), reboots: [{ robotId: 'ghost', fellAt: { x: 2, y: 1 }, landedAt: { x: 0, y: 0 } }] }
-    expect(playbackPhases(stranger, startAt({ red: start, ghost: start }))).toEqual([])
   })
 
   it('plays the move, fall and respawn before the action completes', () => {
     const robots = [{ robotId: 'red', robotSpriteId: 'tank' as const, colour: '#E55F5F', position: start }, DEMO_ROBOTS[0]]
-    const action = { ...fall('MOVE_2', { x: 2, y: 1 }, { coordinate: { x: 0, y: 0 }, orientation: 'EAST' }),
+    const action = { ...fall('MOVE_2', { x: 2, y: 1 }),
       pushedRobots: [{ robotId: 'blue', position: { coordinate: { x: 2, y: 0 }, orientation: 'WEST' as const } }] }
     let state = createRobotPlaybackState(robots)
     state = robotPlaybackReducer(state, { type: 'enqueue', action, board })
@@ -231,12 +258,12 @@ describe('reboot playback', () => {
     state = robotPlaybackReducer(state, { type: 'advance' })
     expect(state.robots[0]).toMatchObject({ position: { coordinate: { x: 2, y: 1 } }, phase: 'pit-fall' })
     state = robotPlaybackReducer(state, { type: 'advance' })
-    expect(state.robots[0]).toMatchObject({ position: action.position, angle: 90, phase: 'pit-respawn' })
+    expect(state.robots[0]).toMatchObject({ position: action.position, angle: 0, phase: 'pit-respawn' })
     expect(state.active).toBe(action)
 
     state = robotPlaybackReducer(state, { type: 'advance' })
     expect(state.active).toBeNull()
-    expect(state.robots[0]).toEqual({ ...robots[0], position: action.position, angle: 90 })
+    expect(state.robots[0]).toEqual({ ...robots[0], position: action.position, angle: 0 })
     expect(robotPlaybackReducer(state, { type: 'advance' })).toBe(state)
   })
 
@@ -245,7 +272,7 @@ describe('reboot playback', () => {
     let state = createRobotPlaybackState(robots)
     state = robotPlaybackReducer(state, { type: 'enqueue', action: move('MOVE_1', { ...start, orientation: 'EAST' }), board })
     state = robotPlaybackReducer(state, { type: 'enqueue', action: fall('MOVE_2', { x: 4, y: 3 }), board })
-    expect(state.pending.map((entry) => entry.phases[0]?.robots[0].position))
+    expect(state.pending.map((entry) => entry.phases[0]?.position))
       .toEqual([{ coordinate: { x: 4, y: 3 }, orientation: 'EAST' }])
   })
 
