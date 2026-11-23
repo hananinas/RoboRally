@@ -131,13 +131,9 @@ export class GameSession {
     if (result.isErr()) return
     const seat = result.value
 
-    try {
-      seat.connectionId = null
-      this.game.pause()
-      this.io.to(this.publicRoom).emit('game.playerConnectionChanged', presentPlayerConnectionChanged(this.game, seat.player, false))
-    } catch (error) {
-      logError('Failed to process player disconnect', error, { command: 'disconnect', gameId: this.game.id, playerId: seat.player.id })
-    }
+    seat.connectionId = null
+    this.game.pause()
+    this.io.to(this.publicRoom).emit('game.playerConnectionChanged', presentPlayerConnectionChanged(this.game, seat.player, false))
   }
 
   addSeat(user: User, connectionId: string): Result<Player, AddPlayerError> {
