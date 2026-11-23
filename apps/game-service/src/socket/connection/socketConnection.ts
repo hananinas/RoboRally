@@ -1,6 +1,7 @@
 import { parseCookie } from 'cookie'
 import { SESSION_COOKIE_NAME, type SessionStore } from '@/auth/sessionStore'
 import type { GameSocket, SocketContext } from '@/socket/gameServer'
+import { logError } from '@/logger'
 
 export function authenticateSocket(sessionStore: SessionStore, socket: GameSocket, next: (error?: Error) => void): void {
   const cookies = parseCookie(socket.handshake.headers.cookie ?? '')
@@ -51,5 +52,12 @@ export function validateSocketSession(context: SocketContext, socket: GameSocket
 
 export function recoverSocketSession(context: SocketContext, socket: GameSocket): void {
   const gameSession = context.registry.getCurrentGame(socket.data.user.userId)
-  if (gameSession) gameSession.reconnectIfRecovered(socket)
+  if (!gameSession) return
+  try {
+    gameSession.reconnectIfRecovered(socket)
+  } catch (error) {
+    logError('Failed to recover socket session', error, {
+      userId: socket.data.user.userId, gameId: gameSession.game.id,
+    })
+  }
 }

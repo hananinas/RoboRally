@@ -4,6 +4,7 @@ import type { GameSocket, SocketContext } from '@/socket/gameServer'
 import { leaveLobby } from '@/socket/handlers/lobbyHandlers'
 import { presentLobby } from '@/socket/presenters/lobbyPresenter'
 import { withValidatedRequest } from '@/socket/utilities/withValidatedRequest'
+import { logError } from '@/logger'
 
 function resolveLobbyMembership(context: SocketContext, socket: GameSocket, user: User): MembershipResult {
   const lobbySession = context.registry.getCurrentLobby(user.userId)
@@ -38,7 +39,11 @@ export function handleGetMembership(
 }
 
 export function handleSocketDisconnect(context: SocketContext, socket: GameSocket): void {
-  leaveLobby(context, socket)
-  const gameSession = context.registry.getCurrentGame(socket.data.user.userId)
-  if (gameSession) gameSession.markDisconnected(socket)
+  try {
+    leaveLobby(context, socket)
+    const gameSession = context.registry.getCurrentGame(socket.data.user.userId)
+    if (gameSession) gameSession.markDisconnected(socket)
+  } catch (error) {
+    logError('Failed to clean up disconnected socket', error, { userId: socket.data.user.userId })
+  }
 }
