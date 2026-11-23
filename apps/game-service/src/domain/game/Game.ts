@@ -8,7 +8,6 @@ import { Deck } from '@/domain/game/Deck'
 import type { CardId, GameId, PlayerId, RobotId } from '@/domain/game/ids'
 import { Player } from '@/domain/game/Player'
 import { Robot, ROBOT_COLOURS } from '@/domain/game/Robot'
-import { tileDefinitions } from '@/domain/game/Tile'
 import { Direction, opposite, type Position } from '@/domain/game/spatial'
 import { PositiveInteger, UnsignedInteger } from '@/numbers'
 import {
