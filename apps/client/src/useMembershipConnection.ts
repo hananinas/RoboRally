@@ -145,6 +145,6 @@ export default function useMembershipConnection() {
     connection, game, membership, busy, lobbies, maps, mapsLoaded, listError,
     joinLobby, startLobby, leaveMembership, refreshLobbies,
     createLobby,
-    retryMembership: () => socket.connected ? dispatch({ type: 'sync-requested' }) : connection.connect(),
+    retrySync: () => socket.connected ? dispatch({ type: 'sync-requested' }) : connection.connect(),
   }
 }

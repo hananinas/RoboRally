@@ -23,7 +23,7 @@ function errorMessage(code: string): string {
 function App() {
   const {
     connection, game, membership, busy, lobbies, maps, mapsLoaded, listError,
-    createLobby, joinLobby, startLobby, leaveMembership, refreshLobbies, retryMembership,
+    createLobby, joinLobby, startLobby, leaveMembership, refreshLobbies, retrySync,
   } = useMembershipConnection()
 
   useEffect(() => {
@@ -60,7 +60,7 @@ function App() {
   } else {
     content = <>
       <p>Restoring session…</p>
-      <button className="entry-secondary-button" type="button" disabled={busy || connection.status === 'connecting'} onClick={retryMembership}>Retry</button>
+      <button className="entry-secondary-button" type="button" disabled={busy || connection.status === 'connecting'} onClick={retrySync}>Retry</button>
     </>
   }
   return (
