@@ -842,7 +842,9 @@ components:
               Every reboot this instruction caused, in the order it happened, for the
               acting robot and pushed robots alike. Use it to show each fall before
               the robot appears on its reboot tile. Empty when no robot rebooted.
-              position and pushedRobots still give the final states.
+              position and pushedRobots still give the final states. A reboot keeps
+              the robot's facing. A pushed robot that reboots onto the tile it started
+              from is not in pushedRobots, so only this list shows that it fell.
             items:
               $ref: "#/components/schemas/RebootEffect"
           gameId:

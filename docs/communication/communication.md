@@ -250,6 +250,8 @@ The event includes final positions after reboots: `position` for the acting robo
 
 `reboots` lists every reboot the instruction caused, in order: the robot, `fellAt` (the pit, or the square just off the board edge) and `landedAt` (the reboot tile). Clients play each fall from it instead of guessing from the path, because a reboot tile can be on the path itself: on Test Map, `MOVE_3` south from (13,1) passes (13,2), falls into the pit at (13,4) and lands back on the reboot tile at (13,2).
 
+Drive the fall animation from each `reboots` entry, and animate only the robot in that entry. A robot can appear in `reboots` without being in `pushedRobots`: a pushed robot that reboots onto the tile it started from has not changed position. When one instruction reboots several robots, play them one after another in list order. A robot whose reboot comes later waits where it started and stays visible until its turn. A reboot keeps the robot's facing.
+
 #### Activation ordering
 
 The antenna is located at the top centre of the board and faces south.
