@@ -13,7 +13,6 @@ import {
 import { err, ok } from 'neverthrow'
 import { withValidatedRequest } from '@/socket/utilities/withValidatedRequest'
 import type { GameSocket, SocketContext } from '@/socket/gameServer'
-import { logWarn } from '@/logger'
 import { publishProgramFinalized } from '@/socket/gameSession/programFinalization'
 import { presentRegistersChanged } from '@/socket/presenters/gamePresenter'
 
@@ -36,15 +35,10 @@ export function handleSubmitProgram(
     resolve: (user) => resolveActiveMember(context, socket, user),
     run: ({ gameSession, player }, ack) => {
       const result = gameSession.expireProgrammingIfDue().andThen(() => gameSession.game.submitProgram(player.id, payload.cardIds))
-      if (result.isErr()) {
-        logWarn('Rejected program.submit request', { command: 'program.submit', gameId: gameSession.game.id, playerId: player.id, outcome: result.error, payload })
-        ack({ outcome: result.error })
-        return
-      }
+      if (result.isErr()) return ack({ outcome: result.error })
       ack({ outcome: 'ACCEPTED' })
       publishProgramFinalized(gameSession, { playerId: player.id, cards: player.robot.program }, 'SUBMITTED')
-      gameSession.programmingTimer.start()
-      if (gameSession.game.requirePhase('activation').isOk()) gameSession.programmingTimer.close()
+      gameSession.noteProgramSubmitted()
     },
   })
 }
@@ -85,10 +79,7 @@ export function handleUpdateRegisters(
     resolve: (user) => resolveActiveMember(context, socket, user),
     run: ({ gameSession, player }, ack) => {
       const result = gameSession.expireProgrammingIfDue().andThen(() => gameSession.game.updateRegisters(player.id, payload.cardIds))
-      if (result.isErr()) {
-        ack({ outcome: result.error })
-        return
-      }
+      if (result.isErr()) return ack({ outcome: result.error })
       ack({ outcome: 'ACCEPTED' })
       gameSession.io.to(gameSession.publicRoom).emit('game.registersChanged', presentRegistersChanged(gameSession.game.id, player))
     },

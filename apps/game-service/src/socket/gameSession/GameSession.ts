@@ -6,7 +6,7 @@ import {
   presentInitialization, presentPlayerConnectionChanged, presentProgrammingTimer, presentPublicGameState, presentWinner,
 } from '@/socket/presenters/gamePresenter'
 import { createActionScheduler, type ActionScheduler } from '@/socket/gameSession/actionScheduler'
-import { createProgrammingTimer, type ProgrammingTimer } from '@/programmingTimer'
+import { createProgrammingTimer, type ProgrammingTimer, type ProgrammingTimerState } from '@/programmingTimer'
 import { publishProgramFinalized } from '@/socket/gameSession/programFinalization'
 import { logError } from '@/logger'
 
@@ -38,30 +38,34 @@ export class GameSession {
       onStop: () => this.programmingTimer.stop(),
     })
     this.programmingTimer = createProgrammingTimer({
-      onExpire: () => {
-        if (game.aborted || game.winner !== undefined || this.seats.size === 0) {
-          this.programmingTimer.stop()
-          return
-        }
-        try {
-          const completed = game.completePrograms()
-          if (completed.isErr()) throw new Error(`Cannot complete programs: ${completed.error}`)
-          for (const program of completed.value) {
-            publishProgramFinalized(this, program, 'TIMEOUT')
-          }
-        } catch (error) {
-          logError('Failed to complete programs at the deadline', error, { gameId: game.id, source: 'programmingTimer' })
-          this.actionScheduler.stop()
-          game.abort()
-          io.to(this.publicRoom).emit('game.aborted', { gameId: game.id })
-        }
-      },
-      onChange: (timer) => {
-        io.to(this.publicRoom).emit('program.timerChanged', presentProgrammingTimer(game.id, timer))
-        if (timer.status !== 'CLOSED' || game.requirePhase('activation').isErr()) return
-        this.actionScheduler.scheduleNextAction()
-      },
+      onExpire: () => this.onProgrammingExpired(),
+      onChange: (timer) => this.onProgrammingTimerChanged(timer),
     })
+  }
+
+  private onProgrammingExpired(): void {
+    if (this.game.aborted || this.game.winner !== undefined || this.seats.size === 0) {
+      this.programmingTimer.stop()
+      return
+    }
+    try {
+      const completed = this.game.completePrograms()
+      if (completed.isErr()) throw new Error(`Cannot complete programs: ${completed.error}`)
+      for (const program of completed.value) {
+        publishProgramFinalized(this, program, 'TIMEOUT')
+      }
+    } catch (error) {
+      logError('Failed to complete programs at the deadline', error, { gameId: this.game.id, source: 'programmingTimer' })
+      this.actionScheduler.stop()
+      this.game.abort()
+      this.io.to(this.publicRoom).emit('game.aborted', { gameId: this.game.id })
+    }
+  }
+
+  private onProgrammingTimerChanged(timer: ProgrammingTimerState): void {
+    this.io.to(this.publicRoom).emit('program.timerChanged', presentProgrammingTimer(this.game.id, timer))
+    if (timer.status !== 'CLOSED' || this.game.requirePhase('activation').isErr()) return
+    this.actionScheduler.scheduleNextAction()
   }
 
   playerRoom(playerId: string): string {
@@ -93,6 +97,16 @@ export class GameSession {
     if (this.game.aborted) return ok(undefined)
 
     return expired ? err('WRONG_PHASE') : ok(undefined)
+  }
+
+  noteProgramSubmitted(): void {
+    if (!this.closeTimerIfRoundConcluded()) this.programmingTimer.start()
+  }
+
+  private closeTimerIfRoundConcluded(): boolean {
+    const concluded = this.game.requirePhase('activation').isOk()
+    if (concluded) this.programmingTimer.close()
+    return concluded
   }
 
   getSeat(userId: string): Seat | undefined {
@@ -142,7 +156,7 @@ export class GameSession {
       this.io.to(this.publicRoom).emit('game.playerLeft', {
         gameId: this.game.id, playerId: player.id, robotId: player.robot.id,
       })
-      if (this.game.requirePhase('activation').isOk()) this.programmingTimer.close()
+      this.closeTimerIfRoundConcluded()
       this.actionScheduler.announceProgress({ roundConcluded })
       this.actionScheduler.scheduleNextAction()
     })
