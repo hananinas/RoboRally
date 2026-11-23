@@ -16,7 +16,6 @@ export type BoardMapSummary = Readonly<{
   mapName: BoardMapName
   name: string
   icon: string
-  defaultForLobbyCreation: boolean
 }>
 export type LobbySummary = Readonly<{
   lobbyId: string

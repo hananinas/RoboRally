@@ -67,9 +67,8 @@ describe('lobby lifecycle over Socket.IO', () => {
     if (listed.outcome !== 'LOBBIES_FOUND') throw new Error(listed.outcome)
     expect(listed.lobbies).toEqual([])
     expect(listed.maps).toEqual(Object.entries(boardMaps).map(([mapName, map]) => ({
-      mapName, name: map.name, icon: map.icon, defaultForLobbyCreation: map.defaultForLobbyCreation,
+      mapName, name: map.name, icon: map.icon,
     })))
-    expect(listed.maps.filter((map) => map.defaultForLobbyCreation)).toHaveLength(1)
     expect(createGame).not.toHaveBeenCalled()
     expect(server.sockets.sockets.get(client.id!)!.rooms).toEqual(new Set([client.id]))
   })
