@@ -244,7 +244,13 @@ A movement card can push a chain of robots. A wall or the antenna blocks the who
 
 Movement resolves one square at a time. Robots entering pits or leaving the board reboot at once. The move stops if the acting robot reboots. A pushed robot rebooting does not stop it.
 
+Each map has four reboot tiles, sent as tiles with type `REBOOT` in the board. A rebooting robot goes to the free reboot tile closest to where it fell and keeps its facing direction. If every reboot tile is taken, it goes to the nearest free tile instead.
+
 The event includes final positions after reboots: `position` for the acting robot and `pushedRobots` for other robots whose positions changed. Clients apply them together when the action plays.
+
+`reboots` lists every reboot the instruction caused, in order: the robot, `fellAt` (the pit, or the square just off the board edge) and `landedAt` (the reboot tile). Clients play each fall from it instead of guessing from the path, because a reboot tile can be on the path itself: on Test Map, `MOVE_3` south from (13,1) passes (13,2), falls into the pit at (13,4) and lands back on the reboot tile at (13,2).
+
+Drive the fall animation from each `reboots` entry, and animate only the robot in that entry. A robot can appear in `reboots` without being in `pushedRobots`: a pushed robot that reboots onto the tile it started from has not changed position. When one instruction reboots several robots, play them one after another in list order. A robot whose reboot comes later waits where it started and stays visible until its turn. A reboot keeps the robot's facing.
 
 #### Activation ordering
 

@@ -18,6 +18,7 @@ export function createBoardFromSnapshot(board: Board, antenna: Antenna): BoardRe
       }] : []),
       checkpoints: board.tiles.flatMap((tile) => tile.checkpointNumber === undefined
         ? [] : [{ ...tile.position, checkpointNumber: tile.checkpointNumber }]),
+      rebootTiles: board.tiles.filter((tile) => tile.type === 'REBOOT').map((tile) => tile.position),
       walls: board.tiles.map((tile) => ({
         ...tile.position,
         north: tile.walls?.includes('NORTH'),

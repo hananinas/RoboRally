@@ -4,10 +4,10 @@ import { describe, expect, it } from 'vitest'
 import { Board, Direction, EmptyTile, Card } from '@/game/index'
 import { Deck } from '@/game/Deck'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestGame, placeTestPlayer } from '../fixtures.ts'
+import { createEmptyTileGrid, createTestGame, placeTestPlayer, withRebootTiles } from '../fixtures.ts'
 
 function createGame(deck: Card[]) {
-  const board = new Board(createEmptyTileGrid(3, 3), { x: Integer(0), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(2) })
+  const board = new Board(withRebootTiles(createEmptyTileGrid(3, 3), { x: Integer(0), y: Integer(2) }), { x: Integer(0), y: Integer(0), angle: Math.PI / 2 })
   const player = placeTestPlayer(board, { x: Integer(1), y: Integer(1) }, {
     id: 'robot-1', direction: Direction.EAST, deck: new Deck(deck),
   })
@@ -35,6 +35,7 @@ describe('Game activation loop', () => {
       expect(result).toEqual({
         registerIndex,
         pushedRobots: [],
+        reboots: [],
         registers: Array.from({ length: 5 }, (_, index) => index <= registerIndex
           ? { status: 'REVEALED', instruction: 'TURN_LEFT' }
           : { status: 'HIDDEN' }),
@@ -94,7 +95,7 @@ describe('Game activation loop', () => {
 })
 
 function resolveCard(instruction: Instruction, direction: Direction, tiles: EmptyTile[][]) {
-  const board = new Board(tiles, { x: Integer(3), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
+  const board = new Board(withRebootTiles(tiles, { x: Integer(0), y: Integer(0) }), { x: Integer(3), y: Integer(0), angle: Math.PI / 2 })
   const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, instruction))
   const player = placeTestPlayer(board, { x: Integer(3), y: Integer(3) }, { direction, deck: new Deck(cards) })
   const game = createTestGame({ board, players: [player], deck: cards })
