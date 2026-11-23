@@ -24,6 +24,7 @@ export class GameSession {
   readonly actionScheduler: ActionScheduler
   readonly programmingTimer: ProgrammingTimer
   private recordedWinner: Winner | null = null
+  private winnerAnnounced = false
 
   constructor(io: GameSocketServer, game: Game) {
     this.io = io
@@ -33,7 +34,7 @@ export class GameSession {
     this.actionScheduler = createActionScheduler({
       io, game, publicRoom: this.publicRoom,
       playerRoom: (playerId) => this.playerRoom(playerId),
-      winner: () => this.winner(),
+      announceWinnerIfConcluded: () => this.announceWinnerIfConcluded(),
       onProgrammingStarted: () => this.programmingTimer.reset(),
       onStop: () => this.programmingTimer.stop(),
     })
@@ -78,6 +79,12 @@ export class GameSession {
       this.recordedWinner = presentWinner(this.game.winner, seat?.user.username ?? '')
     }
     return this.recordedWinner
+  }
+
+  private announceWinnerIfConcluded(): void {
+    if (this.winnerAnnounced || this.game.winner === undefined) return
+    this.winnerAnnounced = true
+    this.io.to(this.publicRoom).emit('game.won', { gameId: this.game.id, ...this.winner()! })
   }
 
   publicState(): PublicGameState {
