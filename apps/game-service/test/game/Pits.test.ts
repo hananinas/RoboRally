@@ -272,6 +272,39 @@ describe('reboots reported in action results', () => {
     ])
   })
 
+  // A pushed robot can land back where it started. pushedRobots then leaves it out, and only
+  // reboots shows that it fell.
+  it('reports a pushed robot that reboots onto its starting tile only in reboots', () => {
+    const tiles = createEmptyTileGrid(5, 3)
+    tiles[1][3] = new PitTile()
+    const board = new Board(
+      withRebootTiles(tiles, { x: Integer(1), y: Integer(1) }, { x: Integer(4), y: Integer(2) }),
+      { x: Integer(0), y: Integer(0), angle: Math.PI / 2 },
+    )
+    const pusherCards = moveCards()
+    const pushedCards = moveCards().map((card) => new Card(`pushed-${card.id}`, card.instruction))
+    const pusher = placeTestPlayer(board, { x: Integer(0), y: Integer(1) }, {
+      id: 'pusher', direction: Direction.EAST, deck: new Deck(pusherCards),
+    })
+    const pushed = placeTestPlayer(board, { x: Integer(1), y: Integer(1) }, {
+      id: 'pushed', direction: Direction.NORTH, deck: new Deck(pushedCards),
+    })
+    const game = createTestGame({ board, players: [pusher, pushed], deck: [...pusherCards, ...pushedCards] })
+    game.submitProgram(pusher.id, pusherCards.map((card) => card.id))._unsafeUnwrap()
+    game.submitProgram(pushed.id, programLeadingWith(pushedCards, 'TURN_LEFT').map((card) => card.id))._unsafeUnwrap()
+
+    const result = resolveRobotAction(game)
+
+    // MOVE_3 pushes the robot from (1,1) into the pit at (3,1); by then (1,1) is free again,
+    // so it reboots where it started. The pusher follows it in and takes the other tile.
+    expect(result.action.position).toEqual({ x: 4, y: 2 })
+    expect(result.pushedRobots).toEqual([])
+    expect(result.reboots).toEqual([
+      { robotId: 'pushed', fellAt: { x: 3, y: 1 }, landedAt: { x: 1, y: 1 } },
+      { robotId: 'pusher', fellAt: { x: 3, y: 1 }, landedAt: { x: 4, y: 2 } },
+    ])
+  })
+
   it('reports no reboots when nobody falls', () => {
     const { player, cards: c, game } = createGame()
     game.submitProgram(player.id, programLeadingWith(Object.values(c), 'TURN_LEFT').map((card) => card.id))._unsafeUnwrap()
