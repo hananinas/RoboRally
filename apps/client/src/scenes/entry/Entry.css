@@ -198,15 +198,19 @@
 }
 
 .entry-layout--wide {
-  align-items: start;
+  align-items: stretch;
   grid-template-columns: 1.08fr 1fr;
   width: min(100% - 48px, 984px);
+}
+
+.entry-layout--wide > .entry-panel {
+  height: 100%;
 }
 
 .entry-side-panels {
   display: grid;
   min-width: 0;
-  gap: var(--entry-space-4);
+  gap: var(--entry-space-2);
 }
 
 .entry :is(button, a):focus-visible {

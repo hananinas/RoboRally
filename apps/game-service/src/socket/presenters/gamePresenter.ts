@@ -81,7 +81,7 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
 
   if (tile instanceof GearTile) return { ...common, type: tile.kind, rotation: tile.rotation }
 
-  if (tile.kind === 'EMPTY' || tile.kind === 'PIT') {
+  if (tile.kind === 'EMPTY' || tile.kind === 'PIT' || tile.kind === 'REBOOT') {
     return {
       ...common,
       type: tile.kind,
@@ -132,6 +132,7 @@ export function presentPublicGameState(
     robots: game.players.map((player) => ({
       robotId: player.robot.id,
       playerId: player.id,
+      robotSpriteId: player.robot.robotSpriteId,
       colour: player.robot.colour,
       position: presentPosition(game.board.positionOf(player.robot.id), player.robot.direction),
     })),
@@ -199,6 +200,11 @@ export function presentRobotActionResolved(
     pushedRobots: result.pushedRobots.map((robot) => ({
       robotId: robot.robotId,
       position: presentPosition(robot.position, robot.direction),
+    })),
+    reboots: result.reboots.map(({ robotId, fellAt, landedAt }) => ({
+      robotId,
+      fellAt: { x: fellAt.x, y: fellAt.y },
+      landedAt: { x: landedAt.x, y: landedAt.y },
     })),
   }
 }

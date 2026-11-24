@@ -47,7 +47,7 @@ export const executionPlayers: readonly PlayerState[] = programmingPlayers.map((
 export const executionAction: RobotActionResolved = {
   gameId: GAME_ID, playerId: ADA_ID, robotId: REGISTER_ROBOT_IDS[0], registerIndex: 2, instruction: 'MOVE_2', resolvedInstruction: 'MOVE_2',
   position: { coordinate: { x: 3, y: 1 }, orientation: 'NORTH' },
-  pushedRobots: [],
+  pushedRobots: [], reboots: [],
 }
 
 export function createRegisterState(executing = false): PublicGameState & { players: readonly PlayerState[] } {
@@ -65,6 +65,7 @@ export function createRegisterState(executing = false): PublicGameState & { play
       base.robots[0],
       ...programmingPlayers.map((player, index) => ({
         robotId: REGISTER_ROBOT_IDS[index], playerId: player.playerId,
+        robotSpriteId: 'tank' as const,
         colour: ['#4D8DEB', '#4CAF70', '#A66BE0'][index],
         position: { coordinate: { x: 3 + index, y: 3 }, orientation: 'NORTH' as const },
         startPosition: { x: 3 + index, y: 3 },

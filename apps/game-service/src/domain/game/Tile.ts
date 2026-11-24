@@ -1,7 +1,7 @@
 import type { GearRotation } from '@robo-rally/game-events'
 import type { Direction } from '@/domain/game/spatial'
 
-export type TileKind = 'EMPTY' | 'PIT' | 'CONVEYOR' | 'GEAR'
+export type TileKind = 'EMPTY' | 'PIT' | 'CONVEYOR' | 'GEAR' | 'REBOOT'
 export type TileEntryEffect = 'reboot'
 
 // Tile suitability only; Board checks robot occupancy separately.
@@ -62,6 +62,15 @@ export class ConveyorTile extends Tile {
     walls: Iterable<Direction> = [],
     checkpointNumber?: number
   ) {
+    super(walls, checkpointNumber)
+  }
+}
+
+// Where robots reappear after falling; see Game.rebootRobot.
+export class RebootTile extends Tile {
+  readonly kind = 'REBOOT'
+
+  constructor(walls: Iterable<Direction> = [], checkpointNumber?: number) {
     super(walls, checkpointNumber)
   }
 }

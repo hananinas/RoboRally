@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { User } from '@robo-rally/game-events'
 import { Lobby } from '@/domain/lobby/Lobby'
+import { DEFAULT_ROBOT_ID } from '@/domain/game/robotCatalog'
 
 function user(userId: string): User {
   return { userId, username: userId }
@@ -22,7 +23,9 @@ describe('Lobby', () => {
     const lobby = new Lobby('Lobby', 'test-map', user('owner'), 'connection-1')
     expect(lobby.size).toBe(1)
     expect(lobby.ownerUserId).toBe('owner')
-    expect(lobby.getMember('owner')).toEqual({ user: user('owner'), connectionId: 'connection-1' })
+    expect(lobby.getMember('owner')).toEqual({
+      user: user('owner'), connectionId: 'connection-1', robotSpriteId: DEFAULT_ROBOT_ID,
+    })
     expect(lobby.getMember('nobody')).toBeUndefined()
   })
 
@@ -31,8 +34,8 @@ describe('Lobby', () => {
     lobby.addMember(user('second'), 'connection-2')
     expect(lobby.size).toBe(2)
     expect(lobby.members).toEqual([
-      { user: user('owner'), connectionId: 'connection-1' },
-      { user: user('second'), connectionId: 'connection-2' },
+      { user: user('owner'), connectionId: 'connection-1', robotSpriteId: DEFAULT_ROBOT_ID },
+      { user: user('second'), connectionId: 'connection-2', robotSpriteId: DEFAULT_ROBOT_ID },
     ])
 
     lobby.removeMember('second')

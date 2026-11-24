@@ -132,7 +132,8 @@ describe('Player', () => {
     player.completeCheckpoint(1)
 
     for (let round = 0; round < 2; round++) {
-      game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
+      const submitted = game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
+      expect(submitted.isOk()).toBe(true)
       for (let register = 0; register < 5; register++) resolveRobotAction(game)
 
       expect(game.lastActivePhase).toBe('programming')

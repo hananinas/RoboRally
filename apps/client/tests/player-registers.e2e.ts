@@ -141,7 +141,7 @@ test('reveals each register during playback and clears the panel when the new ha
   const action: RobotActionResolved = {
     gameId: GAME_ID, playerId: ADA_ID, robotId: REGISTER_ROBOT_IDS[0], registerIndex: 2, instruction: 'MOVE_2', resolvedInstruction: 'MOVE_2',
     position: { coordinate: { x: 3, y: 1 }, orientation: 'NORTH' },
-    pushedRobots: [],
+    pushedRobots: [], reboots: [],
   }
   await game.control({ type: 'round', actions: [action, { ...action, registerIndex: 3, instruction: 'BACK_UP', resolvedInstruction: 'BACK_UP' }], deferHand: true })
   await expect(ada.locator('.other-player__slot--current .other-player__slot-label')).toHaveText('Move 2')

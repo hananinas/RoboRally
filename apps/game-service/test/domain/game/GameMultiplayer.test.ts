@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { Board, Card, Deck, Direction, EmptyTile, Player, Robot } from '@/domain/game/index.ts'
 import type { Antenna, Position, RobotId } from '@/domain/game/index.ts'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestBoard, createTestGame, placeTestPlayer } from '../../fixtures.ts'
+import { createEmptyTileGrid, createTestBoard, createTestGame, gridWithRebootTiles, placeTestPlayer } from '../../fixtures.ts'
 
 function createMultiplayerGame(
   positions: readonly Position[],
@@ -188,7 +188,11 @@ describe('Game multiplayer activation', () => {
       }
     }
     const antenna = { x: Integer(4), y: Integer(4), angle: Math.PI / 2 }
-    const board = new TiedPositionBoard(createEmptyTileGrid(9, 9), antenna, { x: Integer(0), y: Integer(0) }, [{ x: Integer(0), y: Integer(0) }])
+    const board = new TiedPositionBoard(
+      gridWithRebootTiles(createEmptyTileGrid(9, 9), { x: Integer(0), y: Integer(0) }),
+      antenna,
+      [{ x: Integer(0), y: Integer(0) }],
+    )
     const { players, deck, game } = createMultiplayerGame(
       [{ x: Integer(4), y: Integer(5) }, { x: Integer(5), y: Integer(4) }], antenna, board,
     )

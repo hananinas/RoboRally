@@ -48,7 +48,8 @@ function createGearGame(tiles: readonly Tile[], directions: readonly Direction[]
   const board = createTestBoard([
     tiles.map(() => new EmptyTile()),
     tiles,
-  ], { x: Integer(0), y: Integer(0), angle: 0 }, { x: Integer(0), y: Integer(1) })
+    tiles.map(() => new EmptyTile()),
+  ], { x: Integer(0), y: Integer(0), angle: 0 }, { x: Integer(0), y: Integer(2) })
   const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, instruction))
   const players = directions.map((direction, index) =>
     placeTestPlayer(board, { x: Integer(index), y: Integer(1) }, { direction, deck: new Deck(cards) }))

@@ -32,6 +32,29 @@ test('two players wait for owner Start, play a round, and leave for the lobby br
   }
 })
 
+test('a lobby robot selection is used by every client during gameplay', async ({ browser, page, baseURL }) => {
+  const context = await browser.newContext({ baseURL, ignoreHTTPSErrors: true })
+  const other = await context.newPage()
+  try {
+    await browse(page, 'bence')
+    await createLobby(page)
+    await browse(other, 'dane')
+    await other.getByRole('list', { name: 'Lobbies' }).getByRole('button', { disabled: false }).first().click()
+    await other.getByRole('button', { name: 'Join game', exact: true }).click()
+    await other.getByRole('group', { name: 'Choose a robot' }).getByRole('button', { name: 'Robot option 2' }).click()
+    await expect(other.getByRole('group', { name: 'Choose a robot' }).getByRole('button', { name: 'Robot option 2' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('list', { name: 'Connected players' }).getByRole('img', { name: 'Fork Clamp robot' })).toBeVisible()
+    await page.getByRole('button', { name: 'Start', exact: true }).click()
+
+    for (const client of [page, other]) {
+      await expect(client.getByRole('main', { name: 'Game board' })).toBeVisible()
+      await expect(client.locator('svg[data-robot-sprite-id="fork-clamp"]')).toHaveCount(8)
+    }
+  } finally {
+    await context.close()
+  }
+})
+
 
 async function expectRoster(roster: Locator, names: string[], owner: string, self: string) {
   const players = roster.locator('.waiting-lobby__seat:not(.waiting-lobby__seat--empty)')
@@ -60,6 +83,9 @@ for (const departure of ['leaves', 'disconnects'] as const) {
       await expectRoster(otherRoster, ['bence', 'dane'], 'bence', 'dane')
       for (const client of [page, other]) await expect(client.getByText('2/6 connected', { exact: true })).toBeVisible()
       await expect(other.getByRole('button', { name: 'Start', exact: true })).toHaveCount(0)
+      await other.getByRole('group', { name: 'Choose a robot' }).getByRole('button', { name: 'Robot option 2' }).click()
+      await expect(other.getByRole('heading', { name: 'Fork Clamp', exact: true })).toBeVisible()
+      await expect(ownerRoster.getByRole('img', { name: 'Fork Clamp robot' })).toBeVisible()
       if (departure === 'leaves') await page.getByRole('button', { name: 'Leave lobby', exact: true }).click()
       else await page.close()
       await expectRoster(otherRoster, ['dane'], 'dane', 'dane')

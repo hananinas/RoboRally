@@ -1,11 +1,11 @@
 import { resolveRobotAction } from '../../activationTestHelper.js'
 import { describe, expect, it } from 'vitest'
-import { Board, Card, Deck, Direction, EmptyTile, PitTile, type Position } from '@/domain/game/index'
+import { Card, Deck, Direction, EmptyTile, PitTile, type Position } from '@/domain/game/index'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestGame, placeTestPlayer } from '../../fixtures.ts'
+import { createEmptyTileGrid, createTestBoard, createTestGame, placeTestPlayer } from '../../fixtures.ts'
 
 function createGame() {
-  const board = new Board(createEmptyTileGrid(2, 2), { x: Integer(1), y: Integer(1), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(1) }, [{ x: Integer(0), y: Integer(0) }])
+  const board = createTestBoard(createEmptyTileGrid(2, 2), { x: Integer(1), y: Integer(1), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(1) }, [{ x: Integer(0), y: Integer(0) }])
   const deck: Card[] = [
     new Card('move-1', 'MOVE_1'),
     new Card('left-1', 'TURN_LEFT'),
@@ -22,7 +22,7 @@ function createGame() {
 
 describe('Game programming', () => {
   it('executes the additional card types from main in register order', () => {
-    const board = new Board(createEmptyTileGrid(15, 15), { x: Integer(7), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) }, [{ x: Integer(5), y: Integer(5) }])
+    const board = createTestBoard(createEmptyTileGrid(15, 15), { x: Integer(7), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) }, [{ x: Integer(5), y: Integer(5) }])
     const deck = [
       new Card('move-2', 'MOVE_2'),
       new Card('move-3', 'MOVE_3'),
@@ -69,7 +69,7 @@ describe('Game programming', () => {
   })
 
   it('resets existing register state for every player at the initial deal', () => {
-    const board = new Board(createEmptyTileGrid(2, 2), { x: Integer(1), y: Integer(1), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(1) }, [{ x: Integer(0), y: Integer(0) }, { x: Integer(1), y: Integer(0) }])
+    const board = createTestBoard(createEmptyTileGrid(2, 2), { x: Integer(1), y: Integer(1), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(1) }, [{ x: Integer(0), y: Integer(0) }, { x: Integer(1), y: Integer(0) }])
     const deck = Array.from({ length: 5 }, (_, index) => new Card(`left-${index}`, 'TURN_LEFT'))
     const players = [0, 1].map((index) => {
       const player = placeTestPlayer(board, { x: Integer(index), y: Integer(0) }, {
@@ -176,7 +176,7 @@ describe('Game programming', () => {
 
 describe('Game.addPlayer', () => {
   function createEmptyGame(width = 3, startTiles: Position[] = [{ x: Integer(1), y: Integer(0) }, { x: Integer(0), y: Integer(0) }]) {
-    const board = new Board(createEmptyTileGrid(width, 1), { x: Integer(width - 1), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) }, startTiles)
+    const board = createTestBoard(createEmptyTileGrid(width, 1), { x: Integer(width - 1), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) }, startTiles)
     const deck = [
       new Card('move-1', 'MOVE_1'),
       new Card('left-1', 'TURN_LEFT'),
@@ -223,7 +223,7 @@ describe('Game.addPlayer', () => {
 
   it('spawns players at successive declared start tiles and reports exhaustion once they are all occupied', () => {
     const { deck } = createGame()
-    const board = new Board(createEmptyTileGrid(3, 1), {
+    const board = createTestBoard(createEmptyTileGrid(3, 1), {
       x: Integer(1), y: Integer(0), angle: 0,
     }, { x: Integer(0), y: Integer(0) }, [{ x: Integer(2), y: Integer(0) }, { x: Integer(0), y: Integer(0) }])
     const game = createTestGame({ board, players: [], deck })
@@ -240,7 +240,7 @@ describe('Game.addPlayer', () => {
   it('stores the given name', () => {
     const { deck } = createGame()
     const named = createTestGame({
-      board: new Board(createEmptyTileGrid(2, 1), { x: Integer(0), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(1), y: Integer(0) }, [{ x: Integer(1), y: Integer(0) }]),
+      board: createTestBoard(createEmptyTileGrid(2, 1), { x: Integer(0), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(1), y: Integer(0) }),
       players: [],
       deck,
       name: 'Shared game',
@@ -252,7 +252,7 @@ describe('Game.addPlayer', () => {
 describe('Game roster validation and spawn skipping', () => {
   it('rejects a roster whose robot is already standing on a pit', () => {
     const { deck } = createGame()
-    const board = new Board([[new EmptyTile(), new PitTile(), new EmptyTile()]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) }, [{ x: Integer(0), y: Integer(0) }])
+    const board = createTestBoard([[new EmptyTile(), new PitTile(), new EmptyTile()]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
     const player = placeTestPlayer(board, { x: Integer(0), y: Integer(0) }, { direction: Direction.EAST, deck: new Deck(deck) })
     board.pushRobot(player.robot.id, Direction.EAST)
 
@@ -262,7 +262,7 @@ describe('Game roster validation and spawn skipping', () => {
 
   it('reports no safe spawn once the only declared start tile is occupied', () => {
     const { deck } = createGame()
-    const board = new Board([[new EmptyTile(), new PitTile(), new EmptyTile()]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) }, [{ x: Integer(0), y: Integer(0) }])
+    const board = createTestBoard([[new EmptyTile(), new PitTile(), new EmptyTile()]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
     const game = createTestGame({ board, players: [], deck })
     const first = game.addPlayer('red')._unsafeUnwrap()
 

@@ -1,15 +1,15 @@
 import { resolveRobotAction } from '../../activationTestHelper.js'
 import { describe, expect, it } from 'vitest'
-import { Board, Card, Direction, EmptyTile } from '@/domain/game/index'
+import { Card, Direction, EmptyTile } from '@/domain/game/index'
 import { Deck } from '@/domain/game/Deck'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestGame, placeTestPlayer } from '../../fixtures.ts'
+import { createEmptyTileGrid, createTestBoard, createTestGame, placeTestPlayer } from '../../fixtures.ts'
 
 function createGame(starts = [{ x: 0, y: 1, direction: Direction.EAST }]) {
   const tiles = createEmptyTileGrid(5, 3)
   tiles[1][1] = new EmptyTile([], 1)
   tiles[1][3] = new EmptyTile([], 2)
-  const board = new Board(tiles, { x: Integer(0), y: Integer(0), angle: 0 }, { x: Integer(0), y: Integer(2) }, [{ x: Integer(2), y: Integer(1) }])
+  const board = createTestBoard(tiles, { x: Integer(0), y: Integer(0), angle: 0 }, { x: Integer(0), y: Integer(2) }, [{ x: Integer(2), y: Integer(1) }])
   const cards = {
     step: new Card('step', 'MOVE_1'),
     stepAgain: new Card('step-again', 'MOVE_1'),

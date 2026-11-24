@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { Board, Direction, EmptyTile, PitTile, ConveyorTile, GearTile } from '@/domain/game/index.ts'
+import { Board, Direction, EmptyTile, PitTile, ConveyorTile, GearTile, RebootTile } from '@/domain/game/index.ts'
 import type { Position, Tile, TileKind } from '@/domain/game/index.ts'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestBoard } from '../../fixtures.ts'
+import { createEmptyTileGrid, createTestBoard, gridWithRebootTiles } from '../../fixtures.ts'
 
 const antenna = { x: Integer(0), y: Integer(0), angle: Math.PI / 2 }
 const rebootTile = { x: Integer(2), y: Integer(2) }
@@ -21,12 +21,13 @@ describe('Tile and Board layout', () => {
     tiles[2][2] = new PitTile()
     const reboot = at(0, 1)
 
-    expect(new Board(tiles, antenna, reboot, [at(1, 1), at(2, 1)]).startTiles).toEqual([at(1, 1), at(2, 1)])
-    expect(() => new Board(tiles, antenna, reboot, [])).toThrow(RangeError)
-    expect(() => new Board(tiles, antenna, reboot, [at(1, 1), at(1, 1)])).toThrow(RangeError)
-    expect(() => new Board(tiles, antenna, reboot, [at(2, 2)])).toThrow(RangeError)
-    expect(() => new Board(tiles, antenna, reboot, [at(0, 0)])).toThrow(RangeError)
-    expect(() => new Board(tiles, antenna, reboot, [at(3, 0)])).toThrow(RangeError)
+    const grid = gridWithRebootTiles(tiles, reboot)
+    expect(new Board(grid, antenna, [at(1, 1), at(2, 1)]).startTiles).toEqual([at(1, 1), at(2, 1)])
+    expect(() => new Board(grid, antenna, [])).toThrow(RangeError)
+    expect(() => new Board(grid, antenna, [at(1, 1), at(1, 1)])).toThrow(RangeError)
+    expect(() => new Board(grid, antenna, [at(2, 2)])).toThrow(RangeError)
+    expect(() => new Board(grid, antenna, [at(0, 0)])).toThrow(RangeError)
+    expect(() => new Board(grid, antenna, [at(3, 0)])).toThrow(RangeError)
   })
   it('stores pits with walls without counting them as checkpoints', () => {
     const pit = new PitTile([Direction.NORTH])
@@ -59,11 +60,10 @@ describe('Tile and Board layout', () => {
 
   it('rejects duplicate or skipped checkpoint numbers', () => {
     for (const numbers of [[1, 1], [1, 3], [2]]) {
-      expect(() => new Board(
-        [numbers.map((number) => new EmptyTile([], number))],
+      expect(() => createTestBoard(
+        [numbers.map((number) => new EmptyTile([], number)), numbers.map(() => new EmptyTile())],
         antenna,
-        rebootTile,
-        [],
+        { x: Integer(0), y: Integer(1) },
       )).toThrow(RangeError)
     }
   })
@@ -99,13 +99,13 @@ describe('Tile and Board layout', () => {
   })
 
   it('requires a rectangular grid and copies its rows', () => {
-    expect(() => new Board([], antenna, rebootTile, [])).toThrow(RangeError)
-    expect(() => new Board([[]], antenna, rebootTile, [])).toThrow(RangeError)
-    expect(() => new Board([[new EmptyTile()], []], antenna, rebootTile, [])).toThrow(RangeError)
+    expect(() => new Board([], antenna, [])).toThrow(RangeError)
+    expect(() => new Board([[]], antenna, [])).toThrow(RangeError)
+    expect(() => new Board([[new EmptyTile()], []], antenna, [])).toThrow(RangeError)
 
     const tiles = createEmptyTileGrid(2, 2)
     const original = tiles[0][0]
-    const board = createTestBoard(tiles, antenna, { x: Integer(1), y: Integer(1) })
+    const board = createTestBoard(tiles, antenna, { x: Integer(1), y: Integer(0) })
     tiles[0][0] = new EmptyTile([Direction.EAST])
     tiles.pop()
 
@@ -133,28 +133,42 @@ describe('Tile and Board layout', () => {
       { x: Integer(0), y: Integer(0), angle: Infinity },
       { x: Integer(0), y: Integer(0), angle: NaN },
     ]) {
-      expect(() => new Board(createEmptyTileGrid(3, 3), invalid, rebootTile, [{ x: Integer(1), y: Integer(1) }])).toThrow(RangeError)
+      expect(() => createTestBoard(createEmptyTileGrid(3, 3), invalid, rebootTile)).toThrow(RangeError)
     }
   })
 
-  it('copies and freezes a valid reboot tile', () => {
-    const source = { x: Integer(2), y: Integer(2) }
-    const board = createTestBoard(createEmptyTileGrid(3, 3), antenna, source)
-    source.x = Integer(0)
+  it('lists its reboot tiles in reading order and freezes them', () => {
+    const at = (x: number, y: number) => ({ x: Integer(x), y: Integer(y) })
+    const tiles = createEmptyTileGrid(3, 3)
+    tiles[1][1] = new RebootTile([Direction.NORTH], 1)
+    const board = createTestBoard(tiles, antenna, [at(2, 2), at(0, 1)])
 
-    expect(board.rebootTile).toEqual({ x: 2, y: 2 })
-    expect(() => Object.assign(board.rebootTile, { x: 0 })).toThrow()
+    expect(board.rebootTiles).toEqual([at(0, 1), at(1, 1), at(2, 2)])
+    expect(board.getTile(at(1, 1))).toMatchObject({ kind: 'REBOOT', checkpointNumber: 1 })
+    expect(board.getTile(at(1, 1))?.hasWall(Direction.NORTH)).toBe(true)
+    expect(Object.isFrozen(board.rebootTiles)).toBe(true)
+    expect(() => Object.assign(board.rebootTiles[0], { x: 2 })).toThrow()
   })
 
-  it('rejects reboot tiles outside the board, on pits or on the antenna', () => {
-    const tiles = [[new EmptyTile(), new PitTile(), new EmptyTile()]]
+  it('requires a reboot tile outside the antenna', () => {
     const boardAntenna = { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }
-    for (const invalid of [
-      { x: Integer(-1), y: Integer(0) }, { x: Integer(0), y: Integer(1) },
-      { x: Integer(1), y: Integer(0) }, { x: Integer(2), y: Integer(0) },
-    ]) {
-      expect(() => new Board(tiles, boardAntenna, invalid, [{ x: Integer(0), y: Integer(0) }])).toThrow(RangeError)
-    }
+    const start = [{ x: Integer(0), y: Integer(0) }]
+    expect(() => new Board([[new EmptyTile(), new PitTile(), new EmptyTile()]], boardAntenna, start)).toThrow(RangeError)
+    expect(() => new Board([[new EmptyTile(), new PitTile(), new RebootTile()]], boardAntenna, start)).toThrow(RangeError)
+    expect(new Board([[new RebootTile(), new PitTile(), new EmptyTile()]], boardAntenna, start).rebootTiles)
+      .toEqual([{ x: 0, y: 0 }])
+  })
+
+  it('lets robots stand on and cross reboot tiles', () => {
+    const board = new Board(
+      [[new EmptyTile(), new RebootTile(), new EmptyTile()]],
+      { x: Integer(2), y: Integer(0), angle: 0 },
+      [{ x: Integer(0), y: Integer(0) }],
+    )
+    board.placeRobot('robot', { x: Integer(0), y: Integer(0) })
+
+    expect(board.allowsPlacement({ x: Integer(1), y: Integer(0) })).toBe(true)
+    expect(board.getTile({ x: Integer(1), y: Integer(0) })?.entryEffect).toBeUndefined()
   })
 
   it('rejects positions outside the grid or between tiles', () => {
@@ -175,6 +189,7 @@ describe('Board robot ownership', () => {
     PIT: { tile: new PitTile(), canOccupy: false},
     GEAR: { tile: new GearTile('CLOCKWISE'), canOccupy: true },
     CONVEYOR: { tile: new ConveyorTile('conveyor-1-straight', Direction.NORTH), canOccupy: true },
+    REBOOT: { tile: new RebootTile(), canOccupy: true },
   }
 
   it.each(Object.entries(destinations))('uses %s rules for placement, relocation and safe destinations', (kind, { tile, canOccupy }) => {

@@ -66,11 +66,74 @@ test('joining requires selection and enters the waiting screen', async ({ page }
     if (!map || !robot) throw new Error('Lobby panel positions are unavailable')
     expect(map.x).toBeCloseTo(robot.x)
     expect(map.width).toBeCloseTo(robot.width)
-    expect(map.y).toBeGreaterThan(robot.y + robot.height)
+    expect(map.y + map.height).toBeLessThan(robot.y)
   }
   await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Leave lobby', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeEnabled()
+})
+
+test('selects a robot in the waiting lobby', async ({ page }) => {
+  await page.goto('/')
+  await createLobby(page)
+
+  const picker = page.getByRole('group', { name: 'Choose a robot' })
+  const robotPanel = page.getByRole('complementary', { name: 'Your robot' })
+  const mapTop = await page.getByRole('region', { name: 'Selected map' })
+    .evaluate((element) => element.getBoundingClientRect().top)
+  const robotTop = await robotPanel.evaluate((element) => element.getBoundingClientRect().top)
+  expect(mapTop).toBeLessThan(robotTop)
+  const choices = picker.getByRole('button', { name: /^Robot option \d+$/ })
+  await expect(choices).toHaveCount(6)
+  await expect(robotPanel.getByRole('heading', { name: 'Tank', exact: true })).toBeVisible()
+  await expect(choices.nth(0)).toHaveAttribute('aria-pressed', 'true')
+  await expect(choices.nth(0).locator('.robot-preview__layer')).toHaveCount(8)
+  for (let index = 0; index < 6; index += 1) {
+    await expect(choices.nth(index).locator('.robot-preview__layer').first()).toBeVisible()
+  }
+  const tankPortrait = page.getByRole('list', { name: 'Connected players' })
+    .getByLabel('Tank robot').locator('.robot-preview')
+  const tankPortraitBox = await tankPortrait.boundingBox()
+  expect(tankPortraitBox?.width).toBe(28)
+  await expect(tankPortrait.locator('.robot-preview__layer').first()).toHaveAttribute('viewBox', '0 0 57 87')
+  await expect(page.getByText('Player colour', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Blue', exact: true })).toBeDisabled()
+
+  await choices.nth(1).click()
+  await expect(robotPanel.getByRole('heading', { name: 'Scout', exact: true })).toBeVisible()
+  const playerSprite = page.getByRole('list', { name: 'Connected players' })
+    .getByLabel('Scout robot').locator('.robot-preview__layer')
+  await expect(playerSprite).toBeVisible()
+  await expect(playerSprite).toHaveAttribute('viewBox', '0 0 100 100')
+  await expect(choices.nth(0)).toHaveAttribute('aria-pressed', 'false')
+  await expect(choices.nth(1)).toHaveAttribute('aria-pressed', 'true')
+  const stage = page.getByRole('complementary', { name: 'Your robot' }).locator('.robot-picker__stage')
+  const stageSprite = stage.locator('.robot-preview__layer')
+  await expect(stageSprite).toHaveAttribute('viewBox', '0 0 100 100')
+
+  await choices.nth(0).click()
+  await expect(robotPanel.getByRole('heading', { name: 'Tank', exact: true })).toBeVisible()
+  await expect(choices.nth(0)).toHaveAttribute('aria-pressed', 'true')
+  await expect(stageSprite.first()).toHaveAttribute('viewBox', '0 0 57 87')
+  await expect(tankPortrait.locator('.robot-preview__layer').first()).toHaveAttribute('viewBox', '0 0 57 87')
+})
+
+test('shows robot selection only after entering the waiting lobby', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByRole('group', { name: 'Choose a robot' })).toHaveCount(0)
+  await createLobby(page)
+  await expect(page.getByRole('group', { name: 'Choose a robot' })).toBeVisible()
+  await expect(page.getByRole('list', { name: 'Connected players' }).getByLabel('Tank robot')).toBeVisible()
+})
+
+test('shows robot selection after joining an existing lobby', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByRole('group', { name: 'Choose a robot' })).toHaveCount(0)
+  await page.getByRole('list', { name: 'Lobbies' }).getByRole('button', { name: /Lobby 1/ }).click()
+  await page.getByRole('button', { name: 'Join game', exact: true }).click()
+
+  await expect(page.getByRole('group', { name: 'Choose a robot' })).toBeVisible()
+  await expect(page.getByRole('list', { name: 'Connected players' }).getByLabel('Tank robot')).toBeVisible()
 })
 
 test('a disconnected member during Start leaves the owner waiting and able to retry', async ({ page, game }) => {

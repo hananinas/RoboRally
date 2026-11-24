@@ -1,4 +1,4 @@
-import { handleListLobbies, handleCreateLobby, handleJoinLobby, handleLeaveLobby, handleStartLobby } from '@/socket/handlers/lobbyHandlers'
+import { handleListLobbies, handleCreateLobby, handleJoinLobby, handleSelectRobot, handleLeaveLobby, handleStartLobby } from '@/socket/handlers/lobbyHandlers'
 import { handleGetMembership, handleSocketDisconnect } from '@/socket/handlers/membershipHandlers'
 import { handleLeaveGame, handleSubmitProgram, handleUpdateRegisters } from '@/socket/handlers/gameHandlers'
 import { handleClockGet } from '@/socket/handlers/clockHandlers'
@@ -59,6 +59,7 @@ export function createGameSocketServer(
     socket.on('lobby.list', (payload, ack) => handleListLobbies(context, socket, payload, ack))
     socket.on('lobby.create', (payload, ack) => handleCreateLobby(context, socket, payload, ack))
     socket.on('lobby.join', (payload, ack) => handleJoinLobby(context, socket, payload, ack))
+    socket.on('lobby.selectRobot', (payload, ack) => handleSelectRobot(context, socket, payload, ack))
     socket.on('lobby.leave', (payload, ack) => handleLeaveLobby(context, socket, payload, ack))
     socket.on('lobby.start', (payload, ack) => handleStartLobby(context, socket, payload, ack))
     socket.on('membership.get', (payload, ack) => handleGetMembership(context, socket, payload, ack))

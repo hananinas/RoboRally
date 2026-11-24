@@ -809,6 +809,7 @@ components:
           - gameId
           - registerIndex
           - pushedRobots
+          - reboots
           - resolvedInstruction
         properties:
           robotId:
@@ -835,6 +836,17 @@ components:
                   $ref: "#/components/schemas/RobotId"
                 position:
                   $ref: "#/components/schemas/Position"
+          reboots:
+            type: array
+            description: >-
+              Every reboot this instruction caused, in the order it happened, for the
+              acting robot and pushed robots alike. Use it to show each fall before
+              the robot appears on its reboot tile. Empty when no robot rebooted.
+              position and pushedRobots still give the final states. A reboot keeps
+              the robot's facing. A pushed robot that reboots onto the tile it started
+              from is not in pushedRobots, so only this list shows that it fell.
+            items:
+              $ref: "#/components/schemas/RebootEffect"
           gameId:
             $ref: "#/components/schemas/GameId"
           registerIndex:
@@ -857,11 +869,34 @@ components:
             instruction: MOVE_1
             resolvedInstruction: MOVE_1
             pushedRobots: []
+            reboots: []
             position:
               coordinate:
                 x: 10
                 y: 6
               orientation: NORTH
+        - name: fallIntoPit
+          payload:
+            gameId: 00000000-0000-4000-8000-000000000001
+            registerIndex: 0
+            robotId: 00000000-0000-4000-8000-000000000003
+            playerId: 00000000-0000-4000-8000-000000000002
+            instruction: MOVE_3
+            resolvedInstruction: MOVE_3
+            pushedRobots: []
+            reboots:
+              - robotId: 00000000-0000-4000-8000-000000000003
+                fellAt:
+                  x: 13
+                  y: 4
+                landedAt:
+                  x: 13
+                  y: 2
+            position:
+              coordinate:
+                x: 13
+                y: 2
+              orientation: SOUTH
 
     EnvironmentStepResolved:
       name: environment.stepResolved
@@ -1035,6 +1070,7 @@ components:
       properties:
         robotSpriteId:
           $ref: '#/components/schemas/RobotSpriteId'
+          description: ID of a robot returned in the lobby's robot catalog.
     CreateLobbyRequest:
       type: object
       additionalProperties: false
@@ -1047,6 +1083,21 @@ components:
           type: string
           minLength: 1
           maxLength: 50
+    RobotDefinition:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - icon
+      properties:
+        id:
+          $ref: '#/components/schemas/RobotSpriteId'
+        name:
+          type: string
+        icon:
+          type: string
+          format: uri
     BoardMapSummary:
       type: object
       additionalProperties: false
@@ -1065,7 +1116,7 @@ components:
           type: string
         icon:
           type: string
-          description: Preview image as a data URI.
+          format: uri
     LobbySummary:
       type: object
       additionalProperties: false
@@ -1089,7 +1140,7 @@ components:
           type: string
         mapIcon:
           type: string
-          description: Preview image as a data URI.
+          format: uri
         playerCount:
           type: integer
           minimum: 0
@@ -1112,6 +1163,10 @@ components:
             - userId: 00000000-0000-4000-8000-000000000004
               username: Dane
               robotSpriteId: tank
+          robots:
+            - id: tank
+              name: Tank
+              icon: data:image/svg+xml;base64,PHN2Zy8+
       required:
         - lobbyId
         - name
@@ -1122,6 +1177,7 @@ components:
         - maxPlayers
         - ownerUserId
         - players
+        - robots
       properties:
         lobbyId:
           type: string
@@ -1134,7 +1190,7 @@ components:
           type: string
         mapIcon:
           type: string
-          description: Preview image as a data URI.
+          format: uri
         playerCount:
           type: integer
           minimum: 0
@@ -1150,6 +1206,11 @@ components:
           minItems: 1
           items:
             $ref: '#/components/schemas/LobbyPlayer'
+        robots:
+          type: array
+          description: Backend-owned robot catalog used to display and select robot types.
+          items:
+            $ref: '#/components/schemas/RobotDefinition'
     LobbyFailure:
       type: object
       additionalProperties: false
@@ -1173,6 +1234,7 @@ components:
             - outcome
             - lobbies
             - maps
+            - robots
           properties:
             outcome:
               const: LOBBIES_FOUND
@@ -1185,6 +1247,11 @@ components:
               minItems: 1
               items:
                 $ref: '#/components/schemas/BoardMapSummary'
+            robots:
+              type: array
+              minItems: 1
+              items:
+                $ref: '#/components/schemas/RobotDefinition'
         - $ref: '#/components/schemas/LobbyFailure'
     LobbyJoinResult:
       oneOf:
@@ -1286,7 +1353,7 @@ components:
     LobbyUpdated:
       type: object
       additionalProperties: false
-      description: Full lobby snapshot sent to lobby members after a join, robot selection, or ownership change, and to remaining members after a leave or disconnect.
+      description: Full lobby snapshot sent to other lobby members after a join or robot selection, and to remaining members after a leave or disconnect. The initiating socket receives the updated snapshot through its acknowledgement.
       required:
         - lobby
       properties:
@@ -1696,8 +1763,8 @@ components:
 
     RobotSpriteId:
       type: string
-      description: Robot sprite selected by a lobby member.
-      enum: [ tank, scout, guardian, rover, striker, sentinel, hauler ]
+      minLength: 1
+      description: ID of a robot in the backend-provided robot catalog.
 
     CardId:
       type: string
@@ -1732,6 +1799,32 @@ components:
         y:
           type: integer
           minimum: 0
+
+    RebootEffect:
+      type: object
+      additionalProperties: false
+      description: >-
+        One robot rebooting during an instruction. The robot keeps its facing
+        direction.
+      required: [ robotId, fellAt, landedAt ]
+      properties:
+        robotId:
+          $ref: "#/components/schemas/RobotId"
+        fellAt:
+          type: object
+          description: >-
+            The pit the robot entered, or the square just outside the board where
+            it left the board, so x or y can be -1, width or height.
+          required: [ x, y ]
+          properties:
+            x:
+              type: integer
+              minimum: -1
+            y:
+              type: integer
+              minimum: -1
+        landedAt:
+          $ref: "#/components/schemas/Coordinate"
 
     Position:
       type: object
@@ -1781,10 +1874,13 @@ components:
           $ref: '#/components/schemas/Coordinate'
         type:
           type: string
-          enum: [ EMPTY, PIT, CONVEYOR, GEAR ]
+          enum: [ EMPTY, PIT, CONVEYOR, GEAR, REBOOT ]
           description: >-
             PIT triggers an immediate server-side reboot on entry during movement,
             discarding the remaining steps of that instruction. Walls can block entry.
+            REBOOT is a reboot tile: a robot that falls into a pit or off the board
+            reappears on the free REBOOT tile closest to where it fell. Robots can
+            stand on and move across it like an EMPTY tile.
         walls:
           type: array
           uniqueItems: true

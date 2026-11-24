@@ -33,7 +33,12 @@ const joined: GameInitialization = {
   programSubmitted: false,
 }
 
-const lobby = { lobbyId: 'lobby-1', name: 'Lobby One', mapName: 'test-map' as const, mapDisplayName: 'Test Map', mapIcon: 'test-map-icon', ownerUserId: user.userId, playerCount: 1, maxPlayers: 6, players: [user] }
+const robot = { id: 'tank', name: 'Tank', icon: '' }
+const lobby = {
+  lobbyId: 'lobby-1', name: 'Lobby One', mapName: 'test-map' as const, mapDisplayName: 'Test Map',
+  mapIcon: 'test-map-icon', ownerUserId: user.userId, playerCount: 1, maxPlayers: 6,
+  players: [{ ...user, robotSpriteId: 'tank' as const }], robots: [robot],
+}
 const browsing: MembershipState = { status: 'browsing', user, error: null }
 const waiting: MembershipState = { status: 'waiting', user, lobby, error: null }
 

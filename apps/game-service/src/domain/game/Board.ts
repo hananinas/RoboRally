@@ -12,13 +12,12 @@ export class Board {
   readonly width: number
   readonly height: number
   readonly antenna: Antenna
-  readonly rebootTile: Position
+  readonly rebootTiles: readonly Position[]
   readonly startTiles: readonly Position[]
 
   constructor(
     tiles: readonly (readonly Tile[])[],
     antenna: Antenna,
-    rebootTile: Position,
     startTiles: readonly Position[],
   ) {
     const width = tiles[0]?.length ?? 0
@@ -43,10 +42,16 @@ export class Board {
     }
     this.antenna = Object.freeze({ ...antenna })
 
-    if (!this.allowsPlacement(rebootTile)) {
-      throw new RangeError('Reboot tile must be a non-pit tile on the board outside the priority antenna')
+    // Reboot tiles in reading order: top-to-bottom, then left-to-right.
+    const rebootTiles = this.tiles.flatMap((row, y) => row.flatMap((tile, x) =>
+      tile.kind === 'REBOOT' ? [{ x: Integer(x), y: Integer(y) }] : []))
+    if (rebootTiles.length === 0) {
+      throw new RangeError('A board requires at least one reboot tile')
     }
-    this.rebootTile = Object.freeze({ ...rebootTile })
+    if (!rebootTiles.every((position) => this.allowsPlacement(position))) {
+      throw new RangeError('Reboot tiles must be outside the priority antenna')
+    }
+    this.rebootTiles = Object.freeze(rebootTiles.map((position) => Object.freeze(position)))
 
     if (startTiles.length === 0) {
       throw new RangeError('A board must have at least one starting tile')

@@ -1,4 +1,4 @@
-import type { GameInitialization, PublicGameState, User, Winner } from '@robo-rally/game-events'
+import type { GameInitialization, PublicGameState, RobotSpriteId, User, Winner } from '@robo-rally/game-events'
 import { err, ok, type Result } from 'neverthrow'
 import type { GameSocket, GameSocketServer } from '@/socket/gameServer'
 import type { AddPlayerError, Game, Player } from '@/domain/game/index'
@@ -149,8 +149,8 @@ export class GameSession {
     this.io.to(this.publicRoom).emit('game.playerConnectionChanged', presentPlayerConnectionChanged(this.game, seat.player, false))
   }
 
-  addSeat(user: User, connectionId: string): Result<Player, AddPlayerError> {
-    return this.game.addPlayer().map((player) => {
+  addSeat(user: User, connectionId: string, robotSpriteId: RobotSpriteId): Result<Player, AddPlayerError> {
+    return this.game.addPlayer(undefined, robotSpriteId).map((player) => {
       this.seats.set(user.userId, { user, player, connectionId })
       return player
     })
