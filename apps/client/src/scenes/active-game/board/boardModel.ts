@@ -16,7 +16,7 @@ export type BoardTile =
     }>
 
 export type BoardTileType = BoardTile['tile']
-export type BoardRecipeName = BoardTileType | 'pillar' | 'antenna'
+export type BoardRecipeName = BoardTileType | 'pillar' | 'antenna' | 'reboot'
 
 
 export type BoardCell = BoardPoint &
@@ -41,6 +41,7 @@ export type BoardComponentName =
   | 'gearCounterclockwise'
   | `antenna${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10}`
   | 'ground'
+  | `reboot${1 | 2 | 3 | 4}`
   | 'laser1'
   | 'laser2'
   | 'laser3'

@@ -5,6 +5,7 @@ import tankSprites from '../board/assets/tanks.hbls?raw'
 import { robotOptionFor } from '../../entry/robotPreviews.ts'
 import gearSprites from '../board/assets/gears.hbls?raw'
 import conveyorSprites from '../board/assets/conveyors.hbls?raw'
+import rebootSprites from '../board/assets/reboot.hbls?raw'
 import {
   BOARD_COMPONENTS,
   BOARD_CONFIG,
@@ -243,7 +244,7 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
       >
         <div
           aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: `${laserSprites}${antennaSprites}${tankSprites}${conveyorSprites}${gearSprites}` }}
+          dangerouslySetInnerHTML={{ __html: `${laserSprites}${antennaSprites}${tankSprites}${conveyorSprites}${gearSprites}${rebootSprites}` }}
         />
         {scene.planes.map((pieces, layer) => {
           const robotComponent = ROBOT_COMPONENTS[layer - 3]
