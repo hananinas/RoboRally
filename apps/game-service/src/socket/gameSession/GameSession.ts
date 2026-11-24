@@ -16,6 +16,11 @@ export type Seat = {
   connectionId: string | null
 }
 
+export type ReattachedMembership = {
+  initialization: GameInitialization
+  announceReconnected: () => void
+}
+
 export class GameSession {
   readonly io: GameSocketServer
   readonly game: Game
@@ -128,7 +133,8 @@ export class GameSession {
     if (!socket.recovered) return
     const seat = this.seatFor(socket)
     if (seat && this.reattachSeat(seat, socket.id)) {
-      this.resumeUnlessStillDisconnected()
+      const announceResumed = this.resumeUnlessStillDisconnected()
+      announceResumed()
       this.notifyReconnected(seat.player)
     }
   }
@@ -165,7 +171,7 @@ export class GameSession {
     })
   }
 
-  reattach(socket: GameSocket): Result<GameInitialization, 'ALREADY_HAS_MEMBERSHIP' | 'INTERNAL_ERROR'> {
+  reattach(socket: GameSocket): Result<ReattachedMembership, 'ALREADY_HAS_MEMBERSHIP' | 'INTERNAL_ERROR'> {
     const seat = this.seatFor(socket)
     if (!seat) return err('INTERNAL_ERROR')
     if (seat.connectionId && seat.connectionId !== socket.id) return err('ALREADY_HAS_MEMBERSHIP')
@@ -174,12 +180,17 @@ export class GameSession {
     const previousConnectionId = seat.connectionId
     const wasPaused = this.game.paused
     const reconnected = this.reattachSeat(seat, socket.id)
-    this.resumeUnlessStillDisconnected()
     try {
-      const initialization = presentInitialization(this.game, seat.player, this.publicState())
       void socket.join([this.publicRoom, this.playerRoom(seat.player.id)])
-      if (reconnected) this.notifyReconnected(seat.player)
-      return ok(initialization)
+      const announceResumed = this.resumeUnlessStillDisconnected()
+      const initialization = presentInitialization(this.game, seat.player, this.publicState())
+      return ok({
+        initialization,
+        announceReconnected: () => {
+          announceResumed()
+          if (reconnected) this.notifyReconnected(seat.player)
+        },
+      })
     } catch (error) {
       for (const room of [this.publicRoom, this.playerRoom(seat.player.id)]) {
         if (!previousRooms.has(room)) void socket.leave(room)
@@ -201,10 +212,11 @@ export class GameSession {
     return wasDisconnected
   }
 
-  private resumeUnlessStillDisconnected(): void {
-    if (this.anyDisconnected()) return
+  private resumeUnlessStillDisconnected(): () => void {
+    if (this.anyDisconnected()) return () => {}
     const result = this.game.resume()
-    if (result.isOk()) this.actionScheduler.announceProgress(result.value)
+    if (result.isErr()) return () => {}
+    return () => this.actionScheduler.announceProgress(result.value)
   }
 
   private notifyReconnected(player: Player): void {

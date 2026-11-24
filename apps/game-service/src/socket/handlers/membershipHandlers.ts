@@ -14,11 +14,16 @@ function resolveLobbyMembership(context: SocketContext, socket: GameSocket, user
     : { outcome: 'ALREADY_HAS_MEMBERSHIP' }
 }
 
-function resolveGameMembership(context: SocketContext, socket: GameSocket, user: User): MembershipResult {
+function resolveGameMembership(context: SocketContext, socket: GameSocket, user: User): {
+  result: MembershipResult
+  announceReconnected: () => void
+} {
   const gameSession = context.registry.getCurrentGame(user.userId)
   if (!gameSession) throw new Error('Membership references a missing game')
   const result = gameSession.reattach(socket)
-  return result.isOk() ? { outcome: 'IN_GAME', initialization: result.value, user } : { outcome: result.error }
+  if (result.isErr()) return { result: { outcome: result.error }, announceReconnected: () => {} }
+  const { initialization, announceReconnected } = result.value
+  return { result: { outcome: 'IN_GAME', initialization, user }, announceReconnected }
 }
 
 export function handleGetMembership(
@@ -33,7 +38,10 @@ export function handleGetMembership(
     run: (user, ack) => {
       const membership = context.registry.getActiveMembership(user.userId)
       if (!membership) return ack({ outcome: 'NO_MEMBERSHIP', user })
-      ack(membership.kind === 'lobby' ? resolveLobbyMembership(context, socket, user) : resolveGameMembership(context, socket, user))
+      if (membership.kind === 'lobby') return ack(resolveLobbyMembership(context, socket, user))
+      const { result, announceReconnected } = resolveGameMembership(context, socket, user)
+      ack(result)
+      announceReconnected()
     },
   })
 }
