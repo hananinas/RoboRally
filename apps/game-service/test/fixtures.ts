@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { Instruction } from '@robo-rally/game-events'
 import type { Card } from '@/domain/game/Card'
 import { Deck, createDeckCards } from '@/domain/game/Deck'
-import { Game } from '@/domain/game/Game'
+import { Game, type PlayerPlacement } from '@/domain/game/Game'
 import { Board, type Antenna } from '@/domain/game/Board'
 import { Player } from '@/domain/game/Player'
 import { Robot, ROBOT_COLOURS } from '@/domain/game/Robot'
@@ -37,7 +37,7 @@ export function createTestPlayer(overrides: Partial<{
 
 export function createTestGame(options: {
   board: Board
-  players?: readonly Player[]
+  players?: readonly PlayerPlacement[]
   deck?: readonly Card[]
   name?: string
 }): Game {
@@ -49,14 +49,12 @@ export function createTestGame(options: {
   })
 }
 
-export function placeTestPlayer(
-  board: Board,
+export function createTestPlacement(
   position: Position,
   overrides: RobotOverrides & Partial<{ deck: Deck }> = {},
-): Player {
+): PlayerPlacement {
   const robot = createTestRobot(overrides)
-  board.placeRobot(robot.id, position)
-  return createTestPlayer({ robot, deck: overrides.deck })
+  return { player: createTestPlayer({ robot, deck: overrides.deck }), position }
 }
 
 export function addTestPlayer(game: Game, colour?: string): Player {

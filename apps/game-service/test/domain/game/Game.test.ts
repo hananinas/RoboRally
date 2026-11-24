@@ -2,7 +2,7 @@ import { resolveRobotAction } from '../../activationTestHelper.js'
 import { describe, expect, it } from 'vitest'
 import { Card, Deck, Direction, EmptyTile, PitTile, type Position } from '@/domain/game/index'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestBoard, createTestGame, placeTestPlayer } from '../../fixtures.ts'
+import { createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement } from '../../fixtures.ts'
 
 function createGame() {
   const board = createTestBoard(createEmptyTileGrid(2, 2), { x: Integer(1), y: Integer(1), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(1) }, [{ x: Integer(0), y: Integer(0) }])
@@ -14,9 +14,10 @@ function createGame() {
     new Card('move-3', 'MOVE_1'),
     new Card('left-3', 'TURN_LEFT'),
   ]
-  const player = placeTestPlayer(board, { x: Integer(0), y: Integer(0) }, { direction: Direction.EAST, deck: new Deck(deck) })
+  const placement = createTestPlacement({ x: Integer(0), y: Integer(0) }, { direction: Direction.EAST, deck: new Deck(deck) })
+  const { player } = placement
   const robot = player.robot
-  const game = createTestGame({ board, players: [player], deck })
+  const game = createTestGame({ board, players: [placement], deck })
   return { board, robot, player, deck, game }
 }
 
@@ -30,8 +31,9 @@ describe('Game programming', () => {
       new Card('right', 'TURN_RIGHT'),
       new Card('u-turn', 'U_TURN'),
     ]
-    const player = placeTestPlayer(board, { x: Integer(5), y: Integer(5) }, { direction: Direction.EAST, deck: new Deck(deck) })
-    const game = createTestGame({ board, players: [player], deck })
+    const placement = createTestPlacement({ x: Integer(5), y: Integer(5) }, { direction: Direction.EAST, deck: new Deck(deck) })
+    const { player } = placement
+    const game = createTestGame({ board, players: [placement], deck })
     game.submitProgram(player.id, deck.map((card) => card.id))
 
     const actions = Array.from({ length: 5 }, () => resolveRobotAction(game))
@@ -71,18 +73,20 @@ describe('Game programming', () => {
   it('resets existing register state for every player at the initial deal', () => {
     const board = createTestBoard(createEmptyTileGrid(2, 2), { x: Integer(1), y: Integer(1), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(1) }, [{ x: Integer(0), y: Integer(0) }, { x: Integer(1), y: Integer(0) }])
     const deck = Array.from({ length: 5 }, (_, index) => new Card(`left-${index}`, 'TURN_LEFT'))
-    const players = [0, 1].map((index) => {
-      const player = placeTestPlayer(board, { x: Integer(index), y: Integer(0) }, {
+    const placements = [0, 1].map((index) => {
+      const placement = createTestPlacement({ x: Integer(index), y: Integer(0) }, {
         id: `player-${index}`, direction: Direction.EAST, deck: new Deck(deck),
       })
+      const { player } = placement
       if (index === 0) player.drawHand()
       player.updateRegisters([deck[0], deck[1], deck[2], deck[3], deck[4]])
       player.revealRegister(0, 'TURN_LEFT')
-      return player
+      return placement
     })
+    const players = placements.map(({ player }) => player)
     const snapshots = players.map((player) => player.registers)
 
-    createTestGame({ board, players, deck })
+    createTestGame({ board, players: placements, deck })
 
     for (const player of players) {
       expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
@@ -123,11 +127,17 @@ describe('Game programming', () => {
   })
 
   it('accepts an empty roster but requires unique players and at least five distinct cards', () => {
-    const { board, player, deck } = createGame()
-    expect(createTestGame({ board, players: [], deck }).players).toEqual([])
-    expect(() => createTestGame({ board, players: [player, player], deck })).toThrow(RangeError)
-    expect(() => createTestGame({ board, players: [player], deck: deck.slice(0, 4) })).toThrow(RangeError)
-    expect(() => createTestGame({ board, players: [player], deck: [deck[0], deck[0], ...deck.slice(1, 5)] })).toThrow(RangeError)
+    const { deck } = createGame()
+    const start = { x: Integer(0), y: Integer(0) }
+    const freshBoard = () => createTestBoard(
+      createEmptyTileGrid(2, 2), { x: Integer(1), y: Integer(1), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(1) }, [start],
+    )
+    const placement = createTestPlacement(start, { direction: Direction.EAST, deck: new Deck(deck) })
+
+    expect(createTestGame({ board: freshBoard(), players: [], deck }).players).toEqual([])
+    expect(() => createTestGame({ board: freshBoard(), players: [placement, placement], deck })).toThrow(RangeError)
+    expect(() => createTestGame({ board: freshBoard(), players: [placement], deck: deck.slice(0, 4) })).toThrow(RangeError)
+    expect(() => createTestGame({ board: freshBoard(), players: [placement], deck: [deck[0], deck[0], ...deck.slice(1, 5)] })).toThrow(RangeError)
   })
 
   it('starts unpaused and toggles via pause/resume', () => {
@@ -250,14 +260,14 @@ describe('Game.addPlayer', () => {
 })
 
 describe('Game roster validation and spawn skipping', () => {
-  it('rejects a roster whose robot is already standing on a pit', () => {
+  it('rejects a roster whose robot starts on a pit', () => {
     const { deck } = createGame()
     const board = createTestBoard([[new EmptyTile(), new PitTile(), new EmptyTile()]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
-    const player = placeTestPlayer(board, { x: Integer(0), y: Integer(0) }, { direction: Direction.EAST, deck: new Deck(deck) })
-    board.pushRobot(player.robot.id, Direction.EAST)
+    const pit = { x: Integer(1), y: Integer(0) }
+    const placement = createTestPlacement(pit, { direction: Direction.EAST, deck: new Deck(deck) })
 
-    expect(() => createTestGame({ board, players: [player], deck }))
-      .toThrow('Robots cannot start on pits')
+    expect(() => createTestGame({ board, players: [placement], deck }))
+      .toThrow('Robots cannot be placed on pits')
   })
 
   it('reports no safe spawn once the only declared start tile is occupied', () => {

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { Board, Card, Deck, Direction, EmptyTile, Player, Robot } from '@/domain/game/index.ts'
 import type { Antenna, Position, RobotId } from '@/domain/game/index.ts'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestBoard, createTestGame, gridWithRebootTiles, placeTestPlayer } from '../../fixtures.ts'
+import { createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, gridWithRebootTiles } from '../../fixtures.ts'
 
 function createMultiplayerGame(
   positions: readonly Position[],
@@ -11,9 +11,10 @@ function createMultiplayerGame(
   board = createTestBoard(createEmptyTileGrid(9, 9), antenna, { x: Integer(0), y: Integer(0) }),
   deck: readonly Card[] = Array.from({ length: 6 }, (_, index) => new Card(`left-${index}`, 'TURN_LEFT')),
 ) {
-  const players = positions.map((position) =>
-    placeTestPlayer(board, position, { direction: Direction.EAST, deck: new Deck(deck) }))
-  const game = createTestGame({ board, players, deck })
+  const placements = positions.map((position) =>
+    createTestPlacement(position, { direction: Direction.EAST, deck: new Deck(deck) }))
+  const players = placements.map(({ player }) => player)
+  const game = createTestGame({ board, players: placements, deck })
   return { board, players, deck, game }
 }
 
@@ -64,12 +65,32 @@ describe('Game fixed-roster programming', () => {
     expect(empty.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))._unsafeUnwrapErr()).toBe('PLAYER_NOT_IN_GAME')
   })
 
-  it('rejects duplicate player IDs, duplicate robot IDs, and unplaced robots', () => {
-    const { board, players, deck } = createMultiplayerGame([{ x: Integer(4), y: Integer(5) }, { x: Integer(5), y: Integer(4) }])
+  it('rejects duplicate player IDs and duplicate robot IDs', () => {
+    const first = { x: Integer(4), y: Integer(5) }
+    const second = { x: Integer(5), y: Integer(4) }
+    const { players, deck } = createMultiplayerGame([first, second])
     const emptyDeck = new Deck([])
-    expect(() => createTestGame({ board, players: [players[0], new Player(players[0].id, players[1].robot, emptyDeck)], deck })).toThrow(RangeError)
-    expect(() => createTestGame({ board, players: [players[0], new Player('other', new Robot(players[0].robot.id, Direction.NORTH, 'red'), emptyDeck)], deck })).toThrow(RangeError)
-    expect(() => createTestGame({ board, players: [new Player('unplaced', new Robot('unplaced', Direction.NORTH, 'red'), emptyDeck)], deck })).toThrow()
+    const freshBoard = () => createTestBoard(
+      createEmptyTileGrid(9, 9), { x: Integer(4), y: Integer(4), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) },
+    )
+
+    expect(() => createTestGame({
+      board: freshBoard(),
+      players: [
+        { player: players[0], position: first },
+        { player: new Player(players[0].id, players[1].robot, emptyDeck), position: second },
+      ],
+      deck,
+    })).toThrow(RangeError)
+
+    expect(() => createTestGame({
+      board: freshBoard(),
+      players: [
+        { player: players[0], position: first },
+        { player: new Player('other', new Robot(players[0].robot.id, Direction.NORTH, 'red'), emptyDeck), position: second },
+      ],
+      deck,
+    })).toThrow(RangeError)
   })
 
   it('exposes the antenna of its board', () => {

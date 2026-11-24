@@ -25,7 +25,7 @@ import {
   presentRobotActionResolved,
 } from '@/socket/presenters/gamePresenter.ts'
 import { Integer } from '@/numbers'
-import { createTestBoard, createTestGame, createTestPlayer, placeTestPlayer } from '../../fixtures.ts'
+import { createTestBoard, createTestGame, createTestPlacement, createTestPlayer } from '../../fixtures.ts'
 
 function createGameWithPlayer() {
   const game = createGame('empty-map', 'Test game')
@@ -177,8 +177,9 @@ describe('game presenter', () => {
       { length: 5 },
       (_, index) => new Card(`card-${index}`, 'MOVE_1'),
     )
-    const player = placeTestPlayer(board, { x: Integer(0), y: Integer(0) }, { direction: Direction.EAST, deck: new Deck(cards) })
-    const game = createTestGame({ board, players: [player], deck: cards })
+    const placement = createTestPlacement({ x: Integer(0), y: Integer(0) }, { direction: Direction.EAST, deck: new Deck(cards) })
+    const { player } = placement
+    const game = createTestGame({ board, players: [placement], deck: cards })
     game.submitProgram(player.id, cards.map((card) => card.id))
 
     const state = presentPublicGameState(game, { status: 'CLOSED' }, [], null)
@@ -201,8 +202,9 @@ describe('game presenter', () => {
       [new EmptyTile(), new EmptyTile([], 1), new EmptyTile()],
     ], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
-    const player = placeTestPlayer(board, { x: Integer(0), y: Integer(0) }, { direction: Direction.EAST, deck: new Deck(cards) })
-    const game = createTestGame({ board, players: [player], deck: cards })
+    const placement = createTestPlacement({ x: Integer(0), y: Integer(0) }, { direction: Direction.EAST, deck: new Deck(cards) })
+    const { player } = placement
+    const game = createTestGame({ board, players: [placement], deck: cards })
     game.submitProgram(player.id, cards.map((card) => card.id))
     expect(presentPublicGameState(game, { status: 'CLOSED' }, [], null).winner).toBeNull()
 

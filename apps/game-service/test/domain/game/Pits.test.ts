@@ -5,7 +5,7 @@ import type { Instruction } from '@robo-rally/game-events'
 import { Card, Direction, EmptyTile, PitTile, type Position, type Tile } from '@/domain/game/index'
 import { Deck } from '@/domain/game/Deck'
 import { createBoard } from '@/domain/game/BoardFactory'
-import { addTestPlayer, createEmptyTileGrid, createTestBoard, createTestGame, placeTestPlayer, programLeadingWith } from '../../fixtures.ts'
+import { addTestPlayer, createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, programLeadingWith } from '../../fixtures.ts'
 
 function createGame(
   pit = { x: Integer(1), y: Integer(1) },
@@ -25,11 +25,12 @@ function createGame(
     TURN_RIGHT: new Card('right', 'TURN_RIGHT'),
     U_TURN: new Card('uturn', 'U_TURN'),
   }
-  const player = placeTestPlayer(board, { x: Integer(0), y: Integer(1) }, {
+  const placement = createTestPlacement({ x: Integer(0), y: Integer(1) }, {
     direction: Direction.EAST, deck: new Deck(Object.values(cards)),
   })
+  const { player } = placement
   const robot = player.robot
-  const game = createTestGame({ board, players: [player], deck: Object.values(cards) })
+  const game = createTestGame({ board, players: [placement], deck: Object.values(cards) })
   return { board, robot, player, cards, game }
 }
 
@@ -202,11 +203,12 @@ describe('pit entry and rebooting', () => {
     ], { x: Integer(2), y: Integer(1), angle: Math.PI / 2 }, rebootTile)
     const instructions: Instruction[] = ['MOVE_3', 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'BACK_UP']
     const program = instructions.map((instruction, index) => new Card(`card-${index}`, instruction))
-    const player = placeTestPlayer(board, { x: Integer(0), y: Integer(0) }, {
+    const placement = createTestPlacement({ x: Integer(0), y: Integer(0) }, {
       direction: Direction.EAST, deck: new Deck(program),
     })
+    const { player } = placement
     player.completeCheckpoint(1)
-    const game = createTestGame({ board, players: [player], deck: program })
+    const game = createTestGame({ board, players: [placement], deck: program })
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
     expect(resolveRobotAction(game).action.position).toEqual(rebootTile)
@@ -225,10 +227,11 @@ describe('reboots reported in action results', () => {
   it('reports the fall when MOVE_3 crosses a reboot tile into a pit on Test Map', () => {
     const board = createBoard('test-map')
     const cards = moveCards()
-    const player = placeTestPlayer(board, { x: Integer(13), y: Integer(1) }, {
+    const placement = createTestPlacement({ x: Integer(13), y: Integer(1) }, {
       id: 'robot', direction: Direction.SOUTH, deck: new Deck(cards),
     })
-    const game = createTestGame({ board, players: [player], deck: cards })
+    const { player } = placement
+    const game = createTestGame({ board, players: [placement], deck: cards })
     game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
 
     const result = resolveRobotAction(game)
@@ -258,13 +261,15 @@ describe('reboots reported in action results', () => {
     const pusherCards = moveCards()
     const pushedCards = moveCards().map((card) => new Card(`pushed-${card.id}`, card.instruction))
     // The pusher at (0,1) is closer to the antenna (0,0), so it acts first.
-    const pusher = placeTestPlayer(board, { x: Integer(0), y: Integer(1) }, {
+    const pusherPlacement = createTestPlacement({ x: Integer(0), y: Integer(1) }, {
       id: 'pusher', direction: Direction.EAST, deck: new Deck(pusherCards),
     })
-    const pushed = placeTestPlayer(board, { x: Integer(1), y: Integer(1) }, {
+    const pushedPlacement = createTestPlacement({ x: Integer(1), y: Integer(1) }, {
       id: 'pushed', direction: Direction.NORTH, deck: new Deck(pushedCards),
     })
-    const game = createTestGame({ board, players: [pusher, pushed], deck: [...pusherCards, ...pushedCards] })
+    const pusher = pusherPlacement.player
+    const pushed = pushedPlacement.player
+    const game = createTestGame({ board, players: [pusherPlacement, pushedPlacement], deck: [...pusherCards, ...pushedCards] })
     game.submitProgram(pusher.id, pusherCards.map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(pushed.id, programLeadingWith(pushedCards, 'TURN_LEFT').map((card) => card.id))._unsafeUnwrap()
 
@@ -291,13 +296,15 @@ describe('reboots reported in action results', () => {
     )
     const pusherCards = moveCards()
     const pushedCards = moveCards().map((card) => new Card(`pushed-${card.id}`, card.instruction))
-    const pusher = placeTestPlayer(board, { x: Integer(0), y: Integer(1) }, {
+    const pusherPlacement = createTestPlacement({ x: Integer(0), y: Integer(1) }, {
       id: 'pusher', direction: Direction.EAST, deck: new Deck(pusherCards),
     })
-    const pushed = placeTestPlayer(board, { x: Integer(1), y: Integer(1) }, {
+    const pushedPlacement = createTestPlacement({ x: Integer(1), y: Integer(1) }, {
       id: 'pushed', direction: Direction.NORTH, deck: new Deck(pushedCards),
     })
-    const game = createTestGame({ board, players: [pusher, pushed], deck: [...pusherCards, ...pushedCards] })
+    const pusher = pusherPlacement.player
+    const pushed = pushedPlacement.player
+    const game = createTestGame({ board, players: [pusherPlacement, pushedPlacement], deck: [...pusherCards, ...pushedCards] })
     game.submitProgram(pusher.id, pusherCards.map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(pushed.id, programLeadingWith(pushedCards, 'TURN_LEFT').map((card) => card.id))._unsafeUnwrap()
 

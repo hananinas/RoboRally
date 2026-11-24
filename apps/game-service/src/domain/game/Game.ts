@@ -75,9 +75,14 @@ export type CompletedProgram = Readonly<{
 
 const REGISTERS_PER_ROUND = 5
 
+export type PlayerPlacement = Readonly<{
+  player: Player
+  position: Position
+}>
+
 export type GameOptions = Readonly<{
   board: Board
-  players: readonly Player[]
+  players: readonly PlayerPlacement[]
   // Template for each private deck created by addPlayer.
   deck: readonly Card[]
   name: string
@@ -111,12 +116,9 @@ export class Game {
 
     const playerIds = new Set<PlayerId>()
     const robotIds = new Set<RobotId>()
-    for (const player of players) {
+    for (const { player } of players) {
       if (playerIds.has(player.id) || robotIds.has(player.robot.id)) {
         throw new RangeError('Players and robots must have unique IDs')
-      }
-      if (!board.allowsPlacement(board.positionOf(player.robot.id))) {
-        throw new RangeError('Robots cannot start on pits or the priority antenna')
       }
       playerIds.add(player.id)
       robotIds.add(player.robot.id)
@@ -125,8 +127,9 @@ export class Game {
     this.id = randomUUID()
     this.board = board
     this.name = name
-    this.roster = [...players]
+    this.roster = players.map(({ player }) => player)
     this.deck = [...deck]
+    for (const { player, position } of players) board.placeRobot(player.robot.id, position)
     this.dealInitialHands()
   }
 

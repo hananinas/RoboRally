@@ -105,10 +105,10 @@ describe('Again card', () => {
       [{ x: Integer(4), y: Integer(0) }],
     )
     const robot = createTestRobot({ direction: Direction.EAST })
-    board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })
     const cards = instructions.map((instruction, index) => new Card(`card-${index}`, instruction))
     const player = createTestPlayer({ robot, deck: new Deck(cards) })
-    const game = createTestGame({ board, players: [player], deck: cards })
+    const position = { x: Integer(0), y: Integer(0) }
+    const game = createTestGame({ board, players: [{ player, position }], deck: cards })
     game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
     const results = cards.map(() => resolveRobotAction(game))
     return results.map(({ action }) => action)

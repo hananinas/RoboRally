@@ -4,7 +4,7 @@ import type { Instruction } from '@robo-rally/game-events'
 import { Card, Direction, EmptyTile, type Position } from '@/domain/game/index'
 import { Deck } from '@/domain/game/Deck'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestBoard, createTestGame, placeTestPlayer } from '../../fixtures.ts'
+import { createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement } from '../../fixtures.ts'
 
 function createGame(
   instruction: Instruction = 'MOVE_3',
@@ -20,9 +20,10 @@ function createGame(
   const direction = instruction === 'BACK_UP' ? Direction.WEST : Direction.EAST
   const instructions: Instruction[] = [instruction, 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'MOVE_1']
   const program = instructions.map((instr, index) => new Card(`card-${index}`, instr))
-  const player = placeTestPlayer(board, start, { direction, deck: new Deck(program) })
+  const placement = createTestPlacement(start, { direction, deck: new Deck(program) })
+  const { player } = placement
   const robot = player.robot
-  const game = createTestGame({ board, players: [player], deck: program })
+  const game = createTestGame({ board, players: [placement], deck: program })
   return { board, robot, player, program, reboot, game }
 }
 
@@ -104,9 +105,10 @@ describe('board-edge falls', () => {
     const reboot = { x: Integer(0), y: Integer(0) }
     const board = createTestBoard([[new EmptyTile(), new EmptyTile()]], { x: Integer(1), y: Integer(0), angle: 0 }, reboot)
     const program = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_3'))
-    const player = placeTestPlayer(board, reboot, { direction: Direction.WEST, deck: new Deck(program) })
+    const placement = createTestPlacement(reboot, { direction: Direction.WEST, deck: new Deck(program) })
+    const { player } = placement
     const robot = player.robot
-    const game = createTestGame({ board, players: [player], deck: program })
+    const game = createTestGame({ board, players: [placement], deck: program })
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
     for (let register = 0; register < 5; register++) {

@@ -4,7 +4,7 @@ import type { Instruction } from '@robo-rally/game-events'
 import { Card, Direction, EmptyTile, PitTile, type Antenna, type Position, type Tile } from '@/domain/game/index'
 import { Deck } from '@/domain/game/Deck'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestBoard, createTestGame, placeTestPlayer, programLeadingWith } from '../../fixtures.ts'
+import { createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, programLeadingWith } from '../../fixtures.ts'
 
 function position(x: number, y = 3): Position {
   return { x: Integer(x), y: Integer(y) }
@@ -24,9 +24,10 @@ function createGame(
   const directions = [Direction.EAST, Direction.NORTH, Direction.WEST, Direction.SOUTH]
   const instructions: Instruction[] = ['MOVE_1', 'MOVE_2', 'MOVE_3', 'BACK_UP', 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'AGAIN']
   const cards = instructions.map((instruction) => new Card(instruction, instruction))
-  const players = starts.map((start, index) =>
-    placeTestPlayer(board, start, { direction: directions[index % directions.length], deck: new Deck(cards) }))
-  const game = createTestGame({ board, players, deck: cards })
+  const placements = starts.map((start, index) =>
+    createTestPlacement(start, { direction: directions[index % directions.length], deck: new Deck(cards) }))
+  const players = placements.map(({ player }) => player)
+  const game = createTestGame({ board, players: placements, deck: cards })
   return { board, players, robots: players.map((player) => player.robot), cards, game, reboot }
 }
 
@@ -214,7 +215,8 @@ describe('robot pushing', () => {
       new Card('filler-a', 'TURN_RIGHT'),
       new Card('filler-b', 'U_TURN'),
     ]
-    const mover = placeTestPlayer(board, position(1), { direction: Direction.EAST, deck: new Deck(moverDeck) })
+    const moverPlacement = createTestPlacement(position(1), { direction: Direction.EAST, deck: new Deck(moverDeck) })
+    const mover = moverPlacement.player
     const bystanderDeck = [
       new Card('wait-a', 'AGAIN'),
       new Card('wait-b', 'AGAIN'),
@@ -222,8 +224,9 @@ describe('robot pushing', () => {
       new Card('filler-c', 'TURN_RIGHT'),
       new Card('filler-d', 'U_TURN'),
     ]
-    const bystander = placeTestPlayer(board, position(2), { direction: Direction.NORTH, deck: new Deck(bystanderDeck) })
-    const game = createTestGame({ board, players: [mover, bystander] })
+    const bystanderPlacement = createTestPlacement(position(2), { direction: Direction.NORTH, deck: new Deck(bystanderDeck) })
+    const bystander = bystanderPlacement.player
+    const game = createTestGame({ board, players: [moverPlacement, bystanderPlacement] })
     game.submitProgram(mover.id, moverDeck.map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(bystander.id, bystanderDeck.map((card) => card.id))._unsafeUnwrap()
 

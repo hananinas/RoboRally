@@ -27,9 +27,9 @@ describe('activation scheduler', () => {
     ], { x: Integer(0), y: Integer(0), angle: 0 }, { x: Integer(2), y: Integer(0) })
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'TURN_LEFT'))
     const robot = createTestRobot({ direction: Direction.NORTH })
-    board.placeRobot(robot.id, { x: Integer(onGear ? 0 : 1), y: Integer(1) })
     const player = createTestPlayer({ id: 'player', robot, deck: new Deck(cards) })
-    const game = createTestGame({ board, players: [player], deck: cards })
+    const position = { x: Integer(onGear ? 0 : 1), y: Integer(1) }
+    const game = createTestGame({ board, players: [{ player, position }], deck: cards })
     game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
     io = createGameSocketServer(createServer(), createSessionStore({ oidcClient: { refreshToken: vi.fn() }, refreshBufferSeconds: 0 }))
     const broadcast = vi.spyOn(io.of('/').adapter, 'broadcast')
