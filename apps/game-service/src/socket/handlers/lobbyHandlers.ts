@@ -14,8 +14,9 @@ import { LobbySession, type ConnectedLobbyMember } from '@/socket/LobbySession'
 import { presentInitialization } from '@/socket/presenters/gamePresenter'
 import { presentBoardMaps, presentLobby, presentLobbySummary } from '@/socket/presenters/lobbyPresenter'
 
-export function leaveLobby(context: SocketContext, socket: GameSocket): Result<void, 'NOT_A_MEMBER'> {
+export function leaveLobby(context: SocketContext, socket: GameSocket): Result<void, 'NO_MEMBERSHIP' | 'NOT_A_MEMBER'> {
   const userId = socket.data.user.userId
+  if (!context.registry.getActiveMembership(userId)) return err('NO_MEMBERSHIP')
   const lobbySession = context.registry.getCurrentLobby(userId)
   if (!lobbySession) return err('NOT_A_MEMBER')
   return lobbySession.isMember(socket).map(() => {
@@ -111,7 +112,7 @@ export function handleLeaveLobby(
     resolve: (user) => ok(user),
     run: (_user, ack) => {
       const result = leaveLobby(context, socket)
-      ack(result.isOk() ? { outcome: 'LEFT' } : { outcome: result.error })
+      ack(result.isOk() || result.error === 'NO_MEMBERSHIP' ? { outcome: 'LEFT' } : { outcome: 'NOT_A_MEMBER' })
     },
   })
 }

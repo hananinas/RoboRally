@@ -236,6 +236,10 @@ describe('lobby lifecycle over Socket.IO', () => {
     })
     expect(server.sockets.adapter.rooms.has(`lobby:${lobby.lobbyId}`)).toBe(false)
   })
+  it('treats leaving with no membership as already left', async () => {
+    const stranger = await connect('Stranger')
+    expect(await stranger.emitWithAck('lobby.leave', {})).toEqual({ outcome: 'LEFT' })
+  })
   it('keeps the lobby usable if game preparation fails', async () => {
     const owner = await connect('Owner')
     const lobby = await create(owner)
