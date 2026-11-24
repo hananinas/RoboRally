@@ -1,5 +1,5 @@
 import { type Direction, type Position, neighbour, opposite } from '@/domain/game/spatial'
-import { allowsPlacement, type Tile } from '@/domain/game/Tile'
+import { allowsPlacement, StartTile, type Tile } from '@/domain/game/Tile'
 import { Integer } from '@/numbers'
 
 export type Antenna = Readonly<Position & { angle: number }>
@@ -16,7 +16,6 @@ export class Board {
   constructor(
     tiles: readonly (readonly Tile[])[],
     antenna: Antenna,
-    startTiles: readonly Position[],
   ) {
     const width = tiles[0]?.length ?? 0
     if (width === 0 || tiles.some((row) => row.length !== width)) {
@@ -51,17 +50,14 @@ export class Board {
     }
     this.rebootTiles = Object.freeze(rebootTiles.map((position) => Object.freeze(position)))
 
-    if (startTiles.length === 0) {
-      throw new RangeError('A board must have at least one starting tile')
-    }
-    const startKeys = new Set(startTiles.map(({ x, y }) => `${x},${y}`))
-    if (startKeys.size !== startTiles.length) {
-      throw new RangeError('Starting tiles must be distinct')
-    }
-    if (!startTiles.every((position) => this.allowsPlacement(position))) {
+    const numberedStarts = this.tiles.flatMap((row, y) => row.flatMap((tile, x) =>
+      tile instanceof StartTile ? [{ number: tile.number, position: { x: Integer(x), y: Integer(y) } }] : []))
+    if (!numberedStarts.every(({ position }) => this.allowsPlacement(position))) {
       throw new RangeError('Starting tiles must be non-pit tiles on the board outside the priority antenna')
     }
-    this.startTiles = Object.freeze(startTiles.map((position) => Object.freeze({ ...position })))
+    this.startTiles = Object.freeze(numberedStarts
+      .sort((first, second) => first.number - second.number)
+      .map(({ position }) => Object.freeze(position)))
   }
 
   get checkpointCount(): number {

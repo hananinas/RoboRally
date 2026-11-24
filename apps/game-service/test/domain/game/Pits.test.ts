@@ -152,35 +152,52 @@ describe('pit entry and rebooting', () => {
 
   it('uses the next closest reboot tile when the closest one is taken', () => {
     const rebootTiles = [{ x: Integer(0), y: Integer(2) }, { x: Integer(4), y: Integer(2) }]
-    const { player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, rebootTiles)
-    const blocker = addTestPlayer(game)
+    const { player, cards: c, game } = createGame(
+      { x: Integer(1), y: Integer(1) }, rebootTiles, undefined, [{ x: Integer(2), y: Integer(1) }],
+    )
+    const earlier = addTestPlayer(game)
+    earlier.robot.turn(1) // NORTH -> WEST, also facing the pit
     game.submitProgram(player.id, programLeadingWith(Object.values(c), 'MOVE_1').map((card) => card.id))._unsafeUnwrap()
-    game.submitProgram(blocker.id, programLeadingWith(blocker.hand, 'TURN_LEFT').map((card) => card.id))._unsafeUnwrap()
+    game.submitProgram(earlier.id, programLeadingWith(earlier.hand, 'MOVE_1').map((card) => card.id))._unsafeUnwrap()
 
+    // (2,1) is nearer the antenna than (0,1), so that robot falls first and claims (0,2).
+    expect(resolveRobotAction(game).action.position).toEqual({ x: Integer(0), y: Integer(2) })
     expect(resolveRobotAction(game).action.position).toEqual({ x: Integer(4), y: Integer(2) })
-    expect(game.getRobotPosition(blocker.robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
   })
 
   it('falls back to the nearest free tile when every reboot tile is taken', () => {
     const rebootTiles = [{ x: Integer(0), y: Integer(2) }, { x: Integer(4), y: Integer(2) }]
-    const { player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, rebootTiles)
-    const blockers = [addTestPlayer(game), addTestPlayer(game)]
-    game.submitProgram(player.id, programLeadingWith(Object.values(c), 'MOVE_1').map((card) => card.id))._unsafeUnwrap()
-    for (const blocker of blockers) {
-      game.submitProgram(blocker.id, programLeadingWith(blocker.hand, 'TURN_LEFT').map((card) => card.id))._unsafeUnwrap()
+    const { game } = createGame(
+      { x: Integer(1), y: Integer(1) }, rebootTiles, undefined,
+      [{ x: Integer(2), y: Integer(1) }, { x: Integer(1), y: Integer(0) }],
+    )
+    const [fromEast, fromNorth] = [addTestPlayer(game), addTestPlayer(game)]
+    fromEast.robot.turn(1) // NORTH -> WEST
+    fromNorth.robot.turn(2) // NORTH -> SOUTH
+    for (const each of game.players) {
+      game.submitProgram(each.id, programLeadingWith(each.hand, 'MOVE_1').map((card) => card.id))._unsafeUnwrap()
     }
 
-    // Nearest free tile to the closest reboot tile (0,2); (0,1) wins the tie by being higher up.
+    expect(resolveRobotAction(game).action.position).toEqual({ x: Integer(0), y: Integer(2) })
+    expect(resolveRobotAction(game).action.position).toEqual({ x: Integer(4), y: Integer(2) })
+    // Both reboot tiles are taken, so the nearest free tile to (0,2) wins; (0,1) is
+    // free again because its own robot is the one falling.
     expect(resolveRobotAction(game).action.position).toEqual({ x: Integer(0), y: Integer(1) })
   })
 
   it('skips the antenna when choosing a fallback for an occupied reboot tile', () => {
-    const { robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, [{ x: Integer(2), y: Integer(1) }])
+    const { robot, player, cards: c, game } = createGame(
+      { x: Integer(1), y: Integer(1) }, [{ x: Integer(2), y: Integer(1) }], undefined, [{ x: Integer(1), y: Integer(0) }],
+    )
     const other = addTestPlayer(game)
-    other.robot.turn(1)
+    other.robot.turn(2) // NORTH -> SOUTH, facing the pit
     game.submitProgram(player.id, [c.MOVE_3, c.MOVE_1, c.TURN_LEFT, c.TURN_RIGHT, c.BACK_UP].map((card) => card.id))._unsafeUnwrap()
-    game.submitProgram(other.id, [4, 5, 6, 0, 1].map((index) => other.hand[index].id))._unsafeUnwrap()
-    expect(resolveRobotAction(game).action.robotId).toBe(other.robot.id)
+    game.submitProgram(other.id, programLeadingWith(other.hand, 'MOVE_1').map((card) => card.id))._unsafeUnwrap()
+
+    // (1,0) is nearer the antenna, so that robot falls first and claims the reboot tile.
+    expect(resolveRobotAction(game).action).toMatchObject({
+      robotId: other.robot.id, position: { x: Integer(2), y: Integer(1) },
+    })
 
     const { action } = resolveRobotAction(game)
     expect(action.robotId).toBe(robot.id)

@@ -81,7 +81,7 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
 
   if (tile instanceof GearTile) return { ...common, type: tile.kind, rotation: tile.rotation }
 
-  if (tile.kind === 'EMPTY' || tile.kind === 'PIT' || tile.kind === 'REBOOT') {
+  if (tile.kind === 'EMPTY' || tile.kind === 'PIT' || tile.kind === 'REBOOT' || tile.kind === 'START') {
     return {
       ...common,
       type: tile.kind,

@@ -7,7 +7,7 @@ import { Board, type Antenna } from '@/domain/game/Board'
 import { Player } from '@/domain/game/Player'
 import { Robot, ROBOT_COLOURS } from '@/domain/game/Robot'
 import { Direction, type Position } from '@/domain/game/spatial'
-import { EmptyTile, RebootTile, type Tile } from '@/domain/game/Tile'
+import { EmptyTile, RebootTile, StartTile, type Tile } from '@/domain/game/Tile'
 
 type RobotOverrides = Partial<{
   id: string
@@ -73,14 +73,22 @@ export function gridWithRebootTiles(tiles: readonly (readonly Tile[])[], ...posi
   return grid
 }
 
+export function gridWithStartTiles(tiles: readonly (readonly Tile[])[], ...positions: readonly Position[]): Tile[][] {
+  const grid = tiles.map((row) => [...row])
+  positions.forEach(({ x, y }, index) => {
+    grid[y][x] = new StartTile(index + 1, grid[y][x].walls)
+  })
+  return grid
+}
+
 export function createTestBoard(
   tiles: readonly (readonly Tile[])[],
   antenna: Antenna,
   rebootTiles: Position | readonly Position[],
-  startTiles?: readonly Position[],
+  startTiles: readonly Position[] = [],
 ): Board {
   const reboots = [rebootTiles].flat()
-  return new Board(gridWithRebootTiles(tiles, ...reboots), antenna, startTiles ?? reboots)
+  return new Board(gridWithStartTiles(gridWithRebootTiles(tiles, ...reboots), ...startTiles), antenna)
 }
 
 export function programLeadingWith(cards: readonly Card[], instruction: Instruction): Card[] {

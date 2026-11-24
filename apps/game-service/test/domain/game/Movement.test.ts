@@ -20,7 +20,7 @@ function createGame(options: {
   tiles[0][4] = new EmptyTile([], 1)
   tiles[2][3] = new EmptyTile([], 2)
   tiles[2][0] = new EmptyTile([], 3)
-  const board = createTestBoard(tiles, { x: Integer(4), y: Integer(1), angle: Math.PI / 2 }, { x: Integer(3), y: Integer(2) })
+  const board = createTestBoard(tiles, { x: Integer(4), y: Integer(1), angle: Math.PI / 2 }, { x: Integer(3), y: Integer(2) }, [{ x: Integer(2), y: Integer(1) }])
   const pit = { x: Integer(1), y: Integer(1) }
   const reboot = { x: Integer(3), y: Integer(2) }
   const program = [
@@ -75,17 +75,19 @@ describe('shared gameplay movement', () => {
 
   it('uses the nearest safe tile and deterministic tie order when the reboot tile is occupied', () => {
     const { robot, player, program, game, reboot } = createGame({ direction: Direction.EAST })
-    const other = addTestPlayer(game)
+    const earlier = addTestPlayer(game)
+    earlier.robot.turn(1) // NORTH -> WEST, also facing the pit
     const fallback = { x: Integer(3), y: Integer(1) }
     game.submitProgram(player.id, programLeadingWith(program, 'MOVE_3').map((card) => card.id))._unsafeUnwrap()
-    game.submitProgram(other.id, programLeadingWith(other.hand, 'TURN_LEFT').map((card) => card.id))._unsafeUnwrap()
+    game.submitProgram(earlier.id, programLeadingWith(earlier.hand, 'MOVE_3').map((card) => card.id))._unsafeUnwrap()
 
-    // The robot on the reboot tile is closer to the antenna, so it acts first.
+    // (2,1) is nearer the antenna than (0,1), so that robot falls first and claims the
+    // reboot tile, leaving the second faller the nearest free tile instead.
     resolveRobotAction(game)
     resolveRobotAction(game)
 
+    expect(game.getRobotPosition(earlier.robot.id)).toEqual(reboot)
     expect(game.getRobotPosition(robot.id)).toEqual(fallback)
-    expect(game.getRobotPosition(other.robot.id)).toEqual(reboot)
     expect(robot.direction).toBe(Direction.EAST)
   })
 

@@ -9,7 +9,7 @@ import { Direction, Game, createBoard, createDeckCards } from '@/domain/game/ind
 // A real map with its start tiles replaced, so a robot can begin where the test needs it.
 function gameStartingAt(mapName: BoardMapName, start: readonly [x: number, y: number]): Game {
   return new Game({
-    board: createBoard({ ...boardMaps[mapName], startTiles: [start], maxPlayers: 1 }),
+    board: createBoard({ ...boardMaps[mapName], startTiles: [start] }),
     players: [],
     deck: createDeckCards(),
     name: 'Test game',

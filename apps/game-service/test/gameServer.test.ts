@@ -66,9 +66,7 @@ describe('started game membership over Socket.IO', () => {
     deck?: readonly Card[]
   }): void {
     vi.spyOn(GameFactory, 'createGame').mockImplementationOnce((mapName, name) => new Game({
-      board: createBoard({
-        ...boardMaps[mapName], startTiles: options.startTiles, maxPlayers: options.startTiles.length,
-      }),
+      board: createBoard({ ...boardMaps[mapName], startTiles: options.startTiles }),
       players: [],
       deck: options.deck ?? createDeckCards(),
       name,
@@ -550,17 +548,18 @@ describe('started game membership over Socket.IO', () => {
     })
 
     it('broadcasts the next closest reboot tile to every member when the closest one is taken', async () => {
-      // robot1 occupies (2,6), the reboot tile closest to the pit at (3,3), so the
-      // falling robot must use the next closest one. (3,2) keeps robot0 strictly closer
-      // to the antenna (10,0) than the occupied reboot tile (distance 14), so it always
-      // has priority; the dealt MOVE_1 moves it 1 step. (10,13) is 13 from the antenna,
-      // so robot2 acts between robot0 (9) and robot1 (14).
-      stageNextGame({ startTiles: [[3, 2], [2, 6], [10, 13]] })
+      // Two robots fall into the pit at (3,3) in register 0, the dealt MOVE_1 carrying
+      // each one step. (3,2) is 9 from the antenna at (10,0) and (2,3) is 11, so the
+      // first faller claims (2,6), the reboot tile closest to the pit, and the second
+      // must take the next one. (13,2) and (2,13) are both 11 away; (13,2) wins the tie
+      // because it comes first in reading order. (10,13) is 13 away, so robot2 acts last.
+      stageNextGame({ startTiles: [[3, 2], [2, 3], [10, 13]] })
       const { members: sockets, initializations } = await startGame(['First', 'Second', 'Third'], 'test-map')
       const members = sockets.map((client, index) => ({ client, joined: initializations[index] }))
       const game = currentGame()
       const robotIds = members.map(({ joined }) => joined.assignment.robotId)
       game.players[0].robot.turn(2) // NORTH -> SOUTH, facing the pit
+      game.players[1].robot.turn(3) // NORTH -> EAST, also facing the pit
       const actions: RobotActionResolved[][] = members.map(() => [])
       const dealt: CardsDealt[][] = members.map(() => [])
       for (const [index, { client }] of members.entries()) {
@@ -581,20 +580,19 @@ describe('started game membership over Socket.IO', () => {
       expect(actions[0]).toHaveLength(15)
       expect(actions[1]).toEqual(actions[0])
       expect(actions[2]).toEqual(actions[0])
-      // (2,6) is occupied. (13,2) and (2,13) are next, both 11 away; (13,2) wins the tie
-      // because it comes first in reading order.
       expect(actions[0][0]).toEqual({
         gameId: game.id, registerIndex: 0, robotId: robotIds[0], instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1',
         playerId: initializations[0].assignment.playerId,
         pushedRobots: [],
-        position: { coordinate: { x: 13, y: 2 }, orientation: 'SOUTH' },
-        reboots: [{ robotId: robotIds[0], fellAt: { x: 3, y: 3 }, landedAt: { x: 13, y: 2 } }],
+        position: { coordinate: { x: 2, y: 6 }, orientation: 'SOUTH' },
+        reboots: [{ robotId: robotIds[0], fellAt: { x: 3, y: 3 }, landedAt: { x: 2, y: 6 } }],
       })
-      expect(game.getRobotPosition(robotIds[0])).toEqual({ x: 13, y: 2 })
-      // robot1 keeps moving under its own program, so only the fallback tile matters.
-      expect(game.getRobotPosition(robotIds[1])).not.toEqual({ x: 13, y: 2 })
-      expect(actions[0].slice(0, 3).map((action) => action.robotId)).toEqual([robotIds[0], robotIds[2], robotIds[1]])
-      expect(actions[0].slice(3, 6).map((action) => action.robotId)).toEqual([robotIds[0], robotIds[2], robotIds[1]])
+      expect(actions[0][1]).toMatchObject({
+        registerIndex: 0, robotId: robotIds[1],
+        position: { coordinate: { x: 13, y: 2 }, orientation: 'EAST' },
+        reboots: [{ robotId: robotIds[1], fellAt: { x: 3, y: 3 }, landedAt: { x: 13, y: 2 } }],
+      })
+      expect(actions[0].slice(0, 3).map((action) => action.robotId)).toEqual([robotIds[0], robotIds[1], robotIds[2]])
       for (const [index, { client, joined }] of members.entries()) {
         const snapshot = await getSnapshot(client)
         expect(snapshot.outcome).toBe('JOINED')

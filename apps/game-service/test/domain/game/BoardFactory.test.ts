@@ -82,12 +82,11 @@ describe('board factory', () => {
     expect(createBoard(boardMaps['test-map']).antenna).not.toBe(createBoard(boardMaps['test-map']).antenna)
   })
   
-  it('places a starting tile for every player of each map', () => {
+  it('derives each map\'s starting tiles from the grid in spec order', () => {
     for (const mapName of ['empty-map', 'test-map'] as const) {
       const board = createBoard(boardMaps[mapName])
 
       expect(board.startTiles).toEqual(boardMaps[mapName].startTiles.map(([x, y]) => ({ x, y })))
-      expect(board.startTiles).toHaveLength(boardMaps[mapName].maxPlayers)
     }
   })
 

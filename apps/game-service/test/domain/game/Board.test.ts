@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Board, Direction, EmptyTile, PitTile, RebootTile } from '@/domain/game/index.ts'
+import { Board, Direction, EmptyTile, PitTile, RebootTile, StartTile } from '@/domain/game/index.ts'
 import { Integer } from '@/numbers'
 import { createEmptyTileGrid, createTestBoard, gridWithRebootTiles } from '../../fixtures.ts'
 
@@ -7,19 +7,18 @@ const antenna = { x: Integer(0), y: Integer(0), angle: Math.PI / 2 }
 const rebootTile = { x: Integer(2), y: Integer(2) }
 
 describe('Tile and Board layout', () => {
-  it('stores distinct starting tiles and rejects ones a robot cannot stand on', () => {
+  it('orders its starting tiles by number and rejects one on the antenna', () => {
     const at = (x: number, y: number) => ({ x: Integer(x), y: Integer(y) })
-    const tiles = createEmptyTileGrid(3, 3)
-    tiles[2][2] = new PitTile()
-    const reboot = at(0, 1)
+    const grid = gridWithRebootTiles(createEmptyTileGrid(3, 3), at(0, 1))
 
-    const grid = gridWithRebootTiles(tiles, reboot)
-    expect(new Board(grid, antenna, [at(1, 1), at(2, 1)]).startTiles).toEqual([at(1, 1), at(2, 1)])
-    expect(() => new Board(grid, antenna, [])).toThrow(RangeError)
-    expect(() => new Board(grid, antenna, [at(1, 1), at(1, 1)])).toThrow(RangeError)
-    expect(() => new Board(grid, antenna, [at(2, 2)])).toThrow(RangeError)
-    expect(() => new Board(grid, antenna, [at(0, 0)])).toThrow(RangeError)
-    expect(() => new Board(grid, antenna, [at(3, 0)])).toThrow(RangeError)
+    // Declared out of number order and scanned in reading order, so neither ordering
+    // would produce this result by accident.
+    grid[1][2] = new StartTile(1)
+    grid[1][1] = new StartTile(2)
+    expect(new Board(grid, antenna).startTiles).toEqual([at(2, 1), at(1, 1)])
+
+    grid[antenna.y][antenna.x] = new StartTile(3)
+    expect(() => new Board(grid, antenna)).toThrow(RangeError)
   })
 
   it('stores pits with walls without counting them as checkpoints', () => {
@@ -76,9 +75,9 @@ describe('Tile and Board layout', () => {
   })
 
   it('requires a rectangular grid and copies its rows', () => {
-    expect(() => new Board([], antenna, [])).toThrow(RangeError)
-    expect(() => new Board([[]], antenna, [])).toThrow(RangeError)
-    expect(() => new Board([[new EmptyTile()], []], antenna, [])).toThrow(RangeError)
+    expect(() => new Board([], antenna)).toThrow(RangeError)
+    expect(() => new Board([[]], antenna)).toThrow(RangeError)
+    expect(() => new Board([[new EmptyTile()], []], antenna)).toThrow(RangeError)
 
     const tiles = createEmptyTileGrid(2, 2)
     const original = tiles[0][0]
@@ -129,10 +128,9 @@ describe('Tile and Board layout', () => {
 
   it('requires a reboot tile outside the antenna', () => {
     const boardAntenna = { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }
-    const start = [{ x: Integer(0), y: Integer(0) }]
-    expect(() => new Board([[new EmptyTile(), new PitTile(), new EmptyTile()]], boardAntenna, start)).toThrow(RangeError)
-    expect(() => new Board([[new EmptyTile(), new PitTile(), new RebootTile()]], boardAntenna, start)).toThrow(RangeError)
-    expect(new Board([[new RebootTile(), new PitTile(), new EmptyTile()]], boardAntenna, start).rebootTiles)
+    expect(() => new Board([[new EmptyTile(), new PitTile(), new EmptyTile()]], boardAntenna)).toThrow(RangeError)
+    expect(() => new Board([[new EmptyTile(), new PitTile(), new RebootTile()]], boardAntenna)).toThrow(RangeError)
+    expect(new Board([[new RebootTile(), new PitTile(), new EmptyTile()]], boardAntenna).rebootTiles)
       .toEqual([{ x: 0, y: 0 }])
   })
 
@@ -140,7 +138,6 @@ describe('Tile and Board layout', () => {
     const board = new Board(
       [[new EmptyTile(), new RebootTile(), new EmptyTile()]],
       { x: Integer(2), y: Integer(0), angle: 0 },
-      [{ x: Integer(0), y: Integer(0) }],
     )
 
     expect(board.allowsPlacement({ x: Integer(1), y: Integer(0) })).toBe(true)

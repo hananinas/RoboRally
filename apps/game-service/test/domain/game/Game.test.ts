@@ -186,7 +186,7 @@ describe('Game programming', () => {
 
 describe('Game.addPlayer', () => {
   function createEmptyGame(width = 3, startTiles: Position[] = [{ x: Integer(1), y: Integer(0) }, { x: Integer(0), y: Integer(0) }]) {
-    const board = createTestBoard(createEmptyTileGrid(width, 1), { x: Integer(width - 1), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) }, startTiles)
+    const board = createTestBoard(createEmptyTileGrid(width, 2), { x: Integer(width - 1), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(1) }, startTiles)
     const deck = [
       new Card('move-1', 'MOVE_1'),
       new Card('left-1', 'TURN_LEFT'),
@@ -233,9 +233,9 @@ describe('Game.addPlayer', () => {
 
   it('spawns players at successive declared start tiles and reports exhaustion once they are all occupied', () => {
     const { deck } = createGame()
-    const board = createTestBoard(createEmptyTileGrid(3, 1), {
+    const board = createTestBoard(createEmptyTileGrid(3, 2), {
       x: Integer(1), y: Integer(0), angle: 0,
-    }, { x: Integer(0), y: Integer(0) }, [{ x: Integer(2), y: Integer(0) }, { x: Integer(0), y: Integer(0) }])
+    }, { x: Integer(0), y: Integer(1) }, [{ x: Integer(2), y: Integer(0) }, { x: Integer(0), y: Integer(0) }])
     const game = createTestGame({ board, players: [], deck })
     const first = game.addPlayer('red')._unsafeUnwrap()
     const second = game.addPlayer('blue')._unsafeUnwrap()
@@ -271,7 +271,10 @@ describe('Game roster validation and spawn skipping', () => {
 
   it('reports no safe spawn once the only declared start tile is occupied', () => {
     const { deck } = createGame()
-    const board = createTestBoard([[new EmptyTile(), new PitTile(), new EmptyTile()]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
+    const board = createTestBoard([
+      [new EmptyTile(), new PitTile(), new EmptyTile()],
+      [new EmptyTile(), new EmptyTile(), new EmptyTile()],
+    ], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(1) }, [{ x: Integer(0), y: Integer(0) }])
     const game = createTestGame({ board, players: [], deck })
     const first = game.addPlayer('red')._unsafeUnwrap()
 

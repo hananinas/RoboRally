@@ -1,7 +1,7 @@
 import type { GearRotation } from '@robo-rally/game-events'
 import type { Direction } from '@/domain/game/spatial'
 
-export type TileKind = 'EMPTY' | 'PIT' | 'CONVEYOR' | 'GEAR' | 'REBOOT'
+export type TileKind = 'EMPTY' | 'PIT' | 'CONVEYOR' | 'GEAR' | 'REBOOT' | 'START'
 export type TileEntryEffect = 'reboot'
 
 // Tile suitability only; Board checks robot occupancy separately.
@@ -63,6 +63,15 @@ export class ConveyorTile extends Tile {
     checkpointNumber?: number
   ) {
     super(walls, checkpointNumber)
+  }
+}
+
+// Where robots begin. The number identifies the start position, not who spawns on it.
+export class StartTile extends Tile {
+  readonly kind = 'START'
+
+  constructor(readonly number: number, walls: Iterable<Direction> = []) {
+    super(walls)
   }
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Direction, EmptyTile, PitTile, ConveyorTile, GearTile, RebootTile, RobotPlacements } from '@/domain/game/index.ts'
+import { Direction, EmptyTile, PitTile, ConveyorTile, GearTile, RebootTile, RobotPlacements, StartTile } from '@/domain/game/index.ts'
 import type { Position, Tile, TileKind } from '@/domain/game/index.ts'
 import { Integer } from '@/numbers'
 import { createEmptyTileGrid, createTestBoard } from '../../fixtures.ts'
@@ -21,6 +21,7 @@ describe('robot ownership', () => {
     GEAR: { tile: new GearTile('CLOCKWISE'), canOccupy: true },
     CONVEYOR: { tile: new ConveyorTile('conveyor-1-straight', Direction.NORTH), canOccupy: true },
     REBOOT: { tile: new RebootTile(), canOccupy: true },
+    START: { tile: new StartTile(1), canOccupy: true },
   }
 
   it.each(Object.entries(destinations))('uses %s rules for placement, relocation and safe destinations', (kind, { tile, canOccupy }) => {
