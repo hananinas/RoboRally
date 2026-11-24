@@ -3,8 +3,18 @@ import { Integer } from '@/numbers'
 import { submitProgramSchema } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'
 import { createGame } from '@/domain/game/GameFactory'
-import { boardMaps } from '@/domain/game/boardMaps'
-import { Direction } from '@/domain/game/index'
+import { boardMaps, type BoardMapName } from '@/domain/game/boardMaps'
+import { Direction, Game, createBoard, createDeckCards } from '@/domain/game/index'
+
+// A real map with its start tiles replaced, so a robot can begin where the test needs it.
+function gameStartingAt(mapName: BoardMapName, start: readonly [x: number, y: number]): Game {
+  return new Game({
+    board: createBoard({ ...boardMaps[mapName], startTiles: [start], maxPlayers: 1 }),
+    players: [],
+    deck: createDeckCards(),
+    name: 'Test game',
+  })
+}
 
 describe('game factory', () => {
   it('includes both gear directions in the test map', () => {
@@ -17,20 +27,18 @@ describe('game factory', () => {
     { mapName: 'empty-map', closest: { x: 3, y: 3 } },
     { mapName: 'test-map', closest: { x: 2, y: 6 } },
   ] as const)('reboots on the closest reboot tile after falling off $mapName', ({ mapName, closest }) => {
-    const game = createGame(mapName, 'Test game')
+    const game = gameStartingAt(mapName, [0, 0])
     const player = game.addPlayer('red')._unsafeUnwrap()
-    game.board.relocateRobot(player.robot.id, { x: Integer(0), y: Integer(0) })
     game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
 
     expect(resolveRobotAction(game).action.position).toEqual(closest)
     expect(player.robot.direction).toBe(Direction.NORTH)
-    expect(game.board.occupantAt({ x: Integer(0), y: Integer(0) })).toBeUndefined()
+    expect(game.getRobotPosition(player.robot.id)).toEqual(closest)
   })
 
   it('uses the closest map reboot tile when a robot enters a test pit', () => {
-    const game = createGame('test-map', 'Test game')
+    const game = gameStartingAt('test-map', [5, 11])
     const player = game.addPlayer('red')._unsafeUnwrap()
-    game.board.relocateRobot(player.robot.id, { x: Integer(5), y: Integer(11) })
     game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
 
     expect(resolveRobotAction(game).action.position).toEqual({ x: 10, y: 10 })
@@ -63,14 +71,14 @@ describe('game factory', () => {
   it('only picks starting tiles that are still free', () => {
     const game = createGame('test-map', 'Test game')
     const positions = Array.from({ length: 3 }, () =>
-      game.board.positionOf(game.addPlayer('red')._unsafeUnwrap().robot.id))
+      game.getRobotPosition(game.addPlayer('red')._unsafeUnwrap().robot.id))
     expect(positions).toEqual([{ x: 8, y: 7 }, { x: 3, y: 8 }, { x: 10, y: 13 }])
   })
 
   it('gives six players six different starting tiles and has no tile for a seventh', () => {
     const game = createGame('test-map', 'Test game')
     const starts = Array.from({ length: 6 }, () =>
-      game.board.positionOf(game.addPlayer('red')._unsafeUnwrap().robot.id))
+      game.getRobotPosition(game.addPlayer('red')._unsafeUnwrap().robot.id))
 
     expect(new Set(starts.map(({ x, y }) => `${x},${y}`))).toEqual(
       new Set(boardMaps['test-map'].startTiles.map(([x, y]) => `${x},${y}`)),
@@ -83,7 +91,7 @@ describe('game factory', () => {
     const player = game.addPlayer('red')._unsafeUnwrap()
 
     game.removePlayer(player.id)
-    expect(game.board.positionOf(game.addPlayer('red')._unsafeUnwrap().robot.id)).toEqual({ x: 8, y: 7 })
+    expect(game.getRobotPosition(game.addPlayer('red')._unsafeUnwrap().robot.id)).toEqual({ x: 8, y: 7 })
   })
 
   it('creates isolated state for each game', () => {

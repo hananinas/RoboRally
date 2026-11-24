@@ -25,7 +25,7 @@ function expectRejectedWithoutMutation(game: Game, playerId: string, error: Upda
       submitted: game.hasSubmittedProgram(player.id),
       lastCheckpoint: player.lastCheckpoint,
       direction: player.robot.direction,
-      position: game.board.positionOf(player.robot.id),
+      position: game.getRobotPosition(player.robot.id),
     })),
   })
   const before = state()

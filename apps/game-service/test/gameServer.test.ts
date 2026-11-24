@@ -1,12 +1,13 @@
 import { resolveRobotAction } from './activationTestHelper.js'
-import { Integer } from '@/numbers'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { submitProgramSchema } from '@robo-rally/game-events'
 import type { ClientToServerEvents, CardsDealt, GameWon, RobotActionResolved, GameInitialization, PlayerConnectionChanged, EnvironmentStepResolved, ServerToClientEvents } from '@robo-rally/game-events'
 import { io, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
-import { Game, type BoardMapName } from '@/domain/game/index'
+import { Card, Game, createBoard, createDeckCards, type BoardMapName } from '@/domain/game/index'
+import { boardMaps } from '@/domain/game/boardMaps'
+import * as GameFactory from '@/domain/game/GameFactory'
 import { HAND_SIZE } from '@/domain/game/Deck'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
 import * as gameSessionModule from '@/socket/gameSession/GameSession'
@@ -57,6 +58,21 @@ describe('started game membership over Socket.IO', () => {
     const result = await client.emitWithAck('membership.get', {})
     if (result.outcome !== 'IN_GAME') throw new Error(result.outcome)
     return result.initialization
+  }
+  // Robots spawn on start tiles in order, so overriding them is how a test chooses
+  // where each robot begins. Everything else about the map stays as it is.
+  function stageNextGame(options: {
+    startTiles: readonly (readonly [x: number, y: number])[]
+    deck?: readonly Card[]
+  }): void {
+    vi.spyOn(GameFactory, 'createGame').mockImplementationOnce((mapName, name) => new Game({
+      board: createBoard({
+        ...boardMaps[mapName], startTiles: options.startTiles, maxPlayers: options.startTiles.length,
+      }),
+      players: [],
+      deck: options.deck ?? createDeckCards(),
+      name,
+    }))
   }
   async function startGame(names: string[], mapName: BoardMapName = 'empty-map') {
     const members = await Promise.all(names.map(connect))
@@ -137,7 +153,7 @@ describe('started game membership over Socket.IO', () => {
     expect(await raw(first, 'game.leave', { extra: true })).toEqual({ outcome: 'INVALID_REQUEST' })
     expect(await first.emitWithAck('game.leave', {})).toEqual({ outcome: 'LEFT' })
     expect(await left).toEqual({ gameId: game.id, playerId: initial.assignment.playerId, robotId: initial.assignment.robotId })
-    expect(game.board.occupantAt({ x: Integer(10), y: Integer(7) })).toBeUndefined()
+    expect(() => game.getRobotPosition(initial.assignment.robotId)).toThrow()
     expect(server.sockets.sockets.get(first.id!)!.rooms).toEqual(new Set([first.id]))
     expect(await first.emitWithAck('membership.get', {})).toEqual({ outcome: 'NO_MEMBERSHIP', user: { userId: 'First', username: 'First' } })
     expect(await first.emitWithAck('program.submit', submission(initial))).toEqual({ outcome: 'NOT_A_MEMBER' })
@@ -315,27 +331,28 @@ describe('started game membership over Socket.IO', () => {
     expect((await getSnapshot(replacement)).assignment).toEqual(initial.assignment)
     expect(game.paused).toBe(false)
   })
-    it('announces the winner instead of dealing hands when a departure completes the final checkpoint', async () => {
-    const { members, initializations } = await startGame(['First', 'Second'])
+  it('announces the winner instead of dealing hands when a departure completes the final checkpoint', async () => {
+    // Four cancelling turns leave both robots facing north and in place, so nobody
+    // moves until register 4, when the leading robot steps onto checkpoint 2 at (8,9).
+    stageNextGame({
+      startTiles: [[8, 10], [8, 11]],
+      deck: [
+        new Card('turn-0', 'TURN_LEFT'), new Card('turn-1', 'TURN_RIGHT'),
+        new Card('turn-2', 'TURN_LEFT'), new Card('turn-3', 'TURN_RIGHT'),
+        new Card('move', 'MOVE_1'),
+        new Card('turn-4', 'TURN_LEFT'), new Card('turn-5', 'TURN_RIGHT'),
+        new Card('turn-6', 'TURN_LEFT'), new Card('turn-7', 'TURN_RIGHT'),
+      ],
+    })
+    const { members: [remaining, leaving] } = await startGame(['First', 'Second'])
     const game = currentGame()
-    for (const player of game.players) game.submitProgram(player.id, player.hand.slice(0, 5).map((card) => card.id))
-    // Priority order depends on card-driven positions, so whichever player's final
-    // register is still pending after 9 of the 10 actions can vary between runs.
-    let lastActedRobotId: string | undefined
-    for (let action = 0; action < 9; action++) lastActedRobotId = resolveRobotAction(game).action.robotId
-    const pendingPlayer = game.players.find((candidate) => candidate.robot.id !== lastActedRobotId)!
-    const player = game.players.find((candidate) => candidate !== pendingPlayer)!
-    const pendingIndex = initializations.findIndex((initial) => initial.assignment.playerId === pendingPlayer.id)
-    const leaving = members[pendingIndex]
-    const remaining = members[1 - pendingIndex]
-    const remainingName = ['First', 'Second'][1 - pendingIndex]
-
+    const [player] = game.players
     player.completeCheckpoint(1)
-    // pendingPlayer is about to leave anyway; remove it first so it can never be
-    // occupying (8,9) by coincidence of random movement during the 9 prior actions.
-    game.board.removeRobot(pendingPlayer.robot.id)
-    game.board.removeRobot(player.robot.id)
-    game.board.placeRobot(player.robot.id, { x: Integer(8), y: Integer(9) })
+    for (const each of game.players) game.submitProgram(each.id, each.hand.slice(0, 5).map((card) => card.id))
+    // (8,10) is closer to the antenna than (8,11), so the winner acts first in every
+    // register; after nine of the ten actions only the other robot's last one is pending.
+    for (let action = 0; action < 9; action++) resolveRobotAction(game)
+
     const events: string[] = []
     remaining.onAny((name) => { if (['game.playerLeft', 'environment.stepResolved', 'game.won', 'cards.dealt'].includes(name)) events.push(name) })
     const progress = new Promise<EnvironmentStepResolved>((resolve) => remaining.on('environment.stepResolved', (step) => {
@@ -344,17 +361,18 @@ describe('started game membership over Socket.IO', () => {
     const won = new Promise<GameWon>((resolve) => remaining.once('game.won', resolve))
     await leaving.emitWithAck('game.leave', {})
     expect((await progress).checkpointProgress).toEqual([{ playerId: player.id, lastCheckpoint: 2 }])
-    expect(await won).toEqual({ gameId: game.id, playerId: player.id, username: remainingName })
+    expect(await won).toEqual({ gameId: game.id, playerId: player.id, username: 'First' })
     await getSnapshot(remaining)
     expect(events).toEqual(['game.playerLeft', 'environment.stepResolved', 'game.won'])
   })
 
   it('announces the winner after the final checkpoint and ends the game', async () => {
+    // One tile south of checkpoint 2 at (8,9), facing north, so a MOVE_1 wins.
+    stageNextGame({ startTiles: [[8, 10]] })
     const { members: [client], initializations: [initial] } = await startGame(['First'])
     const game = currentGame()
     const player = game.players[0]
     player.completeCheckpoint(1)
-    game.board.relocateRobot(player.robot.id, { x: Integer(8), y: Integer(10) })
     const events: string[] = []
     client.onAny((name) => { if (name !== 'program.timerChanged') events.push(name) })
     const won = new Promise<GameWon>((resolve) => client.once('game.won', resolve))
@@ -373,11 +391,11 @@ describe('started game membership over Socket.IO', () => {
   })
 
   it("keeps the winner's username in snapshots after the winner has left", async () => {
+    stageNextGame({ startTiles: [[8, 10], [7, 10]] })
     const { members: [first, second], initializations } = await startGame(['First', 'Second'])
     const game = currentGame()
     const player = game.players[0]
     player.completeCheckpoint(1)
-    game.board.relocateRobot(player.robot.id, { x: Integer(8), y: Integer(10) })
     const won = new Promise<GameWon>((resolve) => second.once('game.won', resolve))
     for (const [index, client] of [first, second].entries()) {
       expect(await client.emitWithAck('program.submit', submission(initializations[index]))).toEqual({ outcome: 'ACCEPTED' })
@@ -418,17 +436,15 @@ describe('started game membership over Socket.IO', () => {
 
   describe('pit results over Socket.IO', () => {
     it('broadcasts a chain push and its rebooted robot to every client in one action', async () => {
-      const { members: sockets, initializations } = await startGame(['Pusher', 'Pushed', 'Falling'], 'test-map')
-      const members = sockets.map((client, index) => ({ client, joined: initializations[index] }))
-      const game = currentGame()
-      const robotIds = members.map(({ joined }) => joined.assignment.robotId)
       const column = 15
       const pitY = 9
       // Distance from the antenna (10,0) is monotonic in y for a fixed x, so the
       // topmost robot always has priority. The dealt MOVE_1 card moves it 1 step.
-      game.board.relocateRobot(robotIds[0], { x: Integer(column), y: Integer(pitY - 3) })
-      game.board.relocateRobot(robotIds[1], { x: Integer(column), y: Integer(pitY - 2) })
-      game.board.relocateRobot(robotIds[2], { x: Integer(column), y: Integer(pitY - 1) })
+      stageNextGame({ startTiles: [[column, pitY - 3], [column, pitY - 2], [column, pitY - 1]] })
+      const { members: sockets, initializations } = await startGame(['Pusher', 'Pushed', 'Falling'], 'test-map')
+      const members = sockets.map((client, index) => ({ client, joined: initializations[index] }))
+      const game = currentGame()
+      const robotIds = members.map(({ joined }) => joined.assignment.robotId)
       game.players[0].robot.turn(2) // NORTH -> SOUTH, facing the pit
       game.players[1].robot.turn(1) // NORTH -> WEST
       game.players[2].robot.turn(3) // NORTH -> EAST
@@ -457,6 +473,8 @@ describe('started game membership over Socket.IO', () => {
     })
 
     it('broadcasts rebooted positions before progress and hands and restores them on rejoining', async () => {
+      // (3,2) is one tile north of the pit at (3,3).
+      stageNextGame({ startTiles: [[3, 2]] })
       const { members: [client], initializations: [initial] } = await startGame(['First'], 'test-map')
       expect(initial.state.board.tiles.find((tile) => tile.type === 'PIT'))
         .toEqual({ position: { x: 3, y: 3 }, type: 'PIT' })
@@ -474,7 +492,6 @@ describe('started game membership over Socket.IO', () => {
       const hand = new Promise<CardsDealt>((resolve) => client.once('cards.dealt', resolve))
 
       const robotId = initial.assignment.robotId
-      game.board.relocateRobot(robotId, { x: Integer(3), y: Integer(2) })
       game.players[0].robot.turn(2) // NORTH -> SOUTH, facing the pit
 
       expect(await client.timeout(1000).emitWithAck('program.submit', submission(initial)))
@@ -521,7 +538,6 @@ describe('started game membership over Socket.IO', () => {
         colour: initial.state.robots[0].colour,
         position: actions[4].position,
       }])
-      expect(game.board.occupantAt({ x: Integer(3), y: Integer(3) })).toBeUndefined()
       await outsider.timeout(1000).emitWithAck('membership.get', {})
       expect(outsideEvents).not.toHaveBeenCalled()
 
@@ -534,19 +550,17 @@ describe('started game membership over Socket.IO', () => {
     })
 
     it('broadcasts the next closest reboot tile to every member when the closest one is taken', async () => {
+      // robot1 occupies (2,6), the reboot tile closest to the pit at (3,3), so the
+      // falling robot must use the next closest one. (3,2) keeps robot0 strictly closer
+      // to the antenna (10,0) than the occupied reboot tile (distance 14), so it always
+      // has priority; the dealt MOVE_1 moves it 1 step. (10,13) is 13 from the antenna,
+      // so robot2 acts between robot0 (9) and robot1 (14).
+      stageNextGame({ startTiles: [[3, 2], [2, 6], [10, 13]] })
       const { members: sockets, initializations } = await startGame(['First', 'Second', 'Third'], 'test-map')
       const members = sockets.map((client, index) => ({ client, joined: initializations[index] }))
       const game = currentGame()
       const robotIds = members.map(({ joined }) => joined.assignment.robotId)
-      // Occupy (2,6), the reboot tile closest to the pit at (3,3), so the falling
-      // robot must use the next closest one.
-      game.board.relocateRobot(robotIds[1], { x: Integer(2), y: Integer(6) })
-      // (3,2) keeps robot0 strictly closer to the antenna (10,0) than the occupied
-      // reboot tile (distance 14), so it always has priority. The dealt MOVE_1 moves it 1 step.
-      game.board.relocateRobot(robotIds[0], { x: Integer(3), y: Integer(2) })
       game.players[0].robot.turn(2) // NORTH -> SOUTH, facing the pit
-      // (10,13) is 13 from the antenna, so robot2 acts between robot0 (9) and robot1 (14).
-      game.board.relocateRobot(robotIds[2], { x: Integer(10), y: Integer(13) })
       const actions: RobotActionResolved[][] = members.map(() => [])
       const dealt: CardsDealt[][] = members.map(() => [])
       for (const [index, { client }] of members.entries()) {
@@ -576,8 +590,9 @@ describe('started game membership over Socket.IO', () => {
         position: { coordinate: { x: 13, y: 2 }, orientation: 'SOUTH' },
         reboots: [{ robotId: robotIds[0], fellAt: { x: 3, y: 3 }, landedAt: { x: 13, y: 2 } }],
       })
-      expect(game.board.occupantAt({ x: Integer(3), y: Integer(3) })).toBeUndefined()
-      expect(game.board.positionOf(robotIds[1])).not.toEqual({ x: 13, y: 2 })
+      expect(game.getRobotPosition(robotIds[0])).toEqual({ x: 13, y: 2 })
+      // robot1 keeps moving under its own program, so only the fallback tile matters.
+      expect(game.getRobotPosition(robotIds[1])).not.toEqual({ x: 13, y: 2 })
       expect(actions[0].slice(0, 3).map((action) => action.robotId)).toEqual([robotIds[0], robotIds[2], robotIds[1]])
       expect(actions[0].slice(3, 6).map((action) => action.robotId)).toEqual([robotIds[0], robotIds[2], robotIds[1]])
       for (const [index, { client, joined }] of members.entries()) {

@@ -70,14 +70,14 @@ describe('Game activation loop', () => {
       new Card('left-3', 'TURN_LEFT'),
       new Card('left-4', 'TURN_LEFT'),
     ]
-    const { board, player, game } = createGame(deck)
+    const { player, game } = createGame(deck)
     game.submitProgram(player.id, deck.map((card) => card.id))
 
     resolveRobotAction(game)
     const result = resolveRobotAction(game)
 
     expect(result.action.position).toEqual({ x: 1, y: 0 })
-    expect(board.positionOf('robot-1')).toEqual({ x: 1, y: 0 })
+    expect(game.getRobotPosition('robot-1')).toEqual({ x: 1, y: 0 })
     expect(result.action.card).toBe(deck[1])
     expect(result.action.direction).toBe(Direction.NORTH)
     expect(resolveRobotAction(game).action.direction).toBe(Direction.WEST)
@@ -85,13 +85,13 @@ describe('Game activation loop', () => {
 
   it('reports the position reached by movement', () => {
     const deck = Array.from({ length: 5 }, (_, index) => new Card(`move-${index}`, 'MOVE_1'))
-    const { board, player, game } = createGame(deck)
+    const { player, game } = createGame(deck)
     game.submitProgram(player.id, deck.map((card) => card.id))
 
     const result = resolveRobotAction(game)
 
     expect(result.action.position).toEqual({ x: 2, y: 1 })
-    expect(board.positionOf('robot-1')).toEqual({ x: 2, y: 1 })
+    expect(game.getRobotPosition('robot-1')).toEqual({ x: 2, y: 1 })
   })
 })
 

@@ -1,16 +1,12 @@
 import { Board } from '@/domain/game/Board'
-import { boardMaps, type BoardMapName, type MapSpec } from '@/domain/game/boardMaps'
+import type { MapSpec } from '@/domain/game/boardMaps'
 import type { Direction } from '@/domain/game/spatial'
 import { EmptyTile, PitTile, ConveyorTile, GearTile, RebootTile, type Tile } from '@/domain/game/Tile'
 import { Integer } from '@/numbers'
 export type { BoardMapName } from '@/domain/game/boardMaps'
 
-const MAPS: Readonly<Record<BoardMapName, MapSpec>> = boardMaps
-
-const DEFAULT_MAP: BoardMapName = 'empty-map'
-
-export function createBoard(mapName: BoardMapName = DEFAULT_MAP): Board {
-  const { width, height, walls, checkpoints, antenna, rebootTiles, pits = [], conveyors = [], gears = [], startTiles, maxPlayers } = MAPS[mapName]
+export function createBoard(spec: MapSpec): Board {
+  const { name: mapName, width, height, walls, checkpoints, antenna, rebootTiles, pits = [], conveyors = [], gears = [], startTiles, maxPlayers } = spec
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
     throw new RangeError(`Map "${mapName}" must have a positive integer width and height`)
   }

@@ -91,7 +91,7 @@ describe('checkpoint activation', () => {
   })
 
   it('rejects register updates after a checkpoint win', () => {
-    const { board, players: [player], cards: c, game } = createGame()
+    const { players: [player], cards: c, game } = createGame()
     const program = [c.move2, c.back, c.step, c.stepAgain, c.left]
     game.updateRegisters(player.id, program.map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
@@ -122,7 +122,7 @@ describe('checkpoint activation', () => {
       submitted: game.hasSubmittedProgram(player.id),
       lastCheckpoint: player.lastCheckpoint,
       direction: player.robot.direction,
-      position: board.positionOf(player.robot.id),
+      position: game.getRobotPosition(player.robot.id),
     })
     const expectRejected = (playerId: string, error: 'GAME_FINISHED') => {
       const before = state()

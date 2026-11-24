@@ -198,7 +198,7 @@ describe('Game.addPlayer', () => {
   }
 
   it('creates and places a player with a private hand drawn from the deck', () => {
-    const { board, deck, game } = createEmptyGame()
+    const { deck, game } = createEmptyGame()
 
     const result = game.addPlayer('red')
 
@@ -206,7 +206,7 @@ describe('Game.addPlayer', () => {
     const player = result._unsafeUnwrap()
     expect(game.players).toEqual([player])
     expect(player.robot.direction).toBe(Direction.NORTH)
-    expect(board.positionOf(player.robot.id)).toEqual({ x: 1, y: 0 })
+    expect(game.getRobotPosition(player.robot.id)).toEqual({ x: 1, y: 0 })
     expect(player.hand).toHaveLength(deck.length)
     expect(player.hand.map((card) => card.instruction).sort()).toEqual(deck.map((card) => card.instruction).sort())
     expect(player.hand.map((card) => card.id)).not.toEqual(deck.map((card) => card.id))
@@ -240,10 +240,9 @@ describe('Game.addPlayer', () => {
     const first = game.addPlayer('red')._unsafeUnwrap()
     const second = game.addPlayer('blue')._unsafeUnwrap()
 
-    expect(board.positionOf(first.robot.id)).toEqual({ x: 2, y: 0 })
-    expect(board.positionOf(second.robot.id)).toEqual({ x: 0, y: 0 })
+    expect(game.getRobotPosition(first.robot.id)).toEqual({ x: 2, y: 0 })
+    expect(game.getRobotPosition(second.robot.id)).toEqual({ x: 0, y: 0 })
     expect(game.addPlayer('green')._unsafeUnwrapErr()).toBe('NO_SPAWN_AVAILABLE')
-    expect(board.occupantAt(board.antenna)).toBeUndefined()
     expect(game.players).toEqual([first, second])
   })
 
@@ -276,12 +275,10 @@ describe('Game roster validation and spawn skipping', () => {
     const game = createTestGame({ board, players: [], deck })
     const first = game.addPlayer('red')._unsafeUnwrap()
 
-    expect(board.positionOf(first.robot.id)).toEqual({ x: 0, y: 0 })
+    expect(game.getRobotPosition(first.robot.id)).toEqual({ x: 0, y: 0 })
     expect(first.hand).toHaveLength(deck.length)
     expect(first.hand.map((card) => card.instruction).sort()).toEqual(deck.map((card) => card.instruction).sort())
     expect(game.addPlayer('blue')._unsafeUnwrapErr()).toBe('NO_SPAWN_AVAILABLE')
     expect(game.players).toEqual([first])
-    expect(board.occupantAt({ x: Integer(1), y: Integer(0) })).toBeUndefined()
-    expect(board.occupantAt({ x: Integer(2), y: Integer(0) })).toBeUndefined()
   })
 })

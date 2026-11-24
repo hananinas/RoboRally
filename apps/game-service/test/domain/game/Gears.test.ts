@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
-import { Card, Deck, Direction, EmptyTile, GearTile, type Position, type Tile } from '@/domain/game/index'
+import { Card, Deck, Direction, EmptyTile, GearTile, RobotPlacements, type Position, type Tile } from '@/domain/game/index'
 import { Integer } from '@/numbers'
 import { createTestBoard, createTestGame, createTestPlacement, createTestPlayer, createTestRobot } from '../../fixtures.ts'
 
@@ -14,8 +14,9 @@ describe('gear tiles', () => {
         [new EmptyTile(), new GearTile(rotation), new EmptyTile()],
         [new EmptyTile(), new EmptyTile(), new EmptyTile()],
       ], { x: Integer(2), y: Integer(1), angle: 0 }, { x: Integer(0), y: Integer(1) })
-      placementBoard.placeRobot(robot.id, gearPosition)
-      expect(placementBoard.positionOf(robot.id)).toEqual(gearPosition)
+      const placements = new RobotPlacements(placementBoard)
+      placements.place(robot.id, gearPosition)
+      expect(placements.positionOf(robot.id)).toEqual(gearPosition)
       expect(robot.direction).toBe(Direction.EAST)
 
       // Each check gets a fresh game so that an earlier register's end-of-register
@@ -31,15 +32,15 @@ describe('gear tiles', () => {
         const game = createTestGame({ board, players: [placement], deck: cards })
         game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
         game.executeNextAction()
-        return { board, robot: player.robot }
+        return { game, robot: player.robot }
       }
 
       const onto = crossGear('MOVE_1', { x: Integer(0), y: Integer(0) })
-      expect(onto.board.positionOf(onto.robot.id)).toEqual(gearPosition)
+      expect(onto.game.getRobotPosition(onto.robot.id)).toEqual(gearPosition)
       expect(onto.robot.direction).toBe(Direction.EAST)
 
       const through = crossGear('MOVE_2', { x: Integer(0), y: Integer(0) })
-      expect(through.board.positionOf(through.robot.id)).toEqual({ x: 2, y: 0 })
+      expect(through.game.getRobotPosition(through.robot.id)).toEqual({ x: 2, y: 0 })
       expect(through.robot.direction).toBe(Direction.EAST)
     },
   )
@@ -57,7 +58,7 @@ function createGearGame(tiles: readonly Tile[], directions: readonly Direction[]
   const players = placements.map(({ player }) => player)
   const game = createTestGame({ board, players: placements, deck: cards })
   for (const player of players) game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
-  return { game, board, players, cards }
+  return { game, players, cards }
 }
 
 describe('gear activation', () => {
@@ -73,11 +74,11 @@ describe('gear activation', () => {
     { rotation: 'COUNTERCLOCKWISE', initialDirection: N, facing: S, expected: E },
     { rotation: 'COUNTERCLOCKWISE', initialDirection: W, facing: E, expected: N },
   ] as const)('turns $rotation from $facing to $expected without moving', ({ rotation, initialDirection, facing, expected }) => {
-    const { game, board, players } = createGearGame([new GearTile(rotation)], [initialDirection])
+    const { game, players } = createGearGame([new GearTile(rotation)], [initialDirection])
     const robot = players[0].robot
     game.executeNextStep()
     expect(robot.direction).toBe(facing)
-    const position = board.positionOf(robot.id)
+    const position = game.getRobotPosition(robot.id)
 
     expect(game.executeNextStep()).toEqual({
       type: 'environment', result: {
@@ -86,18 +87,17 @@ describe('gear activation', () => {
       },
     })
     expect(robot.direction).toBe(expected)
-    expect(board.positionOf(robot.id)).toEqual(position)
-    expect(board.occupantAt(position)).toBe(robot.id)
+    expect(game.getRobotPosition(robot.id)).toEqual(position)
     game.executeNextStep() // Checkpoints must not rotate the robot again.
     expect(robot.direction).toBe(expected)
   })
 
   it('rotates every robot on a gear independently and leaves other robots unchanged', () => {
-    const { game, board, players } = createGearGame([
+    const { game, players } = createGearGame([
       new GearTile('CLOCKWISE'), new GearTile('COUNTERCLOCKWISE'), new EmptyTile(), new GearTile('CLOCKWISE'),
     ], [N, N, N, E])
     for (const _player of players) game.executeNextStep()
-    const positions = players.map(({ robot }) => board.positionOf(robot.id))
+    const positions = players.map(({ robot }) => game.getRobotPosition(robot.id))
     expect(players.map(({ robot }) => robot.direction)).toEqual([S, S, S, W])
 
     const step = game.executeNextStep()
@@ -109,14 +109,14 @@ describe('gear activation', () => {
       { robotId: players[3].robot.id, position: positions[3], direction: N },
     ])
     expect(players.map(({ robot }) => robot.direction)).toEqual([W, E, S, N])
-    expect(players.map(({ robot }) => board.positionOf(robot.id))).toEqual(positions)
+    expect(players.map(({ robot }) => game.getRobotPosition(robot.id))).toEqual(positions)
   })
 
   it.each([
     { rotation: 'CLOCKWISE', expected: [W, S, E, N] },
     { rotation: 'COUNTERCLOCKWISE', expected: [E, S, W, N] },
   ] as const)('activates a $rotation gear once per register across rounds', ({ rotation, expected }) => {
-    const { game, board, players, cards } = createGearGame([new GearTile(rotation)], [N])
+    const { game, players, cards } = createGearGame([new GearTile(rotation)], [N])
     const player = players[0]
     for (let round = 0; round < 2; round++) {
       if (round > 0) game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
@@ -125,7 +125,7 @@ describe('gear activation', () => {
         game.executeNextStep()
         const direction = expected[(round * 5 + register) % 4]
         expect(player.robot.direction).toBe(direction)
-        expect(board.positionOf(player.robot.id)).toEqual({ x: 0, y: 1 })
+        expect(game.getRobotPosition(player.robot.id)).toEqual({ x: 0, y: 1 })
         game.executeNextStep()
         expect(player.robot.direction).toBe(direction)
       }
@@ -136,7 +136,7 @@ describe('gear activation', () => {
     { instruction: 'MOVE_1', expectedX: 1, expectedDirection: S, changed: true },
     { instruction: 'MOVE_2', expectedX: 2, expectedDirection: E, changed: false },
   ] as const)('checks final occupancy after $instruction crosses a gear', ({ instruction, expectedX, expectedDirection, changed }) => {
-    const { game, board, players } = createGearGame([
+    const { game, players } = createGearGame([
       new EmptyTile(), new GearTile('CLOCKWISE'), new EmptyTile(),
     ], [E], instruction)
     const robot = players[0].robot
@@ -146,7 +146,7 @@ describe('gear activation', () => {
     expect(step.type).toBe('environment')
     if (step.type !== 'environment' || step.result.kind !== 'GEARS') throw new Error('Expected gear step')
     expect(step.result.robots).toHaveLength(changed ? 1 : 0)
-    expect(board.positionOf(robot.id)).toEqual({ x: expectedX, y: 1 })
+    expect(game.getRobotPosition(robot.id)).toEqual({ x: expectedX, y: 1 })
     expect(robot.direction).toBe(expectedDirection)
   })
 

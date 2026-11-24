@@ -5,7 +5,7 @@ import { Integer } from '@/numbers'
 
 describe('board factory', () => {
   it('keeps test pits within the resized map and preserves their walls', () => {
-    const board = createBoard('test-map')
+    const board = createBoard(boardMaps['test-map'])
     for (const [x, y] of boardMaps['test-map'].pits) {
       expect(board.getTile({ x: Integer(x), y: Integer(y) })).toBeInstanceOf(PitTile)
     }
@@ -13,7 +13,7 @@ describe('board factory', () => {
   })
 
   it('creates the empty map with the size specified by the map and no walls', () => {
-    const board = createBoard('empty-map')
+    const board = createBoard(boardMaps['empty-map'])
 
     expect(board.width).toBe(boardMaps['empty-map'].width)
     expect(board.height).toBe(boardMaps['empty-map'].height)
@@ -23,7 +23,7 @@ describe('board factory', () => {
   })
 
   it('applies the walls specified by the map', () => {
-    const board = createBoard('test-map')
+    const board = createBoard(boardMaps['test-map'])
 
     expect(board.width).toBe(boardMaps['test-map'].width)
     expect(board.height).toBe(boardMaps['test-map'].height)
@@ -40,7 +40,7 @@ describe('board factory', () => {
 
   it('places the checkpoints specified by each map', () => {
     for (const mapName of ['empty-map', 'test-map'] as const) {
-      const board = createBoard(mapName)
+      const board = createBoard(boardMaps[mapName])
 
       expect(board.checkpointCount).toBe(2)
       expect(board.getTile({ x: Integer(10), y: Integer(6) })?.checkpointNumber).toBe(1)
@@ -63,12 +63,12 @@ describe('board factory', () => {
   })
 
   it('reads the priority antenna location from the map', () => {
-    expect(createBoard('test-map').antenna).toEqual(boardMaps['test-map'].antenna)
-    expect(createBoard('empty-map').antenna).toEqual(boardMaps['empty-map'].antenna)
+    expect(createBoard(boardMaps['test-map']).antenna).toEqual(boardMaps['test-map'].antenna)
+    expect(createBoard(boardMaps['empty-map']).antenna).toEqual(boardMaps['empty-map'].antenna)
   })
 
   it.each(['empty-map', 'test-map'] as const)('places a reboot tile on each of the four %s reboot positions', (mapName) => {
-    const board = createBoard(mapName)
+    const board = createBoard(boardMaps[mapName])
     const { rebootTiles, startTiles } = boardMaps[mapName]
     const keys = rebootTiles.map(([x, y]) => `${x},${y}`)
 
@@ -79,12 +79,12 @@ describe('board factory', () => {
   })
 
   it('gives each board its own antenna object', () => {
-    expect(createBoard('test-map').antenna).not.toBe(createBoard('test-map').antenna)
+    expect(createBoard(boardMaps['test-map']).antenna).not.toBe(createBoard(boardMaps['test-map']).antenna)
   })
   
   it('places a starting tile for every player of each map', () => {
     for (const mapName of ['empty-map', 'test-map'] as const) {
-      const board = createBoard(mapName)
+      const board = createBoard(boardMaps[mapName])
 
       expect(board.startTiles).toEqual(boardMaps[mapName].startTiles.map(([x, y]) => ({ x, y })))
       expect(board.startTiles).toHaveLength(boardMaps[mapName].maxPlayers)
@@ -92,6 +92,6 @@ describe('board factory', () => {
   })
 
   it('creates an independent board for each call', () => {
-    expect(createBoard('test-map')).not.toBe(createBoard('test-map'))
+    expect(createBoard(boardMaps['test-map'])).not.toBe(createBoard(boardMaps['test-map']))
   })
 })

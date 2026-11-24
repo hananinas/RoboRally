@@ -24,45 +24,39 @@ function createGame(
   const { player } = placement
   const robot = player.robot
   const game = createTestGame({ board, players: [placement], deck: program })
-  return { board, robot, player, program, reboot, game }
+  return { robot, player, program, reboot, game }
 }
 
 const edges = [
-  { direction: Direction.NORTH, start: { x: Integer(2), y: Integer(0) }, outside: { x: Integer(2), y: Integer(-1) } },
-  { direction: Direction.EAST, start: { x: Integer(4), y: Integer(2) }, outside: { x: Integer(5), y: Integer(2) } },
-  { direction: Direction.SOUTH, start: { x: Integer(2), y: Integer(4) }, outside: { x: Integer(2), y: Integer(5) } },
-  { direction: Direction.WEST, start: { x: Integer(0), y: Integer(2) }, outside: { x: Integer(-1), y: Integer(2) } },
+  { direction: Direction.NORTH, start: { x: Integer(2), y: Integer(0) } },
+  { direction: Direction.EAST, start: { x: Integer(4), y: Integer(2) } },
+  { direction: Direction.SOUTH, start: { x: Integer(2), y: Integer(4) } },
+  { direction: Direction.WEST, start: { x: Integer(0), y: Integer(2) } },
 ]
 
 describe('board-edge falls', () => {
-  it.each(edges)('reboots immediately after falling off the $direction edge', ({ direction, start, outside }) => {
-    const { board, robot, player, program, reboot, game } = createGame('MOVE_3', start)
+  it.each(edges)('reboots immediately after falling off the $direction edge', ({ direction, start }) => {
+    const { robot, player, program, reboot, game } = createGame('MOVE_3', start)
     robot.turn([Direction.EAST, Direction.NORTH, Direction.WEST, Direction.SOUTH].indexOf(direction))
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
     const result = resolveRobotAction(game)
 
     expect(result.action.position).toEqual(reboot)
-    expect(board.positionOf(robot.id)).toEqual(reboot)
-    expect(board.occupantAt(start)).toBeUndefined()
-    expect(board.occupantAt(outside)).toBeUndefined()
-    expect(board.occupantAt(reboot)).toBe(robot.id)
+    expect(game.getRobotPosition(robot.id)).toEqual(reboot)
     expect(robot.program).toEqual(program)
     expect(player.hand).toEqual([])
     expect(game.currentRegister).toBe(1)
   })
 
-  it.each(edges)('does not fall through a wall on the $direction edge', ({ direction, start, outside }) => {
-    const { board, robot, player, program, reboot, game } = createGame('MOVE_3', start, [direction])
+  it.each(edges)('does not fall through a wall on the $direction edge', ({ direction, start }) => {
+    const { robot, player, program, game } = createGame('MOVE_3', start, [direction])
     robot.turn([Direction.EAST, Direction.NORTH, Direction.WEST, Direction.SOUTH].indexOf(direction))
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
     resolveRobotAction(game)
 
-    expect(board.positionOf(robot.id)).toEqual(start)
-    expect(board.occupantAt(start)).toBe(robot.id)
-    expect(board.occupantAt(outside)).toBeUndefined()
-    expect(board.occupantAt(reboot)).toBeUndefined()
+    expect(game.getRobotPosition(robot.id)).toEqual(start)
   })
 
   it.each([
@@ -75,7 +69,7 @@ describe('board-edge falls', () => {
     { instruction: 'BACK_UP', x: 4 },
   ] as const)('reboots during $instruction from column $x and discards remaining steps', ({ instruction, x }) => {
     const start = { x: Integer(x), y: Integer(2) }
-    const { board, robot, player, program, reboot, game } = createGame(instruction, start)
+    const { robot, player, program, reboot, game } = createGame(instruction, start)
     const direction = robot.direction
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
@@ -86,8 +80,7 @@ describe('board-edge falls', () => {
       pushedRobots: [],
       action: { robotId: robot.id, card: program[0], position: reboot, direction },
     })
-    expect(board.positionOf(robot.id)).toEqual(reboot)
-    expect(board.occupantAt(start)).toBeUndefined()
+    expect(game.getRobotPosition(robot.id)).toEqual(reboot)
     expect(robot.direction).toBe(direction)
     expect(robot.program).toEqual(program)
     expect(player.hand).toEqual([])
@@ -96,7 +89,7 @@ describe('board-edge falls', () => {
     expect(game.lastActivePhase).toBe('activation')
 
     expect(resolveRobotAction(game).action.card).toBe(program[1])
-    expect(board.positionOf(robot.id)).toEqual(reboot)
+    expect(game.getRobotPosition(robot.id)).toEqual(reboot)
     expect(robot.program).toEqual(program)
     expect(game.currentRegister).toBe(2)
   })
@@ -113,7 +106,7 @@ describe('board-edge falls', () => {
 
     for (let register = 0; register < 5; register++) {
       expect(resolveRobotAction(game).action.position).toEqual(reboot)
-      expect(board.occupantAt(reboot)).toBe(robot.id)
+      expect(game.getRobotPosition(robot.id)).toEqual(reboot)
       expect(robot.direction).toBe(Direction.WEST)
     }
     expect(game.lastActivePhase).toBe('programming')

@@ -8,6 +8,7 @@ import { Deck } from '@/domain/game/Deck'
 import type { CardId, GameId, PlayerId, RobotId } from '@/domain/game/ids'
 import { Player } from '@/domain/game/Player'
 import { Robot, ROBOT_COLOURS } from '@/domain/game/Robot'
+import { RobotPlacements } from '@/domain/game/RobotPlacements'
 import { Direction, opposite, type Position } from '@/domain/game/spatial'
 import { PositiveInteger, UnsignedInteger } from '@/numbers'
 import {
@@ -92,6 +93,7 @@ export class Game {
   readonly id: GameId
   readonly name: string
   readonly board: Board
+  private readonly robotPlacements: RobotPlacements
   private readonly roster: Player[]
   private readonly deck: readonly Card[]
   private readonly lifecycle = new GameLifecycle('programming')
@@ -126,10 +128,11 @@ export class Game {
 
     this.id = randomUUID()
     this.board = board
+    this.robotPlacements = new RobotPlacements(board)
     this.name = name
     this.roster = players.map(({ player }) => player)
     this.deck = [...deck]
-    for (const { player, position } of players) board.placeRobot(player.robot.id, position)
+    for (const { player, position } of players) this.robotPlacements.place(player.robot.id, position)
     this.dealInitialHands()
   }
 
@@ -180,8 +183,12 @@ export class Game {
     return this.submittedPlayerIds.has(playerId)
   }
 
+  getRobotPosition(robotId: RobotId): Position {
+    return this.robotPlacements.positionOf(robotId)
+  }
+
   private findSpawn(): Result<Position, 'NO_SPAWN_AVAILABLE'> {
-    const free = this.board.startTiles.filter((position) => this.board.occupantAt(position) === undefined)
+    const free = this.board.startTiles.filter((position) => this.robotPlacements.occupantAt(position) === undefined)
     if (free.length === 0) return err('NO_SPAWN_AVAILABLE')
     return ok({ ...free[0] })
   }
@@ -197,7 +204,7 @@ export class Game {
       const robot = new Robot(randomUUID(), Direction.NORTH, assignedColour, robotSpriteId)
       const player = new Player(randomUUID(), robot, Deck.fromTemplate(this.deck))
       player.drawHand()
-      this.board.placeRobot(robot.id, position)
+      this.robotPlacements.place(robot.id, position)
       this.roster.push(player)
       return player
     })
@@ -207,7 +214,7 @@ export class Game {
     const index = this.roster.findIndex((player) => player.id === playerId)
     if (index < 0) return { roundConcluded: false }
     const [player] = this.roster.splice(index, 1)
-    this.board.removeRobot(player.robot.id)
+    this.robotPlacements.remove(player.robot.id)
     player.robot.clearProgram()
     this.submittedPlayerIds.delete(playerId)
     this.activatedRobotIds.delete(player.robot.id)
@@ -326,7 +333,7 @@ export class Game {
     const index = this.environmentStepIndex
     if (index === null) return { type: 'robot', result: this.executeNextAction() }
 
-    const changes = environmentSteps[index](captureEnvironmentSnapshot(this.board, this.roster))
+    const changes = environmentSteps[index](captureEnvironmentSnapshot(this.board, this.robotPlacements, this.roster))
     if (changes.kind === 'GEARS') {
       for (const { robotId, direction } of changes.robots) {
         const robot = this.roster.find(({ robot }) => robot.id === robotId)!.robot
@@ -369,13 +376,13 @@ export class Game {
   // Gameplay movement resolves entry effects; Board movement only changes positions.
   private moveRobot(robot: Robot, direction: Direction, steps: PositiveInteger): void {
     for (let step = 0; step < steps; step++) {
-      const movedRobotIds = this.board.pushRobot(robot.id, direction)
+      const movedRobotIds = this.robotPlacements.push(robot.id, direction)
       if (movedRobotIds.length === 0) return
 
       for (const id of movedRobotIds) {
         const movedRobot = id === robot.id ? robot : this.roster.find((player) => player.robot.id === id)?.robot
         if (movedRobot === undefined) throw new Error(`Pushed robot ${id} is not in the game`)
-        const entry = this.resolveMovementEntry(movedRobot, this.board.positionOf(id))
+        const entry = this.resolveMovementEntry(movedRobot, this.robotPlacements.positionOf(id))
         if (id === robot.id && entry === 'stop') return
       }
     }
@@ -391,7 +398,7 @@ export class Game {
 
     const registerIndex = this.registerIndex
     const card = robot.getProgramCard(UnsignedInteger(registerIndex))
-    const previousPositions = this.roster.map((player) => this.board.positionOf(player.robot.id))
+    const previousPositions = this.roster.map((player) => this.robotPlacements.positionOf(player.robot.id))
     this.actionReboots = []
     const resolvedInstruction = this.executeCard(robot, card, registerIndex)
     const reboots = this.actionReboots
@@ -403,12 +410,12 @@ export class Game {
       robotId: robot.id,
       card,
       resolvedInstruction,
-      position: this.board.positionOf(robot.id),
+      position: this.robotPlacements.positionOf(robot.id),
       direction: robot.direction,
     }
     const pushedRobots = this.roster.flatMap(({ robot: other }, index) => {
       if (other.id === robot.id) return []
-      const position = this.board.positionOf(other.id)
+      const position = this.robotPlacements.positionOf(other.id)
       const previous = previousPositions[index]
       if (position.x === previous.x && position.y === previous.y) return []
       return [{ robotId: other.id, position, direction: other.direction }]
@@ -451,7 +458,7 @@ export class Game {
     // Recheck current positions every action; exact ties retain roster order.
     for (const { robot } of this.players) {
       if (this.activatedRobotIds.has(robot.id)) continue
-      const position = this.board.positionOf(robot.id)
+      const position = this.robotPlacements.positionOf(robot.id)
       const dx = position.x - antenna.x
       const dy = position.y - antenna.y
       const distance = Math.abs(dx) + Math.abs(dy)
@@ -507,10 +514,10 @@ export class Game {
   private rebootRobot(robot: Robot, fellAt: Position): void {
     const distance = (tile: Position) => Math.abs(tile.x - fellAt.x) + Math.abs(tile.y - fellAt.y)
     const closestFirst = [...this.board.rebootTiles].sort((a, b) => distance(a) - distance(b))
-    const destination = closestFirst.find((tile) => this.board.occupantAt(tile) === undefined)
-      ?? this.board.nearestFreePosition(closestFirst[0])
+    const destination = closestFirst.find((tile) => this.robotPlacements.occupantAt(tile) === undefined)
+      ?? this.robotPlacements.nearestFreePosition(closestFirst[0])
     if (destination === undefined) throw new Error('No safe reboot destination is available')
-    this.board.relocateRobot(robot.id, destination)
+    this.robotPlacements.relocate(robot.id, destination)
     this.actionReboots.push({ robotId: robot.id, fellAt: { ...fellAt }, landedAt: { ...destination } })
     // TODO: Add two SPAM cards and cancel this robot's remaining registers.
   }
