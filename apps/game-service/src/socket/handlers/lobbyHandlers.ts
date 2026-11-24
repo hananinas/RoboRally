@@ -25,8 +25,8 @@ export function presentLobby(lobby: Lobby): LobbyState {
   return { lobbyId: lobby.lobbyId, name: lobby.name, mapName: lobby.mapName, mapDisplayName: map.name, mapIcon: map.icon,
     ownerUserId: lobby.members.keys().next().value!,
     playerCount: lobby.members.size, maxPlayers: MAX_PLAYERS,
-    players: [...lobby.members.values()].map(({ user, robotSpriteId }) => ({
-      userId: user.userId, username: user.username, robotSpriteId,
+    players: [...lobby.members.values()].map(({ user, robotSpriteId, colour }) => ({
+      userId: user.userId, username: user.username, robotSpriteId, ...(colour ? { colour } : {}),
     })),
     robots: robotCatalog }
 }
@@ -151,6 +151,13 @@ export function handleSelectRobot(
     const lobby = session?.kind === 'lobby' ? context.lobbies.get(session.lobbyId) : undefined
     const member = lobby?.members.get(user.userId)
     if (!lobby || member?.connectionId !== socket.id) return ack({ outcome: 'NOT_LOBBY_MEMBER' })
+    
+    if (payload.colour) {
+      const colourTaken = [...lobby.members.entries()].some(([userId, m]) => userId !== user.userId && m.colour === payload.colour)
+      if (colourTaken) return ack({ outcome: 'INVALID_REQUEST' })
+      member.colour = payload.colour
+    }
+    
     member.robotSpriteId = payload.robotSpriteId
     const state = presentLobby(lobby)
     ack({ outcome: 'ROBOT_SELECTED', lobby: state })

@@ -76,6 +76,11 @@ function App() {
               selectedRobotId={session.lobby.players.find((player) => player.userId === session.user.userId)?.robotSpriteId
                 ?? session.lobby.robots.find((robot) => robot.defaultForLobbyCreation)?.id
                 ?? ''}
+              selectedColor={session.lobby.players.find((player) => player.userId === session.user.userId)?.colour}
+              takenColors={session.lobby.players
+                .filter((player) => player.userId !== session.user.userId)
+                .map((player) => player.colour)
+                .filter((colour): colour is string => !!colour)}
               disabled={busy || connection.status !== 'connected'}
               onSelect={selectRobot}
             />

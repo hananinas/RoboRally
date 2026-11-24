@@ -23,7 +23,7 @@ export default function WaitingLobby({ lobby, userId, disabled, onStart, onLeave
             return (
               <li className={`waiting-lobby__seat${self ? ' waiting-lobby__seat--self' : ''}`} key={player.userId}>
                 <span className="waiting-lobby__portrait" role="img" aria-label={`${robot?.name ?? 'Unknown'} robot`}>
-                  <RobotPreview sprite={robotOptionFor(player.robotSpriteId).sprite} />
+                  <RobotPreview sprite={robotOptionFor(player.robotSpriteId).sprite} color={player.colour} />
                 </span>
                 <span className="waiting-lobby__name">{player.username}</span>
                 <span className="waiting-lobby__roles">
