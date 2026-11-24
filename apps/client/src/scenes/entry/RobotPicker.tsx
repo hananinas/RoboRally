@@ -1,18 +1,28 @@
+import { useState } from 'react'
 import type { RobotDefinition } from '@robo-rally/game-events'
 import RobotPreview from './RobotPreview.tsx'
 import { robotOptionFor } from './robotPreviews.ts'
 import './RobotPicker.css'
 
-const PREVIEW_COLOURS = ['Blue', 'Red', 'Yellow', 'Green', 'Purple', 'Pink'] as const
+const PREVIEW_COLOURS = [
+  { name: 'Blue', hex: '#4d8deb' },
+  { name: 'Red', hex: '#e55f5f' },
+  { name: 'Yellow', hex: '#ffc107' },
+  { name: 'Green', hex: '#4caf70' },
+  { name: 'Purple', hex: '#a67de0' },
+  { name: 'Pink', hex: '#db79a8' },
+] as const
 
 type Props = {
   robots: readonly RobotDefinition[]
   selectedRobotId: string
   disabled: boolean
-  onSelect: (robotSpriteId: string) => Promise<boolean>
+  onSelect: (robotSpriteId: string, color: string) => Promise<boolean>
 }
 
 export default function RobotPicker({ robots, selectedRobotId, disabled, onSelect }: Props) {
+  const [selectedColor, setSelectedColor] = useState(PREVIEW_COLOURS[0].hex)
+  
   const selectedRobot = robots.find((option) => option.id === selectedRobotId)
   const choices = robots
   const robot = selectedRobot && choices.some((option) => option.id === selectedRobot.id)
@@ -21,7 +31,11 @@ export default function RobotPicker({ robots, selectedRobotId, disabled, onSelec
   const preview = robot ? robotOptionFor(robot.id) : undefined
 
   function chooseRobot(robotSpriteId: string) {
-    if (!disabled && robotSpriteId !== robot?.id) void onSelect(robotSpriteId)
+    if (!disabled && robotSpriteId !== robot?.id) void onSelect(robotSpriteId, selectedColor)
+  }
+
+  function chooseColor(colorHex: string) {
+    if (!disabled) setSelectedColor(colorHex)
   }
 
   return (
@@ -41,7 +55,7 @@ export default function RobotPicker({ robots, selectedRobotId, disabled, onSelec
             </svg>
           </span>
         </div>
-        {robot && preview && <RobotPreview sprite={preview.sprite} />}
+        {robot && preview && <RobotPreview sprite={preview.sprite} color={selectedColor} />}
       </div>
       <div aria-live="polite">
         <div className="robot-picker__selected">
@@ -68,18 +82,20 @@ export default function RobotPicker({ robots, selectedRobotId, disabled, onSelec
         })}
       </div>
       {robots.length === 0 && <p className="robot-picker__help">No robots are currently available.</p>}
-      <fieldset className="robot-picker__colours" disabled>
+      <fieldset className="robot-picker__colours">
         <legend>Player colour</legend>
         <div className="robot-picker__swatches">
           {PREVIEW_COLOURS.map((colour) => (
             <button
-              className={`robot-picker__swatch robot-picker__swatch--${colour.toLowerCase()}`}
+              className={`robot-picker__swatch robot-picker__swatch--${colour.name.toLowerCase()}`}
               type="button"
-              key={colour}
-              aria-label={colour}
-              aria-pressed={colour === PREVIEW_COLOURS[0]}
+              key={colour.hex}
+              aria-label={colour.name}
+              aria-pressed={selectedColor === colour.hex}
+              disabled={disabled}
+              onClick={() => chooseColor(colour.hex)}
             >
-              {colour === PREVIEW_COLOURS[0] && <span aria-hidden="true">✓</span>}
+              {selectedColor === colour.hex && <span aria-hidden="true">✓</span>}
             </button>
           ))}
         </div>
