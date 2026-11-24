@@ -9,6 +9,7 @@ import type { CardId, GameId, PlayerId, RobotId } from '@/domain/game/ids'
 import { Player } from '@/domain/game/Player'
 import { Robot, ROBOT_COLOURS } from '@/domain/game/Robot'
 import { RobotPlacements } from '@/domain/game/RobotPlacements'
+import { Roster } from '@/domain/game/Roster'
 import { Direction, opposite, type Position } from '@/domain/game/spatial'
 import { PositiveInteger, UnsignedInteger } from '@/numbers'
 import {
@@ -94,7 +95,7 @@ export class Game {
   readonly name: string
   readonly board: Board
   private readonly robotPlacements: RobotPlacements
-  private readonly roster: Player[]
+  private readonly roster: Roster
   private readonly deck: readonly Card[]
   private readonly lifecycle = new GameLifecycle('programming')
   private registerIndex = 0
@@ -116,21 +117,11 @@ export class Game {
       throw new RangeError('The deck must contain at least five distinct cards')
     }
 
-    const playerIds = new Set<PlayerId>()
-    const robotIds = new Set<RobotId>()
-    for (const { player } of players) {
-      if (playerIds.has(player.id) || robotIds.has(player.robot.id)) {
-        throw new RangeError('Players and robots must have unique IDs')
-      }
-      playerIds.add(player.id)
-      robotIds.add(player.robot.id)
-    }
-
     this.id = randomUUID()
     this.board = board
     this.robotPlacements = new RobotPlacements(board)
     this.name = name
-    this.roster = players.map(({ player }) => player)
+    this.roster = new Roster(players.map(({ player }) => player))
     this.deck = [...deck]
     for (const { player, position } of players) this.robotPlacements.place(player.robot.id, position)
     this.dealInitialHands()
@@ -145,7 +136,7 @@ export class Game {
   }
 
   get players(): readonly Player[] {
-    return Object.freeze([...this.roster])
+    return Object.freeze([...this.roster.players])
   }
 
   requirePhase(phase: GamePhase): Result<void, PhaseError> {
@@ -194,8 +185,8 @@ export class Game {
   }
 
   private nextAvailableColour(): string {
-    return ROBOT_COLOURS.find((colour) => !this.roster.some((player) => player.robot.colour === colour))
-      ?? ROBOT_COLOURS[this.roster.length % ROBOT_COLOURS.length]
+    return ROBOT_COLOURS.find((colour) => !this.roster.players.some((player) => player.robot.colour === colour))
+      ?? ROBOT_COLOURS[this.roster.size % ROBOT_COLOURS.length]
   }
 
   addPlayer(robotSpriteId: RobotSpriteId, colour?: string): Result<Player, AddPlayerError> {
@@ -205,15 +196,15 @@ export class Game {
       const player = new Player(randomUUID(), robot, Deck.fromTemplate(this.deck))
       player.drawHand()
       this.robotPlacements.place(robot.id, position)
-      this.roster.push(player)
+      this.roster.add(player)
       return player
     })
   }
 
   removePlayer(playerId: PlayerId): { roundConcluded: boolean } {
-    const index = this.roster.findIndex((player) => player.id === playerId)
-    if (index < 0) return { roundConcluded: false }
-    const [player] = this.roster.splice(index, 1)
+    const removed = this.roster.remove(playerId)
+    if (removed.isErr()) return { roundConcluded: false }
+    const player = removed.value
     this.robotPlacements.remove(player.robot.id)
     player.robot.clearProgram()
     this.submittedPlayerIds.delete(playerId)
@@ -226,13 +217,9 @@ export class Game {
   private checkCanSubmitProgram(
     playerId: PlayerId,
   ): Result<Player, Exclude<SubmitProgramError, 'INVALID_PROGRAM'>> {
-    return this.requirePhase('programming').andThen(() => {
-      const player = this.players.find((candidate) => candidate.id === playerId)
-      if (!player) return err('PLAYER_NOT_IN_GAME')
-      if (this.submittedPlayerIds.has(playerId)) return err('ALREADY_SUBMITTED')
-
-      return ok(player)
-    })
+    return this.requirePhase('programming')
+      .andThen(() => this.roster.getPlayer(playerId))
+      .andThen((player) => this.submittedPlayerIds.has(player.id) ? err('ALREADY_SUBMITTED') : ok(player))
   }
 
   private checkProgram(player: Player, cardIds: readonly CardId[]): Result<readonly Card[], 'INVALID_PROGRAM'> {
@@ -321,8 +308,8 @@ export class Game {
     if (this.requirePhase('activation').isErr()) {
       return { roundConcluded: false }
     }
-    if (this.roster.length === 0) return this.concludeRegister()
-    if (!this.hasPendingEnvironment && this.activatedRobotIds.size === this.roster.length) {
+    if (this.roster.size === 0) return this.concludeRegister()
+    if (!this.hasPendingEnvironment && this.activatedRobotIds.size === this.roster.size) {
       this.environmentStepIndex = 0
     }
     return { roundConcluded: false }
@@ -333,15 +320,15 @@ export class Game {
     const index = this.environmentStepIndex
     if (index === null) return { type: 'robot', result: this.executeNextAction() }
 
-    const changes = environmentSteps[index](captureEnvironmentSnapshot(this.board, this.robotPlacements, this.roster))
+    const changes = environmentSteps[index](captureEnvironmentSnapshot(this.board, this.robotPlacements, this.roster.players))
     if (changes.kind === 'GEARS') {
       for (const { robotId, direction } of changes.robots) {
-        const robot = this.roster.find(({ robot }) => robot.id === robotId)!.robot
+        const robot = this.roster.requireOwner(robotId).robot
         robot.turn(direction - robot.direction)
       }
     } else {
       for (const { playerId, lastCheckpoint } of changes.checkpointProgress) {
-        this.roster.find(({ id }) => id === playerId)!.completeCheckpoint(lastCheckpoint)
+        this.roster.requirePlayer(playerId).completeCheckpoint(lastCheckpoint)
         if (lastCheckpoint === this.board.checkpointCount) this.lifecycle.finish(playerId)
       }
     }
@@ -357,7 +344,7 @@ export class Game {
 
   private concludeRegister(): { roundConcluded: boolean } {
     this.environmentStepIndex = null
-    if (this.roster.length === 0) {
+    if (this.roster.size === 0) {
       this.finishRound()
       return { roundConcluded: true }
     }
@@ -380,8 +367,7 @@ export class Game {
       if (movedRobotIds.length === 0) return
 
       for (const id of movedRobotIds) {
-        const movedRobot = id === robot.id ? robot : this.roster.find((player) => player.robot.id === id)?.robot
-        if (movedRobot === undefined) throw new Error(`Pushed robot ${id} is not in the game`)
+        const movedRobot = this.roster.requireOwner(id).robot
         const entry = this.resolveMovementEntry(movedRobot, this.robotPlacements.positionOf(id))
         if (id === robot.id && entry === 'stop') return
       }
@@ -398,13 +384,13 @@ export class Game {
 
     const registerIndex = this.registerIndex
     const card = robot.getProgramCard(UnsignedInteger(registerIndex))
-    const previousPositions = this.roster.map((player) => this.robotPlacements.positionOf(player.robot.id))
+    const previousPositions = this.roster.players.map((player) => this.robotPlacements.positionOf(player.robot.id))
     this.actionReboots = []
     const resolvedInstruction = this.executeCard(robot, card, registerIndex)
     const reboots = this.actionReboots
     this.actionReboots = []
     this.activatedRobotIds.add(robot.id)
-    const player = this.roster.find((candidate) => candidate.robot === robot)!
+    const player = this.roster.requireOwner(robot.id)
     const registers = player.revealRegister(registerIndex, card.instruction)
     const action: RobotActionResult = {
       robotId: robot.id,
@@ -413,7 +399,7 @@ export class Game {
       position: this.robotPlacements.positionOf(robot.id),
       direction: robot.direction,
     }
-    const pushedRobots = this.roster.flatMap(({ robot: other }, index) => {
+    const pushedRobots = this.roster.players.flatMap(({ robot: other }, index) => {
       if (other.id === robot.id) return []
       const position = this.robotPlacements.positionOf(other.id)
       const previous = previousPositions[index]
