@@ -4,7 +4,7 @@ import type { Instruction } from '@robo-rally/game-events'
 import { Card, Direction, EmptyTile, type Position } from '@/domain/game/index'
 import { Deck } from '@/domain/game/Deck'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement } from '../../fixtures.ts'
+import { createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, instructionsOf } from '../../fixtures.ts'
 
 function createGame(
   instruction: Instruction = 'MOVE_3',
@@ -23,7 +23,7 @@ function createGame(
   const placement = createTestPlacement(start, { direction, deck: new Deck(program) })
   const { player } = placement
   const robot = player.robot
-  const game = createTestGame({ board, players: [placement], deck: program })
+  const game = createTestGame({ board, players: [placement], deck: instructionsOf(program) })
   return { robot, player, program, reboot, game }
 }
 
@@ -101,7 +101,7 @@ describe('board-edge falls', () => {
     const placement = createTestPlacement(reboot, { direction: Direction.WEST, deck: new Deck(program) })
     const { player } = placement
     const robot = player.robot
-    const game = createTestGame({ board, players: [placement], deck: program })
+    const game = createTestGame({ board, players: [placement], deck: instructionsOf(program) })
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
     for (let register = 0; register < 5; register++) {

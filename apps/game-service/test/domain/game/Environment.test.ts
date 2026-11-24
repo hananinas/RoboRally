@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Card, Deck, Direction, EmptyTile } from '@/domain/game/index'
 import { Integer } from '@/numbers'
-import { createTestBoard, createTestGame, createTestPlacement } from '../../fixtures.ts'
+import { createTestBoard, createTestGame, createTestPlacement, instructionsOf } from '../../fixtures.ts'
 
 function createGame(count = 2) {
   const tiles = Array.from({ length: 3 }, () => Array.from({ length: 5 }, () => new EmptyTile()))
@@ -12,7 +12,7 @@ function createGame(count = 2) {
   const placements = Array.from({ length: count }, (_, index) =>
     createTestPlacement({ x: Integer(index + 1), y: Integer(1) }, { direction: Direction.NORTH, deck: new Deck(cards) }))
   const players = placements.map(({ player }) => player)
-  const game = createTestGame({ board, players: placements, deck: cards })
+  const game = createTestGame({ board, players: placements, deck: instructionsOf(cards) })
   for (const player of players) game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
   return { game, players, cards }
 }

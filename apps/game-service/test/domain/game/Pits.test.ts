@@ -6,7 +6,7 @@ import { Card, Direction, EmptyTile, PitTile, type Position, type Tile } from '@
 import { Deck } from '@/domain/game/Deck'
 import { createBoard } from '@/domain/game/BoardFactory'
 import { boardMaps } from '@/domain/game/boardMaps'
-import { addTestPlayer, createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, programLeadingWith } from '../../fixtures.ts'
+import { addTestPlayer, createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, instructionsOf, programLeadingWith } from '../../fixtures.ts'
 
 function createGame(
   pit = { x: Integer(1), y: Integer(1) },
@@ -31,7 +31,7 @@ function createGame(
   })
   const { player } = placement
   const robot = player.robot
-  const game = createTestGame({ board, players: [placement], deck: Object.values(cards) })
+  const game = createTestGame({ board, players: [placement], deck: instructionsOf(Object.values(cards)) })
   return { robot, player, cards, game }
 }
 
@@ -221,7 +221,7 @@ describe('pit entry and rebooting', () => {
     })
     const { player } = placement
     player.completeCheckpoint(1)
-    const game = createTestGame({ board, players: [placement], deck: program })
+    const game = createTestGame({ board, players: [placement], deck: instructionsOf(program) })
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
     expect(resolveRobotAction(game).action.position).toEqual(rebootTile)
@@ -244,7 +244,7 @@ describe('reboots reported in action results', () => {
       id: 'robot', direction: Direction.SOUTH, deck: new Deck(cards),
     })
     const { player } = placement
-    const game = createTestGame({ board, players: [placement], deck: cards })
+    const game = createTestGame({ board, players: [placement], deck: instructionsOf(cards) })
     game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
 
     const result = resolveRobotAction(game)
@@ -282,7 +282,7 @@ describe('reboots reported in action results', () => {
     })
     const pusher = pusherPlacement.player
     const pushed = pushedPlacement.player
-    const game = createTestGame({ board, players: [pusherPlacement, pushedPlacement], deck: [...pusherCards, ...pushedCards] })
+    const game = createTestGame({ board, players: [pusherPlacement, pushedPlacement], deck: instructionsOf([...pusherCards, ...pushedCards]) })
     game.submitProgram(pusher.id, pusherCards.map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(pushed.id, programLeadingWith(pushedCards, 'TURN_LEFT').map((card) => card.id))._unsafeUnwrap()
 
@@ -317,7 +317,7 @@ describe('reboots reported in action results', () => {
     })
     const pusher = pusherPlacement.player
     const pushed = pushedPlacement.player
-    const game = createTestGame({ board, players: [pusherPlacement, pushedPlacement], deck: [...pusherCards, ...pushedCards] })
+    const game = createTestGame({ board, players: [pusherPlacement, pushedPlacement], deck: instructionsOf([...pusherCards, ...pushedCards]) })
     game.submitProgram(pusher.id, pusherCards.map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(pushed.id, programLeadingWith(pushedCards, 'TURN_LEFT').map((card) => card.id))._unsafeUnwrap()
 

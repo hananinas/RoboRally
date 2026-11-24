@@ -4,7 +4,7 @@ import { submitProgramSchema } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'
 import { createGame } from '@/domain/game/GameFactory'
 import { boardMaps, type BoardMapName } from '@/domain/game/boardMaps'
-import { Direction, Game, createBoard, createDeckCards } from '@/domain/game/index'
+import { DECK_INSTRUCTIONS, Direction, Game, createBoard } from '@/domain/game/index'
 import { addTestPlayer } from '../../fixtures.ts'
 
 // A real map with its start tiles replaced, so a robot can begin where the test needs it.
@@ -12,7 +12,7 @@ function gameStartingAt(mapName: BoardMapName, start: readonly [x: number, y: nu
   return new Game({
     board: createBoard({ ...boardMaps[mapName], startTiles: [start] }),
     players: [],
-    deck: createDeckCards(),
+    deck: DECK_INSTRUCTIONS,
     name: 'Test game',
   })
 }

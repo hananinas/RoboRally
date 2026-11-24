@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
 import { Card, Deck, Direction, EmptyTile, GearTile, RobotPlacements, type Position, type Tile } from '@/domain/game/index'
 import { Integer } from '@/numbers'
-import { createTestBoard, createTestGame, createTestPlacement, createTestPlayer, createTestRobot } from '../../fixtures.ts'
+import { createTestBoard, createTestGame, createTestPlacement, createTestPlayer, createTestRobot, instructionsOf } from '../../fixtures.ts'
 
 describe('gear tiles', () => {
   it.each(['CLOCKWISE', 'COUNTERCLOCKWISE'] as const)(
@@ -29,7 +29,7 @@ describe('gear tiles', () => {
         const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, instruction))
         const placement = createTestPlacement(start, { direction: Direction.EAST, deck: new Deck(cards) })
         const { player } = placement
-        const game = createTestGame({ board, players: [placement], deck: cards })
+        const game = createTestGame({ board, players: [placement], deck: instructionsOf(cards) })
         game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
         game.executeNextAction()
         return { game, robot: player.robot }
@@ -56,7 +56,7 @@ function createGearGame(tiles: readonly Tile[], directions: readonly Direction[]
   const placements = directions.map((direction, index) =>
     createTestPlacement({ x: Integer(index), y: Integer(1) }, { direction, deck: new Deck(cards) }))
   const players = placements.map(({ player }) => player)
-  const game = createTestGame({ board, players: placements, deck: cards })
+  const game = createTestGame({ board, players: placements, deck: instructionsOf(cards) })
   for (const player of players) game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
   return { game, players, cards }
 }
@@ -162,7 +162,7 @@ describe('gear activation', () => {
     const placements = [{ robot: pushed, at: position(1) }, { robot: pusher, at: position(0) }].map(({ robot, at }) =>
       ({ player: createTestPlayer({ id: robot.id, robot, deck: new Deck(cards) }), position: at }))
     if (reverse) placements.reverse()
-    const game = createTestGame({ board, players: placements, deck: cards })
+    const game = createTestGame({ board, players: placements, deck: instructionsOf(cards) })
     for (const { player } of placements) game.submitProgram(player.id, cards.map(({ id }) => id))._unsafeUnwrap()
 
     expect(game.executeNextStep()).toMatchObject({ type: 'robot', result: { action: { robotId: pushed.id } } })

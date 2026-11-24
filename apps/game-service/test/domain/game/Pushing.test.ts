@@ -4,7 +4,7 @@ import type { Instruction } from '@robo-rally/game-events'
 import { Card, Direction, EmptyTile, PitTile, type Antenna, type Position, type Tile } from '@/domain/game/index'
 import { Deck } from '@/domain/game/Deck'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, programLeadingWith } from '../../fixtures.ts'
+import { createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, instructionsOf, programLeadingWith } from '../../fixtures.ts'
 
 function position(x: number, y = 3): Position {
   return { x: Integer(x), y: Integer(y) }
@@ -27,7 +27,7 @@ function createGame(
   const placements = starts.map((start, index) =>
     createTestPlacement(start, { direction: directions[index % directions.length], deck: new Deck(cards) }))
   const players = placements.map(({ player }) => player)
-  const game = createTestGame({ board, players: placements, deck: cards })
+  const game = createTestGame({ board, players: placements, deck: instructionsOf(cards) })
   return { players, robots: players.map((player) => player.robot), cards, game, reboot }
 }
 

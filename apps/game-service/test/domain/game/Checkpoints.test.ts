@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { Card, Direction, EmptyTile } from '@/domain/game/index'
 import { Deck } from '@/domain/game/Deck'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement } from '../../fixtures.ts'
+import { createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, instructionsOf } from '../../fixtures.ts'
 
 function createGame(starts = [{ x: 0, y: 1, direction: Direction.EAST }]) {
   const tiles = createEmptyTileGrid(5, 3)
@@ -22,7 +22,7 @@ function createGame(starts = [{ x: 0, y: 1, direction: Direction.EAST }]) {
   const placements = starts.map(({ x, y, direction }) =>
     createTestPlacement({ x: Integer(x), y: Integer(y) }, { direction, deck: new Deck(Object.values(cards)) }))
   const players = placements.map(({ player }) => player)
-  const game = createTestGame({ board, players: placements, deck: Object.values(cards) })
+  const game = createTestGame({ board, players: placements, deck: instructionsOf(Object.values(cards)) })
   return { board, players, cards, game }
 }
 

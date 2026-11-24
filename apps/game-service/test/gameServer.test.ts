@@ -1,11 +1,11 @@
 import { resolveRobotAction } from './activationTestHelper.js'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { submitProgramSchema } from '@robo-rally/game-events'
+import { submitProgramSchema, type Instruction } from '@robo-rally/game-events'
 import type { ClientToServerEvents, CardsDealt, GameWon, RobotActionResolved, GameInitialization, PlayerConnectionChanged, EnvironmentStepResolved, ServerToClientEvents } from '@robo-rally/game-events'
 import { io, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
-import { Card, Game, createBoard, createDeckCards, type BoardMapName } from '@/domain/game/index'
+import { DECK_INSTRUCTIONS, Game, createBoard, type BoardMapName } from '@/domain/game/index'
 import { boardMaps } from '@/domain/game/boardMaps'
 import * as GameFactory from '@/domain/game/GameFactory'
 import { HAND_SIZE } from '@/domain/game/Deck'
@@ -63,12 +63,12 @@ describe('started game membership over Socket.IO', () => {
   // where each robot begins. Everything else about the map stays as it is.
   function stageNextGame(options: {
     startTiles: readonly (readonly [x: number, y: number])[]
-    deck?: readonly Card[]
+    deck?: readonly Instruction[]
   }): void {
     vi.spyOn(GameFactory, 'createGame').mockImplementationOnce((mapName, name) => new Game({
       board: createBoard({ ...boardMaps[mapName], startTiles: options.startTiles }),
       players: [],
-      deck: options.deck ?? createDeckCards(),
+      deck: options.deck ?? DECK_INSTRUCTIONS,
       name,
     }))
   }
@@ -335,11 +335,9 @@ describe('started game membership over Socket.IO', () => {
     stageNextGame({
       startTiles: [[8, 10], [8, 11]],
       deck: [
-        new Card('turn-0', 'TURN_LEFT'), new Card('turn-1', 'TURN_RIGHT'),
-        new Card('turn-2', 'TURN_LEFT'), new Card('turn-3', 'TURN_RIGHT'),
-        new Card('move', 'MOVE_1'),
-        new Card('turn-4', 'TURN_LEFT'), new Card('turn-5', 'TURN_RIGHT'),
-        new Card('turn-6', 'TURN_LEFT'), new Card('turn-7', 'TURN_RIGHT'),
+        'TURN_LEFT', 'TURN_RIGHT', 'TURN_LEFT', 'TURN_RIGHT',
+        'MOVE_1',
+        'TURN_LEFT', 'TURN_RIGHT', 'TURN_LEFT', 'TURN_RIGHT',
       ],
     })
     const { members: [remaining, leaving] } = await startGame(['First', 'Second'])

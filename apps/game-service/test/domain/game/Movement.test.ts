@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { Card, Direction, EmptyTile, PitTile, type Position, type Tile } from '@/domain/game/index'
 import { Deck } from '@/domain/game/Deck'
 import { Integer } from '@/numbers'
-import { addTestPlayer, createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, programLeadingWith } from '../../fixtures.ts'
+import { addTestPlayer, createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, instructionsOf, programLeadingWith } from '../../fixtures.ts'
 
 function createGame(options: {
   pitWalls?: readonly Direction[]
@@ -33,7 +33,7 @@ function createGame(options: {
   const placement = createTestPlacement(start, { direction, deck: new Deck(program) })
   const { player } = placement
   const robot = player.robot
-  const game = createTestGame({ board, players: [placement], deck: program })
+  const game = createTestGame({ board, players: [placement], deck: instructionsOf(program) })
   return { robot, player, program, game, start, pit, reboot }
 }
 
@@ -151,7 +151,7 @@ describe('shared gameplay movement', () => {
     const bystanderPlacement = createTestPlacement({ x: Integer(2), y: Integer(0) }, { direction: Direction.EAST, deck: new Deck(bystanderProgram) })
     const mover = moverPlacement.player
     const bystander = bystanderPlacement.player
-    const game = createTestGame({ board, players: [moverPlacement, bystanderPlacement], deck: moverProgram })
+    const game = createTestGame({ board, players: [moverPlacement, bystanderPlacement], deck: instructionsOf(moverProgram) })
     game.submitProgram(mover.id, moverProgram.map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(bystander.id, bystanderProgram.map((card) => card.id))._unsafeUnwrap()
 

@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import type { Instruction } from '@robo-rally/game-events'
 import type { Card } from '@/domain/game/Card'
-import { Deck, createDeckCards } from '@/domain/game/Deck'
+import { Deck } from '@/domain/game/Deck'
+import { DECK_INSTRUCTIONS } from '@/domain/game/deckComposition'
 import { Game, type PlayerPlacement } from '@/domain/game/Game'
 import { Board, type Antenna } from '@/domain/game/Board'
 import { Player } from '@/domain/game/Player'
@@ -36,16 +37,20 @@ export function createTestPlayer(overrides: Partial<{
   )
 }
 
+export function instructionsOf(cards: readonly Card[]): readonly Instruction[] {
+  return cards.map((card) => card.instruction)
+}
+
 export function createTestGame(options: {
   board: Board
   players?: readonly PlayerPlacement[]
-  deck?: readonly Card[]
+  deck?: readonly Instruction[]
   name?: string
 }): Game {
   return new Game({
     board: options.board,
     players: options.players ?? [],
-    deck: options.deck ?? createDeckCards(),
+    deck: options.deck ?? DECK_INSTRUCTIONS,
     name: options.name ?? 'Test game',
   })
 }

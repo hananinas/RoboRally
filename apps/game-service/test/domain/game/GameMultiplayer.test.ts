@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { Card, Deck, Direction, EmptyTile, Player, Robot } from '@/domain/game/index.ts'
 import type { Antenna, Position } from '@/domain/game/index.ts'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement } from '../../fixtures.ts'
+import { createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, instructionsOf } from '../../fixtures.ts'
 
 function createMultiplayerGame(
   positions: readonly Position[],
@@ -14,7 +14,7 @@ function createMultiplayerGame(
   const placements = positions.map((position) =>
     createTestPlacement(position, { direction: Direction.EAST, deck: new Deck(deck) }))
   const players = placements.map(({ player }) => player)
-  const game = createTestGame({ board, players: placements, deck })
+  const game = createTestGame({ board, players: placements, deck: instructionsOf(deck) })
   return { board, players, deck, game }
 }
 
@@ -58,7 +58,7 @@ describe('Game fixed-roster programming', () => {
     game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
     expect(game.lastActivePhase).toBe('activation')
 
-    const empty = createTestGame({ board, players: [], deck })
+    const empty = createTestGame({ board, players: [], deck: instructionsOf(deck) })
     expect(empty.lastActivePhase).toBe('programming')
     expect(empty.currentRegister).toBe(0)
     expect(() => empty.executeNextAction()).toThrow()
@@ -80,7 +80,7 @@ describe('Game fixed-roster programming', () => {
         { player: players[0], position: first },
         { player: new Player(players[0].id, players[1].robot, emptyDeck), position: second },
       ],
-      deck,
+      deck: instructionsOf(deck),
     })).toThrow(RangeError)
 
     expect(() => createTestGame({
@@ -89,7 +89,7 @@ describe('Game fixed-roster programming', () => {
         { player: players[0], position: first },
         { player: new Player('other', new Robot(players[0].robot.id, Direction.NORTH, 'red', 'tank'), emptyDeck), position: second },
       ],
-      deck,
+      deck: instructionsOf(deck),
     })).toThrow(RangeError)
   })
 

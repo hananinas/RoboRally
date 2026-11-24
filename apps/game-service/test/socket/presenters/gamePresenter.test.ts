@@ -25,7 +25,7 @@ import {
   presentRobotActionResolved,
 } from '@/socket/presenters/gamePresenter.ts'
 import { Integer } from '@/numbers'
-import { addTestPlayer, createTestBoard, createTestGame, createTestPlacement, createTestPlayer } from '../../fixtures.ts'
+import { addTestPlayer, createTestBoard, createTestGame, createTestPlacement, createTestPlayer, instructionsOf } from '../../fixtures.ts'
 
 function createGameWithPlayer() {
   const game = createGame('empty-map', 'Test game')
@@ -98,7 +98,7 @@ describe('game presenter', () => {
       new EmptyTile([Direction.SOUTH], 1),
     ]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
-    const game = createTestGame({ board, players: [], deck: cards })
+    const game = createTestGame({ board, players: [], deck: instructionsOf(cards) })
     const state = presentPublicGameState(game, { status: 'IDLE' }, [], null)
 
     expect(state.checkpointCount).toBe(1)
@@ -118,7 +118,7 @@ describe('game presenter', () => {
       new PitTile(),
     ]], { x: Integer(3), y: Integer(0), angle: 0 }, { x: Integer(0), y: Integer(0) })
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
-    const game = createTestGame({ board, players: [], deck: cards })
+    const game = createTestGame({ board, players: [], deck: instructionsOf(cards) })
 
     expect(presentPublicGameState(game, { status: 'IDLE' }, [], null).board.tiles).toEqual([
       { position: { x: 0, y: 0 }, type: 'REBOOT' },
@@ -180,7 +180,7 @@ describe('game presenter', () => {
     )
     const placement = createTestPlacement({ x: Integer(0), y: Integer(0) }, { direction: Direction.EAST, deck: new Deck(cards) })
     const { player } = placement
-    const game = createTestGame({ board, players: [placement], deck: cards })
+    const game = createTestGame({ board, players: [placement], deck: instructionsOf(cards) })
     game.submitProgram(player.id, cards.map((card) => card.id))
 
     const state = presentPublicGameState(game, { status: 'CLOSED' }, [], null)
@@ -207,7 +207,7 @@ describe('game presenter', () => {
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
     const placement = createTestPlacement({ x: Integer(0), y: Integer(0) }, { direction: Direction.EAST, deck: new Deck(cards) })
     const { player } = placement
-    const game = createTestGame({ board, players: [placement], deck: cards })
+    const game = createTestGame({ board, players: [placement], deck: instructionsOf(cards) })
     game.submitProgram(player.id, cards.map((card) => card.id))
     expect(presentPublicGameState(game, { status: 'CLOSED' }, [], null).winner).toBeNull()
 

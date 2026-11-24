@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { err, ok, type Result } from 'neverthrow'
 import type { Board } from '@/domain/game/Board'
-import { effects, type PrivateProgram, type PublicRegisters, type ResolvedInstruction, type RobotSpriteId } from '@robo-rally/game-events'
+import { effects, type Instruction, type PrivateProgram, type PublicRegisters, type ResolvedInstruction, type RobotSpriteId } from '@robo-rally/game-events'
 import { captureEnvironmentSnapshot, environmentSteps, type EnvironmentChanges } from '@/domain/game/environment'
 import { Card } from '@/domain/game/Card'
 import { Deck } from '@/domain/game/Deck'
@@ -85,8 +85,8 @@ export type PlayerPlacement = Readonly<{
 export type GameOptions = Readonly<{
   board: Board
   players: readonly PlayerPlacement[]
-  // Template for each private deck created by addPlayer.
-  deck: readonly Card[]
+  // Composition of each private deck created by addPlayer.
+  deck: readonly Instruction[]
   name: string
 }>
 
@@ -96,7 +96,7 @@ export class Game {
   readonly board: Board
   private readonly robotPlacements: RobotPlacements
   private readonly roster: Roster
-  private readonly deck: readonly Card[]
+  private readonly deck: readonly Instruction[]
   private readonly lifecycle = new GameLifecycle('programming')
   private registerIndex = 0
   // Reboots recorded while the current action resolves.
@@ -113,8 +113,8 @@ export class Game {
     deck,
     name,
   }: GameOptions) {
-    if (deck.length < REGISTERS_PER_ROUND || new Set(deck.map((card) => card.id)).size !== deck.length) {
-      throw new RangeError('The deck must contain at least five distinct cards')
+    if (deck.length < REGISTERS_PER_ROUND) {
+      throw new RangeError('The deck must contain at least five cards')
     }
 
     this.id = randomUUID()

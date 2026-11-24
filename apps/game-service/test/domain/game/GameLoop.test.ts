@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { Direction, EmptyTile, Card } from '@/domain/game/index'
 import { Deck } from '@/domain/game/Deck'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement } from '../../fixtures.ts'
+import { createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, instructionsOf } from '../../fixtures.ts'
 
 function createGame(deck: Card[]) {
   const board = createTestBoard(createEmptyTileGrid(3, 3), { x: Integer(0), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(2) })
@@ -13,7 +13,7 @@ function createGame(deck: Card[]) {
   })
   const { player } = placement
   const robot = player.robot
-  const game = createTestGame({ board, players: [placement], deck })
+  const game = createTestGame({ board, players: [placement], deck: instructionsOf(deck) })
   return { board, robot, player, game }
 }
 
@@ -100,7 +100,7 @@ function resolveCard(instruction: Instruction, direction: Direction, tiles: Empt
   const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, instruction))
   const placement = createTestPlacement({ x: Integer(3), y: Integer(3) }, { direction, deck: new Deck(cards) })
   const { player } = placement
-  const game = createTestGame({ board, players: [placement], deck: cards })
+  const game = createTestGame({ board, players: [placement], deck: instructionsOf(cards) })
   game.submitProgram(player.id, cards.map((card) => card.id))
   return resolveRobotAction(game).action
 }
