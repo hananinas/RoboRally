@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { User } from '@robo-rally/game-events'
 import { Lobby } from '@/domain/lobby/Lobby'
+import { boards } from '@/domain/game/BoardFactory'
 import { DEFAULT_ROBOT_ID } from '@/domain/game/robotCatalog'
 
 function user(userId: string): User {
@@ -50,13 +51,18 @@ describe('Lobby', () => {
     expect(lobby.ownerUserId).toBe('second')
   })
 
+  it('caps players at the number of start tiles on its map', () => {
+    const lobby = new Lobby('Lobby', 'test-map', user('owner'), 'connection-1')
+    expect(lobby.maxPlayers).toBe(boards['test-map'].startTiles.length)
+  })
+
   it('reports full only once membership reaches the player cap', () => {
     const lobby = new Lobby('Lobby', 'test-map', user('owner'), 'connection-1')
-    for (let i = 1; i < Lobby.MAX_PLAYERS - 1; i++) lobby.addMember(user(`player-${i}`), `connection-${i}`)
+    for (let i = 1; i < lobby.maxPlayers - 1; i++) lobby.addMember(user(`player-${i}`), `connection-${i}`)
     expect(lobby.isFull).toBe(false)
 
     lobby.addMember(user('last'), 'connection-last')
-    expect(lobby.size).toBe(Lobby.MAX_PLAYERS)
+    expect(lobby.size).toBe(lobby.maxPlayers)
     expect(lobby.isFull).toBe(true)
   })
 })
