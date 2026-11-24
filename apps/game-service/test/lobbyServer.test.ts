@@ -94,6 +94,12 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(result.lobby.mapName).toBe('empty-map')
     expect(result.lobby.mapDisplayName).toBe(boardMaps['empty-map'].name)
   })
+  it('stores the lobby name trimmed, within the length limit', async () => {
+    const owner = await connect('Padder')
+    const result = await owner.emitWithAck('lobby.create', { mapName: 'empty-map', name: `  ${'x'.repeat(50)}  ` })
+    if (result.outcome !== 'LOBBY_JOINED') throw new Error(result.outcome)
+    expect(result.lobby.name).toBe('x'.repeat(50))
+  })
   it.each(['leave', 'disconnect'] as const)('updates the roster and owner on %s without notifying other lobbies', async (departure) => {
     const owner = await connect('Owner')
     const lobby = await create(owner)

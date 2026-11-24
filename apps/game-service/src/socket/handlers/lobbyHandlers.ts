@@ -53,9 +53,9 @@ export function handleCreateLobby(
   withValidatedRequest({
     socket, command: 'lobby.create', schema: createLobbyRequestSchema, payload, acknowledge,
     resolve: (user, data) => isBoardMapName(data.mapName)
-      ? ok({ user, mapName: data.mapName })
+      ? ok({ user, mapName: data.mapName, name: data.name })
       : err({ outcome: 'INVALID_REQUEST' as const }),
-    run: ({ user, mapName }, ack) => {
+    run: ({ user, mapName, name }, ack) => {
       const membership = context.registry.getActiveMembership(user.userId)
       if (membership) {
         const existingLobbySession = context.registry.getCurrentLobby(user.userId)
@@ -63,7 +63,7 @@ export function handleCreateLobby(
           ? { outcome: 'LOBBY_JOINED', lobby: presentLobby(existingLobbySession.lobby) }
           : { outcome: 'ALREADY_HAS_MEMBERSHIP' })
       }
-      const lobby = new Lobby(payload.name, mapName, user, socket.id)
+      const lobby = new Lobby(name, mapName, user, socket.id)
       void socket.join(LobbySession.roomFor(lobby.lobbyId))
       context.registry.addLobby(lobby)
       context.registry.setActiveMembership(user.userId, { kind: 'lobby', lobbyId: lobby.lobbyId })
