@@ -27,10 +27,8 @@ export default function RobotPicker({ robots, selectedRobotId, selectedColor, ta
   const [displayColor, setDisplayColor] = useState(selectedColor ?? defaultColor)
   
   useEffect(() => {
-    if (selectedColor) {
-      setDisplayColor(selectedColor)
-    }
-  }, [selectedColor])
+    setDisplayColor(selectedColor ?? defaultColor)
+  }, [selectedColor, defaultColor])
   
   const selectedRobot = robots.find((option) => option.id === selectedRobotId)
   const choices = robots
