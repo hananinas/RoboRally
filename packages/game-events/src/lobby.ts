@@ -8,6 +8,7 @@ export const ROBOT_SPRITE_IDS = [
 export const lobbyRequestSchema = z.strictObject({ lobbyId: z.uuid() }).readonly()
 export const robotSelectionRequestSchema = z.looseObject({
   robotSpriteId: z.string().trim().min(1),
+  colour: z.string().trim().optional(),
 }).readonly()
 export const createLobbyRequestSchema = z.strictObject({
   mapName: z.string().min(1).optional(),
@@ -41,7 +42,7 @@ export type LobbySummary = Readonly<{
   playerCount: number
   maxPlayers: number
 }>
-export type LobbyPlayer = User & Readonly<{ robotSpriteId: RobotSpriteId }>
+export type LobbyPlayer = User & Readonly<{ robotSpriteId: RobotSpriteId; colour?: string }>
 export type LobbyState = LobbySummary & Readonly<{
   ownerUserId: string
   players: readonly LobbyPlayer[]

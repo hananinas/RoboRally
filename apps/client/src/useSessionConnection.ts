@@ -121,7 +121,7 @@ export default function useSessionConnection() {
       result: await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.create', { mapName, name }),
     }))
   }
-  async function selectRobot(robotSpriteId: RobotSpriteId): Promise<boolean> {
+  async function selectRobot(robotSpriteId: RobotSpriteId, colour?: string): Promise<boolean> {
     if (pending.current || !socket.connected) return false
     if (current.current.status !== 'waiting') return false
     pending.current = true
@@ -129,7 +129,7 @@ export default function useSessionConnection() {
     const attempt = generation.current
     try {
       const result = await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS)
-        .emitWithAck('lobby.selectRobot', { robotSpriteId })
+        .emitWithAck('lobby.selectRobot', { robotSpriteId, ...(colour ? { colour } : {}) })
       if (generation.current !== attempt || !socket.connected) return false
       if (result.outcome === 'ROBOT_SELECTED') {
         dispatch({ type: 'lobby-updated', lobby: result.lobby })

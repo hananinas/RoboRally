@@ -7,7 +7,7 @@ export type Lobby = {
   lobbyId: string
   name: string
   mapName: BoardMapName
-  members: Map<string, { user: User; connectionId: string; robotSpriteId: RobotSpriteId }>
+  members: Map<string, { user: User; connectionId: string; robotSpriteId: RobotSpriteId; colour?: string }>
 }
 
 type UserSession = { kind: 'lobby'; lobbyId: string } | { kind: 'game'; gameId: string }
