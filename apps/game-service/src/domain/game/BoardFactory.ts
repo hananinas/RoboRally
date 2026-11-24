@@ -1,5 +1,5 @@
 import { Board } from '@/domain/game/Board'
-import type { MapSpec } from '@/domain/game/boardMaps'
+import { boardMaps, type BoardMapName, type MapSpec } from '@/domain/game/boardMaps'
 import type { Direction } from '@/domain/game/spatial'
 import { EmptyTile, PitTile, ConveyorTile, GearTile, RebootTile, StartTile, type Tile } from '@/domain/game/Tile'
 export type { BoardMapName } from '@/domain/game/boardMaps'
@@ -90,3 +90,10 @@ export function createBoard(spec: MapSpec): Board {
 
   return new Board(boardTiles, antenna)
 }
+
+// One board per map, shared by every game on it: anything a game changes about a
+// space belongs to the game, not here. Building at import also fails a malformed
+// map at startup rather than on lobby.start.
+export const boards: Readonly<Record<BoardMapName, Board>> = Object.freeze(
+  Object.fromEntries(Object.entries(boardMaps).map(([name, spec]) => [name, createBoard(spec)])),
+) as Readonly<Record<BoardMapName, Board>>

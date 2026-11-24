@@ -26,7 +26,8 @@ export class Board {
       .filter((tile) => tile.checkpointNumber !== undefined).length
     this.width = width
     this.height = tiles.length
-    this.tiles = tiles.map((row) => [...row])
+    for (const row of tiles) for (const tile of row) Object.freeze(tile)
+    this.tiles = Object.freeze(tiles.map((row) => Object.freeze([...row])))
 
     if (!this.contains(antenna) || !Number.isFinite(antenna.angle)) {
       throw new RangeError('The antenna must be on the board with a finite angle')

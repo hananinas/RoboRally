@@ -84,6 +84,13 @@ describe('Tile and Board layout', () => {
     expect(board.getTile({ x: Integer(1), y: Integer(1) })).toBeInstanceOf(EmptyTile)
   })
 
+  it('freezes its tiles so a shared board cannot gain per-game state', () => {
+    const board = createTestBoard(createEmptyTileGrid(2, 2), antenna, { x: Integer(1), y: Integer(1) })
+    const tile = board.getTile({ x: Integer(0), y: Integer(0) })!
+
+    expect(() => Object.assign(tile, { collected: true })).toThrow()
+  })
+
   it('keeps an independent, frozen copy of its antenna', () => {
     const source = { x: Integer(1), y: Integer(2), angle: Math.PI / 2 }
     const board = createTestBoard(createEmptyTileGrid(3, 3), source, { x: Integer(0), y: Integer(0) })

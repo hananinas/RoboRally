@@ -95,11 +95,15 @@ describe('game factory', () => {
     expect(game.getRobotPosition(addTestPlayer(game, 'red').robot.id)).toEqual({ x: 8, y: 7 })
   })
 
-  it('creates isolated state for each game', () => {
+  it('shares one board per map while keeping game state separate', () => {
     const first = createGame('test-map', 'Test game')
     const second = createGame('test-map', 'Test game')
+    const player = addTestPlayer(first, 'red')
 
     expect(first).not.toBe(second)
-    expect(first.board).not.toBe(second.board)
+    expect(first.board).toBe(second.board)
+    expect(first.players).toEqual([player])
+    expect(second.players).toEqual([])
+    expect(() => second.getRobotPosition(player.robot.id)).toThrow()
   })
 })
