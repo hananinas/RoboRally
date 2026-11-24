@@ -20,6 +20,7 @@ export function createTestRobot(overrides: RobotOverrides = {}): Robot {
     overrides.id ?? randomUUID(),
     overrides.direction ?? Direction.NORTH,
     overrides.colour ?? ROBOT_COLOURS[0],
+    'tank',
   )
 }
 
@@ -58,7 +59,7 @@ export function createTestPlacement(
 }
 
 export function addTestPlayer(game: Game, colour?: string): Player {
-  return game.addPlayer(colour)._unsafeUnwrap()
+  return game.addPlayer('tank', colour)._unsafeUnwrap()
 }
 
 export function createEmptyTileGrid(width: number, height: number): Tile[][] {
@@ -68,7 +69,7 @@ export function createEmptyTileGrid(width: number, height: number): Tile[][] {
 export function gridWithRebootTiles(tiles: readonly (readonly Tile[])[], ...positions: Position[]): Tile[][] {
   const grid = tiles.map((row) => [...row])
   for (const { x, y } of positions) {
-    grid[y][x] = new RebootTile(grid[y][x].walls, grid[y][x].checkpointNumber)
+    grid[y][x] = new RebootTile(grid[y][x].walls)
   }
   return grid
 }

@@ -79,8 +79,8 @@ export class StartTile extends Tile {
 export class RebootTile extends Tile {
   readonly kind = 'REBOOT'
 
-  constructor(walls: Iterable<Direction> = [], checkpointNumber?: number) {
-    super(walls, checkpointNumber)
+  constructor(walls: Iterable<Direction> = []) {
+    super(walls)
   }
 }
 

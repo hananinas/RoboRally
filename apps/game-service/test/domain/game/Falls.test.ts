@@ -13,7 +13,7 @@ function createGame(
 ) {
   const tiles = createEmptyTileGrid(5, 5)
   tiles[start.y][start.x] = new EmptyTile(walls)
-  tiles[2][1] = new EmptyTile([], 1)
+  tiles[1][1] = new EmptyTile([], 1)
   tiles[4][0] = new EmptyTile([], 2)
   const reboot = { x: Integer(1), y: Integer(2) }
   const board = createTestBoard(tiles, { x: Integer(0), y: Integer(0), angle: 0 }, reboot, [start])
@@ -84,7 +84,7 @@ describe('board-edge falls', () => {
     expect(robot.direction).toBe(direction)
     expect(robot.program).toEqual(program)
     expect(player.hand).toEqual([])
-    expect(player.lastCheckpoint).toBe(1)
+    expect(player.lastCheckpoint).toBe(0)
     expect(game.currentRegister).toBe(1)
     expect(game.lastActivePhase).toBe('activation')
 

@@ -198,7 +198,7 @@ export class Game {
       ?? ROBOT_COLOURS[this.roster.length % ROBOT_COLOURS.length]
   }
 
-  addPlayer(colour?: string, robotSpriteId: RobotSpriteId = 'tank'): Result<Player, AddPlayerError> {
+  addPlayer(robotSpriteId: RobotSpriteId, colour?: string): Result<Player, AddPlayerError> {
     const assignedColour = colour ?? this.nextAvailableColour()
     return this.findSpawn().map((position) => {
       const robot = new Robot(randomUUID(), Direction.NORTH, assignedColour, robotSpriteId)

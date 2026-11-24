@@ -1,7 +1,7 @@
 import { resolveRobotAction } from '../../activationTestHelper.ts'
 import { describe, expect, it } from 'vitest'
 import { Card, Deck, createGame } from '@/domain/game/index'
-import { createTestPlayer } from '../../fixtures.ts'
+import { addTestPlayer, createTestPlayer } from '../../fixtures.ts'
 
 describe('Player', () => {
   it('keeps its robot and manages hands through its private deck', () => {
@@ -128,7 +128,7 @@ describe('Player', () => {
 
   it('preserves checkpoint progress across rounds and program clearing', () => {
     const game = createGame('empty-map', 'Test game')
-    const player = game.addPlayer('red')._unsafeUnwrap()
+    const player = addTestPlayer(game, 'red')
     player.completeCheckpoint(1)
 
     for (let round = 0; round < 2; round++) {

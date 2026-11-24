@@ -24,8 +24,8 @@ export class Robot {
   constructor(
     readonly id: RobotId,
     direction: Direction,
-    readonly colour: string = ROBOT_COLOURS[0],
-    readonly robotSpriteId: RobotSpriteId = 'tank',
+    readonly colour: string,
+    readonly robotSpriteId: RobotSpriteId,
   ) {
     this.currentDirection = direction
   }

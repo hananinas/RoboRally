@@ -2,7 +2,7 @@ import { resolveRobotAction } from '../../activationTestHelper.js'
 import { describe, expect, it } from 'vitest'
 import { Card, Deck, Direction, EmptyTile, PitTile, type Position } from '@/domain/game/index'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement } from '../../fixtures.ts'
+import { addTestPlayer, createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement } from '../../fixtures.ts'
 
 function createGame() {
   const board = createTestBoard(createEmptyTileGrid(2, 2), { x: Integer(1), y: Integer(1), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(1) }, [{ x: Integer(0), y: Integer(0) }])
@@ -200,7 +200,7 @@ describe('Game.addPlayer', () => {
   it('creates and places a player with a private hand drawn from the deck', () => {
     const { deck, game } = createEmptyGame()
 
-    const result = game.addPlayer('red')
+    const result = game.addPlayer('tank', 'red')
 
     expect(result.isOk()).toBe(true)
     const player = result._unsafeUnwrap()
@@ -215,17 +215,17 @@ describe('Game.addPlayer', () => {
   it('gives each added player a hand with distinct card IDs', () => {
     const { game } = createEmptyGame()
 
-    const first = game.addPlayer('red')._unsafeUnwrap()
-    const second = game.addPlayer('blue')._unsafeUnwrap()
+    const first = addTestPlayer(game, 'red')
+    const second = addTestPlayer(game, 'blue')
 
     expect(second.hand.every((card) => !first.hand.some((other) => other.id === card.id))).toBe(true)
   })
 
   it('rejects adding a player when no spawn tile is free', () => {
     const { game } = createEmptyGame(2, [{ x: Integer(0), y: Integer(0) }])
-    game.addPlayer('red')._unsafeUnwrap()
+    addTestPlayer(game, 'red')
 
-    const result = game.addPlayer('blue')
+    const result = game.addPlayer('tank', 'blue')
 
     expect(result.isErr()).toBe(true)
     expect(result._unsafeUnwrapErr()).toBe('NO_SPAWN_AVAILABLE')
@@ -237,12 +237,12 @@ describe('Game.addPlayer', () => {
       x: Integer(1), y: Integer(0), angle: 0,
     }, { x: Integer(0), y: Integer(1) }, [{ x: Integer(2), y: Integer(0) }, { x: Integer(0), y: Integer(0) }])
     const game = createTestGame({ board, players: [], deck })
-    const first = game.addPlayer('red')._unsafeUnwrap()
-    const second = game.addPlayer('blue')._unsafeUnwrap()
+    const first = addTestPlayer(game, 'red')
+    const second = addTestPlayer(game, 'blue')
 
     expect(game.getRobotPosition(first.robot.id)).toEqual({ x: 2, y: 0 })
     expect(game.getRobotPosition(second.robot.id)).toEqual({ x: 0, y: 0 })
-    expect(game.addPlayer('green')._unsafeUnwrapErr()).toBe('NO_SPAWN_AVAILABLE')
+    expect(game.addPlayer('tank', 'green')._unsafeUnwrapErr()).toBe('NO_SPAWN_AVAILABLE')
     expect(game.players).toEqual([first, second])
   })
 
@@ -276,12 +276,12 @@ describe('Game roster validation and spawn skipping', () => {
       [new EmptyTile(), new EmptyTile(), new EmptyTile()],
     ], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(1) }, [{ x: Integer(0), y: Integer(0) }])
     const game = createTestGame({ board, players: [], deck })
-    const first = game.addPlayer('red')._unsafeUnwrap()
+    const first = addTestPlayer(game, 'red')
 
     expect(game.getRobotPosition(first.robot.id)).toEqual({ x: 0, y: 0 })
     expect(first.hand).toHaveLength(deck.length)
     expect(first.hand.map((card) => card.instruction).sort()).toEqual(deck.map((card) => card.instruction).sort())
-    expect(game.addPlayer('blue')._unsafeUnwrapErr()).toBe('NO_SPAWN_AVAILABLE')
+    expect(game.addPlayer('tank', 'blue')._unsafeUnwrapErr()).toBe('NO_SPAWN_AVAILABLE')
     expect(game.players).toEqual([first])
   })
 })

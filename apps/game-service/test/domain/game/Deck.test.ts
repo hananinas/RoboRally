@@ -5,7 +5,7 @@ import { Card } from '@/domain/game/Card'
 import { Deck, HAND_SIZE, createDeckCards } from '@/domain/game/Deck'
 import { Direction, EmptyTile, createGame } from '@/domain/game/index'
 import { Integer } from '@/numbers'
-import { createTestBoard, createTestGame, createTestPlayer, createTestRobot } from '../../fixtures.ts'
+import { addTestPlayer, createTestBoard, createTestGame, createTestPlayer, createTestRobot } from '../../fixtures.ts'
 
 function counts(cards: readonly Card[]): Record<string, number> {
   const result: Record<string, number> = {}
@@ -73,8 +73,8 @@ describe('Deck.remove', () => {
 describe('Game card cycle', () => {
   it('gives each player a private hand of nine and cycles cards through the discard pile', () => {
     const game = createGame('empty-map', 'Test game')
-    const first = game.addPlayer('red')._unsafeUnwrap()
-    const second = game.addPlayer('blue')._unsafeUnwrap()
+    const first = addTestPlayer(game, 'red')
+    const second = addTestPlayer(game, 'blue')
     expect(first.hand).toHaveLength(HAND_SIZE)
     const firstIds = new Set(first.hand.map((card) => card.id))
     expect(second.hand.some((card) => firstIds.has(card.id))).toBe(false)

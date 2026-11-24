@@ -87,7 +87,7 @@ describe('Game fixed-roster programming', () => {
       board: freshBoard(),
       players: [
         { player: players[0], position: first },
-        { player: new Player('other', new Robot(players[0].robot.id, Direction.NORTH, 'red'), emptyDeck), position: second },
+        { player: new Player('other', new Robot(players[0].robot.id, Direction.NORTH, 'red', 'tank'), emptyDeck), position: second },
       ],
       deck,
     })).toThrow(RangeError)

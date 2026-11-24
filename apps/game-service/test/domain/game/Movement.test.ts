@@ -18,8 +18,8 @@ function createGame(options: {
   tiles[1][0] = new EmptyTile(startWalls)
   tiles[1][1] = new PitTile(pitWalls)
   tiles[0][4] = new EmptyTile([], 1)
-  tiles[2][3] = new EmptyTile([], 2)
-  tiles[2][0] = new EmptyTile([], 3)
+  tiles[2][0] = new EmptyTile([], 2)
+  tiles[0][2] = new EmptyTile([], 3)
   const board = createTestBoard(tiles, { x: Integer(4), y: Integer(1), angle: Math.PI / 2 }, { x: Integer(3), y: Integer(2) }, [{ x: Integer(2), y: Integer(1) }])
   const pit = { x: Integer(1), y: Integer(1) }
   const reboot = { x: Integer(3), y: Integer(2) }
@@ -91,11 +91,12 @@ describe('shared gameplay movement', () => {
     expect(robot.direction).toBe(Direction.EAST)
   })
 
-  it.each(['walking', 'rebooting'] as const)('defers checkpoints reached by %s until the register completes', (movement) => {
-    const initialProgress = movement === 'walking' ? 0 : 1
-    const destination = movement === 'walking' ? { x: Integer(4), y: Integer(0) } : { x: Integer(3), y: Integer(2) }
+  it.each([
+    { checkpoint: 1, destination: { x: Integer(4), y: Integer(0) }, initialProgress: 0 },
+    { checkpoint: 2, destination: { x: Integer(0), y: Integer(2) }, initialProgress: 1 },
+  ])('defers checkpoint $checkpoint until the register completes', ({ destination, initialProgress }) => {
     const { robot, player, program, game } = createGame({ start: destination })
-    if (movement === 'rebooting') player.completeCheckpoint(1)
+    if (initialProgress > 0) player.completeCheckpoint(initialProgress)
 
     expect(game.getRobotPosition(robot.id)).toEqual(destination)
     expect(player.lastCheckpoint).toBe(initialProgress)

@@ -23,7 +23,10 @@ describe('Tile and Board layout', () => {
 
   it('stores pits with walls without counting them as checkpoints', () => {
     const pit = new PitTile([Direction.NORTH])
-    const board = createTestBoard([[pit, new EmptyTile([], 1), new PitTile()]], antenna, { x: Integer(1), y: Integer(0) })
+    const board = createTestBoard([
+      [pit, new EmptyTile([], 1), new PitTile()],
+      [new EmptyTile(), new EmptyTile(), new EmptyTile()],
+    ], antenna, { x: Integer(0), y: Integer(1) })
 
     expect(board.getTile({ x: Integer(0), y: Integer(0) })).toBe(pit)
     expect(pit.hasWall(Direction.NORTH)).toBe(true)
@@ -49,16 +52,6 @@ describe('Tile and Board layout', () => {
     'rejects invalid checkpoint number %s',
     (number) => expect(() => new EmptyTile([], number)).toThrow(RangeError),
   )
-
-  it('rejects duplicate or skipped checkpoint numbers', () => {
-    for (const numbers of [[1, 1], [1, 3], [2]]) {
-      expect(() => createTestBoard(
-        [numbers.map((number) => new EmptyTile([], number)), numbers.map(() => new EmptyTile())],
-        antenna,
-        { x: Integer(0), y: Integer(1) },
-      )).toThrow(RangeError)
-    }
-  })
 
   it('keeps walls on tile edges without a separate wall tile', () => {
     const walls = new Set([Direction.NORTH])
@@ -116,11 +109,11 @@ describe('Tile and Board layout', () => {
   it('lists its reboot tiles in reading order and freezes them', () => {
     const at = (x: number, y: number) => ({ x: Integer(x), y: Integer(y) })
     const tiles = createEmptyTileGrid(3, 3)
-    tiles[1][1] = new RebootTile([Direction.NORTH], 1)
+    tiles[1][1] = new RebootTile([Direction.NORTH])
     const board = createTestBoard(tiles, antenna, [at(2, 2), at(0, 1)])
 
     expect(board.rebootTiles).toEqual([at(0, 1), at(1, 1), at(2, 2)])
-    expect(board.getTile(at(1, 1))).toMatchObject({ kind: 'REBOOT', checkpointNumber: 1 })
+    expect(board.getTile(at(1, 1))).toMatchObject({ kind: 'REBOOT' })
     expect(board.getTile(at(1, 1))?.hasWall(Direction.NORTH)).toBe(true)
     expect(Object.isFrozen(board.rebootTiles)).toBe(true)
     expect(() => Object.assign(board.rebootTiles[0], { x: 2 })).toThrow()

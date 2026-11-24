@@ -208,7 +208,6 @@ describe('pit entry and rebooting', () => {
 
   it.each([
     { rebootTile: { x: Integer(0), y: Integer(1) }, expectedProgress: 1 },
-    { rebootTile: { x: Integer(1), y: Integer(0) }, expectedProgress: 2 },
   ])('evaluates checkpoints at the reboot destination $rebootTile', ({ rebootTile, expectedProgress }) => {
     const board = createTestBoard([
       [new EmptyTile(), new EmptyTile([], 2), new PitTile()],

@@ -25,11 +25,11 @@ import {
   presentRobotActionResolved,
 } from '@/socket/presenters/gamePresenter.ts'
 import { Integer } from '@/numbers'
-import { createTestBoard, createTestGame, createTestPlacement, createTestPlayer } from '../../fixtures.ts'
+import { addTestPlayer, createTestBoard, createTestGame, createTestPlacement, createTestPlayer } from '../../fixtures.ts'
 
 function createGameWithPlayer() {
   const game = createGame('empty-map', 'Test game')
-  const player = game.addPlayer('red')._unsafeUnwrap()
+  const player = addTestPlayer(game, 'red')
   return { gameId: game.id, game, player }
 }
 
@@ -172,7 +172,8 @@ describe('game presenter', () => {
         new EmptyTile([Direction.NORTH, Direction.WEST], 1),
         new EmptyTile(),
       ],
-    ], { x: Integer(1), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
+      [new EmptyTile(), new EmptyTile()],
+    ], { x: Integer(1), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(1) })
     const cards = Array.from(
       { length: 5 },
       (_, index) => new Card(`card-${index}`, 'MOVE_1'),
@@ -188,11 +189,13 @@ describe('game presenter', () => {
     expect(state.board.tiles).toEqual([
       {
         position: { x: 0, y: 0 },
-        type: 'REBOOT',
+        type: 'EMPTY',
         walls: ['NORTH', 'WEST'],
         checkpointNumber: 1,
       },
       { position: { x: 1, y: 0 }, type: 'EMPTY' },
+      { position: { x: 0, y: 1 }, type: 'REBOOT' },
+      { position: { x: 1, y: 1 }, type: 'EMPTY' },
     ])
     expect(state.robots[0].position.orientation).toBe('EAST')
   })
