@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react'
 import type { RobotDefinition } from '@robo-rally/game-events'
 import RobotPreview from './RobotPreview.tsx'
 import { robotOptionFor } from './robotPreviews.ts'
@@ -24,11 +23,7 @@ type Props = {
 
 export default function RobotPicker({ robots, selectedRobotId, selectedColor, takenColors, disabled, onSelect }: Props) {
   const defaultColor = PREVIEW_COLOURS[0].hex
-  const [displayColor, setDisplayColor] = useState(selectedColor ?? defaultColor)
-  
-  useEffect(() => {
-    setDisplayColor(selectedColor ?? defaultColor)
-  }, [selectedColor, defaultColor])
+  const displayColor = selectedColor ?? defaultColor
   
   const selectedRobot = robots.find((option) => option.id === selectedRobotId)
   const choices = robots
@@ -43,7 +38,6 @@ export default function RobotPicker({ robots, selectedRobotId, selectedColor, ta
 
   function chooseColor(colorHex: string) {
     if (!disabled && !takenColors.includes(colorHex)) {
-      setDisplayColor(colorHex)
       if (robot) void onSelect(robot.id, colorHex)
     }
   }
