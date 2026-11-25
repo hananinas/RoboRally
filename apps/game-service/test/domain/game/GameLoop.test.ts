@@ -59,6 +59,22 @@ describe('Game activation loop', () => {
     expect(robot.direction).toBe(Direction.WEST)
   })
 
+  it('counts a round once its fifth register has resolved', () => {
+    const deck = Array.from({ length: 5 }, (_, index) => new Card(`left-${index}`, 'TURN_LEFT'))
+    const { player, game } = createGame(deck)
+    expect(game.completedRounds).toBe(0)
+
+    for (const round of [1, 2]) {
+      game.submitProgram(player.id, deck.map((card) => card.id))
+      for (let register = 0; register < 4; register++) {
+        resolveRobotAction(game)
+        expect(game.completedRounds).toBe(round - 1)
+      }
+      resolveRobotAction(game)
+      expect(game.completedRounds).toBe(round)
+    }
+  })
+
   it('interprets movement through Board using the direction after a turn', () => {
     const deck: Card[] = [
       new Card('left-1', 'TURN_LEFT'),

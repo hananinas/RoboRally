@@ -98,6 +98,7 @@ export class Game {
   private readonly deck: readonly Instruction[]
   private readonly lifecycle = new GameLifecycle('programming')
   private registerIndex = 0
+  #completedRounds = 0
   // Reboots recorded while the current action resolves.
   private actionReboots: RebootResult[] = []
   private environmentStepIndex: number | null = null
@@ -132,6 +133,10 @@ export class Game {
 
   get currentRegister(): number {
     return this.registerIndex
+  }
+
+  get completedRounds(): number {
+    return this.#completedRounds
   }
 
   get players(): readonly Player[] {
@@ -525,6 +530,7 @@ export class Game {
     this.discardPrograms()
     this.registerIndex = 0
     this.dealNewHands()
+    this.#completedRounds++
     this.lifecycle.enterProgramming()
   }
 }
