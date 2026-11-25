@@ -35,7 +35,7 @@ describe('Deck', () => {
     const hand = deck.draw(HAND_SIZE)
     expect(hand).toHaveLength(HAND_SIZE)
     expect(new Set(hand.map((card) => card.id)).size).toBe(HAND_SIZE)
-    expect(deck.size).toBe(DECK_INSTRUCTIONS.length - HAND_SIZE)
+    expect(deck.drawPile).toHaveLength(DECK_INSTRUCTIONS.length - HAND_SIZE)
   })
 
   it('draws the remainder from the reshuffled discard pile when the draw pile runs short', () => {
@@ -48,8 +48,8 @@ describe('Deck', () => {
     expect(second).toHaveLength(9)
     expect(new Set(second.map((card) => card.id)).size).toBe(9)
     const remaining = cards.filter((card) => !second.includes(card))
-    expect(deck.size).toBe(remaining.length)
-    expect(deck.discarded).toBe(0)
+    expect(deck.drawPile).toHaveLength(remaining.length)
+    expect(deck.discardPile).toEqual([])
     // The 3 cards left in the draw pile are always drawn.
     const leftover = cards.filter((card) => !first.includes(card))
     expect(leftover.every((card) => second.includes(card))).toBe(true)
@@ -58,7 +58,8 @@ describe('Deck', () => {
   it('draws everything available when the deck cannot fill a hand', () => {
     const deck = new Deck([new Card('a', 'MOVE_1'), new Card('b', 'MOVE_2')])
     expect(deck.draw(9)).toHaveLength(2)
-    expect(deck.isEmpty).toBe(true)
+    expect(deck.drawPile).toEqual([])
+    expect(deck.discardPile).toEqual([])
   })
 })
 
@@ -71,7 +72,8 @@ describe('Deck.remove', () => {
     expect(deck.remove('b')?.id).toBe('b')
     expect(deck.remove('a')?.id).toBe('a')
     expect(deck.remove('a')).toBeUndefined()
-    expect(deck.isEmpty).toBe(true)
+    expect(deck.drawPile).toEqual([])
+    expect(deck.discardPile).toEqual([])
   })
 })
 
