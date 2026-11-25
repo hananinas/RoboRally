@@ -5,6 +5,7 @@ import { effects, type Instruction, type ResolvedInstruction, type RobotSpriteId
 import { captureEnvironmentSnapshot, environmentSteps, type EnvironmentChanges } from '@/domain/game/environment'
 import { Card } from '@/domain/game/Card'
 import { Deck } from '@/domain/game/Deck'
+import type { GameSnapshot } from '@/domain/game/GameSnapshot'
 import type { CardId, GameId, PlayerId, RobotId } from '@/domain/game/ids'
 import { Player } from '@/domain/game/Player'
 import { REGISTER_COUNT, type RegisterView } from '@/domain/game/Registers'
@@ -137,6 +138,17 @@ export class Game {
 
   get completedRounds(): number {
     return this.#completedRounds
+  }
+
+  get snapshot(): GameSnapshot {
+    if (this.roster.players.some((player) => player.robot.program.length > 0)) {
+      throw new Error('Cannot snapshot a game while cards sit in registers')
+    }
+    return {
+      completedRounds: this.#completedRounds,
+      players: this.roster.players.map((player) =>
+        player.snapshot(this.robotPlacements.positionOf(player.robot.id))),
+    }
   }
 
   get players(): readonly Player[] {

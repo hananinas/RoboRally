@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { Instruction } from '@robo-rally/game-events'
 import { Card } from '@/domain/game/Card'
+import { cardSnapshot, type DeckSnapshot } from '@/domain/game/GameSnapshot'
 import type { CardId } from '@/domain/game/ids'
 
 export const HAND_SIZE = 9
@@ -18,12 +19,11 @@ export class Deck {
     return new Deck(instructions.map((instruction) => new Card(randomUUID(), instruction)))
   }
 
-  get drawPile(): readonly Card[] {
-    return [...this.#drawPile]
-  }
-
-  get discardPile(): readonly Card[] {
-    return [...this.#discardPile]
+  get snapshot(): DeckSnapshot {
+    return {
+      drawPile: this.#drawPile.map(cardSnapshot),
+      discardPile: this.#discardPile.map(cardSnapshot),
+    }
   }
 
   add(cards: readonly Card[]): void {
