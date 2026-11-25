@@ -1,3 +1,4 @@
+import type { Orientation } from '@robo-rally/game-events'
 import { Integer } from '@/numbers'
 
 // Coordinates start at the top-left: x increases east, y increases south.
@@ -8,6 +9,17 @@ export enum Direction {
   WEST = 1,
   SOUTH = 2,
   EAST = 3,
+}
+
+const orientations: Record<Direction, Orientation> = {
+  [Direction.NORTH]: 'NORTH',
+  [Direction.EAST]: 'EAST',
+  [Direction.SOUTH]: 'SOUTH',
+  [Direction.WEST]: 'WEST',
+}
+
+export function orientationOf(direction: Direction): Orientation {
+  return orientations[direction]
 }
 
 export function neighbour(position: Position, direction: Direction): Position {

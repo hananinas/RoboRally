@@ -7,7 +7,6 @@ import type {
   ProgrammingTimer,
   ProgramTimerChanged,
   GamePhase as GamePhasePayload,
-  Orientation,
   Position as PositionPayload,
   PlayerConnectionChanged,
   PrivateProgram,
@@ -22,9 +21,10 @@ import type {
   Tile as TilePayload,
 } from '@robo-rally/game-events'
 import {
-  Direction,
+  orientationOf,
   type Card,
   type CompletedProgram,
+  type Direction,
   type Game,
   type GameId,
   type GamePhase,
@@ -39,20 +39,13 @@ import { Integer } from '@/numbers'
 import type { EnvironmentStepResult } from '@/domain/game/Game'
 import { ConveyorTile, GearTile } from '@/domain/game/Tile'
 
-const orientations: Record<Direction, Orientation> = {
-  [Direction.NORTH]: 'NORTH',
-  [Direction.EAST]: 'EAST',
-  [Direction.SOUTH]: 'SOUTH',
-  [Direction.WEST]: 'WEST',
-}
-
 const phases: Record<GamePhase, GamePhasePayload> = {
   programming: 'PROGRAMMING',
   activation: 'EXECUTING',
 }
 
 function presentPosition(coordinate: Position, direction: Direction): PositionPayload {
-  return { coordinate, orientation: orientations[direction] }
+  return { coordinate, orientation: orientationOf(direction) }
 }
 
 function presentCard(card: Card): CardPayload {
@@ -86,7 +79,7 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
     throw new Error(`Missing tile at ${x},${y}`)
   }
 
-  const walls = [...tile.walls].map((direction) => orientations[direction])
+  const walls = [...tile.walls].map(orientationOf)
 
   const common = {
     position: { x, y },
@@ -101,7 +94,7 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
       ...common,
       type: tile.kind,
       sprite: tile.sprite,
-      direction: orientations[tile.direction],
+      direction: orientationOf(tile.direction),
     }
   }
 
