@@ -165,7 +165,7 @@ export function handleCardChoice(
   }, (error) => {
     logError('Failed to choose card action', error, {
       command: 'card.choose',
-      gameId: ctx.gameId,
+      gameId: ctx.game.id,
     })
 
     return { outcome: 'INTERNAL_ERROR' } as const

@@ -1,9 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { err, ok, type Result } from 'neverthrow'
 import type { Board } from '@/game/Board'
-import { effects, type PrivateProgram, type PublicRegisters, type Instruction, type ResolvedInstruction, type PendingCardChoice, type ChooseCardAction } from '@robo-rally/game-events'
+import { effects, type PrivateProgram, type PublicRegisters, type Instruction, type ResolvedInstruction, type PendingCardChoice, type ChooseCardAction, type RobotSpriteId } from '@robo-rally/game-events'
 import { captureEnvironmentSnapshot, environmentSteps, type EnvironmentChanges } from '@/game/environment'
-import { effects, type PrivateProgram, type PublicRegisters, type ResolvedInstruction, type RobotSpriteId } from '@robo-rally/game-events'
 import { Card } from '@/game/Card'
 import { Deck } from '@/game/Deck'
 import type { CardId, GameId, PlayerId, RobotId } from '@/game/ids'
@@ -96,13 +95,8 @@ export class Game {
   private environmentStepIndex: number | null = null
   private readonly submittedPlayerIds = new Set<PlayerId>()
   private readonly activatedRobotIds = new Set<RobotId>()
-  private readonly random: () => number
-  private readonly drawRandom: () => number
   // Reboots recorded while the current action resolves.
   private actionReboots: RebootResult[] = []
-  private environmentStepIndex: number | null = null
-  private readonly submittedPlayerIds = new Set<PlayerId>()
-  private readonly activatedRobotIds = new Set<RobotId>()
   // What each robot's registers resolved to this round, so Again repeats the real action.
   private readonly resolvedInstructions = new Map<RobotId, (ResolvedInstruction | undefined)[]>()
 

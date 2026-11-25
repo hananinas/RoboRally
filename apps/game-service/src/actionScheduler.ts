@@ -65,7 +65,7 @@ export function createActionScheduler(
         const choice = game.prepareNextChoice()
         if ((choice?.choiceId ?? null) !== announcedChoiceId){
           io.to(publicRoom).emit('card.choiceChanged', {
-            gameId,
+            gameId: game.id,
             choice,
           })
           announcedChoiceId = choice?.choiceId ?? null

@@ -14,7 +14,6 @@ import { SESSION_COOKIE_NAME, type Session, type SessionStore } from '@/auth/ses
 import { createAuthGatedAdapter } from '@/socket/authGatedAdapter'
 
 export type GameSocketData = { user: User; authSession: Session; sessionId: string }
-d
 export type GameSocketServer = Server<
   ClientToServerEvents,
   ServerToClientEvents,

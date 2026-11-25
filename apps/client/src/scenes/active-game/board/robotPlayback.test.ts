@@ -149,7 +149,7 @@ describe('reboot playback', () => {
   })
   // A move the server reports as ending in a reboot.
   const fall = (
-    instruction: ResolvedRobotAction['instruction'],
+    instruction: NonNullable<ResolvedRobotAction['resolvedInstruction']>,
     fellAt: { x: number; y: number },
     position: ResolvedRobotAction['position'] = reboot,
     robotId = 'red',
