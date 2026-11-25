@@ -86,10 +86,11 @@ async function expectStill(tank: Locator) {
   expect(midway).toBe(start)
 }
 
-test('falls into the pit and respawns in place at the reboot tile', async ({ page, game }) => {
+test('falls into the pit and pops up on the reboot tile while its arrows spin', async ({ page, game }) => {
   await openPitBoard(page, game)
   const tank = page.locator(`[data-robot-id="${ROBOT_ID}"]`).first()
   const hole = page.locator('[data-board-tile-type="hole"][data-board-tile="5,3"]')
+  const arrows = page.locator('[data-board-component="reboot3"][data-board-tile="1,9"]')
   await game.control({ type: 'round', actions: [...ROUND] })
 
   await expect(tank).toHaveAttribute('data-board-tile', '5,4')
@@ -113,12 +114,17 @@ test('falls into the pit and respawns in place at the reboot tile', async ({ pag
   await expect(tank).toHaveAttribute('data-board-tile', '1,9')
   await expect(hole).not.toHaveAttribute('data-pit-active')
   await expectStill(tank)
-  await page.clock.runFor(300)
+  await expect(arrows).toHaveAttribute('data-reboot-active', 'true')
+  await expect(arrows.locator('use')).toHaveCSS('animation-name', 'reboot-spin')
+  await expect(tank.locator(':scope > g')).toHaveCSS('animation-name', 'reboot-pop')
+  await expect(page.locator('[data-reboot-active]')).toHaveCount(4)
+  await page.clock.runFor(900)
 
   await expect(tank).not.toHaveAttribute('data-playback-phase')
   await expect(tank).toHaveAttribute('data-board-tile', '1,9')
   await expect.poll(() => opacity(tank)).toBe('1')
   await expect(page.locator('[data-pit-active]')).toHaveCount(0)
+  await expect(page.locator('[data-reboot-active]')).toHaveCount(0)
 })
 
 test('shows the fall when the robot reboots on a tile it drove over', async ({ page, game }) => {
@@ -138,7 +144,8 @@ test('shows the fall when the robot reboots on a tile it drove over', async ({ p
 
   await expect(tank).toHaveAttribute('data-playback-phase', 'pit-respawn')
   await expect(tank).toHaveAttribute('data-board-tile', '5,4')
-  await page.clock.runFor(300)
+  await expect(page.locator('[data-reboot-active]')).toHaveCount(0)
+  await page.clock.runFor(900)
 
   await expect(tank).not.toHaveAttribute('data-playback-phase')
   await expect(tank).toHaveAttribute('data-board-tile', '5,4')
@@ -164,7 +171,8 @@ test('animates only the robot that is rebooting when a push sends two robots int
 
   await expect(pushed).toHaveAttribute('data-playback-phase', 'pit-respawn')
   await expect(pushed).toHaveAttribute('data-board-tile', '5,4')
-  await page.clock.runFor(300)
+  await expect(page.locator('[data-reboot-active]')).toHaveCount(0)
+  await page.clock.runFor(900)
 
   await expect(actor).toHaveAttribute('data-playback-phase', 'pit-enter')
   await expect(actor).toHaveAttribute('data-board-tile', '5,2')
@@ -178,7 +186,9 @@ test('animates only the robot that is rebooting when a push sends two robots int
 
   await expect(actor).toHaveAttribute('data-playback-phase', 'pit-respawn')
   await expect(actor).toHaveAttribute('data-board-tile', '1,9')
-  await page.clock.runFor(300)
+  await expect(page.locator('[data-reboot-active][data-board-tile="1,9"]')).toHaveCount(4)
+  await expect(pushed.locator(':scope > g')).not.toHaveCSS('animation-name', 'reboot-pop')
+  await page.clock.runFor(900)
 
   await expect(actor).not.toHaveAttribute('data-playback-phase')
   await expect(pushed).not.toHaveAttribute('data-playback-phase')
@@ -196,5 +206,6 @@ test('skips every pit phase with reduced motion', async ({ page, game }) => {
   await expect(tank).toHaveAttribute('data-board-tile', '1,9')
   await expect(tank).not.toHaveAttribute('data-playback-phase')
   await expect(page.locator('[data-pit-active]')).toHaveCount(0)
+  await expect(page.locator('[data-reboot-active]')).toHaveCount(0)
   await expectStill(tank)
 })

@@ -82,14 +82,42 @@
     opacity var(--pit-fall-duration) ease-in;
 }
 
-/* Respawn places the tank at once; only its appearance animates. */
+/* Respawn places the robot at once on the reboot tile. While the tile's arrows
+   spin, the robot pops up out of the tile. The drawing inside the sprite scales,
+   so the robot grows in place and the piece transform is untouched. */
 .board-piece--test-tank[data-playback-phase='pit-respawn'] {
   transition:
     left 0s,
     top 0s,
     --board-piece-angle 0s,
-    scale var(--pit-respawn-duration) var(--tank-motion-easing),
-    opacity var(--pit-respawn-duration) var(--tank-motion-easing);
+    scale 0s,
+    opacity 0s;
+}
+
+.board-piece--test-tank[data-playback-phase='pit-respawn'] > g {
+  transform-box: view-box;
+  transform-origin: center;
+  animation: reboot-pop calc(var(--pit-respawn-duration) * 0.6)
+    cubic-bezier(0.3, 1.6, 0.5, 1) calc(var(--pit-respawn-duration) * 0.4) backwards;
+}
+
+.board-piece[data-board-component='reboot3'][data-reboot-active] use {
+  transform-box: view-box;
+  transform-origin: center;
+  animation: reboot-spin var(--pit-respawn-duration) ease-in-out;
+}
+
+@keyframes reboot-pop {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+}
+
+@keyframes reboot-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .board-piece--checkpoint {
@@ -124,7 +152,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .board-piece--test-tank {
+  .board-piece--test-tank,
+  .board-piece--test-tank[data-playback-phase='pit-respawn'] > g,
+  .board-piece[data-board-component='reboot3'][data-reboot-active] use {
     transition-duration: 0s;
     animation: none;
   }

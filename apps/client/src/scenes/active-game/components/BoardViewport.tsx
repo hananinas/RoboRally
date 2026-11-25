@@ -5,6 +5,7 @@ import tankSprites from '../board/assets/tanks.hbls?raw'
 import { robotOptionFor } from '../../entry/robotPreviews.ts'
 import gearSprites from '../board/assets/gears.hbls?raw'
 import conveyorSprites from '../board/assets/conveyors.hbls?raw'
+import rebootSprites from '../board/assets/reboot.hbls?raw'
 import {
   BOARD_COMPONENTS,
   BOARD_CONFIG,
@@ -100,7 +101,7 @@ function pieceStyle(piece: BoardScenePiece): PieceStyle {
   return style
 }
 
-function BoardPiece({ piece }: Readonly<{ piece: BoardScenePiece }>) {
+function BoardPiece({ piece, rebooting }: Readonly<{ piece: BoardScenePiece; rebooting?: boolean }>) {
   const className = [
     'board-piece',
     piece.component.className,
@@ -116,6 +117,7 @@ function BoardPiece({ piece }: Readonly<{ piece: BoardScenePiece }>) {
     'data-board-tile-type': piece.cell.tile,
     'data-board-tile': `${piece.cell.x},${piece.cell.y}`,
     'data-board-wall': piece.slice.wall,
+    'data-reboot-active': rebooting || undefined,
     style: pieceStyle(piece),
   }
 
@@ -222,6 +224,9 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
   const checkpointTiles = scene.tiles.filter((tile) => tile.cell.checkpointNumber !== undefined)
   const fallingInto = new Set(robots.flatMap((robot) => robot.phase === 'pit-fall'
     ? [`${robot.position.coordinate.x},${robot.position.coordinate.y}`] : []))
+  // Only the robot that is rebooting has this phase, so only its reboot tile spins.
+  const rebootingAt = new Set(robots.flatMap((robot) => robot.phase === 'pit-respawn'
+    ? [`${robot.position.coordinate.x},${robot.position.coordinate.y}`] : []))
 
   return (
     <main
@@ -243,7 +248,7 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
       >
         <div
           aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: `${laserSprites}${antennaSprites}${tankSprites}${conveyorSprites}${gearSprites}` }}
+          dangerouslySetInnerHTML={{ __html: `${laserSprites}${antennaSprites}${tankSprites}${conveyorSprites}${gearSprites}${rebootSprites}` }}
         />
         {scene.planes.map((pieces, layer) => {
           const robotComponent = ROBOT_COMPONENTS[layer - 3]
@@ -255,7 +260,11 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
               style={{ zIndex: layer }}
             >
               {pieces.map((piece) => (
-                <BoardPiece key={piece.key} piece={piece} />
+                <BoardPiece
+                  key={piece.key}
+                  piece={piece}
+                  rebooting={piece.componentName.startsWith('reboot') && rebootingAt.has(`${piece.cell.x},${piece.cell.y}`)}
+                />
               ))}
               {checkpointTiles.map((tile) => (
                 <CheckpointPiece key={`${tile.cell.x},${tile.cell.y}`} tile={tile} layer={layer} />
