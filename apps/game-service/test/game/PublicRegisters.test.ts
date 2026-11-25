@@ -2,6 +2,7 @@ import { resolveRobotAction } from '../activationTestHelper.js'
 import { describe, expect, it } from 'vitest'
 import type { Game, UpdateRegistersError } from '@/game/Game'
 import type { Player } from '@/game/Player'
+import { Integer } from '@/numbers'
 import { createGame } from '@/game/GameFactory'
 
 const selection = (player: Player) => [player.hand[0].id, null, player.hand[2].id, null, player.hand[4].id] as const
@@ -148,6 +149,42 @@ describe('public register lifecycle', () => {
     expect(game.hasSubmittedProgram(player.id)).toBe(false)
     expect(player.program).toEqual([null, null, null, null, null])
     expect(game.updateRegisters(player.id, selection(player))._unsafeUnwrap()).toBeUndefined()
+  })
+
+  it('reveals only the executed instructions and clears the slots once a reboot ends the round', () => {
+    const game = createGame('empty-map', 'Test game')
+    const player = game.addPlayer('red')._unsafeUnwrap()
+    const hand = player.hand
+    expect(hand.slice(0, 5).map((card) => card.instruction))
+      .toEqual(['MOVE_1', 'MOVE_1', 'MOVE_1', 'MOVE_1', 'MOVE_2'])
+    // Off the antenna column, the second register drives the robot off the north edge.
+    game.board.relocateRobot(player.robot.id, { x: Integer(9), y: Integer(1) })
+    game.updateRegisters(player.id, hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
+    game.submitProgram(player.id, hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
+    const revealed = (count: number) => Array.from({ length: 5 }, (_, slot) => slot < count
+      ? { status: 'REVEALED', instruction: hand[slot].instruction }
+      : { status: 'HIDDEN' })
+
+    const first = resolveRobotAction(game)
+    expect(first.action.robotId).toBe(player.robot.id)
+    expect(first.roundConcluded).toBe(false)
+    expect(first.registers).toEqual(revealed(1))
+    expect(player.registers).toEqual(first.registers)
+    expect(game.lastActivePhase).toBe('activation')
+
+    const second = resolveRobotAction(game)
+    // (3,3) is the reboot tile closest to (9,-1), just past the north edge.
+    expect(second.reboots).toEqual([{ robotId: player.robot.id, fellAt: { x: 9, y: -1 }, landedAt: { x: 3, y: 3 } }])
+    expect(second.registers).toEqual(revealed(2))
+    expect(second.registers[1]).not.toHaveProperty('id')
+    expect(second.roundConcluded).toBe(true)
+
+    // The reboot cancels the only robot, so the new hand clears every slot.
+    expect(game.lastActivePhase).toBe('programming')
+    expect(player.registers).toEqual(empty)
+    expect(player.hand).toHaveLength(9)
+    expect(game.hasSubmittedProgram(player.id)).toBe(false)
+    expect(player.program).toEqual([null, null, null, null, null])
   })
 
   it('preserves colours across departure', () => {

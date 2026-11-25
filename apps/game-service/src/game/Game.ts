@@ -96,6 +96,7 @@ export class Game {
   private environmentStepIndex: number | null = null
   private readonly submittedPlayerIds = new Set<PlayerId>()
   private readonly activatedRobotIds = new Set<RobotId>()
+  private readonly cancelledRobotIds = new Set<RobotId>()
   // What each robot's registers resolved to this round, so Again repeats the real action.
   private readonly resolvedInstructions = new Map<RobotId, (ResolvedInstruction | undefined)[]>()
 
@@ -217,6 +218,7 @@ export class Game {
     player.robot.clearProgram()
     this.submittedPlayerIds.delete(playerId)
     this.activatedRobotIds.delete(player.robot.id)
+    this.cancelledRobotIds.delete(player.robot.id)
     const { roundConcluded } = this.recheckActivationPhase()
     this.recheckProgrammingPhase()
     return { roundConcluded }
@@ -321,7 +323,8 @@ export class Game {
       return { roundConcluded: false }
     }
     if (this.roster.length === 0) return this.concludeRegister()
-    if (!this.hasPendingEnvironment && this.activatedRobotIds.size === this.roster.length) {
+    if (!this.hasPendingEnvironment && this.roster.every(({ robot }) =>
+      this.activatedRobotIds.has(robot.id) || this.cancelledRobotIds.has(robot.id))) {
       this.environmentStepIndex = 0
     }
     return { roundConcluded: false }
@@ -365,11 +368,15 @@ export class Game {
       this.clearRound()
       return { roundConcluded: false }
     }
-    if (this.registerIndex === REGISTERS_PER_ROUND) {
+    if (this.registerIndex === REGISTERS_PER_ROUND || !this.hasEligibleRobot()) {
       this.finishRound()
       return { roundConcluded: true }
     }
     return { roundConcluded: false }
+  }
+
+  private hasEligibleRobot(): boolean {
+    return this.roster.some(({ robot }) => !this.cancelledRobotIds.has(robot.id))
   }
 
   // Gameplay movement resolves entry effects; Board movement only changes positions.
@@ -442,6 +449,7 @@ export class Game {
     this.lifecycle.enterActivation()
     this.registerIndex = 0
     this.activatedRobotIds.clear()
+    this.cancelledRobotIds.clear()
     this.resolvedInstructions.clear()
   }
 
@@ -456,7 +464,7 @@ export class Game {
     // Radians start east and increase clockwise because board y increases south.
     // Recheck current positions every action; exact ties retain roster order.
     for (const { robot } of this.players) {
-      if (this.activatedRobotIds.has(robot.id)) continue
+      if (this.activatedRobotIds.has(robot.id) || this.cancelledRobotIds.has(robot.id)) continue
       const position = this.board.positionOf(robot.id)
       const dx = position.x - antenna.x
       const dy = position.y - antenna.y
@@ -518,7 +526,12 @@ export class Game {
     if (destination === undefined) throw new Error('No safe reboot destination is available')
     this.board.relocateRobot(robot.id, destination)
     this.actionReboots.push({ robotId: robot.id, fellAt: { ...fellAt }, landedAt: { ...destination } })
-    // TODO: Add two SPAM cards and cancel this robot's remaining registers.
+    // TODO: Add two SPAM cards.
+    this.cancelledRobotIds.add(robot.id)
+    const player = this.roster.find((candidate) => candidate.robot === robot)
+    if (player === undefined) return
+    player.discard(robot.program)
+    robot.clearProgram()
   }
 
   private finishRegister(): void {

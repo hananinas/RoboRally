@@ -451,7 +451,16 @@ describe('started game membership over Socket.IO', () => {
         ],
         reboots: [{ robotId: robotIds[2], fellAt: { x: column, y: pitY }, landedAt: { x: 10, y: 10 } }],
       })
-      expect(actions[0]).toHaveLength(15)
+      // A cancelled robot sits out the rest of the round: robot2 never acts, and robot0
+      // drives into the same pit in register 2 and then stops acting too.
+      const registersOf = (robotId: string) =>
+        actions[0].filter((action) => action.robotId === robotId).map((action) => action.registerIndex)
+      expect(registersOf(robotIds[0])).toEqual([0, 1, 2])
+      expect(registersOf(robotIds[1])).toEqual([0, 1, 2, 3, 4])
+      expect(registersOf(robotIds[2])).toEqual([])
+      expect(actions[0].find((action) => action.robotId === robotIds[0] && action.registerIndex === 2)?.reboots)
+        .toEqual([{ robotId: robotIds[0], fellAt: { x: column, y: pitY }, landedAt: { x: 13, y: 2 } }])
+      expect(actions[0]).toHaveLength(8)
       expect(actions[1]).toEqual(actions[0])
       expect(actions[2]).toEqual(actions[0])
     })
@@ -489,28 +498,12 @@ describe('started game membership over Socket.IO', () => {
         position: { coordinate: { x: 2, y: 6 }, orientation: 'SOUTH' },
         reboots: [{ robotId, fellAt: { x: 3, y: 3 }, landedAt: { x: 2, y: 6 } }],
       })
-      expect(actions).toEqual([
-        { coordinate: { x: 2, y: 6 }, orientation: 'SOUTH' },
-        { coordinate: { x: 2, y: 7 }, orientation: 'SOUTH' },
-        { coordinate: { x: 2, y: 8 }, orientation: 'SOUTH' },
-        { coordinate: { x: 2, y: 9 }, orientation: 'SOUTH' },
-        { coordinate: { x: 2, y: 11 }, orientation: 'SOUTH' },
-      ].map((position, registerIndex) => {
-        const instruction = initial.hand[registerIndex].instruction
-        return {
-          gameId: game.id, registerIndex, robotId: initial.assignment.robotId,
-          playerId: initial.assignment.playerId,
-          pushedRobots: [],
-          // Only the first register falls into the pit at (3,3).
-          reboots: registerIndex === 0
-            ? [{ robotId: initial.assignment.robotId, fellAt: { x: 3, y: 3 }, landedAt: { x: 2, y: 6 } }] : [],
-          instruction, resolvedInstruction: instruction, position,
-        }
-      }))
+      // Falling in register 0 cancels the only robot, so the round ends after one action.
+      expect(actions).toHaveLength(1)
       expect(progress.flatMap((step) => step.checkpointProgress ?? [])).toEqual([])
       expect(events).toEqual([
         'program.finalized', 'game.registersChanged', 'program.submitted',
-        ...Array.from({ length: 5 }, () => 'robot.actionResolved'), 'cards.dealt',
+        'robot.actionResolved', 'cards.dealt',
       ])
       const snapshot = await getSnapshot(client)
       expect(snapshot.outcome).toBe('JOINED')
@@ -519,7 +512,7 @@ describe('started game membership over Socket.IO', () => {
         robotId: initial.assignment.robotId, playerId: initial.assignment.playerId,
         robotSpriteId: initial.state.robots[0].robotSpriteId,
         colour: initial.state.robots[0].colour,
-        position: actions[4].position,
+        position: actions[0].position,
       }])
       expect(game.board.occupantAt({ x: Integer(3), y: Integer(3) })).toBeUndefined()
       await outsider.timeout(1000).emitWithAck('session.get', {})
@@ -564,7 +557,8 @@ describe('started game membership over Socket.IO', () => {
         expect(dealtHands[index]).toMatchObject({ gameId: game.id, playerId: joined.assignment.playerId })
         expect(dealtHands[index].cards).toHaveLength(HAND_SIZE)
       }
-      expect(actions[0]).toHaveLength(15)
+      // The fallback robot reboots once, then stays out of every later register.
+      expect(actions[0]).toHaveLength(11)
       expect(actions[1]).toEqual(actions[0])
       expect(actions[2]).toEqual(actions[0])
       // (2,6) is occupied. (13,2) and (2,13) are next, both 11 away; (13,2) wins the tie
@@ -579,7 +573,9 @@ describe('started game membership over Socket.IO', () => {
       expect(game.board.occupantAt({ x: Integer(3), y: Integer(3) })).toBeUndefined()
       expect(game.board.positionOf(robotIds[1])).not.toEqual({ x: 13, y: 2 })
       expect(actions[0].slice(0, 3).map((action) => action.robotId)).toEqual([robotIds[0], robotIds[2], robotIds[1]])
-      expect(actions[0].slice(3, 6).map((action) => action.robotId)).toEqual([robotIds[0], robotIds[2], robotIds[1]])
+      expect(actions[0].slice(3).map((action) => action.robotId))
+        .toEqual(Array.from({ length: 4 }, () => [robotIds[2], robotIds[1]]).flat())
+      expect(actions[0].filter((action) => action.robotId === robotIds[0])).toHaveLength(1)
       for (const [index, { client, joined }] of members.entries()) {
         const snapshot = await getSnapshot(client)
         expect(snapshot.outcome).toBe('JOINED')
