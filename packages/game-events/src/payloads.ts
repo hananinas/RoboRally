@@ -110,6 +110,7 @@ export type PublicGameState = Readonly<{
   gameId: GameId
   serverTime: number
   programmingTimer: ProgrammingTimer
+  pendingChoice?: PendingCardChoice | null
   checkpointCount: number
   antenna: Antenna
   board: Board
@@ -248,6 +249,27 @@ export type RegistersChanged = Readonly<{
   ]
 }>
 
+export type PendingCardChoice = Readonly<{
+  choiceId: string
+  playerId: PlayerId
+  registerIndex: number
+  instruction: Extract<Instruction, 'SANDBOX_ROUTINE' | 'WEASEL_ROUTINE'>
+  options: readonly ResolvedInstruction[]
+}>
+
+export type CardChoiceChanged = Readonly<{
+  gameId: GameId
+  choice: PendingCardChoice | null
+}>
+
+export type ChooseCardAction = Readonly<{
+  choiceId: string
+  instruction: ResolvedInstruction
+}>
+
+export type CardChoiceResult = Readonly<{
+  outcome: 'ACCEPTED' | 'INVALID_REQUEST' | 'NOT_A_MEMBER' | 'INVALID_CHOICE' | 'GAME_PAUSED' | 'GAME_ABORTED' | 'GAME_FINISHED' | 'WRONG_PHASE' | 'INTERNAL_ERROR'
+}>
 export type GameInitialization = Readonly<{
   outcome: 'JOINED'
   assignment: PlayerAssignment

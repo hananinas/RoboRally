@@ -143,15 +143,13 @@ describe('reboot playback', () => {
   const start = { coordinate: { x: 2, y: 3 }, orientation: 'NORTH' as const }
   const reboot = { coordinate: { x: 0, y: 0 }, orientation: 'NORTH' as const }
   const move = (
-    instruction: ResolvedRobotAction['instruction'],
-    position: ResolvedRobotAction['position'] = reboot,
+    instruction: NonNullable<ResolvedRobotAction['resolvedInstruction']>, position: ResolvedRobotAction['position'] = reboot,
   ): ResolvedRobotAction => ({
-    gameId: 'demo', playerId: 'red-player', registerIndex: 0, pushedRobots: [], reboots: [], robotId: 'red', instruction,
-    resolvedInstruction: instruction === 'AGAIN' ? null : instruction, position,
+    gameId: 'demo', playerId: 'red-player', registerIndex: 0, pushedRobots: [], robotId: 'red', instruction, resolvedInstruction: instruction, position,  reboots: []
   })
   // A move the server reports as ending in a reboot.
   const fall = (
-    instruction: ResolvedRobotAction['instruction'],
+    instruction: NonNullable<ResolvedRobotAction['resolvedInstruction']>,
     fellAt: { x: number; y: number },
     position: ResolvedRobotAction['position'] = reboot,
     robotId = 'red',

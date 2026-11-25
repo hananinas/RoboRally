@@ -8,6 +8,13 @@ describe('instruction contract', () => {
     const enumValues = spec.match(/\r?\n    Instruction:\r?\n      type: string\r?\n      enum: \[([^\]]+)\]/)?.[1]
     expect(enumValues).toBeDefined()
     expect(enumValues?.split(',').map(value => value.trim()).sort())
-      .toEqual([...Object.keys(effects), 'AGAIN'].sort())
+      .toEqual([
+        ...Object.keys(effects),
+        'AGAIN',
+        'REPEAT_ROUTINE',
+        'SANDBOX_ROUTINE',
+        'SPEED_ROUTINE',
+        'WEASEL_ROUTINE',
+      ].sort())
   })
 })

@@ -1,3 +1,15 @@
-// Imported (directly, or preloaded via `node --import`) so e2e tests see
-// repeatable card draws without the production server needing any test-only seeding.
+import { Deck } from '../../game-service/dist/game/Deck.js'
+
+// Repeatable card draws for e2e tests.
 Math.random = () => 0.55
+
+// Preserve the original deck composition for deterministic tests.
+const originalFromTemplate = Deck.fromTemplate
+
+Deck.fromTemplate = (template) => {
+  return originalFromTemplate(
+    template.filter(({ instruction }) =>
+      !instruction.endsWith('_ROUTINE')
+    )
+  )
+}

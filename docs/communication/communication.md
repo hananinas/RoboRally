@@ -248,6 +248,28 @@ Each map has four reboot tiles, sent as tiles with type `REBOOT` in the board. A
 
 The event includes final positions after reboots: `position` for the acting robot and `pushedRobots` for other robots whose positions changed. Clients apply them together when the action plays.
 
+#### Interactive card choices
+
+When Sandbox Routine or Weasel Routine activates, the service broadcasts
+`card.choiceChanged {gameId, choice}` to the public game room. The choice includes
+its unique `choiceId`, owner `playerId`, zero-based `registerIndex`, card `instruction`
+and allowed concrete `options`. Activation waits at that action.
+
+The owner submits `card.choose {choiceId, instruction}`. Existing session and membership
+checks identify the player; a wrong owner, invalid option, stale choice ID or duplicate
+submission cannot execute an action. The acknowledgement returns `ACCEPTED` or a rejection
+listed in AsyncAPI. On acceptance, the scheduler clears the public choice and emits the
+normal `robot.actionResolved` event, retaining the original special-card instruction and
+the concrete resolved movement/turn for playback.
+
+`PublicGameState.pendingChoice` restores outstanding decisions through `session.get`.
+Disconnecting preserves the decision and applies the existing game pause policy. Leaving
+removes the departing owner's decision so other players can continue. No choice timeout
+is imposed. Waiting for a choice is distinct from a disconnection pause.
+
+The owner sees the choices directly underneath their filled registers after earlier
+actions finish animating. Other players see a waiting message. The buttons are disabled
+while disconnected, paused, or submitting a response.
 `reboots` lists every reboot the instruction caused, in order: the robot, `fellAt` (the pit, or the square just off the board edge) and `landedAt` (the reboot tile). Clients play each fall from it instead of guessing from the path, because a reboot tile can be on the path itself: on Test Map, `MOVE_3` south from (13,1) passes (13,2), falls into the pit at (13,4) and lands back on the reboot tile at (13,2).
 
 Drive the fall animation from each `reboots` entry, and animate only the robot in that entry. A robot can appear in `reboots` without being in `pushedRobots`: a pushed robot that reboots onto the tile it started from has not changed position. When one instruction reboots several robots, play them one after another in list order. A robot whose reboot comes later waits where it started and stays visible until its turn. A reboot keeps the robot's facing.

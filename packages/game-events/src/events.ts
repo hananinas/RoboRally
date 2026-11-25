@@ -37,6 +37,7 @@ export interface ClientToServerEvents {
     payload: SubmitProgram,
     acknowledge: ProgramResultAcknowledgement,
   ) => void
+  'card.choose': (payload: import('./payloads.js').ChooseCardAction, acknowledge: (result: import('./payloads.js').CardChoiceResult,) => void,) => void
 }
 
 export interface ServerToClientEvents {
@@ -53,4 +54,5 @@ export interface ServerToClientEvents {
   'robot.actionResolved': (payload: RobotActionResolved) => void
   'game.aborted': (payload: GameAborted) => void
   'game.won': (payload: GameWon) => void
+  'card.choiceChanged': (payload: import('./payloads.js').CardChoiceChanged) => void
 }

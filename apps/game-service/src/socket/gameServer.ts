@@ -1,5 +1,5 @@
 import { handleListLobbies, handleCreateLobby, handleJoinLobby, handleSelectRobot, handleLeaveLobby, handleStartLobby } from '@/socket/handlers/lobbyHandlers'
-import { handleGetSession, handleLeaveGame, handleDisconnectSession, handleSessionProgram, handleSessionRegisters, recoverSession, validateRecoveredSession } from '@/socket/handlers/sessionHandlers'
+import { handleSessionCardChoice, handleGetSession, handleLeaveGame, handleDisconnectSession, handleSessionProgram, handleSessionRegisters, recoverSession, validateRecoveredSession } from '@/socket/handlers/sessionHandlers'
 import type { SessionContext } from '@/socket/sessionContext'
 import type { Server as HttpServer } from 'node:http'
 import { emptyRequestSchema } from '@robo-rally/game-events'
@@ -14,7 +14,6 @@ import { SESSION_COOKIE_NAME, type Session, type SessionStore } from '@/auth/ses
 import { createAuthGatedAdapter } from '@/socket/authGatedAdapter'
 
 export type GameSocketData = { user: User; authSession: Session; sessionId: string }
-
 export type GameSocketServer = Server<
   ClientToServerEvents,
   ServerToClientEvents,
@@ -102,6 +101,7 @@ export function createGameSocketServer(
     socket.on('disconnect', () => handleDisconnectSession(context, socket))
     socket.on('program.submit', (payload, ack) => handleSessionProgram(context, socket, payload, ack))
     socket.on('game.updateRegisters', (payload, ack) => handleSessionRegisters(context, socket, payload, ack))
+    socket.on('card.choose', (payload, ack) => handleSessionCardChoice(context, socket, payload, ack))
   })
 
   return io

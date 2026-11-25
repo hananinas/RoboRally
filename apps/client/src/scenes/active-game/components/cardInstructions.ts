@@ -18,4 +18,8 @@ export const cardPresentation: Record<Instruction, { label: string; icon: string
   TURN_RIGHT: { label: 'Turn Right', icon: arrowRight },
   U_TURN: { label: 'U-Turn', icon: uTurn },
   AGAIN: { label: 'Again', icon: repeat },
+  SANDBOX_ROUTINE: { label: 'Sandbox Routine', icon: arrowUp1 },
+  WEASEL_ROUTINE: { label: 'Weasel Routine', icon: uTurn },
+  SPEED_ROUTINE: { label: 'Speed Routine', icon: arrowUp3 },
+  REPEAT_ROUTINE: { label: 'Repeat Routine', icon: repeat },
 }

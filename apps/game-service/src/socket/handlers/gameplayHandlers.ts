@@ -1,14 +1,16 @@
 import {
   submitProgramSchema,
   updateRegistersSchema,
+  type ResolvedInstruction,
   type UpdateRegisters,
   type UpdateRegistersResult,
   type RegistersChanged,
   type ProgramResultAcknowledgement,
   type SubmitProgram,
+  effects,
 } from '@robo-rally/game-events'
 import { err, ok, type Result } from 'neverthrow'
-import type { ZodError } from 'zod'
+import {z, type ZodError } from 'zod'
 import { withAcknowledgeOnce } from '@/socket/utilities/acknowledgeOnce'
 import type { Player } from '@/game/index'
 import type { GameSocket } from '@/socket/gameServer'
@@ -16,6 +18,14 @@ import { logError, logWarn } from '@/logger'
 import { ownedMembership, type MembershipContext } from '@/socket/handlers/membershipHandlers'
 import { toRejection, type Rejection } from '@/socket/utilities/rejection'
 import { publishProgramFinalized } from '@/socket/programFinalization'
+
+const chooseCardActionSchema = z.object({
+  choiceId: z.uuid(),
+  instruction: z.custom<ResolvedInstruction>((value) =>
+    typeof value === 'string' && Object.hasOwn(effects, value),
+  ),
+}).strict()
+
 
 type ValidateSubmissionRequestError =
   | 'NOT_A_MEMBER'
@@ -116,6 +126,48 @@ export function handleUpdateRegisters(
     })
   }, (error) => {
     logError('Failed to update registers', error, { command: 'game.updateRegisters', gameId: ctx.game.id })
+    return { outcome: 'INTERNAL_ERROR' } as const
+  })
+}
+
+export function handleCardChoice(
+  ctx: MembershipContext,
+  socket: GameSocket,
+  payload: import('@robo-rally/game-events').ChooseCardAction,
+  acknowledge: (
+    result: import('@robo-rally/game-events').CardChoiceResult,
+  ) => void,
+): void {
+  withAcknowledgeOnce(acknowledge, (ack) => {
+    const membership = ownedMembership(ctx, socket)
+
+    if (!membership) {
+      return ack({ outcome: 'NOT_A_MEMBER' })
+    }
+
+    const parsed = chooseCardActionSchema.safeParse(payload)
+
+    if (!parsed.success) {
+      return ack({ outcome: 'INVALID_REQUEST' })
+    }
+
+    const result = ctx.game.chooseCardAction(
+      membership.player.id,
+      parsed.data,
+    )
+
+    if (result.isErr()) {
+      return ack({ outcome: result.error })
+    }
+
+    ack({ outcome: 'ACCEPTED' })
+    ctx.actionScheduler.scheduleNextAction()
+  }, (error) => {
+    logError('Failed to choose card action', error, {
+      command: 'card.choose',
+      gameId: ctx.game.id,
+    })
+
     return { outcome: 'INTERNAL_ERROR' } as const
   })
 }

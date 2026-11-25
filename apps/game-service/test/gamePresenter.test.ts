@@ -55,14 +55,14 @@ describe('game presenter', () => {
 
   it('serializes pushed robots and reboots, in order, alongside the acting robot', () => {
     const { game, player } = createGameWithPlayer()
-    const resolvedInstruction = player.hand[0].instruction === 'AGAIN' ? undefined : player.hand[0].instruction
-    const resolved = presentRobotActionResolved(game, {
+    const card = new Card('move-1', 'MOVE_1')
+    const resolved = presentRobotActionResolved( game, {
       registerIndex: 0,
       registers: player.registers,
       action: {
         robotId: player.robot.id,
-        card: player.hand[0],
-        resolvedInstruction,
+        card,
+        resolvedInstruction: 'MOVE_1',
         position: { x: Integer(2), y: Integer(3) },
         direction: Direction.EAST,
       },

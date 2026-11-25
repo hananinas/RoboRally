@@ -12,6 +12,8 @@ import type {
   ProgramFinalized,
   ProgramTimerChanged,
   ProgramSubmitted,
+  CardChoiceChanged,
+  ResolvedInstruction,
 } from '@robo-rally/game-events'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -146,6 +148,7 @@ export default function useGameConnection(socket: GameSocket) {
     const handleEnvironmentStep = (result: EnvironmentStepResolved) => receive({ type: 'environment', result })
     const handleRegistersChanged = (payload: RegistersChanged) => receive({ type: 'registers-changed', payload })
     const handleProgramSubmitted = (payload: ProgramSubmitted) => receive({ type: 'program-submitted', payload })
+    const handleChoiceChanged = (payload: CardChoiceChanged) => receive({ type: 'choice-changed', payload })
 
     socket.on('disconnect', handleDisconnect)
     socket.on('connect', handleConnect)
@@ -161,6 +164,7 @@ export default function useGameConnection(socket: GameSocket) {
     socket.on('environment.stepResolved', handleEnvironmentStep)
     socket.on('game.registersChanged', handleRegistersChanged)
     socket.on('program.submitted', handleProgramSubmitted)
+    socket.on('card.choiceChanged', handleChoiceChanged)
     return () => {
       generation.current += 1
       socket.off('disconnect', handleDisconnect)
@@ -177,6 +181,7 @@ export default function useGameConnection(socket: GameSocket) {
       socket.off('environment.stepResolved', handleEnvironmentStep)
       socket.off('game.registersChanged', handleRegistersChanged)
       socket.off('program.submitted', handleProgramSubmitted)
+      socket.off('card.choiceChanged', handleChoiceChanged)
     }
   }, [dispatch, socket, needsReconciliation])
 
@@ -197,5 +202,20 @@ export default function useGameConnection(socket: GameSocket) {
     })
   }, [dispatch, socket])
 
-  return { state, localDeadline, dispatch, submit, initialize, needsReconciliation }
+  const chooseAction = useCallback((instruction: ResolvedInstruction) => {
+    const currentState = current.current
+    const choice= currentState.pendingChoice
+    if (!socket.connected || !choice) return
+    const requestGeneration = generation.current
+    dispatch({ type: 'choosing' })
+    socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emit('card.choose', { choiceId: choice.choiceId, instruction }, (error, result) => {
+      if (!socket.connect || generation.current !== requestGeneration || current.current.pendingChoice?.choiceId !== choice.choiceId) return
+      if (error || result.outcome !== 'ACCEPTED') {
+        dispatch({ type: 'error', message: error ? 'No acknowledgement. Retry your choice or reconnect to restore the current decision.' : 'Choice rejected. Select an available action when the game resumes.',})
+      }
+    },
+  )
+  }, [dispatch, socket])
+
+  return { state, localDeadline, dispatch, submit, chooseAction, initialize, needsReconciliation }
 }

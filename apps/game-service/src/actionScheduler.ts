@@ -24,6 +24,7 @@ export type ActionScheduler = {
 export function createActionScheduler(
   { io, game, publicRoom, playerRoom, usernameOf, onProgrammingStarted, onStop }: ActionSchedulerDeps,
 ): ActionScheduler {
+  let announcedChoiceId: string | null = null
   let scheduledAction: NodeJS.Immediate | undefined
   let closed = false
   let winnerAnnounced = false
@@ -61,6 +62,16 @@ export function createActionScheduler(
       scheduledAction = undefined
       if (closed || game.requirePhase('activation').isErr()) return
       try {
+        const choice = game.prepareNextChoice()
+        if ((choice?.choiceId ?? null) !== announcedChoiceId){
+          io.to(publicRoom).emit('card.choiceChanged', {
+            gameId: game.id,
+            choice,
+          })
+          announcedChoiceId = choice?.choiceId ?? null
+        }
+        if (choice) return
+
         const step = game.executeNextStep()
         if (step.type === 'robot') {
           io.to(publicRoom).emit('robot.actionResolved', presentRobotActionResolved(game, step.result))

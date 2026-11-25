@@ -480,6 +480,24 @@
   pointer-events: none;
 }
 
+/* Choice panel */
+.card-choice .game-status {
+  margin-top: var(--ui-space-sm);
+}
+
+.card-choice__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-sm);
+  margin-top: var(--ui-space-sm);
+}
+
+.card-choice .register-panel__done {
+  margin: 0;
+  padding: var(--ui-space-sm);
+}
+
+
 .dragged-card[data-moving='true'] {
   animation: card-pickup var(--card-motion);
 }

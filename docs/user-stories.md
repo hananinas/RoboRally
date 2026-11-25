@@ -140,6 +140,13 @@ Robot pushing is implemented; conveyor movement is still missing.
 
 As a player, I want to choose the effect of interactive commands during activation, so that I can make decisions that influence my robot's actions.
 
+Supported scope: Sandbox Routine and Weasel Routine offer their allowed movement/turn
+choices below the filled registers. Activation waits for the owner, validates their
+choice, resolves it once, and continues in the normal priority order. Reconnection restores
+the outstanding decision. Speed Routine and Repeat Routine resolve automatically.
+Energy Routine and SPAM Folder are deferred. See [Cards](game_model_UML.md#special-programming-cards)
+and [Interactive card choices](communication/communication.md#interactive-card-choices).
+
 #### V2-06 - Resume a saved game
 
 As a player, I want to resume a saved game after a server restart, so that I can continue playing without losing my progress.
