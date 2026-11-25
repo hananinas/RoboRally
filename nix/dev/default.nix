@@ -31,7 +31,7 @@ let
     withBrowser ? false
   }:
     pkgs.mkShell ({
-      packages = [ nodejs pnpm ]
+      packages = [ nodejs pnpm pkgs.dbmate ]
         ++ pkgs.lib.optionals withBackend [ pkgs.process-compose pkgs.kratos pkgs.ory-hydra pkgs.mailpit pkgs.mkcert pkgs.nss.tools pkgs.caddy pkgs.xdg-utils ]
         ++ pkgs.lib.optionals withAsyncapi asyncapiPackages
         ++ pkgs.lib.optionals withDiagrams [ pkgs.plantuml-c4 ]
