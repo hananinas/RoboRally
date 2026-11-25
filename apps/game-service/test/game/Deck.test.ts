@@ -19,6 +19,10 @@ describe('createDeckCards', () => {
     expect(counts(cards)).toEqual({
       MOVE_1: 4, MOVE_2: 3, MOVE_3: 1, BACK_UP: 1,
       TURN_RIGHT: 4, TURN_LEFT: 4, U_TURN: 1, AGAIN: 1,
+      REPEAT_ROUTINE: 1,
+      SANDBOX_ROUTINE: 1,
+      SPEED_ROUTINE: 1,
+      WEASEL_ROUTINE: 1,
     })
     expect(new Set(cards.map((card) => card.id)).size).toBe(cards.length)
   })
