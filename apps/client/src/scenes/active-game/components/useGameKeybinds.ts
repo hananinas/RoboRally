@@ -24,9 +24,10 @@ export default function useGameKeybinds(
   onRedo: () => void,
   onSubmit: () => void,
   canSubmit: boolean,
-) : [number | null, (cardIndex: number) => void, boolean, boolean]  {
+) : [number | null, (cardIndex: number, focus?: boolean) => void, boolean, boolean]  {
 
-    const [highlightedCardIndex, setHighlightedCardIndex] = useState<number | null>(null)
+    const [highlight, setHighlight] = useState<{ index: number | null; focus: boolean }>({ index: null, focus: false })
+    const highlightedCardIndex = highlight.index
     const [pendingSequence, setPendingSequence] = useState<'none' | 'delete' | 'colon' | 'colon-w'>('none')
 
     // Clear a dangling multi-key sequence when programming ends or a new hand arrives
@@ -37,7 +38,7 @@ export default function useGameKeybinds(
         setPendingSequence('none')
     }
 
-    function highlightNextUnregistered(startIndex: number, direction: number) {
+    function highlightNextUnregistered(startIndex: number, direction: number, focus = true) {
       if (cards.length === 0) return
 
       let wrappedIndex = ((startIndex % cards.length) + cards.length) % cards.length
@@ -48,12 +49,12 @@ export default function useGameKeybinds(
         wrappedIndex = ((wrappedIndex + direction) % cards.length + cards.length) % cards.length
       }
 
-      setHighlightedCardIndex(wrappedIndex)
+      setHighlight({ index: wrappedIndex, focus })
     }
 
-    function highlightCard(cardIndex: number) {
+    function highlightCard(cardIndex: number, focus = true) {
       const direction = Math.sign(cardIndex - (highlightedCardIndex ?? 0)) || 1
-      highlightNextUnregistered(cardIndex, direction)
+      highlightNextUnregistered(cardIndex, direction, focus)
     }
 
     const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
@@ -170,7 +171,7 @@ export default function useGameKeybinds(
     const awaitingSubmitConfirm = canSubmit && pendingSequence === 'colon-w'
 
     return [
-      highlightedCardIndex,
+      highlight.focus ? highlightedCardIndex : null,
       highlightCard,
       pendingDelete,
       awaitingSubmitConfirm

@@ -1,4 +1,5 @@
 import type { Instruction, ResolvedInstruction } from './instructions.js'
+import type { RobotSpriteId } from './lobby.js'
 
 export type { UpdateRegisters } from './updateRegisters.js'
 
@@ -45,6 +46,7 @@ export type Position = Readonly<{
 export type Robot = Readonly<{
   robotId: RobotId
   playerId: PlayerId
+  robotSpriteId: RobotSpriteId
   colour: string
   position: Position
 }>
@@ -57,7 +59,7 @@ export type Tile = Readonly<{
   checkpointNumber?: number
 }> & (
   | Readonly<{
-      type: 'EMPTY' | 'PIT'
+      type: 'EMPTY' | 'PIT' | 'REBOOT'
     }>
   | Readonly<{ type: 'GEAR'; rotation: GearRotation }>
   | Readonly<{
@@ -182,6 +184,13 @@ export type ProgramFinalized = Readonly<{
   cards: readonly [Card, Card, Card, Card, Card]
 }>
 
+// One robot rebooting during an action; fellAt can be just outside the board.
+export type RebootEffect = Readonly<{
+  robotId: RobotId
+  fellAt: Coordinate
+  landedAt: Coordinate
+}>
+
 export type RobotActionResolved = Readonly<{
   gameId: GameId
   registerIndex: number
@@ -192,6 +201,8 @@ export type RobotActionResolved = Readonly<{
   resolvedInstruction: ResolvedInstruction | null
   position: Position
   pushedRobots: readonly Pick<Robot, 'robotId' | 'position'>[]
+  // Every reboot the action caused, in order.
+  reboots: readonly RebootEffect[]
 }>
 
 export type PublicRegisterStatus = 'EMPTY' | 'HIDDEN' | 'REVEALED'

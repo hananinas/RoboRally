@@ -1,8 +1,31 @@
-.auth-container {
-  display: flex;
-  flex-direction: column;
+body > main {
+  display: grid;
+  justify-items: center;
   align-items: center;
-  padding: 4rem;
-  /* we need this padding since the footer will hide content at the bottom of the container */
-  padding-bottom: 5.5rem;
+  padding: 24px 16px;
+}
+
+.auth-container {
+  width: min(100%, 420px);
+  min-width: 0;
+}
+
+/* The page supplies the panel around Ory's generated card. */
+.auth-container [class*="ory_elements__card_size_"] {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.auth-container h2 {
+  font-size: 22px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.auth-container [class*="ory_elements__divider__"] {
+  display: none;
 }

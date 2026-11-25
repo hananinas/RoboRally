@@ -1,19 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { Board, Card, Deck, Direction, EmptyTile, Game, Player, Robot } from '@/game/index'
+import { Board, Card, Deck, Direction, EmptyTile } from '@/game/index'
 import { Integer } from '@/numbers'
+import { createTestGame, placeTestPlayer, withRebootTiles } from '../fixtures.ts'
 
 function createGame(count = 2) {
   const tiles = Array.from({ length: 3 }, () => Array.from({ length: 5 }, () => new EmptyTile()))
   tiles[1][1] = new EmptyTile([], 1)
   tiles[2][2] = new EmptyTile([], 2)
-  const board = new Board(tiles, { x: Integer(0), y: Integer(0), angle: 0 })
+  const board = new Board(withRebootTiles(tiles, { x: Integer(0), y: Integer(2) }), { x: Integer(0), y: Integer(0), angle: 0 })
   const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'TURN_LEFT'))
-  const players = Array.from({ length: count }, (_, index) => {
-    const robot = new Robot(`robot-${index}`, Direction.NORTH)
-    board.placeRobot(robot.id, { x: Integer(index + 1), y: Integer(1) })
-    return new Player(`player-${index}`, robot, new Deck(cards))
-  })
-  const game = new Game({ board, players, deck: cards, rebootTile: { x: Integer(0), y: Integer(2) }, drawRandom: () => 0 })
+  const players = Array.from({ length: count }, (_, index) =>
+    placeTestPlayer(board, { x: Integer(index + 1), y: Integer(1) }, { direction: Direction.NORTH, deck: new Deck(cards) }))
+  const game = createTestGame({ board, players, deck: cards })
   for (const player of players) game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
   return { game, players, cards }
 }

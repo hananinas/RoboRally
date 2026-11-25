@@ -59,7 +59,13 @@ The client then requets a list of existant lobbies via
 
 A successful request returns:
 
-`LOBBIES_FOUND {lobbies}`
+`LOBBIES_FOUND {lobbies, maps, robots}`
+
+The server owns the map and robot catalogs. Each catalog entry contains its ID,
+display name, icon, and whether it is the default for lobby creation. Clients use
+the returned catalog metadata rather than defining available robot names or
+icons locally. Lobby snapshots also include the robot catalog so it is available
+when restoring an existing lobby.
 
 From there the user has two options, creating a lobby or joining a lobby.
 
@@ -70,9 +76,11 @@ The client sends `lobby.create`. As of this version there are no options and the
 Alternatively, the user can join an existing lobby. Once a lobby has been selected, the clients sends `lobby.join {lobbyId}`. 
 
 ### Selecting a robot
-While waiting in a lobby, a client can select its player's robot sprite with `lobby.selectRobot {robotSpriteId}`. The allowed values are `tank`, `scout`, `guardian`, `rover`, `striker`, `sentinel`, and `hauler`. New lobby members start with `tank` selected.
+While waiting in a lobby, a client can select its player's robot with `lobby.selectRobot {robotSpriteId}`. The ID must be present in the server-provided robot catalog. New lobby members start with the entry marked `defaultForLobbyCreation`.
 
-The selection is scoped to the authenticated lobby member. The server acknowledges a successful selection with `ROBOT_SELECTED {lobby}` and broadcasts the updated full lobby snapshot through `lobby.updated {lobby}` to every lobby member. Invalid sprite IDs are rejected with `INVALID_REQUEST`; a connection that is not a member of a lobby is rejected with `NOT_LOBBY_MEMBER`.
+The selection is scoped to the authenticated lobby member. The server acknowledges a successful selection with `ROBOT_SELECTED {lobby}`. Other lobby members receive the updated full lobby snapshot through `lobby.updated {lobby}`; the selecting connection is not sent a duplicate event because it receives the snapshot in the acknowledgement. Unknown robot IDs are rejected with `INVALID_REQUEST`; a connection that is not a member of a lobby is rejected with `NOT_LOBBY_MEMBER`.
+
+The robot catalog is authoritative. The server discovers the tank and fork-clamp designs from `tanks.hbls` and `fork-clamp.hbls` and returns one entry per robot asset in `lobby.list`, lobby joins, lobby snapshots, and `session.get`. Each file's SVG symbols form the layers of one robot design. The client must render the server list and must not independently truncate or substitute it. If a selection acknowledgement times out, the client performs `session.get` to refresh and reconcile the lobby snapshot.
 
 The selected sprite is included in each player's lobby roster as `robotSpriteId`. When the lobby starts, the same sprite ID is copied to that player's game robot; the robot's server-assigned colour remains a separate property.
 
@@ -82,7 +90,7 @@ Both `lobby.join` and `lobby.create` acknowledge with `LOBBY_JOINED {lobby}` aft
 Once a game has successfully started , the onber receives `STARTED {gameId}` as the command acknowledgement. How the game is initialised is described in [Initialization](#initialization).
 
 ### Lobby Membership
-`LOBBY_JOINED`, `IN_LOBBY`, and `lobby.updated` include the full `lobby.players` roster (`userId`, `username`, `robotSpriteId`) in join order. Clients replace their roster on each snapshot; `lobby.list` returns summaries only.
+`LOBBY_JOINED`, `IN_LOBBY`, and `lobby.updated` include the full `lobby.players` roster (`userId`, `username`, `robotSpriteId`) in join order and the robot catalog. Clients replace their roster on each snapshot; `lobby.list` returns lobby summaries, map metadata, and the robot catalog.
 
 While waiting, `lobby.leave {}` or disconnecting removes membership. Leaving returns `LEFT`. Ownership passes to the earliest remaining member, announced to the [lobby room](#rooms) through `lobby.updated {lobby}`. An empty lobby is deleted. A disconnected lobby member returns to browsing after reconnecting.
 
@@ -236,6 +244,8 @@ A movement card can push a chain of robots. A wall or the antenna blocks the who
 
 Movement resolves one square at a time. Robots entering pits or leaving the board reboot at once. The move stops if the acting robot reboots. A pushed robot rebooting does not stop it.
 
+Each map has four reboot tiles, sent as tiles with type `REBOOT` in the board. A rebooting robot goes to the free reboot tile closest to where it fell and keeps its facing direction. If every reboot tile is taken, it goes to the nearest free tile instead.
+
 The event includes final positions after reboots: `position` for the acting robot and `pushedRobots` for other robots whose positions changed. Clients apply them together when the action plays.
 
 #### Interactive card choices
@@ -260,6 +270,9 @@ is imposed. Waiting for a choice is distinct from a disconnection pause.
 The owner sees the choices directly underneath their filled registers after earlier
 actions finish animating. Other players see a waiting message. The buttons are disabled
 while disconnected, paused, or submitting a response.
+`reboots` lists every reboot the instruction caused, in order: the robot, `fellAt` (the pit, or the square just off the board edge) and `landedAt` (the reboot tile). Clients play each fall from it instead of guessing from the path, because a reboot tile can be on the path itself: on Test Map, `MOVE_3` south from (13,1) passes (13,2), falls into the pit at (13,4) and lands back on the reboot tile at (13,2).
+
+Drive the fall animation from each `reboots` entry, and animate only the robot in that entry. A robot can appear in `reboots` without being in `pushedRobots`: a pushed robot that reboots onto the tile it started from has not changed position. When one instruction reboots several robots, play them one after another in list order. A robot whose reboot comes later waits where it started and stays visible until its turn. A reboot keeps the robot's facing.
 
 #### Activation ordering
 

@@ -33,12 +33,12 @@ export class Deck {
   private drawPile: Card[]
   private discardPile: Card[] = []
 
-  constructor(cards: readonly Card[] = []) {
+  constructor(cards: readonly Card[]) {
     this.drawPile = [...cards]
   }
 
   // A player's private deck: fresh copies of the template cards with new ids.
-  static fromTemplate(template: readonly Card[] = createDeckCards()): Deck {
+  static fromTemplate(template: readonly Card[]): Deck {
     return new Deck(template.map((card) => new Card(randomUUID(), card.instruction)))
   }
 
@@ -73,21 +73,21 @@ export class Deck {
 
   // Drawing at random is equivalent to shuffling and drawing from the top, so
   // "draw the top card" is simply draw(1).
-  draw(count: number, random: () => number = Math.random): Card[] {
-    const drawn = this.drawFromPile(count, random)
+  draw(count: number): Card[] {
+    const drawn = this.drawFromPile(count)
     // If draw pile was exhausted, replenish from discard pile and draw the rest.
     if (drawn.length < count && this.discardPile.length > 0) {
       this.drawPile.push(...this.discardPile)
       this.discardPile = []
-      drawn.push(...this.drawFromPile(count - drawn.length, random))
+      drawn.push(...this.drawFromPile(count - drawn.length))
     }
     return drawn
   }
 
-  private drawFromPile(count: number, random: () => number): Card[] {
+  private drawFromPile(count: number): Card[] {
     const drawn: Card[] = []
     while (drawn.length < count && this.drawPile.length > 0) {
-      const index = Math.min(Math.floor(random() * this.drawPile.length), this.drawPile.length - 1)
+      const index = Math.min(Math.floor(Math.random() * this.drawPile.length), this.drawPile.length - 1)
       drawn.push(...this.drawPile.splice(index, 1))
     }
     return drawn

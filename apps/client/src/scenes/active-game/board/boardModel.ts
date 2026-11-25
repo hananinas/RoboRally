@@ -16,7 +16,7 @@ export type BoardTile =
     }>
 
 export type BoardTileType = BoardTile['tile']
-export type BoardRecipeName = BoardTileType | 'pillar' | 'antenna'
+export type BoardRecipeName = BoardTileType | 'pillar' | 'antenna' | 'reboot'
 
 
 export type BoardCell = BoardPoint &
@@ -24,6 +24,7 @@ export type BoardCell = BoardPoint &
   Readonly<{
     walls: BoardTileWalls
     checkpointNumber?: number
+    reboot?: true
   }>
 
 export type BoardRenderModel = Readonly<{
@@ -40,6 +41,7 @@ export type BoardComponentName =
   | 'gearCounterclockwise'
   | `antenna${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10}`
   | 'ground'
+  | `reboot${1 | 2 | 3 | 4}`
   | 'laser1'
   | 'laser2'
   | 'laser3'
@@ -131,6 +133,7 @@ type BoardAssignments = Readonly<{
   }>)[]
   walls?: readonly BoardWallAssignment[]
   checkpoints?: readonly (BoardPoint & { checkpointNumber: number })[]
+  rebootTiles?: readonly BoardPoint[]
 }>
 
 export const BOARD_WALL_SIDES: readonly BoardWallSide[] = [
@@ -230,6 +233,15 @@ export function createBoardRenderModel(
     checkpoints.set(key, checkpointNumber)
   }
 
+  const rebootTiles = new Set<string>()
+  for (const { x, y } of assignments.rebootTiles ?? []) {
+    const key = positionKey(x, y)
+    if (rebootTiles.has(key) || tiles.get(key)?.tile === 'hole') {
+      throw new RangeError(`Invalid reboot tile assignment for cell ${key}`)
+    }
+    rebootTiles.add(key)
+  }
+
   const cells: readonly BoardCell[] = Object.freeze(
     Array.from({ length: rows }, (_, y) =>
       Array.from({ length: columns }, (_, x) =>
@@ -239,6 +251,7 @@ export function createBoardRenderModel(
           ...(tiles.get(`${x},${y}`) ?? { tile: 'empty' as const }),
           walls: walls.get(`${x},${y}`) ?? EMPTY_WALLS,
           ...(checkpoints.has(`${x},${y}`) ? { checkpointNumber: checkpoints.get(`${x},${y}`) } : {}),
+          ...(rebootTiles.has(`${x},${y}`) ? { reboot: true as const } : {}),
         }),
       ),
     ).flat(),

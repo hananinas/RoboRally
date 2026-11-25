@@ -29,15 +29,15 @@ export const DEMO_BOARD = createBoardRenderModel(21, 15, {
 
 export const DEMO_ROBOTS: readonly Robot[] = [
   {
-    robotId: 'blue', colour: '#4D8DEB',
+    robotId: 'blue', robotSpriteId: 'tank', colour: '#4D8DEB',
     position: { coordinate: { x: 9, y: 7 }, orientation: 'WEST' },
   },
   {
-    robotId: 'red', colour: '#E55F5F',
+    robotId: 'red', robotSpriteId: 'scout', colour: '#E55F5F',
     position: { coordinate: { x: 10, y: 7 }, orientation: 'NORTH' },
   },
   {
-    robotId: 'green', colour: '#4CAF70',
+    robotId: 'green', robotSpriteId: 'rover', colour: '#4CAF70',
     position: { coordinate: { x: 11, y: 7 }, orientation: 'SOUTH' },
   },
 ]

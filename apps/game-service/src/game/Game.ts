@@ -3,9 +3,10 @@ import { err, ok, type Result } from 'neverthrow'
 import type { Board } from '@/game/Board'
 import { effects, type PrivateProgram, type PublicRegisters, type Instruction, type ResolvedInstruction, type PendingCardChoice, type ChooseCardAction } from '@robo-rally/game-events'
 import { captureEnvironmentSnapshot, environmentSteps, type EnvironmentChanges } from '@/game/environment'
+import { effects, type PrivateProgram, type PublicRegisters, type ResolvedInstruction, type RobotSpriteId } from '@robo-rally/game-events'
 import { Card } from '@/game/Card'
 import { Deck } from '@/game/Deck'
-import type { CardId, PlayerId, RobotId } from '@/game/ids'
+import type { CardId, GameId, PlayerId, RobotId } from '@/game/ids'
 import { Player } from '@/game/Player'
 import { ROBOT_COLOURS, Robot } from '@/game/Robot'
 import { Direction, opposite, type Position } from '@/game/spatial'
@@ -29,6 +30,13 @@ export type RobotActionResult = Readonly<{
   direction: Direction
 }>
 
+// One robot rebooting during an action. fellAt can be just outside the board.
+export type RebootResult = Readonly<{
+  robotId: RobotId
+  fellAt: Position
+  landedAt: Position
+}>
+
 export type NextActionResult = Readonly<{
   registerIndex: number
   action: RobotActionResult
@@ -38,6 +46,8 @@ export type NextActionResult = Readonly<{
     position: Position
     direction: Direction
   }>[]
+  // Every reboot the action caused, in the order it happened.
+  reboots: readonly RebootResult[]
   roundConcluded: boolean
 }>
 
@@ -64,8 +74,6 @@ export type CompletedProgram = Readonly<{
   cards: readonly Card[]
 }>
 
-export const DEFAULT_GAME_NAME = 'Game'
-
 const REGISTERS_PER_ROUND = 5
 
 export type GameOptions = Readonly<{
@@ -73,19 +81,14 @@ export type GameOptions = Readonly<{
   players: readonly Player[]
   // Template for each private deck created by addPlayer.
   deck: readonly Card[]
-  rebootTile: Position
-  name?: string
-  // Picks start tiles.
-  random?: () => number
-  // Draws cards; defaults to `random`.
-  drawRandom?: () => number
+  name: string
 }>
 
 export class Game {
+  readonly id: GameId
   readonly name: string
   readonly board: Board
   private readonly roster: Player[]
-  readonly rebootTile: Position
   private readonly deck: readonly Card[]
   private readonly lifecycle = new GameLifecycle('programming')
   private registerIndex = 0
@@ -95,24 +98,22 @@ export class Game {
   private readonly activatedRobotIds = new Set<RobotId>()
   private readonly random: () => number
   private readonly drawRandom: () => number
+  // Reboots recorded while the current action resolves.
+  private actionReboots: RebootResult[] = []
+  private environmentStepIndex: number | null = null
+  private readonly submittedPlayerIds = new Set<PlayerId>()
+  private readonly activatedRobotIds = new Set<RobotId>()
+  // What each robot's registers resolved to this round, so Again repeats the real action.
+  private readonly resolvedInstructions = new Map<RobotId, (ResolvedInstruction | undefined)[]>()
 
   constructor({
     board,
     players,
     deck,
-    rebootTile,
-    name = DEFAULT_GAME_NAME,
-    random = Math.random,
-    drawRandom = random,
+    name,
   }: GameOptions) {
     if (deck.length < REGISTERS_PER_ROUND || new Set(deck.map((card) => card.id)).size !== deck.length) {
       throw new RangeError('The deck must contain at least five distinct cards')
-    }
-    if (rebootTile === undefined) {
-      throw new RangeError('A game requires a reboot tile')
-    }
-    if (!board.allowsPlacement(rebootTile)) {
-      throw new RangeError('Reboot tile must be a non-pit tile on the board outside the priority antenna')
     }
 
     const playerIds = new Set<PlayerId>()
@@ -128,13 +129,11 @@ export class Game {
       robotIds.add(player.robot.id)
     }
 
+    this.id = randomUUID()
     this.board = board
     this.name = name
     this.roster = [...players]
-    this.rebootTile = Object.freeze({ ...rebootTile })
     this.deck = [...deck]
-    this.random = random
-    this.drawRandom = drawRandom
     this.dealInitialHands()
   }
 
@@ -207,15 +206,14 @@ export class Game {
   private findFreeStartTile(): Result<Position, 'NO_SPAWN_AVAILABLE'> {
     const free = this.board.startTiles.filter((position) => this.board.occupantAt(position) === undefined)
     if (free.length === 0) return err('NO_SPAWN_AVAILABLE')
-    const index = Math.min(Math.floor(this.random() * free.length), free.length - 1)
-    return ok({ ...free[index] })
+    return ok({ ...free[0] })
   }
 
-  addPlayer(colour: string = ROBOT_COLOURS[0]): Result<Player, AddPlayerError> {
+  addPlayer(colour: string = ROBOT_COLOURS[0], robotSpriteId: RobotSpriteId = 'tank'): Result<Player, AddPlayerError> {
     return this.findSpawn().map((position) => {
-      const robot = new Robot(randomUUID(), Direction.NORTH, colour)
+      const robot = new Robot(randomUUID(), Direction.NORTH, colour, robotSpriteId)
       const player = new Player(randomUUID(), robot, Deck.fromTemplate(this.deck))
-      player.drawHand(this.drawRandom)
+      player.drawHand()
       this.board.placeRobot(robot.id, position)
       this.roster.push(player)
       return player
@@ -315,7 +313,7 @@ export class Game {
     })
   }
 
-  recheckProgrammingPhase(): void {
+  private recheckProgrammingPhase(): void {
     if (
       this.requirePhase('programming').isOk() &&
       this.players.length > 0 &&
@@ -386,7 +384,7 @@ export class Game {
   }
 
   // Gameplay movement resolves entry effects; Board movement only changes positions.
-  moveRobot(robot: Robot, direction: Direction, steps: PositiveInteger): void {
+  private moveRobot(robot: Robot, direction: Direction, steps: PositiveInteger): void {
     for (let step = 0; step < steps; step++) {
       const movedRobotIds = this.board.pushRobot(robot.id, direction)
       if (movedRobotIds.length === 0) return
@@ -419,7 +417,10 @@ export class Game {
       throw new Error('An interactive card requires a choice before execution')
     }
     const previousPositions = this.roster.map((player) => this.board.positionOf(player.robot.id))
+    this.actionReboots = []
     const resolvedInstruction = this.executeCard(robot, card, registerIndex)
+    const reboots = this.actionReboots
+    this.actionReboots = []
     this.activatedRobotIds.add(robot.id)
     const player = this.roster.find((candidate) => candidate.robot === robot)!
     const registers = player.revealRegister(registerIndex, card.instruction)
@@ -439,7 +440,7 @@ export class Game {
     })
 
     const { roundConcluded } = this.recheckActivationPhase()
-    return { registerIndex, action, registers, pushedRobots, roundConcluded }
+    return { registerIndex, action, registers, pushedRobots, reboots, roundConcluded }
   }
 
   prepareNextChoice(): PendingCardChoice | null {
@@ -506,14 +507,14 @@ export class Game {
 
   private dealInitialHands(): void {
     for (const player of this.players) {
-      if (player.hand.length === 0) player.drawHand(this.drawRandom)
+      if (player.hand.length === 0) player.drawHand()
       player.resetRegisters()
     }
   }
 
   private dealNewHands(): void {
     for (const player of this.players) {
-      player.drawHand(this.drawRandom)
+      player.drawHand()
       player.resetRegisters()
     }
   }
@@ -543,7 +544,7 @@ export class Game {
       if (distance > nearestDistance) continue
       const angle = Math.atan2(dy, dx)
       const offset = ((angle - antennaAngle) % fullTurn + fullTurn) % fullTurn
-      if (distance < nearestDistance || offset < smallestOffset) {
+      if (distance < nearestDistance || (distance === nearestDistance && offset < smallestOffset)) {
         nextRobot = robot
         nearestDistance = distance
         smallestOffset = offset
@@ -586,7 +587,7 @@ export class Game {
       case undefined:
         return 'continue'
       case 'reboot':
-        this.rebootRobot(robot)
+        this.rebootRobot(robot, position)
         return 'stop'
       default: {
         const unexpectedEffect: never = effect
@@ -595,10 +596,15 @@ export class Game {
     }
   }
 
-  private rebootRobot(robot: Robot): void {
-    const destination = this.board.nearestFreePosition(this.rebootTile)
+  // Reboots on the free reboot tile closest to where the robot fell; ties keep board order.
+  private rebootRobot(robot: Robot, fellAt: Position): void {
+    const distance = (tile: Position) => Math.abs(tile.x - fellAt.x) + Math.abs(tile.y - fellAt.y)
+    const closestFirst = [...this.board.rebootTiles].sort((a, b) => distance(a) - distance(b))
+    const destination = closestFirst.find((tile) => this.board.occupantAt(tile) === undefined)
+      ?? this.board.nearestFreePosition(closestFirst[0])
     if (destination === undefined) throw new Error('No safe reboot destination is available')
     this.board.relocateRobot(robot.id, destination)
+    this.actionReboots.push({ robotId: robot.id, fellAt: { ...fellAt }, landedAt: { ...destination } })
     // TODO: Add two SPAM cards and cancel this robot's remaining registers.
   }
 

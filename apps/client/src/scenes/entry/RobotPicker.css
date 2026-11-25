@@ -94,10 +94,9 @@
 }
 
 .robot-picker__stage .robot-preview {
-  --robot-colour: var(--entry-player-blue);
   --robot-layer-offset: 5px;
-  width: var(--robot-preview-size);
-  height: var(--robot-preview-size);
+  width: min(var(--robot-preview-size), 150px);
+  height: min(var(--robot-preview-size), 150px);
   margin-top: -5px;
 }
 
@@ -105,62 +104,123 @@
   animation: robot-turn 24s linear infinite;
 }
 
-.robot-picker__carousel {
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) 36px;
-  align-items: center;
-  gap: var(--entry-space-3);
+.robot-picker__stage .robot-picker__icon {
+  width: min(100%, 150px);
+  height: 150px;
+  margin-top: -5px;
+  object-fit: contain;
+  animation: robot-turn 24s linear infinite;
+}
+
+.robot-picker__selected {
+  margin-bottom: var(--entry-space-3);
   text-align: center;
 }
 
-.robot-picker__arrow {
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border: 1px solid var(--entry-border-strong);
-  border-radius: var(--entry-radius-md);
-  background: transparent;
-  color: var(--entry-muted);
-  font: inherit;
-  font-size: 22px;
-  cursor: not-allowed;
-}
-
-.robot-picker__carousel h3 {
+.robot-picker__selected h3 {
   margin: 0 0 var(--entry-space-1);
   font-size: 21px;
 }
 
-.robot-picker__carousel p {
+.robot-picker__selected p {
   margin: 0;
   color: var(--entry-muted);
   font-size: 11px;
-  font-variant-numeric: tabular-nums;
 }
 
-.robot-picker__positions {
+.robot-picker__choices {
   display: flex;
-  justify-content: center;
+  justify-content: safe center;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
   gap: var(--entry-space-2);
-  padding: 0;
   margin: var(--entry-space-4) 0 var(--entry-space-5);
-  list-style: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
 }
 
-.robot-picker__positions button {
-  display: block;
-  width: 6px;
-  height: 6px;
+.robot-picker__choice {
+  display: grid;
+  place-items: center;
+  flex: 0 0 52px;
+  height: 52px;
+  padding: 0;
+  border: 1px solid var(--entry-border);
+  border-radius: 50%;
+  background: var(--entry-inset);
+  color: var(--entry-text);
+  cursor: pointer;
+}
+
+.robot-picker__choice[aria-pressed='true'] {
+  border-color: var(--entry-accent);
+  background: var(--entry-selected);
+  box-shadow: 0 0 0 1px var(--entry-accent);
+}
+
+.robot-picker__choice .robot-preview,
+.robot-picker__choice-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.robot-picker__choice-icon {
+  object-fit: contain;
+}
+
+.robot-picker__colours {
+  min-width: 0;
+  margin: 0;
+  padding: var(--entry-space-5) 0 0;
+  border: 0;
+  border-top: 1px solid var(--entry-border);
+}
+
+.robot-picker__colours legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  margin-bottom: var(--entry-space-4);
+  font-size: 12px;
+}
+
+.robot-picker__swatches {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--entry-space-2);
+  clear: both;
+}
+
+.robot-picker__swatch {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--entry-border-strong);
+  background: var(--swatch-colour);
+  color: var(--entry-text);
+  font: inherit;
+  opacity: 0.65;
   cursor: not-allowed;
 }
 
-.robot-picker__positions button[aria-pressed='true'] {
-  background: var(--entry-accent);
+.robot-picker__swatch[aria-pressed='true'] {
+  outline: 1px solid var(--swatch-colour);
+  outline-offset: 4px;
 }
+
+.robot-picker__swatch--blue { --swatch-colour: var(--entry-player-blue); }
+.robot-picker__swatch--red { --swatch-colour: var(--entry-player-red); }
+.robot-picker__swatch--yellow { --swatch-colour: var(--entry-accent); }
+.robot-picker__swatch--green { --swatch-colour: var(--entry-player-green); }
+.robot-picker__swatch--purple { --swatch-colour: var(--entry-player-purple); }
+.robot-picker__swatch--pink { --swatch-colour: var(--entry-player-pink); }
 
 .robot-picker__colours {
   min-width: 0;
@@ -230,7 +290,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .robot-picker__stage .robot-preview__layer,
+  .robot-picker__stage :is(.robot-preview__layer, .robot-picker__icon),
   .robot-picker__markings {
     animation: none;
   }

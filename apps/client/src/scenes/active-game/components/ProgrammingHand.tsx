@@ -1,71 +1,80 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type CSSProperties } from 'react'
 import type { ProgramCard as Card } from '../gameState.ts'
-import DraggedCard from './DraggedCard.tsx'
 import ProgramCard from './ProgramCard.tsx'
-import useCardDrag from './useCardDrag.ts'
+import type useCardDrag from './useCardDrag.ts'
 
 type ProgrammingHandProps = {
   cards: readonly Card[]
   registeredCardIds: ReadonlySet<string>
+  playedCardIds?: ReadonlySet<string>
   disabled: boolean
+  retired?: boolean
   highlightedIndex: number | null
-  onHighlightCard: (cardIndex: number) => void
-  onSelect: (card: Card) => void
-  onPlaceCard: (card: Card, registerIndex: number) => void
+  onHighlightCard: (cardIndex: number, focus?: boolean) => void
+  cardDrag: Pick<ReturnType<typeof useCardDrag>, 'dragHandlers' | 'isDragging' | 'fan'>
 }
 
-// Renders and manages the draggable hand.
 function ProgrammingHand({
   cards,
   registeredCardIds,
+  playedCardIds,
   disabled,
+  retired,
   highlightedIndex,
   onHighlightCard,
-  onSelect,
-  onPlaceCard,
+  cardDrag: { dragHandlers, isDragging, fan },
 }: ProgrammingHandProps) {
-  const { drag, dragHandlers, isDragging } = useCardDrag({
-    onTap: onSelect,
-    onDrop: (card, registerIndex) => {
-      if (registerIndex !== null) onPlaceCard(card, registerIndex)
-    },
-  })
   const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
 
   useEffect(() => {
     if (highlightedIndex === null) return
 
     const card = cardRefs.current[highlightedIndex]
-    if (card && document.activeElement !== card) card.focus()
+    if (card && document.activeElement !== card) card.focus({ preventScroll: true })
   }, [highlightedIndex])
+
+  const lastSlot = Math.max(0, fan.length - 1)
+  const center = lastSlot / 2
 
   return (
     <section
       className="programming-hand"
       aria-label="Programming hand"
+      data-retired={retired || undefined}
+      style={{ '--fan-intervals': Math.max(1, lastSlot) } as CSSProperties}
     >
       {cards.map((card, index) => {
-        const selected = registeredCardIds.has(card.id)
-
+        const slot = fan.indexOf(card)
+        const registered = registeredCardIds.has(card.id)
+        const offset = (slot === -1 ? Math.min(index, lastSlot) : slot) - center
         return (
-          <ProgramCard
+          <div
             key={card.id}
-            ref={(node) => { cardRefs.current[index] = node }}
-            card={card}
-            size="hand"
-            selected={selected}
-            disabled={selected || disabled}
-            dragging={isDragging(card)}
-            onClick={(event) => {
-              if (event.detail === 0) onSelect(card)
-            }}
-            {...dragHandlers(card)}
-            onMouseEnter={() => onHighlightCard(index)}
-            onFocus={() => onHighlightCard(index)}
-          />
+            className="programming-hand__slot"
+            aria-hidden={registered || undefined}
+            data-outside-fan={slot === -1 || undefined}
+            style={{
+              zIndex: slot,
+              '--deal-index': Math.max(0, slot),
+              '--fan-offset': offset,
+              '--fan-angle': `${offset * 3.5}deg`,
+              '--fan-drop': `${offset ** 2 * 0.1}rem`,
+            } as CSSProperties}
+          >
+            <ProgramCard
+              ref={(node) => { cardRefs.current[index] = node }}
+              card={card}
+              size="hand"
+              data-played={playedCardIds?.has(card.id) || undefined}
+              disabled={registered || disabled}
+              dragging={isDragging(card)}
+              {...dragHandlers(card)}
+              onMouseEnter={() => onHighlightCard(index, false)}
+              onFocus={() => onHighlightCard(index)}
+            />
+          </div>
         )
       })}
-      {drag?.moved && <DraggedCard drag={drag} />}
     </section>
   )
 }

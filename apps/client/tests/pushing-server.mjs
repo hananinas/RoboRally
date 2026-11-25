@@ -1,12 +1,7 @@
-import { createServer } from 'node:http'
-import { Board, Direction, EmptyTile, Game, PitTile, createDeckCards } from '../../game-service/dist/game/index.js'
+import { mock } from 'node:test'
+import './deterministic-random.mjs'
 import { Integer } from '../../game-service/dist/numbers.js'
-import { parseAppConfig } from '../../game-service/dist/config.js'
-import { seededRandom } from '../../game-service/dist/random.js'
-import { createGameSocketServer } from '../../game-service/dist/socket/gameServer.js'
-import { createAuthApp } from '../../game-service/dist/auth/httpRoutes.js'
-import { createSessionStore } from '../../game-service/dist/auth/sessionStore.js'
-import { createOidcClient } from '../../game-service/dist/infra/oidcClient.js'
+import { createGame as realCreateGame } from '../../game-service/dist/game/GameFactory.js'
 
 // Controlled boards for browser tests; all gameplay uses the real service.
 const scenario = process.argv[2]
@@ -41,6 +36,31 @@ server.on('request', (req, res) => {
 const io = createGameSocketServer(server, sessionStore, () => ({ gameId: '00000000-0000-4000-8000-000000000001', game }))
 server.listen(config.port, '127.0.0.1', () => {
   console.log(`Game Service listening at http://127.0.0.1:${config.port}`)
+// Controlled row for browser tests; all gameplay uses the real service and the
+// real test-map. Clear of every pit/wall, with room to push two tiles west.
+const ROW_Y = 13
+const COLUMNS = [6, 5, 4]
+
+mock.module('../../game-service/dist/game/GameFactory.js', {
+  cache: true,
+  exports: {
+    createGame: (mapName, name) => {
+      const game = realCreateGame(mapName, name)
+      const realAddPlayer = game.addPlayer.bind(game)
+      let joined = 0
+      game.addPlayer = (colour) => {
+        const result = realAddPlayer(colour)
+        joined++
+        if (joined === COLUMNS.length) {
+          game.players.forEach((player, index) => {
+            game.board.relocateRobot(player.robot.id, { x: Integer(COLUMNS[index]), y: Integer(ROW_Y) })
+          })
+        }
+        return result
+      }
+      return game
+    },
+  },
 })
-process.once('SIGTERM', () => io.close())
-process.once('SIGINT', () => io.close())
+
+await import('../../game-service/dist/main.js')

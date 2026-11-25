@@ -8,7 +8,6 @@ Will update with a more conceptual domain diagram which will be used for present
         class Game {
         +board: Board
         +players: Player[]
-        +rebootTile: Position readonly
         -phase: GamePhase
         -currentRegister: int
         -winner: PlayerId?
@@ -27,6 +26,7 @@ Will update with a more conceptual domain diagram which will be used for present
         -tiles: Tile[][]
         -robotPositions: Map
         +startTiles: Position[] readonly
+        +rebootTiles: Position[] readonly
         +positionOf(RobotId robotId) Position
         +occupantAt(Position position) RobotId?
         +allowsPlacement(Position position) bool
@@ -45,11 +45,13 @@ Will update with a more conceptual domain diagram which will be used for present
 
         class EmptyTile
         class PitTile
+        class RebootTile
 
         class TileKind {
             <<enumeration>>
             EMPTY
             PIT
+            REBOOT
         }
 
         class Player {
@@ -88,6 +90,7 @@ Will update with a more conceptual domain diagram which will be used for present
         Robot --> Direction
         Tile <|-- EmptyTile
         Tile <|-- PitTile
+        Tile <|-- RebootTile
         Tile --> TileKind
 
         Player "1" --> "1" Robot
@@ -114,16 +117,17 @@ Board owns the tile grid, antenna, and RobotId-to-Position map. It resolves one 
 
 `Board.pushRobot()` validates the complete chain before changing any positions. A wall on either side of any crossed boundary or the priority antenna blocks the whole step. Otherwise it moves the chain farthest first and returns the displaced robot IDs in that order. Board only changes positions; Game handles entry effects after the complete step. Gameplay displacement goes through Game's movement operation.
 
-Placement, relocation, spawning, reboot configuration, and safe-destination search use `Board.allowsPlacement()` to check bounds, tile suitability, and exclusion of the antenna. Robot occupancy is checked separately. Pits remain enterable during movement. Relocation does not trigger entry effects. Every Game requires a valid reboot tile, including on maps without pits. Reboot search uses Manhattan distance, then top-to-bottom and left-to-right tie-breaking; enclosing walls do not exclude a destination.
+Placement, relocation, spawning, reboot configuration, and safe-destination search use `Board.allowsPlacement()` to check bounds, tile suitability, and exclusion of the antenna. Robot occupancy is checked separately. Pits remain enterable during movement. Relocation does not trigger entry effects. Reboot tiles are RebootTile instances in the grid; Board lists their positions as `rebootTiles`, top-to-bottom and left-to-right, and requires at least one, including on maps without pits. Each map defines four. A rebooting robot goes to the free reboot tile with the smallest Manhattan distance from where it fell, with ties kept in that order. If every reboot tile is occupied, the search falls back to the nearest free tile to the closest reboot tile, using Manhattan distance, then top-to-bottom and left-to-right tie-breaking; enclosing walls do not exclude a destination.
 
 # Tile
 
-Tile is descriptive data with a readonly `TileKind`: EmptyTile uses `EMPTY`, and PitTile uses `PIT`. Tile subclasses declare placement suitability and entry effects.
+Tile is descriptive data with a readonly `TileKind`: EmptyTile uses `EMPTY`, PitTile uses `PIT`, and RebootTile uses `REBOOT`. Tile subclasses declare placement suitability and entry effects.
 
 | Kind | `canOccupy` for placement/reboot | `entryEffect` |
 | --- | --- | --- |
 | `EMPTY` | true | absent |
 | `PIT` | false | `reboot` |
+| `REBOOT` | true | absent |
 
 Walls, optional checkpoint numbers, and future settings such as conveyor direction belong to instances. Board validates unique checkpoint numbers consecutive from 1 and derives their count. Checkpoints can coexist with walls without a separate subclass. Tiles hold neither robots nor activation logic.
 

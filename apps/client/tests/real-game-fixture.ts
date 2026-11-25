@@ -7,10 +7,13 @@ export const GAME_SERVICE_URL = 'http://127.0.0.1:3002'
 const mkcertCaRoot = execFileSync('mkcert', ['-CAROOT']).toString().trim()
 
 export const test = base.extend<{ realGameService: void; gameServiceArgs: readonly string[] }>({
-  gameServiceArgs: [[fileURLToPath(new URL('../../game-service/dist/main.js', import.meta.url))], { option: true }],
+  gameServiceArgs: [[
+    '--import', fileURLToPath(new URL('./deterministic-random.mjs', import.meta.url)),
+    fileURLToPath(new URL('../../game-service/dist/main.js', import.meta.url)),
+  ], { option: true }],
   realGameService: [async ({ request, gameServiceArgs }, runTest) => {
     const service = spawn(process.execPath, gameServiceArgs, {
-      env: { ...process.env, PORT: '3002', START_TILE_ORDER: 'ordered', CARD_SEED: '371', NODE_EXTRA_CA_CERTS: `${mkcertCaRoot}/rootCA.pem` },
+      env: { ...process.env, PORT: '3002', NODE_EXTRA_CA_CERTS: `${mkcertCaRoot}/rootCA.pem` },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     const closed = new Promise<void>((resolve) => service.once('close', () => resolve()))

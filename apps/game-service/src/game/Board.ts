@@ -5,12 +5,6 @@ import { Integer } from '@/numbers'
 
 export type Antenna = Readonly<Position & { angle: number }>
 
-export type BoardMap = Readonly<{
-  name: string
-  icon: string
-  maxPlayers: number
-}>
-
 export class Board {
   private readonly tiles: readonly (readonly Tile[])[]
   private readonly robotPositions = new Map<RobotId, Position>()
@@ -18,13 +12,12 @@ export class Board {
   readonly width: number
   readonly height: number
   readonly antenna: Antenna
-  readonly map?: BoardMap
+  readonly rebootTiles: readonly Position[]
   readonly startTiles: readonly Position[]
 
   constructor(
     tiles: readonly (readonly Tile[])[],
     antenna: Antenna,
-    map?: BoardMap,
     startTiles: readonly Position[] = [],
   ) {
     const width = tiles[0]?.length ?? 0
@@ -48,7 +41,17 @@ export class Board {
       throw new RangeError('The antenna must be on the board with a finite angle')
     }
     this.antenna = Object.freeze({ ...antenna })
-    this.map = map === undefined ? undefined : Object.freeze({ ...map })
+
+    // Reboot tiles in reading order: top-to-bottom, then left-to-right.
+    const rebootTiles = this.tiles.flatMap((row, y) => row.flatMap((tile, x) =>
+      tile.kind === 'REBOOT' ? [{ x: Integer(x), y: Integer(y) }] : []))
+    if (rebootTiles.length === 0) {
+      throw new RangeError('A board requires at least one reboot tile')
+    }
+    if (!rebootTiles.every((position) => this.allowsPlacement(position))) {
+      throw new RangeError('Reboot tiles must be outside the priority antenna')
+    }
+    this.rebootTiles = Object.freeze(rebootTiles.map((position) => Object.freeze(position)))
 
     const startKeys = new Set(startTiles.map(({ x, y }) => `${x},${y}`))
     if (startKeys.size !== startTiles.length) {
@@ -64,7 +67,7 @@ export class Board {
     return this.checkpointTotal
   }
 
-  contains(position: Position): boolean {
+  private contains(position: Position): boolean {
     return (
       position.x >= 0 &&
       position.x < this.width &&

@@ -27,7 +27,6 @@ export type GameMembership = {
 export type MembershipContext = {
   io: GameSocketServer
   game: Game
-  gameId: string
   publicRoom: string
   playerRoom: (playerId: string) => string
   memberships: Map<string, GameMembership>
@@ -54,9 +53,9 @@ function resumeUnlessStillDisconnected(ctx: MembershipContext): void {
 
 function notifyReconnected(ctx: MembershipContext, playerId: string): void {
   ctx.io.to(ctx.publicRoom).emit('game.playerConnectionChanged', {
-    gameId: ctx.gameId, playerId, connected: true, paused: ctx.game.paused,
+    gameId: ctx.game.id, playerId, connected: true, paused: ctx.game.paused,
   })
-  ctx.io.to(ctx.playerRoom(playerId)).emit('program.timerChanged', presentProgrammingTimer(ctx.gameId, ctx.programmingTimer.state()))
+  ctx.io.to(ctx.playerRoom(playerId)).emit('program.timerChanged', presentProgrammingTimer(ctx.game.id, ctx.programmingTimer.state()))
   ctx.actionScheduler.scheduleNextAction()
 }
 
@@ -111,7 +110,7 @@ export function handleReattachGame(
     for (const room of [ctx.publicRoom, ctx.playerRoom(membership.player.id)]) {
       if (!previousRooms.has(room)) void socket.leave(room)
     }
-    logError('Failed to reattach game membership', error, { command: 'session.get', gameId: ctx.gameId })
+    logError('Failed to reattach game membership', error, { command: 'session.get', gameId: ctx.game.id })
     membership.connectionId = previousConnectionId
     if (wasPaused) ctx.game.pause()
     return acknowledge({ outcome: 'INTERNAL_ERROR' })
@@ -126,7 +125,7 @@ export function handleLeave(
   payload: EmptyRequest,
   acknowledge: (result: LeaveResult) => void,
 ): void {
-  const { io, game, gameId, memberships, publicRoom, playerRoom, actionScheduler } = ctx
+  const { io, game, memberships, publicRoom, playerRoom, actionScheduler } = ctx
   let playerId: string | undefined
 
   withAcknowledgeOnce(acknowledge, (ack) => {
@@ -138,7 +137,7 @@ export function handleLeave(
       .mapErr(toRejection)
     if (result.isErr()) {
       const { outcome, detail } = result.error
-      logWarn('Rejected game.leave request', { command: 'game.leave', gameId, outcome, detail, payload })
+      logWarn('Rejected game.leave request', { command: 'game.leave', gameId: game.id, outcome, detail, payload })
       ack({ outcome })
       return
     }
@@ -151,13 +150,13 @@ export function handleLeave(
     void socket.leave(playerRoom(player.id))
     ack({ outcome: 'LEFT' })
     io.to(publicRoom).emit('game.playerLeft', {
-      gameId, playerId: player.id, robotId: player.robot.id,
+      gameId: game.id, playerId: player.id, robotId: player.robot.id,
     })
     if (game.requirePhase('activation').isOk()) ctx.programmingTimer.close()
     actionScheduler.announceProgress({ roundConcluded })
     actionScheduler.scheduleNextAction()
   }, (error) => {
-    logError('Failed to process player leaving', error, { command: 'game.leave', gameId, playerId })
+    logError('Failed to process player leaving', error, { command: 'game.leave', gameId: game.id, playerId })
     return { outcome: 'INTERNAL_ERROR' } as const
   })
 }
@@ -170,10 +169,10 @@ export function handleDisconnect(ctx: MembershipContext, socket: GameSocket): vo
     membership.connectionId = null
     ctx.game.pause()
     ctx.io.to(ctx.publicRoom).emit('game.playerConnectionChanged', {
-      gameId: ctx.gameId, playerId: membership.player.id, connected: false, paused: ctx.game.paused,
+      gameId: ctx.game.id, playerId: membership.player.id, connected: false, paused: ctx.game.paused,
     })
   } catch (error) {
-    logError('Failed to process player disconnect', error, { command: 'disconnect', gameId: ctx.gameId, playerId: membership.player.id })
+    logError('Failed to process player disconnect', error, { command: 'disconnect', gameId: ctx.game.id, playerId: membership.player.id })
   }
 }
 
@@ -185,9 +184,9 @@ export function presentInitialization(
   const { player } = membership
   return {
     outcome: 'JOINED',
-    assignment: { gameId: ctx.gameId, playerId: player.id, robotId: player.robot.id },
+    assignment: { gameId: ctx.game.id, playerId: player.id, robotId: player.robot.id },
     state,
-    hand: presentCardsDealt(ctx.gameId, player).cards,
+    hand: presentCardsDealt(ctx.game.id, player).cards,
     program: player.program,
     programSubmitted: ctx.game.hasSubmittedProgram(player.id),
   }

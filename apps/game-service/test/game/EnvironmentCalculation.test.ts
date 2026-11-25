@@ -1,19 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { Board, Direction, EmptyTile, GearTile, Player, Robot, type Tile } from '@/game/index'
+import { Board, Direction, EmptyTile, GearTile, type Tile } from '@/game/index'
 import {
   calculateCheckpoints, calculateGears, captureEnvironmentSnapshot,
 } from '@/game/environment'
 import { Integer } from '@/numbers'
+import { createTestPlayer, createTestRobot, withRebootTiles } from '../fixtures.ts'
 
 function position(x: number, y = 1) {
   return { x: Integer(x), y: Integer(y) }
 }
 
 function createBoard(tiles?: readonly Tile[]) {
-  return new Board([
+  return new Board(withRebootTiles([
     Array.from({ length: 5 }, () => new EmptyTile()),
     tiles ?? Array.from({ length: 5 }, () => new EmptyTile()),
-  ], { ...position(0, 0), angle: 0 })
+  ], position(4, 0)), { ...position(0, 0), angle: 0 })
 }
 
 describe('environment calculations', () => {
@@ -23,9 +24,9 @@ describe('environment calculations', () => {
       new EmptyTile(), new EmptyTile(), new EmptyTile(),
     ])
     const players = [0, 1].map((x) => {
-      const robot = new Robot(`robot-${x}`, Direction.NORTH)
+      const robot = createTestRobot({ id: `robot-${x}`, direction: Direction.NORTH })
       board.placeRobot(robot.id, position(x))
-      return new Player(`player-${x}`, robot)
+      return createTestPlayer({ id: `player-${x}`, robot })
     })
     return { board, players }
   }

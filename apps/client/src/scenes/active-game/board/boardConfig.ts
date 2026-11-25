@@ -76,6 +76,10 @@ export const BOARD_COMPONENTS: Readonly<
     className: 'board-piece--asset board-piece--gear-counterclockwise',
     label: 'Red gear: turn left',
   },
+  reboot1: sprite('reboot1', '0 0 84 84', 7 / 6),
+  reboot2: sprite('reboot2', '0 0 84 84', 7 / 6),
+  reboot3: sprite('reboot3', '0 0 84 84', 7 / 6),
+  reboot4: { ...sprite('reboot4', '0 0 84 84', 7 / 6), label: 'Reboot tile' },
   ground: { className: 'board-piece--ground', width: 1 },
   surface: { className: 'board-piece--surface', width: 1 },
   wallBlack: { className: 'board-piece--wall-black', width: 0.6 },
@@ -157,6 +161,15 @@ export const BOARD_RECIPES: Readonly<
     ],
   },
   hole: { hole: true, slices: [] },
+  reboot: {
+    slices: [
+      ...EMPTY_SLICES,
+      { layer: 3, component: 'reboot1', order: 1 },
+      { layer: 3, component: 'reboot2', order: 1 },
+      { layer: 3, component: 'reboot3', order: 1 },
+      { layer: 3, component: 'reboot4', order: 1 },
+    ],
+  },
   pillar: {
     slices: [
       { layer: 0, component: 'wallBlack', shadow: true },

@@ -11,30 +11,13 @@
   color: var(--entry-text);
 }
 
-.entry-board-background {
-  position: fixed;
-  pointer-events: none;
-  inset: 0;
-  z-index: -1;
-  display: grid;
-  grid-template-columns: repeat(9, 1fr);
-  grid-template-rows: repeat(7, 1fr);
-  gap: 10px;
-  padding: 10px;
-}
-
-.entry-board-background div {
-  border-radius: 10px;
-  background: var(--entry-surface);
-}
-
 .entry-panel {
   min-width: 0;
-  padding: var(--entry-space-6) var(--entry-space-5);
+  padding: var(--theme-panel-padding);
   border: 1px solid var(--entry-border);
   border-radius: var(--entry-radius-lg);
   background: var(--entry-panel);
-  box-shadow: 0 20px 60px rgb(0 0 0 / 35%);
+  box-shadow: var(--theme-panel-shadow);
 }
 
 .entry-panel h1 {
@@ -215,15 +198,19 @@
 }
 
 .entry-layout--wide {
-  align-items: start;
+  align-items: stretch;
   grid-template-columns: 1.08fr 1fr;
   width: min(100% - 48px, 984px);
+}
+
+.entry-layout--wide > .entry-panel {
+  height: 100%;
 }
 
 .entry-side-panels {
   display: grid;
   min-width: 0;
-  gap: var(--entry-space-4);
+  gap: var(--entry-space-2);
 }
 
 .entry :is(button, a):focus-visible {

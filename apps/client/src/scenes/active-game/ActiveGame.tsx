@@ -1,3 +1,6 @@
+import DraggedCard from './components/DraggedCard.tsx'
+import useCardDrag from './components/useCardDrag.ts'
+import { useState } from 'react'
 import './ActiveGame.css'
 import BoardViewport from './components/BoardViewport.tsx'
 import PlayerPanel from './components/PlayerPanel.tsx'
@@ -52,6 +55,11 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
   onSettings: () => void
 }) {
   const { state, dispatch, submit } = game
+  const [handOrder, setHandOrder] = useState<{
+    deal: readonly ProgramCard[]
+    cards: readonly ProgramCard[]
+  }>()
+  const hand = handOrder?.deal === state.hand ? handOrder.cards : state.hand
   const disabled = leaving || state.paused || !canProgram(state)
   const handleRemove = (registerIndex: number) => dispatch({ type: 'remove', registerIndex })
   const handleMove = (fromIndex: number, toIndex: number) =>
@@ -62,21 +70,43 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
   const handleUndo = () => dispatch({ type: 'undo' })
   const handleRedo = () => dispatch({ type: 'redo' })
   const hasHand = state.handVersion > 0
+  const handRetired = !state.handReady || state.phase !== 'PROGRAMMING' ||
+    state.programmingTimer.status === 'CLOSED' || state.submission === 'accepted'
   const status = getGameStatus(state)
   const visibleChoice = !state.playback.active && !state.aborted && state.winner === null ? state.pendingChoice : null
   const disconnectedNames = state.players.filter((player) => !player.connected).map((player) => player.username)
   const { active } = state.playback
   const activeCard = active && !('kind' in active) ? active : null
   const lastCheckpoint = state.assignment ? state.playback.checkpoints.get(state.assignment.playerId) ?? 0 : 0
+  const player = state.players.find((candidate) => candidate.playerId === state.assignment?.playerId)
+  const displayedRegisters = state.playbackProgram ?? state.registers
+  const publicRegisters = player && (state.playbackRegisters?.get(player.playerId) ?? player.registers)
+  const activeRegister = activeCard && activeCard.playerId === state.assignment?.playerId
+    ? activeCard.registerIndex : null
+  const playedCardIds = new Set(displayedRegisters.flatMap((card, index) =>
+    card && publicRegisters?.[index]?.status === 'REVEALED' && index !== activeRegister ? [card.id] : [],
+  ))
   const showWinner = isGameOver(state) && state.connected
   const robotColour = state.playback.robots.find((robot) => robot.robotId === state.assignment?.robotId)?.colour
   const registeredCardIds = new Set(
     state.registers.flatMap((card) => (card ? [card.id] : [])),
   )
   const [highlightedIndex, highlightCard, pendingDelete, awaitingSubmitConfirm] = useGameKeybinds(
-    state.hand, registeredCardIds, disabled, handlePlaceCard, handleRemove,
+    hand, registeredCardIds, disabled, handlePlaceCard, handleRemove,
     handleClearRegisters, handleUndo, handleRedo, submit, registersAreFilled(state.registers),
   )
+  const cardDrag = useCardDrag({
+    cards: hand,
+    registers: state.registers,
+    disabled,
+    onPlace: handlePlaceCard,
+    onRemove: handleRemove,
+    onMove: handleMove,
+    onReorder: (cards) => {
+      setHandOrder({ deal: state.hand, cards })
+      if (highlightedIndex !== null) highlightCard(cards.indexOf(hand[highlightedIndex]))
+    },
+  })
   return (
     <div className="game">
       {state.board && <BoardViewport board={state.board} robots={state.playback.robots} />}
@@ -93,8 +123,9 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
               onSettings={onSettings}
             />
             <RegisterPanel
-              registers={state.playbackProgram ?? state.registers}
-              activeRegister={activeCard?.registerIndex ?? null}
+              registers={displayedRegisters}
+              activeRegister={activeRegister}
+              playedCardIds={playedCardIds}
               disabled={disabled}
               submission={state.submission}
               locked={state.phase === 'PROGRAMMING' && !state.playback.active && state.submission === 'accepted'}
@@ -103,8 +134,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
               error={state.error}
               pendingDelete={pendingDelete}
               awaitingSubmitConfirm={awaitingSubmitConfirm}
-              onRemove={handleRemove}
-              onMove={handleMove}
+              cardDrag={cardDrag}
               onConfirm={submit}
             />
 
@@ -133,17 +163,17 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
         {hasHand && (
           <ProgrammingHand
             key={state.handVersion}
-            cards={state.hand}
+            cards={hand}
+            retired={handRetired}
             registeredCardIds={registeredCardIds}
+            playedCardIds={playedCardIds}
             disabled={disabled}
             highlightedIndex={highlightedIndex}
             onHighlightCard={highlightCard}
-            onSelect={(card) => dispatch({
-              type: 'place', cardId: card.id, registerIndex: state.registers.indexOf(null),
-            })}
-            onPlaceCard={handlePlaceCard}
+            cardDrag={cardDrag}
           />
         )}
+        {cardDrag.drag && <DraggedCard drag={cardDrag.drag} />}
       </div>
       {showWinner && (
         <WinnerPopup

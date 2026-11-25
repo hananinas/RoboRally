@@ -53,7 +53,7 @@ export const createSettingsRoute: RouteCreator =
             flow,
             logoutUrl,
             navClassName: "main-nav",
-            headerContainerClassName: "spacing-32",
+            headerContainerClassName: "settings-header spacing-16",
             dividerClassName: "divider-left",
             settingsCardContainerClassName: "spacing-32",
           },

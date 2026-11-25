@@ -1,18 +1,15 @@
 import { resolveRobotAction } from '../activationTestHelper.js'
 import { describe, expect, it } from 'vitest'
-import { Board, Card, Direction, EmptyTile, Game, Player, Robot } from '@/game/index'
+import { Board, Card, Direction, EmptyTile } from '@/game/index'
+import { Deck } from '@/game/Deck'
 import { Integer } from '@/numbers'
+import { createEmptyTileGrid, createTestGame, placeTestPlayer, withRebootTiles } from '../fixtures.ts'
 
 function createGame(starts = [{ x: 0, y: 1, direction: Direction.EAST }]) {
-  const tiles = Array.from({ length: 3 }, () => Array.from({ length: 5 }, () => new EmptyTile()))
+  const tiles = createEmptyTileGrid(5, 3)
   tiles[1][1] = new EmptyTile([], 1)
   tiles[1][3] = new EmptyTile([], 2)
-  const board = new Board(tiles, { x: Integer(0), y: Integer(0), angle: 0 })
-  const players = starts.map(({ x, y, direction }, index) => {
-    const robot = new Robot(`robot-${index}`, direction)
-    board.placeRobot(robot.id, { x: Integer(x), y: Integer(y) })
-    return new Player(`player-${index}`, robot)
-  })
+  const board = new Board(withRebootTiles(tiles, { x: Integer(0), y: Integer(2) }), { x: Integer(0), y: Integer(0), angle: 0 })
   const cards = {
     step: new Card('step', 'MOVE_1'),
     stepAgain: new Card('step-again', 'MOVE_1'),
@@ -22,8 +19,9 @@ function createGame(starts = [{ x: 0, y: 1, direction: Direction.EAST }]) {
     right: new Card('right', 'TURN_RIGHT'),
     uturn: new Card('uturn', 'U_TURN'),
   }
-  for (const player of players) player.deck.add(Object.values(cards))
-  const game = new Game({ board, players, deck: Object.values(cards), rebootTile: { x: Integer(0), y: Integer(2) }, random: () => 0 })
+  const players = starts.map(({ x, y, direction }) =>
+    placeTestPlayer(board, { x: Integer(x), y: Integer(y) }, { direction, deck: new Deck(Object.values(cards)) }))
+  const game = createTestGame({ board, players, deck: Object.values(cards) })
   return { board, players, cards, game }
 }
 

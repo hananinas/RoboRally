@@ -5,9 +5,13 @@ import type { Lobby, SessionContext } from '@/socket/sessionContext'
 import { withSessionRequest } from '@/socket/utilities/withSessionRequest'
 import { ROBOT_COLOURS } from '@/game/Robot'
 import { boardMaps, type BoardMapName } from '@/game/boardMaps'
+import { DEFAULT_ROBOT_ID, robotCatalog } from '@/game/robotCatalog'
+import { createGame } from '@/game/GameFactory'
 import {
   emptyRequestSchema, lobbyRequestSchema, createLobbyRequestSchema,
-  type EmptyRequest, type LobbyRequest, type CreateLobbyRequest, type GameInitialization, type LobbyState, type User,
+  robotSelectionRequestSchema,
+  type RobotSpriteId,
+  type EmptyRequest, type LobbyRequest, type RobotSelectionRequest, type RobotSelectionResult, type CreateLobbyRequest, type GameInitialization, type LobbyState, type User,
   type LobbyListResult, type LobbyJoinResult, type LobbyLeaveResult, type LobbyStartResult,
 } from '@robo-rally/game-events'
 import { createGameContext } from '@/socket/gameContext'
@@ -21,7 +25,10 @@ export function presentLobby(lobby: Lobby): LobbyState {
   return { lobbyId: lobby.lobbyId, name: lobby.name, mapName: lobby.mapName, mapDisplayName: map.name, mapIcon: map.icon,
     ownerUserId: lobby.members.keys().next().value!,
     playerCount: lobby.members.size, maxPlayers: MAX_PLAYERS,
-    players: [...lobby.members.values()].map(({ user }) => ({ userId: user.userId, username: user.username })) }
+    players: [...lobby.members.values()].map(({ user, robotSpriteId }) => ({
+      userId: user.userId, username: user.username, robotSpriteId,
+    })),
+    robots: robotCatalog }
 }
 
 function isBoardMapName(mapName: string): mapName is BoardMapName {
@@ -69,6 +76,7 @@ export function handleListLobbies(
     ack({
       outcome: 'LOBBIES_FOUND',
       maps: presentBoardMaps(),
+      robots: robotCatalog,
       lobbies: [...context.lobbies.values()].map((lobby) => {
         const { lobbyId, name, mapName, mapDisplayName, mapIcon, playerCount, maxPlayers } = presentLobby(lobby)
         return { lobbyId, name, mapName, mapDisplayName, mapIcon, playerCount, maxPlayers }
@@ -95,7 +103,9 @@ export function handleCreateLobby(
     }
     const lobbyId = randomUUID()
     const lobby: Lobby = { lobbyId, name: payload.name ?? `Lobby ${lobbyId.slice(0, 8)}`, mapName,
-      members: new Map([[user.userId, { user, connectionId: socket.id }]]) }
+      members: new Map([[user.userId, {
+        user, connectionId: socket.id, robotSpriteId: DEFAULT_ROBOT_ID,
+      }]]) }
     void socket.join(lobbyRoom(lobbyId))
     context.lobbies.set(lobbyId, lobby)
     context.sessionsByUser.set(user.userId, { kind: 'lobby', lobbyId })
@@ -121,10 +131,30 @@ export function handleJoinLobby(
     }
     if (lobby.members.size >= MAX_PLAYERS) return ack({ outcome: 'LOBBY_FULL' })
     void socket.join(lobbyRoom(lobby.lobbyId))
-    lobby.members.set(user.userId, { user, connectionId: socket.id })
+    lobby.members.set(user.userId, { user, connectionId: socket.id, robotSpriteId: DEFAULT_ROBOT_ID })
     context.sessionsByUser.set(user.userId, { kind: 'lobby', lobbyId: lobby.lobbyId })
     ack({ outcome: 'LOBBY_JOINED', lobby: presentLobby(lobby) })
     socket.to(lobbyRoom(lobby.lobbyId)).emit('lobby.updated', { lobby: presentLobby(lobby) })
+  })
+}
+
+export function handleSelectRobot(
+  context: SessionContext,
+  socket: GameSocket,
+  payload: RobotSelectionRequest,
+  acknowledge: (result: RobotSelectionResult) => void,
+): void {
+  withSessionRequest(socket, 'lobby.selectRobot', robotSelectionRequestSchema, payload, acknowledge, (user, ack) => {
+    const knownRobot = robotCatalog.some((robot) => robot.id === payload.robotSpriteId)
+    if (!knownRobot) return ack({ outcome: 'INVALID_REQUEST' })
+    const session = context.sessionsByUser.get(user.userId)
+    const lobby = session?.kind === 'lobby' ? context.lobbies.get(session.lobbyId) : undefined
+    const member = lobby?.members.get(user.userId)
+    if (!lobby || member?.connectionId !== socket.id) return ack({ outcome: 'NOT_LOBBY_MEMBER' })
+    member.robotSpriteId = payload.robotSpriteId
+    const state = presentLobby(lobby)
+    ack({ outcome: 'ROBOT_SELECTED', lobby: state })
+    socket.to(lobbyRoom(lobby.lobbyId)).emit('lobby.updated', { lobby: state })
   })
 }
 
@@ -146,7 +176,12 @@ export function handleLeaveLobby(
   })
 }
 
-type ConnectedLobbyMember = { user: User; connectionId: string; socket: GameSocket }
+type ConnectedLobbyMember = {
+  user: User
+  connectionId: string
+  robotSpriteId: RobotSpriteId
+  socket: GameSocket
+}
 
 function getConnectedMembers(context: SessionContext, lobby: Lobby): Result<ConnectedLobbyMember[], 'LOBBY_MEMBER_DISCONNECTED'> {
   const members: ConnectedLobbyMember[] = []
@@ -179,10 +214,10 @@ export function handleStartLobby(
     let gameContext: MembershipContext | undefined
     let prepared: { member: { user: User; player: Player }; socket: GameSocket; initialization: GameInitialization }[] = []
     try {
-      const preparedContext = createGameContext(io, context.createGame(lobby.mapName))
+      const preparedContext = createGameContext(io, createGame(lobby.mapName, lobby.name))
       gameContext = preparedContext
       const members = connected.value.map(({ socket: connection, ...member }) => {
-        const result = preparedContext.game.addPlayer(ROBOT_COLOURS[preparedContext.memberships.size])
+        const result = preparedContext.game.addPlayer(ROBOT_COLOURS[preparedContext.memberships.size], member.robotSpriteId)
         if (result.isErr()) throw new Error(result.error)
         const membership = { ...member, player: result.value }
         preparedContext.memberships.set(member.user.userId, membership)
@@ -207,9 +242,9 @@ export function handleStartLobby(
       gameContext?.actionScheduler.stop()
       throw error
     }
-    context.games.set(gameContext.gameId, gameContext)
+    context.games.set(gameContext.game.id, gameContext)
     for (const entry of prepared) {
-      context.sessionsByUser.set(entry.member.user.userId, { kind: 'game', gameId: gameContext.gameId })
+      context.sessionsByUser.set(entry.member.user.userId, { kind: 'game', gameId: gameContext.game.id })
       void entry.socket.leave(lobbyRoom(lobby.lobbyId))
     }
     context.lobbies.delete(lobby.lobbyId)
@@ -218,6 +253,6 @@ export function handleStartLobby(
         lobbyId: lobby.lobbyId, initialization: entry.initialization,
       })
     }
-    ack({ outcome: 'STARTED', gameId: gameContext.gameId })
+    ack({ outcome: 'STARTED', gameId: gameContext.game.id })
   })
 }

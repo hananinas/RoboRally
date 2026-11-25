@@ -1,7 +1,7 @@
 { pkgs, nixvim, system }:
 
 let
-  nodejs = pkgs.nodejs_24;
+  nodejs = pkgs.nodejs_26;
 
   editor = import ./editor.nix {
     inherit pkgs nixvim system;

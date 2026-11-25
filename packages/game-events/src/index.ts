@@ -43,6 +43,7 @@ export type {
   Robot,
   RobotId,
   RobotActionResolved,
+  RebootEffect,
   Tile,
   UpdateRegisters,
   UpdateRegistersResult,
