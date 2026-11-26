@@ -1,7 +1,7 @@
 import type { GameInitialization, PublicGameState, RobotSpriteId, User, Winner } from '@robo-rally/game-events'
 import { err, ok, type Result } from 'neverthrow'
 import type { GameSocket, GameSocketServer } from '@/socket/gameServer'
-import type { AddPlayerError, Game, Player } from '@/domain/game/index'
+import type { AddPlayerError, Game, Player, PlayerId } from '@/domain/game/index'
 import {
   presentInitialization, presentPlayerConnectionChanged, presentProgrammingTimer, presentPublicGameState, presentWinner,
 } from '@/socket/presenters/gamePresenter'
@@ -28,8 +28,7 @@ export class GameSession {
   private readonly seats = new Map<string, Seat>()
   readonly actionScheduler: ActionScheduler
   readonly programmingTimer: ProgrammingTimer
-  private recordedWinner: Winner | null = null
-  private winnerAnnounced = false
+  private declaredWinner: Winner | null = null
 
   constructor(io: GameSocketServer, game: Game) {
     this.io = io
@@ -39,7 +38,7 @@ export class GameSession {
     this.actionScheduler = createActionScheduler({
       io, game, publicRoom: this.publicRoom,
       playerRoom: (playerId) => this.playerRoom(playerId),
-      announceWinnerIfConcluded: () => this.announceWinnerIfConcluded(),
+      onWinnerDeclared: (playerId) => this.announceWinner(playerId),
       onProgrammingStarted: () => this.programmingTimer.reset(),
       onStop: () => this.programmingTimer.stop(),
     })
@@ -78,22 +77,15 @@ export class GameSession {
     return `game:${this.game.id}:player:${playerId}`
   }
 
-  winner(): Winner | null {
-    if (this.recordedWinner === null && this.game.winner !== undefined) {
-      const seat = [...this.seats.values()].find(({ player }) => player.id === this.game.winner)
-      this.recordedWinner = presentWinner(this.game.winner, seat?.user.username ?? '')
-    }
-    return this.recordedWinner
-  }
-
-  private announceWinnerIfConcluded(): void {
-    if (this.winnerAnnounced || this.game.winner === undefined) return
-    this.winnerAnnounced = true
-    this.io.to(this.publicRoom).emit('game.won', { gameId: this.game.id, ...this.winner()! })
+  // Recorded when the win is declared: the winner may leave before anyone asks.
+  private announceWinner(playerId: PlayerId): void {
+    const seat = [...this.seats.values()].find(({ player }) => player.id === playerId)
+    this.declaredWinner = presentWinner(playerId, seat?.user.username ?? '')
+    this.io.to(this.publicRoom).emit('game.won', { gameId: this.game.id, ...this.declaredWinner })
   }
 
   publicState(): PublicGameState {
-    return presentPublicGameState(this.game, this.programmingTimer.state(), this.seats.values(), this.winner())
+    return presentPublicGameState(this.game, this.programmingTimer.state(), this.seats.values(), this.declaredWinner)
   }
 
   isMember(socket: GameSocket): Result<Seat, 'NOT_A_MEMBER'> {
@@ -158,7 +150,7 @@ export class GameSession {
 
   leave(socket: GameSocket): Result<void, 'NOT_A_MEMBER'> {
     return this.isMember(socket).map(({ player, user }) => {
-      const { roundConcluded } = this.game.removePlayer(player.id)
+      const progress = this.game.removePlayer(player.id)
       this.seats.delete(user.userId)
       void socket.leave(this.publicRoom)
       void socket.leave(this.playerRoom(player.id))
@@ -166,7 +158,7 @@ export class GameSession {
         gameId: this.game.id, playerId: player.id, robotId: player.robot.id,
       })
       this.closeTimerIfRoundConcluded()
-      this.actionScheduler.announceProgress({ roundConcluded })
+      this.actionScheduler.announceProgress(progress)
       this.actionScheduler.scheduleNextAction()
     })
   }

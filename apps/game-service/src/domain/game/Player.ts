@@ -30,7 +30,7 @@ export class Player {
       position: { x: position.x, y: position.y },
       orientation: orientationOf(this.robot.direction),
       lastCheckpoint: this.completedCheckpoint,
-      hand: this.currentHand.map(cardSnapshot),
+      hand: this.#hand.map(cardSnapshot),
       deck: this.deck.snapshot,
     }
   }

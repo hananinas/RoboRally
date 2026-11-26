@@ -82,7 +82,7 @@ describe('gear activation', () => {
 
     expect(game.executeNextStep()).toEqual({
       type: 'environment', result: {
-        kind: 'GEARS', roundConcluded: false,
+        kind: 'GEARS', roundConcluded: false, declaredWinner: null,
         robots: [{ robotId: robot.id, position, direction: expected }],
       },
     })

@@ -33,7 +33,7 @@ describe('activation scheduler', () => {
     game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
     io = createGameSocketServer(createServer(), createSessionStore({ oidcClient: { refreshToken: vi.fn() }, refreshBufferSeconds: 0 }))
     const broadcast = vi.spyOn(io.of('/').adapter, 'broadcast')
-    scheduler = createActionScheduler({ io, game, publicRoom: 'public', playerRoom: (id) => `private:${id}`, announceWinnerIfConcluded: vi.fn(),
+    scheduler = createActionScheduler({ io, game, publicRoom: 'public', playerRoom: (id) => `private:${id}`, onWinnerDeclared: vi.fn(),
       onProgrammingStarted: vi.fn(), onStop: vi.fn() })
     const events = () => broadcast.mock.calls.map(([packet, options]) => ({
       name: packet.data[0], payload: packet.data[1], rooms: [...options.rooms],

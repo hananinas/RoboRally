@@ -45,6 +45,7 @@ describe('Game activation loop', () => {
           direction: directions[registerIndex],
         },
         roundConcluded: registerIndex === 4,
+        declaredWinner: null,
       })
       expect(game.currentRegister).toBe(registerIndex === 4 ? 0 : registerIndex + 1)
       expect(game.lastActivePhase).toBe(registerIndex === 4 ? 'programming' : 'activation')

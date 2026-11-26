@@ -40,7 +40,7 @@ describe('environment execution', () => {
         expect(() => game.executeNextAction()).toThrow()
         expect(game.executeNextStep()).toEqual({
           type: 'environment', result: {
-            kind: 'GEARS', roundConcluded: false,
+            kind: 'GEARS', roundConcluded: false, declaredWinner: null,
             robots: [],
           },
         })
@@ -51,7 +51,7 @@ describe('environment execution', () => {
         expect(() => game.executeNextAction()).toThrow()
         expect(game.executeNextStep()).toEqual({
           type: 'environment', result: {
-            kind: 'CHECKPOINTS', roundConcluded: registerIndex === 4,
+            kind: 'CHECKPOINTS', roundConcluded: registerIndex === 4, declaredWinner: null,
             checkpointProgress: roundNumber === 1 && registerIndex === 0
               ? [{ playerId: players[0].id, lastCheckpoint: 1 }] : [],
           },

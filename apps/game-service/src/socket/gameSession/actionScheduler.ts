@@ -1,4 +1,4 @@
-import type { Game } from '@/domain/game/index'
+import type { ActivationProgress, Game, PlayerId } from '@/domain/game/index'
 import { presentCardsDealt, presentEnvironmentStepResolved, presentRobotActionResolved } from '@/socket/presenters/gamePresenter'
 import type { GameSocketServer } from '@/socket/gameServer'
 import { logError } from '@/logger'
@@ -8,19 +8,19 @@ export type ActionSchedulerDeps = {
   game: Game
   publicRoom: string
   playerRoom: (playerId: string) => string
-  announceWinnerIfConcluded: () => void
+  onWinnerDeclared: (playerId: PlayerId) => void
   onProgrammingStarted: () => void
   onStop: () => void
 }
 
 export type ActionScheduler = {
   scheduleNextAction: () => void
-  announceProgress: (result: { roundConcluded: boolean }) => void
+  announceProgress: (progress: ActivationProgress) => void
   stop: () => void
 }
 
 export function createActionScheduler(
-  { io, game, publicRoom, playerRoom, announceWinnerIfConcluded, onProgrammingStarted, onStop }: ActionSchedulerDeps,
+  { io, game, publicRoom, playerRoom, onWinnerDeclared, onProgrammingStarted, onStop }: ActionSchedulerDeps,
 ): ActionScheduler {
   let scheduledAction: NodeJS.Immediate | undefined
   let closed = false
@@ -32,9 +32,9 @@ export function createActionScheduler(
     onProgrammingStarted()
   }
 
-  function announceProgress(result: { roundConcluded: boolean }): void {
-    announceWinnerIfConcluded()
-    if (result.roundConcluded) announceHands()
+  function announceProgress(progress: ActivationProgress): void {
+    if (progress.declaredWinner !== null) onWinnerDeclared(progress.declaredWinner)
+    if (progress.roundConcluded) announceHands()
   }
 
   function scheduleNextAction(): void {
