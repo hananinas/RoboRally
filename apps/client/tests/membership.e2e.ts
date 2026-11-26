@@ -32,7 +32,7 @@ test('two players wait for owner Start, play a round, and leave for the lobby br
   }
 })
 
-test('a lobby robot selection is used by every client during gameplay', async ({ browser, page, baseURL }) => {
+test('the owner keeps their seat and robot on reload and every client sees that robot in game', async ({ browser, page, baseURL }) => {
   const context = await browser.newContext({ baseURL, ignoreHTTPSErrors: true })
   const other = await context.newPage()
   try {
@@ -41,9 +41,12 @@ test('a lobby robot selection is used by every client during gameplay', async ({
     await browse(other, 'dane')
     await other.getByRole('list', { name: 'Lobbies' }).getByRole('button', { disabled: false }).first().click()
     await other.getByRole('button', { name: 'Join game', exact: true }).click()
-    await other.getByRole('group', { name: 'Choose a robot' }).getByRole('button', { name: 'Robot option 2' }).click()
-    await expect(other.getByRole('group', { name: 'Choose a robot' }).getByRole('button', { name: 'Robot option 2' })).toHaveAttribute('aria-pressed', 'true')
-    await expect(page.getByRole('list', { name: 'Lobby seats' }).getByRole('img', { name: 'Fork Clamp robot' })).toBeVisible()
+    const ownerRobot = page.getByRole('group', { name: 'Choose a robot' }).getByRole('button', { name: 'Robot option 2' })
+    await ownerRobot.click()
+    await expect(other.getByRole('list', { name: 'Lobby seats' }).getByRole('img', { name: 'Fork Clamp robot' })).toBeVisible()
+    await page.reload()
+    await expectRoster(page.getByRole('list', { name: 'Lobby seats' }), ['bence', 'dane'], 'bence', 'bence')
+    await expect(ownerRobot).toHaveAttribute('aria-pressed', 'true')
     await page.getByRole('button', { name: 'Start', exact: true }).click()
 
     for (const client of [page, other]) {

@@ -52,7 +52,11 @@ export function handleSocketDisconnect(context: SocketContext, socket: GameSocke
     const lobbySession = context.registry.getCurrentLobby(userId)
     if (lobbySession) {
       lobbySession.deferLeave(socket, () => {
-        if (context.registry.getCurrentLobby(userId) === lobbySession) leaveLobby(context, socket)
+        try {
+          if (context.registry.getCurrentLobby(userId) === lobbySession) leaveLobby(context, socket)
+        } catch (error) {
+          logError('Failed to release expired lobby seat', error, { userId })
+        }
       })
       return
     }
