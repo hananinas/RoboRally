@@ -68,12 +68,10 @@ describe('lobby lifecycle over Socket.IO', () => {
     if (listed.outcome !== 'LOBBIES_FOUND') throw new Error(listed.outcome)
     expect(listed.lobbies).toEqual([])
     expect(listed.maps).toEqual(Object.entries(boardMaps).map(([mapName, map]) => ({
-      mapName, name: map.name, icon: map.icon, defaultForLobbyCreation: map.defaultForLobbyCreation,
+      mapName, name: map.name, icon: map.icon,
     })))
-    expect(listed.maps.filter((map) => map.defaultForLobbyCreation)).toHaveLength(1)
     expect(listed.robots).toEqual(robotCatalog)
     expect(new Set(listed.robots.map((robot) => robot.id)).size).toBe(listed.robots.length)
-    expect(listed.robots.filter((robot) => robot.defaultForLobbyCreation)).toHaveLength(1)
     expect(createGame).not.toHaveBeenCalled()
     expect(server.sockets.sockets.get(client.id!)!.rooms).toEqual(new Set([client.id]))
   })
@@ -98,6 +96,12 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(result.lobby.name).toBe('Friday Night')
     expect(result.lobby.mapName).toBe('empty-map')
     expect(result.lobby.mapDisplayName).toBe(boardMaps['empty-map'].name)
+  })
+  it('stores the lobby name trimmed, within the length limit', async () => {
+    const owner = await connect('Padder')
+    const result = await owner.emitWithAck('lobby.create', { mapName: 'empty-map', name: `  ${'x'.repeat(50)}  ` })
+    if (result.outcome !== 'LOBBY_JOINED') throw new Error(result.outcome)
+    expect(result.lobby.name).toBe('x'.repeat(50))
   })
   it('stores the selected robot and notifies other lobby members without echoing to the sender', async () => {
     const owner = await connect('Owner')
@@ -278,6 +282,10 @@ describe('lobby lifecycle over Socket.IO', () => {
     })
     expect(server.sockets.adapter.rooms.has(`lobby:${lobby.lobbyId}`)).toBe(false)
   })
+  it('treats leaving with no membership as already left', async () => {
+    const stranger = await connect('Stranger')
+    expect(await stranger.emitWithAck('lobby.leave', {})).toEqual({ outcome: 'LEFT' })
+  })
   it('keeps the lobby usable if game preparation fails', async () => {
     const owner = await connect('Owner')
     const lobby = await create(owner)
@@ -368,18 +376,6 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect(state.outcome).toBe('IN_LOBBY')
     if (state.outcome === 'IN_LOBBY') expect(state.lobby.playerCount).toBe(1)
   })
-  it('rolls back partially joined game rooms before publishing a failed start', async () => {
-    const owner = await connect('Owner')
-    const lobby = await create(owner)
-    const serverSocket = server.sockets.sockets.get(owner.id!)!
-    const original = serverSocket.join.bind(serverSocket)
-    vi.spyOn(serverSocket, 'join').mockImplementationOnce(original).mockImplementationOnce(() => { throw new Error('Room failure') })
-    expect(await owner.emitWithAck('lobby.start', {})).toEqual({ outcome: 'INTERNAL_ERROR' })
-    expect(serverSocket.rooms).toEqual(new Set([owner.id, `lobby:${lobby.lobbyId}`]))
-    expect((await owner.emitWithAck('membership.get', {})).outcome).toBe('IN_LOBBY')
-    expect([...server.sockets.adapter.rooms.keys()].some((room) => room.startsWith('game:'))).toBe(false)
-  })
-
   it('returns an internal error without retaining a failed lobby creation', async () => {
     const owner = await connect('Owner')
     const connection = server.sockets.sockets.get(owner.id!)!

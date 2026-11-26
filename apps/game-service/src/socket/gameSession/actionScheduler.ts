@@ -2,14 +2,13 @@ import type { Game } from '@/domain/game/index'
 import { presentCardsDealt, presentEnvironmentStepResolved, presentRobotActionResolved } from '@/socket/presenters/gamePresenter'
 import type { GameSocketServer } from '@/socket/gameServer'
 import { logError } from '@/logger'
-import type { Winner } from '@robo-rally/game-events'
 
 export type ActionSchedulerDeps = {
   io: GameSocketServer
   game: Game
   publicRoom: string
   playerRoom: (playerId: string) => string
-  winner: () => Winner | null
+  announceWinnerIfConcluded: () => void
   onProgrammingStarted: () => void
   onStop: () => void
 }
@@ -21,17 +20,10 @@ export type ActionScheduler = {
 }
 
 export function createActionScheduler(
-  { io, game, publicRoom, playerRoom, winner, onProgrammingStarted, onStop }: ActionSchedulerDeps,
+  { io, game, publicRoom, playerRoom, announceWinnerIfConcluded, onProgrammingStarted, onStop }: ActionSchedulerDeps,
 ): ActionScheduler {
   let scheduledAction: NodeJS.Immediate | undefined
   let closed = false
-  let winnerAnnounced = false
-
-  function announceWinner(): void {
-    if (winnerAnnounced) return
-    winnerAnnounced = true
-    io.to(publicRoom).emit('game.won', { gameId: game.id, ...winner()! })
-  }
 
   function announceHands(): void {
     for (const player of game.players) {
@@ -41,7 +33,7 @@ export function createActionScheduler(
   }
 
   function announceProgress(result: { roundConcluded: boolean }): void {
-    if (game.winner !== undefined) announceWinner()
+    announceWinnerIfConcluded()
     if (result.roundConcluded) announceHands()
   }
 

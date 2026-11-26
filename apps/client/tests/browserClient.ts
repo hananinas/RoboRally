@@ -16,9 +16,10 @@ export async function browse(page: Page, username: string) {
   await authenticate(page, username)
   await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeVisible()
 }
-export async function createLobby(page: Page, name = 'Test Lobby') {
+export async function createLobby(page: Page, name = 'Test Lobby', map = 'Test Map') {
   await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Choose a map', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: map, exact: true }).click()
   await page.getByLabel('Lobby name').fill(name)
   await page.getByRole('button', { name: 'Create lobby', exact: true }).click()
 }

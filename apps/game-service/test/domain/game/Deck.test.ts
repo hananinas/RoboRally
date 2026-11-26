@@ -1,11 +1,11 @@
-import { resolveRobotAction } from '../activationTestHelper.js'
+import { resolveRobotAction } from '../../activationTestHelper.js'
 import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
 import { Card } from '@/domain/game/Card'
 import { Deck, HAND_SIZE, createDeckCards } from '@/domain/game/Deck'
-import { Board, Direction, EmptyTile, createGame } from '@/domain/game/index'
+import { Direction, EmptyTile, createGame } from '@/domain/game/index'
 import { Integer } from '@/numbers'
-import { createTestGame, createTestPlayer, createTestRobot, withRebootTiles } from '../../fixtures.ts'
+import { createTestBoard, createTestGame, createTestPlayer, createTestRobot } from '../../fixtures.ts'
 
 function counts(cards: readonly Card[]): Record<string, number> {
   const result: Record<string, number> = {}
@@ -98,9 +98,11 @@ describe('Game card cycle', () => {
 
 describe('Again card', () => {
   function run(instructions: Instruction[]) {
-    const board = new Board(
-      withRebootTiles([Array.from({ length: 9 }, () => new EmptyTile())], { x: Integer(0), y: Integer(0) }),
+    const board = createTestBoard(
+      [Array.from({ length: 9 }, () => new EmptyTile())],
       { x: Integer(8), y: Integer(0), angle: 0 },
+      { x: Integer(0), y: Integer(0) },
+      [{ x: Integer(4), y: Integer(0) }],
     )
     const robot = createTestRobot({ direction: Direction.EAST })
     board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })

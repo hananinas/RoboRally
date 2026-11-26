@@ -1,13 +1,13 @@
-import { resolveRobotAction } from '../activationTestHelper.ts'
+import { resolveRobotAction } from '../../activationTestHelper.ts'
 import type { Instruction } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'
-import { Board, Direction, EmptyTile, Card } from '@/domain/game/index'
+import { Direction, EmptyTile, Card } from '@/domain/game/index'
 import { Deck } from '@/domain/game/Deck'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestGame, placeTestPlayer, withRebootTiles } from '../../fixtures.ts'
+import { createEmptyTileGrid, createTestBoard, createTestGame, placeTestPlayer } from '../../fixtures.ts'
 
 function createGame(deck: Card[]) {
-  const board = new Board(withRebootTiles(createEmptyTileGrid(3, 3), { x: Integer(0), y: Integer(2) }), { x: Integer(0), y: Integer(0), angle: Math.PI / 2 })
+  const board = createTestBoard(createEmptyTileGrid(3, 3), { x: Integer(0), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(2) })
   const player = placeTestPlayer(board, { x: Integer(1), y: Integer(1) }, {
     id: 'robot-1', direction: Direction.EAST, deck: new Deck(deck),
   })
@@ -95,7 +95,7 @@ describe('Game activation loop', () => {
 })
 
 function resolveCard(instruction: Instruction, direction: Direction, tiles: EmptyTile[][]) {
-  const board = new Board(withRebootTiles(tiles, { x: Integer(0), y: Integer(0) }), { x: Integer(3), y: Integer(0), angle: Math.PI / 2 })
+  const board = createTestBoard(tiles, { x: Integer(3), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
   const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, instruction))
   const player = placeTestPlayer(board, { x: Integer(3), y: Integer(3) }, { direction, deck: new Deck(cards) })
   const game = createTestGame({ board, players: [player], deck: cards })

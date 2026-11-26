@@ -54,7 +54,7 @@ export class LobbySession {
     this.pendingLeaves.delete(userId)
   }
 
-  connect(socket: GameSocket): void {
+  private connect(socket: GameSocket): void {
     void socket.join(this.room)
   }
 

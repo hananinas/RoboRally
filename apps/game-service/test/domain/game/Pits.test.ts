@@ -1,20 +1,21 @@
-import { resolveRobotAction } from '../activationTestHelper.js'
+import { resolveRobotAction } from '../../activationTestHelper.js'
 import { Integer } from '@/numbers'
 import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
-import { Board, Card, Direction, EmptyTile, PitTile, type Position, type Tile } from '@/domain/game/index'
+import { Card, Direction, EmptyTile, PitTile, type Position, type Tile } from '@/domain/game/index'
 import { Deck } from '@/domain/game/Deck'
 import { createBoard } from '@/domain/game/BoardFactory'
-import { addTestPlayer, createEmptyTileGrid, createTestGame, placeTestPlayer, programLeadingWith, withRebootTiles } from '../../fixtures.ts'
+import { addTestPlayer, createEmptyTileGrid, createTestBoard, createTestGame, placeTestPlayer, programLeadingWith } from '../../fixtures.ts'
 
 function createGame(
   pit = { x: Integer(1), y: Integer(1) },
   rebootTiles: readonly Position[] = [{ x: Integer(0), y: Integer(2) }],
   walls: readonly Direction[] = [],
+  startTiles?: Position[],
 ) {
   const tiles: Tile[][] = createEmptyTileGrid(5, 3)
   tiles[pit.y][pit.x] = new PitTile(walls)
-  const board = new Board(withRebootTiles(tiles, ...rebootTiles), { x: Integer(2), y: Integer(0), angle: Math.PI / 2 })
+  const board = createTestBoard(tiles, { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, rebootTiles, startTiles)
   const cards = {
     MOVE_1: new Card('move-1', 'MOVE_1'),
     MOVE_2: new Card('move-2', 'MOVE_2'),
@@ -69,7 +70,12 @@ describe('pit entry and rebooting', () => {
   })
 
   it('pushes another robot into a pit and resolves a later fall during the same move', () => {
-    const { board, robot, player, cards: c, game } = createGame({ x: Integer(3), y: Integer(1) })
+    const { board, robot, player, cards: c, game } = createGame(
+      { x: Integer(3), y: Integer(1) },
+      undefined,
+      undefined,
+      [{ x: Integer(2), y: Integer(1) }],
+    )
     const other = addTestPlayer(game)
     game.submitProgram(player.id, [c.MOVE_3, c.MOVE_1, c.TURN_LEFT, c.TURN_RIGHT, c.BACK_UP].map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(other.id, programLeadingWith(other.hand, 'TURN_LEFT').map((card) => card.id))._unsafeUnwrap()
@@ -189,11 +195,11 @@ describe('pit entry and rebooting', () => {
     { rebootTile: { x: Integer(0), y: Integer(1) }, expectedProgress: 1 },
     { rebootTile: { x: Integer(1), y: Integer(0) }, expectedProgress: 2 },
   ])('evaluates checkpoints at the reboot destination $rebootTile', ({ rebootTile, expectedProgress }) => {
-    const board = new Board(withRebootTiles([
+    const board = createTestBoard([
       [new EmptyTile(), new EmptyTile([], 2), new PitTile()],
       [new EmptyTile(), new EmptyTile([], 1), new EmptyTile()],
       [new EmptyTile([], 3), new EmptyTile(), new EmptyTile()],
-    ], rebootTile), { x: Integer(2), y: Integer(1), angle: Math.PI / 2 })
+    ], { x: Integer(2), y: Integer(1), angle: Math.PI / 2 }, rebootTile)
     const instructions: Instruction[] = ['MOVE_3', 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'BACK_UP']
     const program = instructions.map((instruction, index) => new Card(`card-${index}`, instruction))
     const player = placeTestPlayer(board, { x: Integer(0), y: Integer(0) }, {
@@ -244,9 +250,10 @@ describe('reboots reported in action results', () => {
   it('reports a pushed robot and the acting robot in the order they fell', () => {
     const tiles = createEmptyTileGrid(5, 3)
     tiles[1][2] = new PitTile()
-    const board = new Board(
-      withRebootTiles(tiles, { x: Integer(0), y: Integer(2) }, { x: Integer(4), y: Integer(2) }),
+    const board = createTestBoard(
+      tiles,
       { x: Integer(0), y: Integer(0), angle: Math.PI / 2 },
+      [{ x: Integer(0), y: Integer(2) }, { x: Integer(4), y: Integer(2) }],
     )
     const pusherCards = moveCards()
     const pushedCards = moveCards().map((card) => new Card(`pushed-${card.id}`, card.instruction))
@@ -277,9 +284,10 @@ describe('reboots reported in action results', () => {
   it('reports a pushed robot that reboots onto its starting tile only in reboots', () => {
     const tiles = createEmptyTileGrid(5, 3)
     tiles[1][3] = new PitTile()
-    const board = new Board(
-      withRebootTiles(tiles, { x: Integer(1), y: Integer(1) }, { x: Integer(4), y: Integer(2) }),
+    const board = createTestBoard(
+      tiles,
       { x: Integer(0), y: Integer(0), angle: Math.PI / 2 },
+      [{ x: Integer(1), y: Integer(1) }, { x: Integer(4), y: Integer(2) }],
     )
     const pusherCards = moveCards()
     const pushedCards = moveCards().map((card) => new Card(`pushed-${card.id}`, card.instruction))

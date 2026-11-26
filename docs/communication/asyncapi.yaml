@@ -28,8 +28,8 @@ channels:
         $ref: '#/components/messages/LobbyLeave'
       startLobby:
         $ref: '#/components/messages/LobbyStart'
-      getSession:
-        $ref: '#/components/messages/SessionGet'
+      getMembership:
+        $ref: '#/components/messages/MembershipGet'
       leaveGame:
         $ref: '#/components/messages/LeaveGame'
       submitProgram:
@@ -81,12 +81,12 @@ channels:
       result:
         $ref: '#/components/messages/LobbyStartReply'
 
-  sessionGetReplies:
+  membershipGetReplies:
     address: null
-    description: Socket.IO acknowledgement of session.get.
+    description: Socket.IO acknowledgement of membership.get.
     messages:
       result:
-        $ref: '#/components/messages/SessionGetReply'
+        $ref: '#/components/messages/MembershipGetReply'
 
   lobby:
     address: 'lobby:{lobbyId}'
@@ -308,17 +308,17 @@ operations:
       x-socketio:
         acknowledgement: true
 
-  handleSessionGet:
+  handleMembershipGet:
     action: receive
     channel:
       $ref: '#/channels/commands'
     messages:
-      - $ref: '#/channels/commands/messages/getSession'
+      - $ref: '#/channels/commands/messages/getMembership'
     reply:
       channel:
-        $ref: '#/channels/sessionGetReplies'
+        $ref: '#/channels/membershipGetReplies'
       messages:
-        - $ref: '#/channels/sessionGetReplies/messages/result'
+        - $ref: '#/channels/membershipGetReplies/messages/result'
       x-socketio:
         acknowledgement: true
 
@@ -408,15 +408,15 @@ components:
       description: Delivered only through the request acknowledgement.
       payload:
         $ref: '#/components/schemas/LobbyStartResult'
-    SessionGet:
-      name: session.get
+    MembershipGet:
+      name: membership.get
       payload:
         $ref: '#/components/schemas/EmptyRequest'
-    SessionGetReply:
-      name: session.getResult
+    MembershipGetReply:
+      name: membership.getResult
       description: Delivered only through the request acknowledgement.
       payload:
-        $ref: '#/components/schemas/SessionResult'
+        $ref: '#/components/schemas/MembershipResult'
     LobbyUpdated:
       name: lobby.updated
       payload:
@@ -1024,6 +1024,7 @@ components:
         Delivered only through the request acknowledgement. CLOCK includes the
         server Unix timestamp in milliseconds, read immediately before sending
         the reply. INVALID_REQUEST rejects a payload other than an empty object.
+        INTERNAL_ERROR reports an unexpected server-side failure.
       payload:
         oneOf:
           - type: object
@@ -1039,7 +1040,7 @@ components:
             required: [ outcome ]
             properties:
               outcome:
-                const: INVALID_REQUEST
+                enum: [ INVALID_REQUEST, INTERNAL_ERROR ]
       examples:
         - name: sampled
           payload:
@@ -1070,35 +1071,6 @@ components:
         robotSpriteId:
           $ref: '#/components/schemas/RobotSpriteId'
           description: ID of a robot returned in the lobby's robot catalog.
-    RobotDefinition:
-      type: object
-      additionalProperties: false
-      required: [ id, name, icon, defaultForLobbyCreation ]
-      properties:
-        id:
-          $ref: '#/components/schemas/RobotSpriteId'
-        name:
-          type: string
-        icon:
-          type: string
-          format: uri
-        defaultForLobbyCreation:
-          type: boolean
-    BoardMapSummary:
-      type: object
-      additionalProperties: false
-      required: [ mapName, name, icon, defaultForLobbyCreation ]
-      properties:
-        mapName:
-          type: string
-          minLength: 1
-        name:
-          type: string
-        icon:
-          type: string
-          format: uri
-        defaultForLobbyCreation:
-          type: boolean
     CreateLobbyRequest:
       type: object
       additionalProperties: false
@@ -1111,6 +1083,40 @@ components:
           type: string
           minLength: 1
           maxLength: 50
+    RobotDefinition:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - icon
+      properties:
+        id:
+          $ref: '#/components/schemas/RobotSpriteId'
+        name:
+          type: string
+        icon:
+          type: string
+          format: uri
+    BoardMapSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - mapName
+        - name
+        - icon
+      examples:
+        - mapName: test-map
+          name: Test Map
+          icon: data:image/svg+xml;base64,PHN2Zy8+
+      properties:
+        mapName:
+          type: string
+        name:
+          type: string
+        icon:
+          type: string
+          format: uri
     LobbySummary:
       type: object
       additionalProperties: false
@@ -1147,6 +1153,9 @@ components:
       examples:
         - lobbyId: 00000000-0000-4000-8000-000000000001
           name: Lobby 1
+          mapName: test-map
+          mapDisplayName: Test Map
+          mapIcon: data:image/svg+xml;base64,PHN2Zy8+
           playerCount: 1
           maxPlayers: 6
           ownerUserId: 00000000-0000-4000-8000-000000000004
@@ -1158,10 +1167,12 @@ components:
             - id: tank
               name: Tank
               icon: data:image/svg+xml;base64,PHN2Zy8+
-              defaultForLobbyCreation: true
       required:
         - lobbyId
         - name
+        - mapName
+        - mapDisplayName
+        - mapIcon
         - playerCount
         - maxPlayers
         - ownerUserId
@@ -1173,6 +1184,13 @@ components:
           format: uuid
         name:
           type: string
+        mapName:
+          type: string
+        mapDisplayName:
+          type: string
+        mapIcon:
+          type: string
+          format: uri
         playerCount:
           type: integer
           minimum: 0
@@ -1207,7 +1225,7 @@ components:
             - NOT_A_MEMBER
             - NOT_LOBBY_OWNER
             - LOBBY_FULL
-            - USER_ALREADY_IN_SESSION
+            - ALREADY_HAS_MEMBERSHIP
     LobbyListResult:
       oneOf:
         - type: object
@@ -1226,10 +1244,12 @@ components:
                 $ref: '#/components/schemas/LobbySummary'
             maps:
               type: array
+              minItems: 1
               items:
                 $ref: '#/components/schemas/BoardMapSummary'
             robots:
               type: array
+              minItems: 1
               items:
                 $ref: '#/components/schemas/RobotDefinition'
         - $ref: '#/components/schemas/LobbyFailure'
@@ -1291,7 +1311,7 @@ components:
             outcome:
               const: LOBBY_MEMBER_DISCONNECTED
         - $ref: '#/components/schemas/LobbyFailure'
-    SessionResult:
+    MembershipResult:
       oneOf:
         - type: object
           additionalProperties: false
@@ -1300,7 +1320,7 @@ components:
             - user
           properties:
             outcome:
-              const: NO_SESSION
+              const: NO_MEMBERSHIP
             user:
               $ref: '#/components/schemas/User'
         - type: object
@@ -1431,7 +1451,7 @@ components:
             Whether this player's program is finalized for the current round, by
             submission or timeout.
       description: >-
-        Private initialization in game.started or session.get; reconnecting
+        Private initialization in game.started or membership.get; reconnecting
         preserves the assignment and restores the current register selection or
         finalized program. The public state includes fresh serverTime and the
         current timer.

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
-import { Board, Card, Deck, Direction, EmptyTile, GearTile, type Position, type Tile } from '@/domain/game/index'
+import { Card, Deck, Direction, EmptyTile, GearTile, type Position, type Tile } from '@/domain/game/index'
 import { Integer } from '@/numbers'
-import { createTestGame, createTestPlayer, createTestRobot, placeTestPlayer, withRebootTiles } from '../../fixtures.ts'
+import { createTestBoard, createTestGame, createTestPlayer, createTestRobot, placeTestPlayer } from '../../fixtures.ts'
 
 describe('gear tiles', () => {
   it.each(['CLOCKWISE', 'COUNTERCLOCKWISE'] as const)(
@@ -10,10 +10,10 @@ describe('gear tiles', () => {
     (rotation) => {
       const gearPosition = { x: Integer(1), y: Integer(0) }
       const robot = createTestRobot({ direction: Direction.EAST })
-      const placementBoard = new Board(withRebootTiles([
+      const placementBoard = createTestBoard([
         [new EmptyTile(), new GearTile(rotation), new EmptyTile()],
         [new EmptyTile(), new EmptyTile(), new EmptyTile()],
-      ], { x: Integer(0), y: Integer(1) }), { x: Integer(2), y: Integer(1), angle: 0 })
+      ], { x: Integer(2), y: Integer(1), angle: 0 }, { x: Integer(0), y: Integer(1) })
       placementBoard.placeRobot(robot.id, gearPosition)
       expect(placementBoard.positionOf(robot.id)).toEqual(gearPosition)
       expect(robot.direction).toBe(Direction.EAST)
@@ -21,10 +21,10 @@ describe('gear tiles', () => {
       // Each check gets a fresh game so that an earlier register's end-of-register
       // gear rotation can't bleed into the next movement-entry check.
       function crossGear(instruction: Instruction, start: Position) {
-        const board = new Board(withRebootTiles([
+        const board = createTestBoard([
           [new EmptyTile(), new GearTile(rotation), new EmptyTile()],
           [new EmptyTile(), new EmptyTile(), new EmptyTile()],
-        ], { x: Integer(0), y: Integer(1) }), { x: Integer(2), y: Integer(1), angle: 0 })
+        ], { x: Integer(2), y: Integer(1), angle: 0 }, { x: Integer(0), y: Integer(1) })
         const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, instruction))
         const player = placeTestPlayer(board, start, { direction: Direction.EAST, deck: new Deck(cards) })
         const game = createTestGame({ board, players: [player], deck: cards })
@@ -45,11 +45,11 @@ describe('gear tiles', () => {
 })
 
 function createGearGame(tiles: readonly Tile[], directions: readonly Direction[], instruction: Instruction = 'U_TURN') {
-  const board = new Board(withRebootTiles([
+  const board = createTestBoard([
     tiles.map(() => new EmptyTile()),
     tiles,
     tiles.map(() => new EmptyTile()),
-  ], { x: Integer(0), y: Integer(2) }), { x: Integer(0), y: Integer(0), angle: 0 })
+  ], { x: Integer(0), y: Integer(0), angle: 0 }, { x: Integer(0), y: Integer(2) })
   const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, instruction))
   const players = directions.map((direction, index) =>
     placeTestPlayer(board, { x: Integer(index), y: Integer(1) }, { direction, deck: new Deck(cards) }))
@@ -150,10 +150,10 @@ describe('gear activation', () => {
 
   it.each([false, true])('resolves a push and both gear turns with reversed roster = %s', (reverse) => {
     const position = (x: number) => ({ x: Integer(x), y: Integer(1) })
-    const board = new Board(withRebootTiles([
+    const board = createTestBoard([
       [new EmptyTile(), new EmptyTile(), new EmptyTile(), new EmptyTile()],
       [new EmptyTile(), new GearTile('COUNTERCLOCKWISE', [N]), new GearTile('CLOCKWISE'), new EmptyTile()],
-    ], position(0)), { x: Integer(2), y: Integer(0), angle: 0 })
+    ], { x: Integer(2), y: Integer(0), angle: 0 }, position(0))
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`move-${index}`, 'MOVE_1'))
     const pushed = createTestRobot({ direction: N })
     const pusher = createTestRobot({ direction: E })

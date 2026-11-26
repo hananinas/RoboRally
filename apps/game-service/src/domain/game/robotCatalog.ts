@@ -11,7 +11,7 @@ function robotAssetDirectory(): string {
   const candidates = [
     resolve(process.cwd(), 'apps/client/src/scenes/active-game/board/assets'),
     resolve(process.cwd(), '../client/src/scenes/active-game/board/assets'),
-    resolve(import.meta.dirname, '../../../../client/src/scenes/active-game/board/assets'),
+    resolve(import.meta.dirname, '../../../client/src/scenes/active-game/board/assets'),
   ]
   const directory = candidates.find((candidate) =>
     ROBOT_ASSETS.every(({ fileName }) => {
@@ -29,7 +29,7 @@ function robotAssetDirectory(): string {
 
 const assetDirectory = robotAssetDirectory()
 
-export const robotCatalog = ROBOT_ASSETS.map(({ id, name, fileName }, index) => {
+export const robotCatalog = ROBOT_ASSETS.map(({ id, name, fileName }) => {
   const source = readFileSync(resolve(assetDirectory, fileName), 'utf8')
   const symbolCount = Array.from(source.matchAll(/<symbol\b[^>]*\bid=["'][^"']+["'][^>]*>/g)).length
   if (symbolCount === 0) throw new Error(`Robot asset ${fileName} contains no SVG symbols`)
@@ -37,7 +37,6 @@ export const robotCatalog = ROBOT_ASSETS.map(({ id, name, fileName }, index) => 
     id,
     name,
     icon: '',
-    defaultForLobbyCreation: index === 0,
   }
 }) satisfies readonly RobotDefinition[]
 

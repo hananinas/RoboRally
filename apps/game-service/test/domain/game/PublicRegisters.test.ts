@@ -1,4 +1,4 @@
-import { resolveRobotAction } from '../activationTestHelper.js'
+import { resolveRobotAction } from '../../activationTestHelper.js'
 import { describe, expect, it } from 'vitest'
 import type { Game, UpdateRegistersError } from '@/domain/game/Game'
 import type { Player } from '@/domain/game/Player'

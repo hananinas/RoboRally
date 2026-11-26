@@ -8,7 +8,6 @@ export function presentBoardMaps(): readonly BoardMapSummary[] {
     mapName,
     name: map.name,
     icon: map.icon,
-    defaultForLobbyCreation: map.defaultForLobbyCreation,
   }))
 }
 

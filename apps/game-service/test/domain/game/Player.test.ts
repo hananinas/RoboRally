@@ -1,4 +1,4 @@
-import { resolveRobotAction } from '../activationTestHelper.ts'
+import { resolveRobotAction } from '../../activationTestHelper.ts'
 import { describe, expect, it } from 'vitest'
 import { Card, Deck, createGame } from '@/domain/game/index'
 import { createTestPlayer } from '../../fixtures.ts'

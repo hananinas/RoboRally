@@ -185,6 +185,6 @@ export default function useMembershipConnection() {
     joinLobby, startLobby, leaveMembership, refreshLobbies,
     createLobby,
     selectRobot,
-    retryMembership: () => socket.connected ? dispatch({ type: 'sync-requested' }) : connection.connect(),
+    retrySync: () => socket.connected ? dispatch({ type: 'sync-requested' }) : connection.connect(),
   }
 }

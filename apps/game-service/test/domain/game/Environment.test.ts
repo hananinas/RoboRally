@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { Board, Card, Deck, Direction, EmptyTile } from '@/domain/game/index'
+import { Card, Deck, Direction, EmptyTile } from '@/domain/game/index'
 import { Integer } from '@/numbers'
-import { createTestGame, placeTestPlayer, withRebootTiles } from '../../fixtures.ts'
+import { createTestBoard, createTestGame, placeTestPlayer } from '../../fixtures.ts'
 
 function createGame(count = 2) {
   const tiles = Array.from({ length: 3 }, () => Array.from({ length: 5 }, () => new EmptyTile()))
   tiles[1][1] = new EmptyTile([], 1)
   tiles[2][2] = new EmptyTile([], 2)
-  const board = new Board(withRebootTiles(tiles, { x: Integer(0), y: Integer(2) }), { x: Integer(0), y: Integer(0), angle: 0 })
+  const board = createTestBoard(tiles, { x: Integer(0), y: Integer(0), angle: 0 }, { x: Integer(0), y: Integer(2) }, [{ x: Integer(3), y: Integer(1) }])
   const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'TURN_LEFT'))
   const players = Array.from({ length: count }, (_, index) =>
     placeTestPlayer(board, { x: Integer(index + 1), y: Integer(1) }, { direction: Direction.NORTH, deck: new Deck(cards) }))

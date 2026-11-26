@@ -3,7 +3,7 @@ import type { Instruction } from '@robo-rally/game-events'
 import type { Card } from '@/domain/game/Card'
 import { Deck, createDeckCards } from '@/domain/game/Deck'
 import { Game } from '@/domain/game/Game'
-import type { Board } from '@/domain/game/Board'
+import { Board, type Antenna } from '@/domain/game/Board'
 import { Player } from '@/domain/game/Player'
 import { Robot, ROBOT_COLOURS } from '@/domain/game/Robot'
 import { Direction, type Position } from '@/domain/game/spatial'
@@ -67,15 +67,22 @@ export function createEmptyTileGrid(width: number, height: number): Tile[][] {
   return Array.from({ length: height }, () => Array.from({ length: width }, () => new EmptyTile()))
 }
 
-// Copies the grid with a RebootTile at each position, keeping that tile's walls and checkpoint.
-export function withRebootTiles(tiles: readonly (readonly Tile[])[], ...positions: Position[]): Tile[][] {
+export function gridWithRebootTiles(tiles: readonly (readonly Tile[])[], ...positions: Position[]): Tile[][] {
   const grid = tiles.map((row) => [...row])
   for (const { x, y } of positions) {
-    const tile = grid[y]?.[x]
-    if (tile?.kind !== 'EMPTY') throw new RangeError(`Reboot tile at ${x},${y} must replace an empty tile`)
-    grid[y][x] = new RebootTile(tile.walls, tile.checkpointNumber)
+    grid[y][x] = new RebootTile(grid[y][x].walls, grid[y][x].checkpointNumber)
   }
   return grid
+}
+
+export function createTestBoard(
+  tiles: readonly (readonly Tile[])[],
+  antenna: Antenna,
+  rebootTiles: Position | readonly Position[],
+  startTiles?: readonly Position[],
+): Board {
+  const reboots = [rebootTiles].flat()
+  return new Board(gridWithRebootTiles(tiles, ...reboots), antenna, startTiles ?? reboots)
 }
 
 export function programLeadingWith(cards: readonly Card[], instruction: Instruction): Card[] {
