@@ -10,6 +10,7 @@ import { boardMaps } from '@/domain/game/boardMaps'
 import * as GameFactory from '@/domain/game/GameFactory'
 import { HAND_SIZE } from '@/domain/game/Deck'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
+import { createFakeGameRepository } from './repositoryTestHelper.ts'
 import * as gameSessionModule from '@/socket/gameSession/GameSession'
 import { createSessionStore, type SessionStore } from '@/auth/sessionStore'
 import { authCookieHeader } from './authTestHelper.ts'
@@ -29,7 +30,7 @@ describe('started game membership over Socket.IO', () => {
   async function start() {
     const http = createServer()
     sessionStore = createSessionStore({ oidcClient: { refreshToken: vi.fn() }, refreshBufferSeconds: 0 })
-    server = createGameSocketServer(http, sessionStore)
+    server = createGameSocketServer(http, sessionStore, createFakeGameRepository())
     await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve))
     url = `http://127.0.0.1:${(http.address() as AddressInfo).port}`
   }

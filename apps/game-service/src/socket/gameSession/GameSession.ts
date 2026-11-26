@@ -1,11 +1,14 @@
-import type { GameInitialization, PublicGameState, RobotSpriteId, User, Winner } from '@robo-rally/game-events'
+import type { GameInitialization, PublicGameState, User, Winner } from '@robo-rally/game-events'
 import { err, ok, type Result } from 'neverthrow'
 import type { GameSocket, GameSocketServer } from '@/socket/gameServer'
-import type { AddPlayerError, Game, Player, PlayerId } from '@/domain/game/index'
+import type { AddPlayerError, BoardMapName, Game, Player, PlayerId } from '@/domain/game/index'
+import type { LobbyMember } from '@/domain/lobby/Lobby'
+import type { GameRepository } from '@/infra/GameRepository'
 import {
   presentInitialization, presentPlayerConnectionChanged, presentProgrammingTimer, presentPublicGameState, presentWinner,
 } from '@/socket/presenters/gamePresenter'
 import { createActionScheduler, type ActionScheduler } from '@/socket/gameSession/actionScheduler'
+import { createGameRecorder, type GameRecorder } from '@/socket/gameSession/gameRecorder'
 import { createProgrammingTimer, type ProgrammingTimer, type ProgrammingTimerState } from '@/programmingTimer'
 import { publishProgramFinalized } from '@/socket/gameSession/programFinalization'
 import { logError } from '@/logger'
@@ -28,17 +31,23 @@ export class GameSession {
   private readonly seats = new Map<string, Seat>()
   readonly actionScheduler: ActionScheduler
   readonly programmingTimer: ProgrammingTimer
+  private readonly recorder: GameRecorder
   private declaredWinner: Winner | null = null
 
-  constructor(io: GameSocketServer, game: Game) {
+  constructor(io: GameSocketServer, game: Game, repository: GameRepository, mapName: BoardMapName) {
     this.io = io
     this.game = game
     this.publicRoom = `game:${game.id}:public`
 
+    this.recorder = createGameRecorder({
+      repository, game, mapName, seats: () => this.seats.values(),
+    })
     this.actionScheduler = createActionScheduler({
       io, game, publicRoom: this.publicRoom,
       playerRoom: (playerId) => this.playerRoom(playerId),
       onWinnerDeclared: (playerId) => this.announceWinner(playerId),
+      onRoundConcluded: () => this.recorder.saveState(),
+      onAborted: () => this.recorder.saveAborted(),
       onProgrammingStarted: () => this.programmingTimer.reset(),
       onStop: () => this.programmingTimer.stop(),
     })
@@ -64,6 +73,7 @@ export class GameSession {
       this.actionScheduler.stop()
       this.game.abort()
       this.io.to(this.publicRoom).emit('game.aborted', { gameId: this.game.id })
+      this.recorder.saveAborted()
     }
   }
 
@@ -82,6 +92,7 @@ export class GameSession {
     const seat = [...this.seats.values()].find(({ player }) => player.id === playerId)
     this.declaredWinner = presentWinner(playerId, seat?.user.username ?? '')
     this.io.to(this.publicRoom).emit('game.won', { gameId: this.game.id, ...this.declaredWinner })
+    this.recorder.saveFinished(playerId)
   }
 
   publicState(): PublicGameState {
@@ -141,11 +152,14 @@ export class GameSession {
     this.io.to(this.publicRoom).emit('game.playerConnectionChanged', presentPlayerConnectionChanged(this.game, seat.player, false))
   }
 
-  addSeat(user: User, connectionId: string, robotSpriteId: RobotSpriteId): Result<Player, AddPlayerError> {
-    return this.game.addPlayer(robotSpriteId).map((player) => {
-      this.seats.set(user.userId, { user, player, connectionId })
-      return player
-    })
+  addSeats(members: readonly LobbyMember[]): Result<void, AddPlayerError> {
+    for (const { user, connectionId, robotSpriteId } of members) {
+      const seated = this.game.addPlayer(robotSpriteId)
+      if (seated.isErr()) return err(seated.error)
+      this.seats.set(user.userId, { user, player: seated.value, connectionId })
+    }
+    this.recorder.saveState()
+    return ok(undefined)
   }
 
   leave(socket: GameSocket): Result<void, 'NOT_A_MEMBER'> {
@@ -160,6 +174,8 @@ export class GameSession {
       this.closeTimerIfRoundConcluded()
       this.actionScheduler.announceProgress(progress)
       this.actionScheduler.scheduleNextAction()
+      this.recorder.markPlayerLeft(player.id)
+      if (this.seats.size === 0) this.recorder.saveAborted()
     })
   }
 

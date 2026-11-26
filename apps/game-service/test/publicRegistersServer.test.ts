@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import * as actionScheduler from '@/socket/gameSession/actionScheduler'
 import type { Game } from '@/domain/game/Game'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
+import { createFakeGameRepository } from './repositoryTestHelper.ts'
 import * as gameSessionModule from '@/socket/gameSession/GameSession'
 import { createSessionStore, type SessionStore } from '@/auth/sessionStore'
 import { authCookieHeader } from './authTestHelper.ts'
@@ -33,7 +34,7 @@ describe('public registers over Socket.IO', () => {
     contexts = vi.spyOn(gameSessionModule, 'GameSession')
     const http = createServer()
     sessionStore = createSessionStore({ oidcClient: { refreshToken: vi.fn() }, refreshBufferSeconds: 0 })
-    server = createGameSocketServer(http, sessionStore)
+    server = createGameSocketServer(http, sessionStore, createFakeGameRepository())
     await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve))
     url = `http://127.0.0.1:${(http.address() as AddressInfo).port}`
   })

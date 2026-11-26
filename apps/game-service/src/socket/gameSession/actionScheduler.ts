@@ -9,6 +9,8 @@ export type ActionSchedulerDeps = {
   publicRoom: string
   playerRoom: (playerId: string) => string
   onWinnerDeclared: (playerId: PlayerId) => void
+  onRoundConcluded: () => void
+  onAborted: () => void
   onProgrammingStarted: () => void
   onStop: () => void
 }
@@ -20,7 +22,10 @@ export type ActionScheduler = {
 }
 
 export function createActionScheduler(
-  { io, game, publicRoom, playerRoom, onWinnerDeclared, onProgrammingStarted, onStop }: ActionSchedulerDeps,
+  {
+    io, game, publicRoom, playerRoom, onWinnerDeclared, onRoundConcluded, onAborted,
+    onProgrammingStarted, onStop,
+  }: ActionSchedulerDeps,
 ): ActionScheduler {
   let scheduledAction: NodeJS.Immediate | undefined
   let closed = false
@@ -34,7 +39,10 @@ export function createActionScheduler(
 
   function announceProgress(progress: ActivationProgress): void {
     if (progress.declaredWinner !== null) onWinnerDeclared(progress.declaredWinner)
-    if (progress.roundConcluded) announceHands()
+    if (progress.roundConcluded) {
+      announceHands()
+      onRoundConcluded()
+    }
   }
 
   function scheduleNextAction(): void {
@@ -63,6 +71,7 @@ export function createActionScheduler(
         stop()
         game.abort()
         io.to(publicRoom).emit('game.aborted', { gameId: game.id })
+        onAborted()
       }
     })
   }

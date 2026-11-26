@@ -1,15 +1,17 @@
 import { createServer } from 'node:http'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { Card, Deck, Direction, EmptyTile, GearTile } from '@/domain/game/index'
 import { createActionScheduler, type ActionScheduler } from '@/socket/gameSession/actionScheduler'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
 import { createSessionStore } from '@/auth/sessionStore'
 import { Integer } from '@/numbers'
 import { createTestBoard, createTestGame, createTestPlayer, createTestRobot, instructionsOf } from './fixtures.ts'
+import { createFakeGameRepository } from './repositoryTestHelper.ts'
 
 describe('activation scheduler', () => {
   let io: GameSocketServer
   let scheduler: ActionScheduler
+  let onRoundConcluded: Mock<() => void>
 
   beforeEach(() => vi.useFakeTimers({ toFake: ['setImmediate', 'clearImmediate'] }))
   afterEach(() => {
@@ -31,10 +33,15 @@ describe('activation scheduler', () => {
     const position = { x: Integer(onGear ? 0 : 1), y: Integer(1) }
     const game = createTestGame({ board, players: [{ player, position }], deck: instructionsOf(cards) })
     game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
-    io = createGameSocketServer(createServer(), createSessionStore({ oidcClient: { refreshToken: vi.fn() }, refreshBufferSeconds: 0 }))
+    io = createGameSocketServer(
+      createServer(),
+      createSessionStore({ oidcClient: { refreshToken: vi.fn() }, refreshBufferSeconds: 0 }),
+      createFakeGameRepository(),
+    )
     const broadcast = vi.spyOn(io.of('/').adapter, 'broadcast')
+    onRoundConcluded = vi.fn()
     scheduler = createActionScheduler({ io, game, publicRoom: 'public', playerRoom: (id) => `private:${id}`, onWinnerDeclared: vi.fn(),
-      onProgrammingStarted: vi.fn(), onStop: vi.fn() })
+      onRoundConcluded, onAborted: vi.fn(), onProgrammingStarted: vi.fn(), onStop: vi.fn() })
     const events = () => broadcast.mock.calls.map(([packet, options]) => ({
       name: packet.data[0], payload: packet.data[1], rooms: [...options.rooms],
     }))
@@ -89,6 +96,7 @@ describe('activation scheduler', () => {
       .toEqual(Array.from({ length: 5 }, () => 'GEARS'))
     expect(player.robot.direction).toBe(Direction.NORTH)
     expect(game.lastActivePhase).toBe('programming')
+    expect(onRoundConcluded).toHaveBeenCalledTimes(1)
   })
 
   it.each(['abort', 'stop'] as const)('does not execute an already queued callback after %s', (action) => {

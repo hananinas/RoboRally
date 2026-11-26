@@ -7,6 +7,7 @@ import { createGameSocketServer } from '@/socket/gameServer.ts'
 import * as gameSessionModule from '@/socket/gameSession/GameSession.ts'
 import { createSessionStore } from '@/auth/sessionStore.ts'
 import { authCookieHeader } from './authTestHelper.ts'
+import { createFakeGameRepository } from './repositoryTestHelper.ts'
 
 it('waits for the roster, broadcasts register-major actions, and deals two private next rounds', async () => {
   const httpServer = createServer()
@@ -15,7 +16,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
     refreshBufferSeconds: 0,
   })
   const contexts: MockInstance<typeof gameSessionModule.GameSession> = vi.spyOn(gameSessionModule, 'GameSession')
-  const server = createGameSocketServer(httpServer, sessionStore)
+  const server = createGameSocketServer(httpServer, sessionStore, createFakeGameRepository())
   const clients: Socket<ServerToClientEvents, ClientToServerEvents>[] = []
   const events: { name: string; payload: unknown }[][] = [[], []]
   try {
