@@ -210,7 +210,6 @@ export class Game {
     if (removed.isErr()) return { roundConcluded: false }
     const player = removed.value
     this.robotPlacements.remove(player.robot.id)
-    player.robot.clearProgram()
     this.submittedPlayerIds.delete(playerId)
     this.activatedRobotIds.delete(player.robot.id)
     const { roundConcluded } = this.recheckActivationPhase()
@@ -238,14 +237,16 @@ export class Game {
     return ok(program)
   }
 
-  submitProgram(playerId: PlayerId, cardIds: readonly CardId[]): Result<void, SubmitProgramError> {
+  submitProgram(playerId: PlayerId, cardIds: readonly CardId[]): Result<CompletedProgram, SubmitProgramError> {
     return this.checkCanSubmitProgram(playerId).andThen((player) =>
-      this.checkProgram(player, cardIds).map((program) => this.applyProgram(player, program)),
+      this.checkProgram(player, cardIds).map((program) => {
+        this.applyProgram(player, program)
+        return { playerId: player.id, cards: program }
+      }),
     )
   }
 
   private applyProgram(player: Player, program: readonly Card[]): void {
-    player.robot.setProgram(program)
     player.updateRegisters(program as Registers)
     // Programmed cards stay out of both piles until the round ends.
     player.discard(player.hand.filter((card) => !program.includes(card)))
@@ -517,10 +518,7 @@ export class Game {
   }
 
   private discardPrograms(): void {
-    for (const player of this.players) {
-      player.discardProgram()
-      player.robot.clearProgram()
-    }
+    for (const player of this.players) player.discardProgram()
     this.submittedPlayerIds.clear()
   }
 

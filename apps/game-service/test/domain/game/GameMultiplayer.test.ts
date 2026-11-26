@@ -39,14 +39,14 @@ describe('Game fixed-roster programming', () => {
     expect(game.submitProgram(players[1].id, [deck[0].id, ...deck.slice(0, 4).map((card) => card.id)])._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
     expect(game.submitProgram('unknown', secondProgramIds)._unsafeUnwrapErr()).toBe('PLAYER_NOT_IN_GAME')
 
-    expect(players[0].robot.program).toEqual(firstProgram)
-    expect(players[1].robot.program).toEqual([])
+    expect(players[0].registers).toEqual(firstProgram)
+    expect(players[1].registers).toEqual([null, null, null, null, null])
     expect(game.hasSubmittedProgram(players[1].id)).toBe(false)
     expect(game.lastActivePhase).toBe('programming')
 
     game.submitProgram(players[1].id, secondProgramIds)
     expect(game.lastActivePhase).toBe('activation')
-    expect(players[1].robot.program).toEqual(secondProgram)
+    expect(players[1].registers).toEqual(secondProgram)
     resolveRobotAction(game)
     expect(resolveRobotAction(game).action.robotId).toBe(players[1].robot.id)
   })
@@ -172,7 +172,7 @@ describe('Game multiplayer activation', () => {
       }
 
       for (const player of players) {
-        expect(player.robot.program).toEqual([])
+        expect(player.registers).toEqual([null, null, null, null, null])
         expect(player.hand).toHaveLength(deck.length)
         expect(player.hand).toEqual(expect.arrayContaining([...deck]))
         expect(game.registerViewsFor(player)).toEqual(emptyViews)

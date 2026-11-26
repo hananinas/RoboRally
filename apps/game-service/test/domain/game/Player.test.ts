@@ -1,6 +1,7 @@
 import { resolveRobotAction } from '../../activationTestHelper.ts'
 import { describe, expect, it } from 'vitest'
 import { Card, Deck, createGame } from '@/domain/game/index'
+import { UnsignedInteger } from '@/numbers'
 import { addTestPlayer, createTestPlayer } from '../../fixtures.ts'
 
 describe('Player', () => {
@@ -23,24 +24,24 @@ describe('Player', () => {
     const cards = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => new Card(id, 'MOVE_1'))
     const player = createTestPlayer({ id: 'player-1', deck: new Deck(cards) })
     player.drawHand()
-    const program = cards.slice(0, 5)
+    const program = [cards[0], cards[1], cards[2], cards[3], cards[4]] as const
 
-    player.robot.setProgram(program)
+    player.updateRegisters(program)
     player.discard(player.hand.filter((card) => !program.includes(card)))
     player.clearHand()
 
     expect(player.hand).toEqual([])
-    expect(player.robot.program).toEqual(program)
+    expect(player.registers).toEqual(program)
 
     player.drawHand()
     expect(player.hand).toEqual([cards[5]])
     player.discard(player.hand)
 
-    player.discard(player.robot.program)
-    player.robot.clearProgram()
+    player.discardProgram()
     player.drawHand()
+    player.resetRegisters()
 
-    expect(player.robot.program).toEqual([])
+    expect(player.registers).toEqual([null, null, null, null, null])
     expect(player.hand).toHaveLength(6)
     expect(player.hand).toEqual(expect.arrayContaining(cards))
   })
@@ -60,11 +61,35 @@ describe('Player', () => {
     expect(Object.isFrozen(first.registers)).toBe(true)
     expect(second.registers).toEqual(blank)
     expect(first.hand).toEqual([card])
-    expect(first.robot.program).toEqual([])
 
     first.resetRegisters()
     expect(first.registers).toEqual(blank)
     expect(first.hand).toEqual([card])
+  })
+
+  it('returns the card held in each register, in the order it was programmed', () => {
+    const cards = [
+      new Card('move-1', 'MOVE_1'),
+      new Card('left-1', 'TURN_LEFT'),
+      new Card('move-2', 'MOVE_1'),
+      new Card('left-2', 'TURN_LEFT'),
+      new Card('move-3', 'MOVE_1'),
+    ]
+    const player = createTestPlayer()
+    player.updateRegisters([cards[0], cards[1], cards[2], cards[3], cards[4]])
+
+    expect(player.cardInRegister(UnsignedInteger(0))).toBe(cards[0])
+    expect(player.cardInRegister(UnsignedInteger(2))).toBe(cards[2])
+    expect(player.cardInRegister(UnsignedInteger(4))).toBe(cards[4])
+  })
+
+  it('rejects reading an empty register or an index past the fifth', () => {
+    const player = createTestPlayer()
+    expect(() => player.cardInRegister(UnsignedInteger(0))).toThrow()
+
+    const cards = Array.from({ length: 5 }, (_, index) => new Card(`move-${index}`, 'MOVE_1'))
+    player.updateRegisters([cards[0], cards[1], cards[2], cards[3], cards[4]])
+    expect(() => player.cardInRegister(UnsignedInteger(5))).toThrow(RangeError)
   })
 
   it('starts each player at checkpoint zero and tracks their progress independently', () => {
@@ -115,7 +140,7 @@ describe('Player', () => {
       for (let register = 0; register < 5; register++) resolveRobotAction(game)
 
       expect(game.lastActivePhase).toBe('programming')
-      expect(player.robot.program).toEqual([])
+      expect(player.registers).toEqual([null, null, null, null, null])
       expect(player.lastCheckpoint).toBe(1)
     }
   })

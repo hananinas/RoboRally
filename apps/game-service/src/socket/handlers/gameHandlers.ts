@@ -37,7 +37,7 @@ export function handleSubmitProgram(
       const result = gameSession.expireProgrammingIfDue().andThen(() => gameSession.game.submitProgram(player.id, payload.cardIds))
       if (result.isErr()) return ack({ outcome: result.error })
       ack({ outcome: 'ACCEPTED' })
-      publishProgramFinalized(gameSession, { playerId: player.id, cards: player.robot.program }, 'SUBMITTED')
+      publishProgramFinalized(gameSession, result.value, 'SUBMITTED')
       gameSession.noteProgramSubmitted()
     },
   })

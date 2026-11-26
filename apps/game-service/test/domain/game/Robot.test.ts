@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Direction, Card, Robot } from '@/domain/game/index'
-import { UnsignedInteger } from '@/numbers'
+import { Direction, Robot } from '@/domain/game/index'
 
 describe('Robot', () => {
   it.each([
@@ -38,37 +37,7 @@ describe('Robot', () => {
     expect(robot.direction).toBe(Direction.EAST)
   })
 
-  it('retains an ordered five-card program independently of the input array', () => {
-    const program = [
-      new Card('move-1', 'MOVE_1'),
-      new Card('left-1', 'TURN_LEFT'),
-      new Card('move-2', 'MOVE_1'),
-      new Card('left-2', 'TURN_LEFT'),
-      new Card('move-3', 'MOVE_1'),
-    ]
-    const robot = new Robot('robot-1', Direction.NORTH, 'red', 'tank')
-    robot.setProgram(program)
-    program.reverse()
-
-    expect(robot.id).toBe('robot-1')
-    expect(robot.getProgramCard(UnsignedInteger(0))).toBe(program[4])
-    expect(robot.getProgramCard(UnsignedInteger(1))).toBeInstanceOf(Card)
-    expect(robot.getProgramCard(UnsignedInteger(4))).toBe(program[0])
-
-    const exposedProgram = robot.program as Card[]
-    exposedProgram.pop()
-    expect(robot.program).toHaveLength(5)
-  })
-
-  it('rejects incomplete programs and invalid register reads', () => {
-    const robot = new Robot('robot-1', Direction.NORTH, 'red', 'tank')
-    expect(() => robot.setProgram([new Card('only-card', 'MOVE_1')])).toThrow(RangeError)
-    expect(() =>
-      robot.setProgram(Array.from({ length: 6 }, (_, index) => new Card(`extra-${index}`, 'MOVE_1'))),
-    ).toThrow(RangeError)
-    expect(() => robot.getProgramCard(UnsignedInteger(0))).toThrow()
-
-    robot.setProgram(Array.from({ length: 5 }, (_, index) => new Card(`move-${index}`, 'MOVE_1')))
-    expect(() => robot.getProgramCard(UnsignedInteger(5))).toThrow(RangeError)
+  it('keeps its id', () => {
+    expect(new Robot('robot-1', Direction.NORTH, 'red', 'tank').id).toBe('robot-1')
   })
 })

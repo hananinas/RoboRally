@@ -20,7 +20,6 @@ function expectRejectedWithoutMutation(game: Game, playerId: string, error: Upda
       id: player.id,
       views: game.registerViewsFor(player),
       registers: player.registers,
-      program: player.robot.program,
       hand: player.hand,
       submitted: game.hasSubmittedProgram(player.id),
       lastCheckpoint: player.lastCheckpoint,
@@ -51,7 +50,6 @@ describe('public register lifecycle', () => {
     ])
     expect(game.registerViewsFor(second)).toEqual(empty)
     expect(first.registers).toEqual([hand[0], null, hand[2], null, hand[4]])
-    expect(first.robot.program).toEqual([])
     expect(first.hand).toEqual(hand)
     expect(game.lastActivePhase).toBe('programming')
     expect(game.currentRegister).toBe(0)
@@ -71,13 +69,12 @@ describe('public register lifecycle', () => {
     expectRejectedWithoutMutation(game, first.id, 'GAME_PAUSED')
     game.resume()
     game.submitProgram(first.id, first.hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
-    const program = first.robot.program
-    expect(first.registers).toEqual(program)
+    const program = first.registers
     expect(game.registerViewsFor(first)).toEqual(Array.from({ length: 5 }, () => ({ kind: 'hidden' })))
     expectRejectedWithoutMutation(game, first.id, 'ALREADY_SUBMITTED')
     game.submitProgram(second.id, second.hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
     expectRejectedWithoutMutation(game, first.id, 'WRONG_PHASE')
-    expect(first.robot.program).toEqual(program)
+    expect(first.registers).toEqual(program)
   })
 
   it('rejects register updates after aborting', () => {

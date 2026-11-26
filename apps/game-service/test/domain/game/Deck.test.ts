@@ -88,7 +88,7 @@ describe('Game card cycle', () => {
     expect(game.submitProgram(first.id, program).isOk()).toBe(true)
     // Unprogrammed cards are discarded; programmed ones sit in the registers, outside every pile.
     expect(first.hand).toEqual([])
-    expect(first.robot.program.map((card) => card.id)).toEqual(program)
+    expect(first.registers.map((card) => card?.id)).toEqual(program)
     expect(game.submitProgram(second.id, second.hand.slice(0, 5).map((card) => card.id)).isOk()).toBe(true)
     expect(game.lastActivePhase).toBe('activation')
     for (let i = 0; i < 10; i++) resolveRobotAction(game)
@@ -97,7 +97,7 @@ describe('Game card cycle', () => {
     expect(first.hand).toHaveLength(HAND_SIZE)
     // 19-card deck: 9 drawn, 10 left, so the next hand has no overlap with the previous one.
     expect(first.hand.some((card) => firstIds.has(card.id))).toBe(false)
-    expect(first.robot.program).toEqual([])
+    expect(first.registers).toEqual([null, null, null, null, null])
   })
 })
 

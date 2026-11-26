@@ -1,8 +1,6 @@
-import type { Card } from '@/domain/game/Card'
 import type { RobotSpriteId } from '@robo-rally/game-events'
 import type { RobotId } from '@/domain/game/ids'
 import { Direction, rotateDirection } from '@/domain/game/spatial'
-import type { UnsignedInteger } from '@/numbers'
 
 export const ROBOT_COLOURS = [
   '#c74f4f', // 1. Red
@@ -19,7 +17,6 @@ export const ROBOT_COLOURS = [
 
 export class Robot {
   #direction: Direction
-  private programmedCards: readonly Card[] = []
 
   constructor(
     readonly id: RobotId,
@@ -32,33 +29,6 @@ export class Robot {
 
   get direction(): Direction {
     return this.#direction
-  }
-
-  get program(): readonly Card[] {
-    return [...this.programmedCards]
-  }
-
-  setProgram(program: readonly Card[]): void {
-    if (program.length !== 5) {
-      throw new RangeError('A program must contain five cards')
-    }
-    this.programmedCards = [...program]
-  }
-
-  clearProgram(): void {
-    this.programmedCards = []
-  }
-
-  getProgramCard(registerIndex: UnsignedInteger): Card {
-    if (registerIndex >= 5) {
-      throw new RangeError('Register index must be between 0 and 4')
-    }
-
-    const card = this.programmedCards[registerIndex]
-    if (!card) {
-      throw new Error('Robot has no program')
-    }
-    return card
   }
 
   turn(quarterTurns: number): void {
