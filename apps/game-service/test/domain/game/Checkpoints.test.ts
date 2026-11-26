@@ -67,7 +67,7 @@ describe('checkpoint activation', () => {
 
     expect(game.winner).toBe(player.id)
     expect(game.lastActivePhase).toBe('activation')
-    expect(game.currentRegister).toBe(0)
+    expect(game.currentRegister).toBe(1)
     expect(player.robot.program).toEqual([])
     expect(game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrapErr()).toBe('GAME_FINISHED')
   })
@@ -100,15 +100,14 @@ describe('checkpoint activation', () => {
     expect(player.lastCheckpoint).toBe(2)
     expect(game.winner).toBe(player.id)
     expect(game.lastActivePhase).toBe('activation')
-    expect(game.currentRegister).toBe(0)
+    expect(game.currentRegister).toBe(4)
     expect(game.hasSubmittedProgram(player.id)).toBe(false)
     expect(player.robot.program).toEqual([])
-    expect(player.registers).toEqual([
-      ...program.slice(0, 4).map((card) => ({ status: 'REVEALED', instruction: card.instruction })),
-      { status: 'HIDDEN' },
+    expect(game.registerViewsFor(player)).toEqual([
+      ...program.slice(0, 4).map((card) => ({ kind: 'revealed', instruction: card.instruction })),
+      { kind: 'hidden' },
     ])
 
-    const registers = player.registers
     const state = () => ({
       phase: game.lastActivePhase,
       currentRegister: game.currentRegister,
@@ -116,7 +115,7 @@ describe('checkpoint activation', () => {
       aborted: game.aborted,
       winner: game.winner,
       players: game.players,
-      registers: player.registers.map((register) => ({ ...register })),
+      registers: game.registerViewsFor(player),
       program: player.robot.program,
       hand: player.hand,
       submitted: game.hasSubmittedProgram(player.id),
@@ -128,7 +127,6 @@ describe('checkpoint activation', () => {
       const before = state()
       expect(game.updateRegisters(playerId, [null, null, null, null, null])._unsafeUnwrapErr()).toBe(error)
       expect(game.completePrograms()._unsafeUnwrapErr()).toBe(error)
-      expect(player.registers).toBe(registers)
       expect(state()).toEqual(before)
     }
 

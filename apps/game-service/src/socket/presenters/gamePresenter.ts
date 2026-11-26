@@ -11,6 +11,8 @@ import type {
   Position as PositionPayload,
   PlayerConnectionChanged,
   PublicGameState,
+  PublicRegisters,
+  PublicRegisterSlot,
   RegistersChanged,
   User,
   Winner,
@@ -29,6 +31,7 @@ import {
   type Player,
   type Position,
   type PlayerId,
+  type RegisterView,
 } from '@/domain/game/index'
 import { Integer } from '@/numbers'
 import type { EnvironmentStepResult } from '@/domain/game/Game'
@@ -52,6 +55,22 @@ function presentPosition(coordinate: Position, direction: Direction): PositionPa
 
 function presentCard(card: Card): CardPayload {
   return { id: card.id, instruction: card.instruction }
+}
+
+function presentRegister(view: RegisterView): PublicRegisterSlot {
+  switch (view.kind) {
+    case 'empty':
+      return { status: 'EMPTY' }
+    case 'hidden':
+      return { status: 'HIDDEN' }
+    case 'revealed':
+      return { status: 'REVEALED', instruction: view.instruction }
+  }
+}
+
+function presentRegisters(game: Game, player: Player): PublicRegisters {
+  const registers: readonly PublicRegisterSlot[] = game.registerViewsFor(player).map(presentRegister)
+  return registers as PublicRegisters
 }
 
 function presentTile(game: Game, x: number, y: number): TilePayload {
@@ -98,7 +117,7 @@ export function presentPlayerState(game: Game, player: Player, username: string,
     username,
     programSubmitted: game.hasSubmittedProgram(player.id),
     connected,
-    registers: player.registers,
+    registers: presentRegisters(game, player),
   }
 }
 
@@ -165,8 +184,9 @@ export function presentInitialization(game: Game, player: Player, state: PublicG
   }
 }
 
-export function presentRegistersChanged(gameId: GameId, player: Player): RegistersChanged {
-  return { gameId, playerId: player.id, registers: player.registers as RegistersChanged['registers'] }
+export function presentRegistersChanged(game: Game, player: Player): RegistersChanged {
+  const registers = presentRegisters(game, player) as RegistersChanged['registers']
+  return { gameId: game.id, playerId: player.id, registers }
 }
 
 export function presentPlayerConnectionChanged(game: Game, player: Player, connected: boolean): PlayerConnectionChanged {

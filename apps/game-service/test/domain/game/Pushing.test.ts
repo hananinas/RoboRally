@@ -45,10 +45,9 @@ describe('robot pushing', () => {
       { robotId: robots[2].id, position: reboot, direction: Direction.WEST },
     ]
     expect(result.pushedRobots).toEqual(expected)
-    expect(result.registers[0]).toEqual({ status: 'REVEALED', instruction: program[0].instruction })
-    expect(players[0].registers).toEqual(result.registers)
+    expect(game.registerViewsFor(players[0])[0]).toEqual({ kind: 'revealed', instruction: program[0].instruction })
     for (const player of players.slice(1)) {
-      expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'HIDDEN' })))
+      expect(game.registerViewsFor(player)).toEqual(Array.from({ length: 5 }, () => ({ kind: 'hidden' })))
     }
     game.executeNextAction()
     expect(result.pushedRobots).toEqual(expected)

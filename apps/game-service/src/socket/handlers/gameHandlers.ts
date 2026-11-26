@@ -81,7 +81,7 @@ export function handleUpdateRegisters(
       const result = gameSession.expireProgrammingIfDue().andThen(() => gameSession.game.updateRegisters(player.id, payload.cardIds))
       if (result.isErr()) return ack({ outcome: result.error })
       ack({ outcome: 'ACCEPTED' })
-      gameSession.io.to(gameSession.publicRoom).emit('game.registersChanged', presentRegistersChanged(gameSession.game.id, player))
+      gameSession.io.to(gameSession.publicRoom).emit('game.registersChanged', presentRegistersChanged(gameSession.game, player))
     },
   })
 }

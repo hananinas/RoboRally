@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { err, ok, type Result } from 'neverthrow'
 import type { Board } from '@/domain/game/Board'
-import { effects, type Instruction, type PrivateProgram, type PublicRegisters, type ResolvedInstruction, type RobotSpriteId } from '@robo-rally/game-events'
+import { effects, type Instruction, type PrivateProgram, type ResolvedInstruction, type RobotSpriteId } from '@robo-rally/game-events'
 import { captureEnvironmentSnapshot, environmentSteps, type EnvironmentChanges } from '@/domain/game/environment'
 import { Card } from '@/domain/game/Card'
 import { Deck } from '@/domain/game/Deck'
 import type { CardId, GameId, PlayerId, RobotId } from '@/domain/game/ids'
 import { Player } from '@/domain/game/Player'
+import { registerViews, type RegisterView } from '@/domain/game/registers'
 import { Robot, ROBOT_COLOURS } from '@/domain/game/Robot'
 import { RobotPlacements } from '@/domain/game/RobotPlacements'
 import { Roster } from '@/domain/game/Roster'
@@ -41,7 +42,6 @@ export type RebootResult = Readonly<{
 export type NextActionResult = Readonly<{
   registerIndex: number
   action: RobotActionResult
-  registers: PublicRegisters
   pushedRobots: readonly Readonly<{
     robotId: RobotId
     position: Position
@@ -176,6 +176,10 @@ export class Game {
 
   getRobotPosition(robotId: RobotId): Position {
     return this.robotPlacements.positionOf(robotId)
+  }
+
+  registerViewsFor(player: Player): readonly RegisterView[] {
+    return registerViews(player.program, this.registerIndex, this.activatedRobotIds.has(player.robot.id))
   }
 
   private findSpawn(): Result<Position, 'NO_SPAWN_AVAILABLE'> {
@@ -350,7 +354,7 @@ export class Game {
     }
     this.finishRegister()
     if (this.winner !== undefined) {
-      this.clearRound()
+      this.discardPrograms()
       return { roundConcluded: false }
     }
     if (this.registerIndex === REGISTERS_PER_ROUND) {
@@ -390,8 +394,6 @@ export class Game {
     const reboots = this.actionReboots
     this.actionReboots = []
     this.activatedRobotIds.add(robot.id)
-    const player = this.roster.requireOwner(robot.id)
-    const registers = player.revealRegister(registerIndex, card.instruction)
     const action: RobotActionResult = {
       robotId: robot.id,
       card,
@@ -408,7 +410,7 @@ export class Game {
     })
 
     const { roundConcluded } = this.recheckActivationPhase()
-    return { registerIndex, action, registers, pushedRobots, reboots, roundConcluded }
+    return { registerIndex, action, pushedRobots, reboots, roundConcluded }
   }
 
   private dealInitialHands(): void {
@@ -513,17 +515,17 @@ export class Game {
     this.registerIndex++
   }
 
-  private clearRound(): void {
+  private discardPrograms(): void {
     for (const player of this.players) {
       player.discard(player.robot.program)
       player.robot.clearProgram()
     }
     this.submittedPlayerIds.clear()
-    this.registerIndex = 0
   }
 
   private finishRound(): void {
-    this.clearRound()
+    this.discardPrograms()
+    this.registerIndex = 0
     this.dealNewHands()
     this.lifecycle.enterProgramming()
   }

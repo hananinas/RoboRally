@@ -37,9 +37,6 @@ describe('Game activation loop', () => {
         registerIndex,
         pushedRobots: [],
         reboots: [],
-        registers: Array.from({ length: 5 }, (_, index) => index <= registerIndex
-          ? { status: 'REVEALED', instruction: 'TURN_LEFT' }
-          : { status: 'HIDDEN' }),
         action: {
           robotId: robot.id,
           card: deck[registerIndex],

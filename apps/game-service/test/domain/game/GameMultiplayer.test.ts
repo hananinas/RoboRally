@@ -5,6 +5,8 @@ import type { Antenna, Position } from '@/domain/game/index.ts'
 import { Integer } from '@/numbers'
 import { createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, instructionsOf } from '../../fixtures.ts'
 
+const emptyViews = Array.from({ length: 5 }, () => ({ kind: 'empty' }))
+
 function createMultiplayerGame(
   positions: readonly Position[],
   antenna: Antenna = { x: Integer(4), y: Integer(4), angle: Math.PI / 2 },
@@ -144,7 +146,7 @@ describe('Game multiplayer activation', () => {
       players.forEach((player, index) => {
         expect(player.hand).toHaveLength(deck.length)
         expect(player.hand).toEqual(expect.arrayContaining([...deck]))
-        expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
+        expect(game.registerViewsFor(player)).toEqual(emptyViews)
         expect(game.updateRegisters(player.id, programs[index].map((card) => card.id))._unsafeUnwrap()).toBeUndefined()
         game.submitProgram(player.id, programs[index].map((card) => card.id))
         expect(game.lastActivePhase).toBe(index === players.length - 1 ? 'activation' : 'programming')
@@ -154,15 +156,18 @@ describe('Game multiplayer activation', () => {
         for (let robotIndex = 0; robotIndex < expectedOrder.length; robotIndex++) {
           const player = expectedOrder[robotIndex]
           const result = resolveRobotAction(game)
+          const registerFinished = robotIndex === expectedOrder.length - 1
+          const roundFinished = registerFinished && registerIndex === 4
           expect(result.registerIndex).toBe(registerIndex)
           expect(result.action.robotId).toBe(player.robot.id)
           expect(result.action.card).toBe(programs[players.indexOf(player)][registerIndex])
-          expect(result.registers).toEqual(Array.from({ length: 5 }, (_, index) => index <= registerIndex
-            ? { status: 'REVEALED', instruction: programs[players.indexOf(player)][index].instruction }
-            : { status: 'HIDDEN' }))
-          const registerFinished = robotIndex === expectedOrder.length - 1
+          expect(game.registerViewsFor(player)).toEqual(roundFinished
+            ? emptyViews
+            : Array.from({ length: 5 }, (_, index) => index <= registerIndex
+              ? { kind: 'revealed', instruction: programs[players.indexOf(player)][index].instruction }
+              : { kind: 'hidden' }))
           expect(game.currentRegister).toBe(registerFinished ? (registerIndex + 1) % 5 : registerIndex)
-          expect(game.lastActivePhase).toBe(registerFinished && registerIndex === 4 ? 'programming' : 'activation')
+          expect(game.lastActivePhase).toBe(roundFinished ? 'programming' : 'activation')
         }
       }
 
@@ -170,7 +175,7 @@ describe('Game multiplayer activation', () => {
         expect(player.robot.program).toEqual([])
         expect(player.hand).toHaveLength(deck.length)
         expect(player.hand).toEqual(expect.arrayContaining([...deck]))
-        expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
+        expect(game.registerViewsFor(player)).toEqual(emptyViews)
         expect(game.hasSubmittedProgram(player.id)).toBe(false)
       }
       expect(game.lastActivePhase).toBe('programming')

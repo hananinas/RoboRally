@@ -4,6 +4,8 @@ import { Card, Deck, Direction, EmptyTile, PitTile, type Position } from '@/doma
 import { Integer } from '@/numbers'
 import { addTestPlayer, createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, instructionsOf } from '../../fixtures.ts'
 
+const emptyViews = Array.from({ length: 5 }, () => ({ kind: 'empty' }))
+
 function createGame() {
   const board = createTestBoard(createEmptyTileGrid(2, 2), { x: Integer(1), y: Integer(1), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(1) }, [{ x: Integer(0), y: Integer(0) }])
   const deck: Card[] = [
@@ -48,10 +50,7 @@ describe('Game programming', () => {
       { registerIndex: 3, position: { x: 9, y: 5 }, direction: Direction.SOUTH },
       { registerIndex: 4, position: { x: 9, y: 5 }, direction: Direction.NORTH },
     ])
-    expect(actions.map(({ registers }, index) => registers[index])).toEqual(
-      deck.map((card) => ({ status: 'REVEALED', instruction: card.instruction })),
-    )
-    expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
+    expect(game.registerViewsFor(player)).toEqual(emptyViews)
     expect(game.lastActivePhase).toBe('programming')
   })
 
@@ -80,21 +79,17 @@ describe('Game programming', () => {
       const { player } = placement
       if (index === 0) player.drawHand()
       player.updateRegisters([deck[0], deck[1], deck[2], deck[3], deck[4]])
-      player.revealRegister(0, 'TURN_LEFT')
       return placement
     })
     const players = placements.map(({ player }) => player)
-    const snapshots = players.map((player) => player.registers)
 
-    createTestGame({ board, players: placements, deck: instructionsOf(deck) })
+    const game = createTestGame({ board, players: placements, deck: instructionsOf(deck) })
 
     for (const player of players) {
-      expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
+      expect(player.program).toEqual([null, null, null, null, null])
+      expect(game.registerViewsFor(player)).toEqual(emptyViews)
       expect(player.hand).toHaveLength(deck.length)
       expect(player.hand).toEqual(expect.arrayContaining(deck))
-    }
-    for (const snapshot of snapshots) {
-      expect(snapshot[0]).toEqual({ status: 'REVEALED', instruction: 'TURN_LEFT' })
     }
   })
 

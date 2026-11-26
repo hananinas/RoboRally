@@ -6,11 +6,10 @@ import { createGame } from '@/domain/game/GameFactory'
 import { addTestPlayer } from '../../fixtures.ts'
 
 const selection = (player: Player) => [player.hand[0].id, null, player.hand[2].id, null, player.hand[4].id] as const
-const empty = Array.from({ length: 5 }, () => ({ status: 'EMPTY' }))
+const empty = Array.from({ length: 5 }, () => ({ kind: 'empty' }))
 
 function expectRejectedWithoutMutation(game: Game, playerId: string, error: UpdateRegistersError) {
   const players = game.players
-  const registers = players.map((player) => player.registers)
   const state = () => ({
     phase: game.lastActivePhase,
     currentRegister: game.currentRegister,
@@ -19,7 +18,7 @@ function expectRejectedWithoutMutation(game: Game, playerId: string, error: Upda
     winner: game.winner,
     players: game.players.map((player) => ({
       id: player.id,
-      registers: player.registers.map((register) => ({ ...register })),
+      registers: game.registerViewsFor(player),
       program: player.robot.program,
       selection: player.program,
       hand: player.hand,
@@ -34,27 +33,23 @@ function expectRejectedWithoutMutation(game: Game, playerId: string, error: Upda
   expect(game.updateRegisters(playerId, [null, null, null, null, null])._unsafeUnwrapErr()).toBe(error)
 
   expect(game.players).toEqual(players)
-  players.forEach((player, index) => expect(player.registers).toBe(registers[index]))
   expect(state()).toEqual(before)
 }
 
 describe('public register lifecycle', () => {
 
-  it('stores private selections without submitting and preserves prior public snapshots', () => {
+  it('stores private selections without submitting them', () => {
     const game = createGame('empty-map', 'Test game')
     const first = addTestPlayer(game, 'red')
     const second = addTestPlayer(game, 'blue')
-    const initial = first.registers
     const hand = first.hand
-    expect(initial).toEqual(empty)
+    expect(game.registerViewsFor(first)).toEqual(empty)
     expect(game.updateRegisters(first.id, selection(first))._unsafeUnwrap()).toBeUndefined()
-    const snapshot = first.registers
-    expect(snapshot).toEqual([
-      { status: 'HIDDEN' }, { status: 'EMPTY' }, { status: 'HIDDEN' },
-      { status: 'EMPTY' }, { status: 'HIDDEN' },
+    expect(game.registerViewsFor(first)).toEqual([
+      { kind: 'hidden' }, { kind: 'empty' }, { kind: 'hidden' },
+      { kind: 'empty' }, { kind: 'hidden' },
     ])
-    expect(initial).toEqual(empty)
-    expect(second.registers).toEqual(empty)
+    expect(game.registerViewsFor(second)).toEqual(empty)
     expect(first.program).toEqual([hand[0], null, hand[2], null, hand[4]])
     expect(first.robot.program).toEqual([])
     expect(first.hand).toEqual(hand)
@@ -62,8 +57,7 @@ describe('public register lifecycle', () => {
     expect(game.currentRegister).toBe(0)
     expect(game.hasSubmittedProgram(first.id)).toBe(false)
     expect(game.updateRegisters(first.id, [null, null, null, null, null])._unsafeUnwrap()).toBeUndefined()
-    expect(snapshot[0]).toEqual({ status: 'HIDDEN' })
-    expect(first.registers).toEqual(empty)
+    expect(game.registerViewsFor(first)).toEqual(empty)
     expect(first.program).toEqual([null, null, null, null, null])
   })
 
@@ -78,26 +72,22 @@ describe('public register lifecycle', () => {
     game.resume()
     game.submitProgram(first.id, first.hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
     const program = first.robot.program
-    const registers = first.registers
     expect(first.program).toEqual(program)
-    expect(registers.every((slot) => slot.status === 'HIDDEN')).toBe(true)
+    expect(game.registerViewsFor(first)).toEqual(Array.from({ length: 5 }, () => ({ kind: 'hidden' })))
     expectRejectedWithoutMutation(game, first.id, 'ALREADY_SUBMITTED')
     game.submitProgram(second.id, second.hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
     expectRejectedWithoutMutation(game, first.id, 'WRONG_PHASE')
-    expect(first.registers).toBe(registers)
     expect(first.robot.program).toEqual(program)
   })
 
-  it('rejects register updates after aborting without changing the snapshot', () => {
+  it('rejects register updates after aborting', () => {
     const game = createGame('empty-map', 'Test game')
     const player = addTestPlayer(game, 'red')
     game.updateRegisters(player.id, selection(player))._unsafeUnwrap()
-    const snapshot = player.registers
     game.abort()
 
     expect(game.lastActivePhase).toBe('programming')
     expectRejectedWithoutMutation(game, player.id, 'GAME_ABORTED')
-    expect(player.registers).toBe(snapshot)
   })
 
   it('checks lifecycle restrictions before membership and submission without mutating state', () => {
@@ -136,16 +126,16 @@ describe('public register lifecycle', () => {
     game.submitProgram(player.id, hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
     for (let index = 0; index < 5; index++) {
       const result = resolveRobotAction(game)
+      const views = game.registerViewsFor(player)
       expect(result.action.robotId).toBe(player.robot.id)
-      expect(result.registers).toEqual(Array.from({ length: 5 }, (_, slot) => slot <= index
-        ? { status: 'REVEALED', instruction: hand[slot].instruction }
-        : { status: 'HIDDEN' }))
-      expect(result.registers[index]).not.toHaveProperty('id')
-      expect(player.registers).toEqual(index === 4 ? empty : result.registers)
+      expect(views).toEqual(index === 4 ? empty : Array.from({ length: 5 }, (_, slot) => slot <= index
+        ? { kind: 'revealed', instruction: hand[slot].instruction }
+        : { kind: 'hidden' }))
+      expect(views[index]).not.toHaveProperty('id')
       expect(game.lastActivePhase).toBe(index === 4 ? 'programming' : 'activation')
     }
     expect(game.lastActivePhase).toBe('programming')
-    expect(player.registers).toEqual(empty)
+    expect(game.registerViewsFor(player)).toEqual(empty)
     expect(game.hasSubmittedProgram(player.id)).toBe(false)
     expect(player.program).toEqual([null, null, null, null, null])
     expect(game.updateRegisters(player.id, selection(player))._unsafeUnwrap()).toBeUndefined()
