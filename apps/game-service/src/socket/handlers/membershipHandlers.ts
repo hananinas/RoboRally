@@ -36,7 +36,7 @@ export function handleGetMembership(
       if (membership.kind === 'lobby') {
         const session = context.registry.getCurrentLobby(user.userId)
         if (!session) throw new Error('Membership references a missing lobby')
-        return ack(session.isMember(socket).isOk()
+        return ack(session.reattach(socket)
           ? { outcome: 'IN_LOBBY', lobby: presentLobby(session.lobby), user }
           : { outcome: 'ALREADY_HAS_MEMBERSHIP' })
       }
@@ -88,8 +88,15 @@ export function handleLeaveGame(
 }
 
 export function handleSocketDisconnect(context: SocketContext, socket: GameSocket): void {
-  leaveLobby(context, socket)
-  const game = context.registry.getCurrentGame(socket.data.user.userId)
+  const { userId } = socket.data.user
+  const lobby = context.registry.getCurrentLobby(userId)
+  if (lobby) {
+    lobby.deferLeave(socket, () => {
+      if (context.registry.getCurrentLobby(userId) === lobby) leaveLobby(context, socket)
+    })
+    return
+  }
+  const game = context.registry.getCurrentGame(userId)
   if (game) markDisconnected(game, socket)
 }
 
