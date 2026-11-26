@@ -19,7 +19,7 @@ sequenceDiagram
     Note over A: socket.recovered is false
     Note over S: Game remains paused until membership is reattached
 
-    A->>S: session.get {}
+    A->>S: membership.get {}
     Note over A,Public: Restore public room membership
     Note over A,PrivateA: Restore private room membership
 
