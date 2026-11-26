@@ -70,12 +70,12 @@ describe('GameRepository', () => {
     return JSON.parse(gameRow().state as string)
   }
 
-  function createGame() {
-    repository.createGame('game-1', 'Friday night', 'test-map', snapshotOf(0, ['red', 'blue']), [red, blue])
+  function saveFirstRound() {
+    repository.saveRound('game-1', 'Friday night', 'test-map', snapshotOf(0, ['red', 'blue']), [red, blue])
   }
 
-  it('records a new game as in progress, with a row per player', () => {
-    createGame()
+  it('creates the game and a row per player on its first write', () => {
+    saveFirstRound()
 
     expect(gameRow()).toMatchObject({
       name: 'Friday night',
@@ -94,18 +94,31 @@ describe('GameRepository', () => {
   })
 
   it('replaces the state and the round count at a round boundary', () => {
-    createGame()
+    saveFirstRound()
 
-    repository.saveRound('game-1', snapshotOf(3, ['red', 'blue']), [red, blue])
+    repository.saveRound('game-1', 'Friday night', 'test-map', snapshotOf(3, ['red', 'blue']), [red, blue])
 
     expect(gameRow()).toMatchObject({ status: 'in_progress', round_count: 3 })
     expect(storedState().snapshot.completedRounds).toBe(3)
   })
 
-  it('records the winner and the final state together', () => {
-    createGame()
+  it('leaves the name, the map and the creation time to the first write', () => {
+    saveFirstRound()
+    const created = gameRow()
 
-    repository.saveFinished('game-1', snapshotOf(7, ['red', 'blue']), [red, blue], 'red')
+    repository.saveRound('game-1', 'Renamed', 'empty-map', snapshotOf(1, ['red', 'blue']), [red, blue])
+
+    expect(gameRow()).toMatchObject({
+      name: 'Friday night',
+      map_name: 'test-map',
+      created_at: created.created_at,
+    })
+  })
+
+  it('records the winner and the final state together', () => {
+    saveFirstRound()
+
+    repository.saveFinished('game-1', 'Friday night', 'test-map', snapshotOf(7, ['red', 'blue']), [red, blue], 'red')
 
     const row = gameRow()
     expect(row).toMatchObject({ status: 'finished', winner_player_id: 'red', round_count: 7 })
@@ -114,7 +127,7 @@ describe('GameRepository', () => {
   })
 
   it('keeps the last good state when a game is aborted', () => {
-    createGame()
+    saveFirstRound()
     const before = storedState()
 
     repository.saveAborted('game-1')
@@ -126,10 +139,10 @@ describe('GameRepository', () => {
   })
 
   it('never drops a player row when the roster shrinks', () => {
-    createGame()
+    saveFirstRound()
 
     repository.markPlayerLeft('game-1', 'blue')
-    repository.saveRound('game-1', snapshotOf(1, ['red']), [red])
+    repository.saveRound('game-1', 'Friday night', 'test-map', snapshotOf(1, ['red']), [red])
 
     expect(storedState().identities).toEqual([red])
     const rows = playerRows()

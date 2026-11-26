@@ -15,16 +15,17 @@ type StoredGame = Readonly<{
 }>
 
 export type GameRepository = Readonly<{
-  createGame: (
+  saveRound: (
     gameId: GameId,
     name: string,
     mapName: BoardMapName,
     snapshot: GameSnapshot,
     identities: readonly PlayerIdentity[],
   ) => void
-  saveRound: (gameId: GameId, snapshot: GameSnapshot, identities: readonly PlayerIdentity[]) => void
   saveFinished: (
     gameId: GameId,
+    name: string,
+    mapName: BoardMapName,
     snapshot: GameSnapshot,
     identities: readonly PlayerIdentity[],
     winnerPlayerId: PlayerId,
@@ -39,26 +40,25 @@ function serializeState(snapshot: GameSnapshot, identities: readonly PlayerIdent
 }
 
 export function createGameRepository(database: DatabaseSync): GameRepository {
-  const insertGame = database.prepare(`
+  const saveStateQuery = database.prepare(`
     INSERT INTO games (id, name, map_name, status, created_at, updated_at, round_count, schema_version, state)
     VALUES ($gameId, $name, $mapName, 'in_progress', $now, $now, $roundCount, $schemaVersion, $state)
+    ON CONFLICT (id) DO UPDATE SET
+      updated_at = excluded.updated_at,
+      round_count = excluded.round_count,
+      schema_version = excluded.schema_version,
+      state = excluded.state
   `)
-  const insertPlayer = database.prepare(`
-    INSERT INTO game_players (game_id, player_id, user_id) VALUES ($gameId, $playerId, $userId)
-  `)
-  const updateState = database.prepare(`
-    UPDATE games SET state = $state, updated_at = $now, round_count = $roundCount WHERE id = $gameId
-  `)
-  const finishGame = database.prepare(`
+  const saveOutcomeQuery = database.prepare(`
     UPDATE games
-    SET state = $state, status = 'finished', winner_player_id = $winnerPlayerId,
-        finished_at = $now, updated_at = $now, round_count = $roundCount
+    SET status = $status, winner_player_id = $winnerPlayerId, finished_at = $now, updated_at = $now
     WHERE id = $gameId
   `)
-  const abortGame = database.prepare(`
-    UPDATE games SET status = 'aborted', finished_at = $now, updated_at = $now WHERE id = $gameId
+  const saveSeatQuery = database.prepare(`
+    INSERT INTO game_players (game_id, player_id, user_id) VALUES ($gameId, $playerId, $userId)
+    ON CONFLICT (game_id, player_id) DO NOTHING
   `)
-  const leaveGame = database.prepare(`
+  const markPlayerLeftQuery = database.prepare(`
     UPDATE game_players SET left_at = $now WHERE game_id = $gameId AND player_id = $playerId
   `)
 
@@ -73,49 +73,45 @@ export function createGameRepository(database: DatabaseSync): GameRepository {
     }
   }
 
+  function saveState(
+    gameId: GameId,
+    name: string,
+    mapName: BoardMapName,
+    snapshot: GameSnapshot,
+    identities: readonly PlayerIdentity[],
+  ): void {
+    saveStateQuery.run({
+      gameId,
+      name,
+      mapName,
+      now: Date.now(),
+      roundCount: snapshot.completedRounds,
+      schemaVersion: SCHEMA_VERSION,
+      state: serializeState(snapshot, identities),
+    })
+    for (const { playerId, userId } of identities) {
+      saveSeatQuery.run({ gameId, playerId, userId })
+    }
+  }
+
   return {
-    createGame(gameId, name, mapName, snapshot, identities) {
+    saveRound(gameId, name, mapName, snapshot, identities) {
+      inTransaction(() => saveState(gameId, name, mapName, snapshot, identities))
+    },
+
+    saveFinished(gameId, name, mapName, snapshot, identities, winnerPlayerId) {
       inTransaction(() => {
-        insertGame.run({
-          gameId,
-          name,
-          mapName,
-          now: Date.now(),
-          roundCount: snapshot.completedRounds,
-          schemaVersion: SCHEMA_VERSION,
-          state: serializeState(snapshot, identities),
-        })
-        for (const { playerId, userId } of identities) {
-          insertPlayer.run({ gameId, playerId, userId })
-        }
-      })
-    },
-
-    saveRound(gameId, snapshot, identities) {
-      updateState.run({
-        gameId,
-        now: Date.now(),
-        roundCount: snapshot.completedRounds,
-        state: serializeState(snapshot, identities),
-      })
-    },
-
-    saveFinished(gameId, snapshot, identities, winnerPlayerId) {
-      finishGame.run({
-        gameId,
-        winnerPlayerId,
-        now: Date.now(),
-        roundCount: snapshot.completedRounds,
-        state: serializeState(snapshot, identities),
+        saveState(gameId, name, mapName, snapshot, identities)
+        saveOutcomeQuery.run({ gameId, winnerPlayerId, status: 'finished', now: Date.now() })
       })
     },
 
     saveAborted(gameId) {
-      abortGame.run({ gameId, now: Date.now() })
+      saveOutcomeQuery.run({ gameId, winnerPlayerId: null, status: 'aborted', now: Date.now() })
     },
 
     markPlayerLeft(gameId, playerId) {
-      leaveGame.run({ gameId, playerId, now: Date.now() })
+      markPlayerLeftQuery.run({ gameId, playerId, now: Date.now() })
     },
   }
 }
