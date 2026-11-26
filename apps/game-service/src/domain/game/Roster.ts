@@ -6,8 +6,6 @@ export type RosterError = 'PLAYER_NOT_IN_GAME'
 
 export class Roster {
   readonly #players: Player[] = []
-  readonly #byPlayerId = new Map<PlayerId, Player>()
-  readonly #byRobotId = new Map<RobotId, Player>()
 
   constructor(players: readonly Player[]) {
     for (const player of players) this.add(player)
@@ -17,35 +15,27 @@ export class Roster {
     return this.#players
   }
 
-  get size(): number {
-    return this.#players.length
-  }
-
   add(player: Player): void {
-    if (this.#byPlayerId.has(player.id) || this.#byRobotId.has(player.robot.id)) {
+    if (this.#players.some((other) => other.id === player.id || other.robot.id === player.robot.id)) {
       throw new RangeError('Players and robots must have unique IDs')
     }
     this.#players.push(player)
-    this.#byPlayerId.set(player.id, player)
-    this.#byRobotId.set(player.robot.id, player)
   }
 
   remove(playerId: PlayerId): Result<Player, RosterError> {
-    const player = this.#byPlayerId.get(playerId)
-    if (player === undefined) return err('PLAYER_NOT_IN_GAME')
-    this.#players.splice(this.#players.indexOf(player), 1)
-    this.#byPlayerId.delete(player.id)
-    this.#byRobotId.delete(player.robot.id)
-    return ok(player)
+    const index = this.#players.findIndex((player) => player.id === playerId)
+    if (index < 0) return err('PLAYER_NOT_IN_GAME')
+    const [removed] = this.#players.splice(index, 1)
+    return ok(removed)
   }
 
   getPlayer(playerId: PlayerId): Result<Player, RosterError> {
-    const player = this.#byPlayerId.get(playerId)
+    const player = this.#findPlayer(playerId)
     return player === undefined ? err('PLAYER_NOT_IN_GAME') : ok(player)
   }
 
   requirePlayer(playerId: PlayerId): Player {
-    const player = this.#byPlayerId.get(playerId)
+    const player = this.#findPlayer(playerId)
     if (player === undefined) {
       throw new Error(`Player ${playerId} is not in the game`)
     }
@@ -53,10 +43,14 @@ export class Roster {
   }
 
   requireOwner(robotId: RobotId): Player {
-    const player = this.#byRobotId.get(robotId)
+    const player = this.#players.find((candidate) => candidate.robot.id === robotId)
     if (player === undefined) {
       throw new Error(`Robot ${robotId} is not in the game`)
     }
     return player
+  }
+
+  #findPlayer(playerId: PlayerId): Player | undefined {
+    return this.#players.find((candidate) => candidate.id === playerId)
   }
 }

@@ -186,7 +186,7 @@ export class Game {
 
   private nextAvailableColour(): string {
     return ROBOT_COLOURS.find((colour) => !this.roster.players.some((player) => player.robot.colour === colour))
-      ?? ROBOT_COLOURS[this.roster.size % ROBOT_COLOURS.length]
+      ?? ROBOT_COLOURS[this.roster.players.length % ROBOT_COLOURS.length]
   }
 
   addPlayer(robotSpriteId: RobotSpriteId, colour?: string): Result<Player, AddPlayerError> {
@@ -308,8 +308,8 @@ export class Game {
     if (this.requirePhase('activation').isErr()) {
       return { roundConcluded: false }
     }
-    if (this.roster.size === 0) return this.concludeRegister()
-    if (!this.hasPendingEnvironment && this.activatedRobotIds.size === this.roster.size) {
+    if (this.roster.players.length === 0) return this.concludeRegister()
+    if (!this.hasPendingEnvironment && this.activatedRobotIds.size === this.roster.players.length) {
       this.environmentStepIndex = 0
     }
     return { roundConcluded: false }
@@ -344,7 +344,7 @@ export class Game {
 
   private concludeRegister(): { roundConcluded: boolean } {
     this.environmentStepIndex = null
-    if (this.roster.size === 0) {
+    if (this.roster.players.length === 0) {
       this.finishRound()
       return { roundConcluded: true }
     }
