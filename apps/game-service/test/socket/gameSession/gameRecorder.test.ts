@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { createGame, type Player } from '@/domain/game/index'
+import { Card, Deck, Direction, EmptyTile, createGame, type Player } from '@/domain/game/index'
 import { createGameRecorder } from '@/socket/gameSession/gameRecorder'
 import type { Seat } from '@/socket/gameSession/GameSession'
-import { addTestPlayer } from '../../fixtures.ts'
+import { Integer } from '@/numbers'
+import { resolveRobotAction } from '../../activationTestHelper.ts'
+import { addTestPlayer, createTestBoard, createTestGame, createTestPlacement, instructionsOf } from '../../fixtures.ts'
 import { createFakeGameRepository } from '../../repositoryTestHelper.ts'
 
 const GAME_NAME = 'Friday night'
@@ -23,6 +25,22 @@ function createRecorder() {
   const repository = createFakeGameRepository()
   const recorder = createGameRecorder({ repository, game, mapName: MAP_NAME, seats: () => seats })
   return { game, players, repository, recorder }
+}
+
+// A one-checkpoint board a single MOVE_1 wins, so the game reaches 'finished'.
+function createRecorderForWonGame() {
+  const board = createTestBoard([
+    [new EmptyTile(), new EmptyTile([], 1), new EmptyTile()],
+  ], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
+  const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_1'))
+  const placement = createTestPlacement({ x: Integer(0), y: Integer(0) }, { direction: Direction.EAST, deck: new Deck(cards) })
+  const { player } = placement
+  const game = createTestGame({ board, players: [placement], deck: instructionsOf(cards), name: GAME_NAME })
+  game.submitProgram(player.id, cards.map((card) => card.id))
+  resolveRobotAction(game)
+  const repository = createFakeGameRepository()
+  const seats = [seatFor(player, 'red')]
+  return { game, player, repository, recorder: createGameRecorder({ repository, game, mapName: MAP_NAME, seats: () => seats }) }
 }
 
 describe('gameRecorder', () => {
@@ -64,6 +82,17 @@ describe('gameRecorder', () => {
 
     expect(repository.saveAborted).toHaveBeenCalledWith(game.id)
     expect(repository.saveRound).not.toHaveBeenCalled()
+  })
+
+  it('never aborts a game that was already won', () => {
+    const { game, player, repository, recorder } = createRecorderForWonGame()
+    expect(game.winner).toBe(player.id)
+
+    // The winner leaving is what empties the last seat after a win.
+    game.removePlayer(player.id)
+    recorder.saveAborted()
+
+    expect(repository.saveAborted).not.toHaveBeenCalled()
   })
 
   it('records a departure against the game', () => {

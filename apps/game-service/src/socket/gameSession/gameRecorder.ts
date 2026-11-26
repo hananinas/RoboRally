@@ -52,6 +52,10 @@ export function createGameRecorder({ repository, game, mapName, seats }: GameRec
     },
 
     saveAborted() {
+      // A declared win is the game's outcome, and the winner leaving afterwards
+      // is how a finished game normally empties. Recording an abort here would
+      // replace the stored winner with nothing.
+      if (game.winner !== undefined) return
       write('saveAborted', () => repository.saveAborted(game.id))
     },
 
