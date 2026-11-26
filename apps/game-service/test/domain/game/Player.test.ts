@@ -51,19 +51,19 @@ describe('Player', () => {
     first.drawHand()
     const second = createTestPlayer({ id: 'player-2' })
     const blank = [null, null, null, null, null]
-    expect(first.program).toEqual(blank)
+    expect(first.registers).toEqual(blank)
 
     const selection = [card, null, new Card('left-1', 'TURN_LEFT'), null, new Card('move-2', 'MOVE_1')] as const
     first.updateRegisters(selection)
-    expect(first.program).toEqual(selection)
-    expect(first.program).not.toBe(selection)
-    expect(Object.isFrozen(first.program)).toBe(true)
-    expect(second.program).toEqual(blank)
+    expect(first.registers).toEqual(selection)
+    expect(first.registers).not.toBe(selection)
+    expect(Object.isFrozen(first.registers)).toBe(true)
+    expect(second.registers).toEqual(blank)
     expect(first.hand).toEqual([card])
     expect(first.robot.program).toEqual([])
 
     first.resetRegisters()
-    expect(first.program).toEqual(blank)
+    expect(first.registers).toEqual(blank)
     expect(first.hand).toEqual([card])
   })
 

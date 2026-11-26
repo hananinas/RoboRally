@@ -18,7 +18,7 @@ export const ROBOT_COLOURS = [
 ]
 
 export class Robot {
-  private currentDirection: Direction
+  #direction: Direction
   private programmedCards: readonly Card[] = []
 
   constructor(
@@ -27,11 +27,11 @@ export class Robot {
     readonly colour: string,
     readonly robotSpriteId: RobotSpriteId,
   ) {
-    this.currentDirection = direction
+    this.#direction = direction
   }
 
   get direction(): Direction {
-    return this.currentDirection
+    return this.#direction
   }
 
   get program(): readonly Card[] {
@@ -62,6 +62,6 @@ export class Robot {
   }
 
   turn(quarterTurns: number): void {
-    this.currentDirection = rotateDirection(this.currentDirection, quarterTurns)
+    this.#direction = rotateDirection(this.#direction, quarterTurns)
   }
 }

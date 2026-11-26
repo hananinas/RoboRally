@@ -10,6 +10,7 @@ import type {
   Orientation,
   Position as PositionPayload,
   PlayerConnectionChanged,
+  PrivateProgram,
   PublicGameState,
   PublicRegisters,
   PublicRegisterSlot,
@@ -32,6 +33,7 @@ import {
   type Position,
   type PlayerId,
   type RegisterView,
+  type Registers,
 } from '@/domain/game/index'
 import { Integer } from '@/numbers'
 import type { EnvironmentStepResult } from '@/domain/game/Game'
@@ -55,6 +57,11 @@ function presentPosition(coordinate: Position, direction: Direction): PositionPa
 
 function presentCard(card: Card): CardPayload {
   return { id: card.id, instruction: card.instruction }
+}
+
+function presentProgram(registers: Registers): PrivateProgram {
+  const program: readonly (CardPayload | null)[] = registers.map((card) => card === null ? null : presentCard(card))
+  return program as PrivateProgram
 }
 
 function presentRegister(view: RegisterView): PublicRegisterSlot {
@@ -179,7 +186,7 @@ export function presentInitialization(game: Game, player: Player, state: PublicG
     assignment: { gameId: game.id, playerId: player.id, robotId: player.robot.id },
     state,
     hand: presentCardsDealt(game.id, player).cards,
-    program: player.program,
+    program: presentProgram(player.registers),
     programSubmitted: game.hasSubmittedProgram(player.id),
   }
 }

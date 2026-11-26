@@ -86,7 +86,7 @@ describe('Game programming', () => {
     const game = createTestGame({ board, players: placements, deck: instructionsOf(deck) })
 
     for (const player of players) {
-      expect(player.program).toEqual([null, null, null, null, null])
+      expect(player.registers).toEqual([null, null, null, null, null])
       expect(game.registerViewsFor(player)).toEqual(emptyViews)
       expect(player.hand).toHaveLength(deck.length)
       expect(player.hand).toEqual(expect.arrayContaining(deck))
