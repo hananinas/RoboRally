@@ -4,17 +4,17 @@ import {
   calculateCheckpoints, calculateGears, captureEnvironmentSnapshot,
 } from '@/domain/game/environment'
 import { Integer } from '@/numbers'
-import { createTestPlayer, createTestRobot } from '../../fixtures.ts'
+import { createTestPlayer, createTestRobot, withRebootTiles } from '../../fixtures.ts'
 
 function position(x: number, y = 1) {
   return { x: Integer(x), y: Integer(y) }
 }
 
 function createBoard(tiles?: readonly Tile[]) {
-  return new Board([
+  return new Board(withRebootTiles([
     Array.from({ length: 5 }, () => new EmptyTile()),
     tiles ?? Array.from({ length: 5 }, () => new EmptyTile()),
-  ], { ...position(0, 0), angle: 0 }, position(4, 0))
+  ], position(4, 0)), { ...position(0, 0), angle: 0 })
 }
 
 describe('environment calculations', () => {

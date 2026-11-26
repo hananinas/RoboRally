@@ -10,6 +10,11 @@ export type SocketStatus = 'connecting' | 'connected' | 'connection-error' | 'un
 export default function useGameSocket() {
   const [socket, setSocket] = useState<GameSocket>(() => io({
     autoConnect: false,
+    transports: ['polling'],
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    reconnectionAttempts: Infinity,
   }))
   const [status, setStatus] = useState<SocketStatus>('connecting')
   const [error, setError] = useState<string | null>(null)
@@ -27,7 +32,7 @@ export default function useGameSocket() {
     }
     const handleConnectError = (error: Error) => {
       if (error.message === 'SOCKET_SESSION_EXPIRED') {
-        setSocket(io({ autoConnect: false, forceNew: true }))
+        setSocket(io({ autoConnect: false, forceNew: true, transports: ['polling'] }))
         return
       }
       if (error.message === 'UNAUTHENTICATED') {

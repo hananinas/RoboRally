@@ -1,10 +1,15 @@
 import { err, ok, type Result } from 'neverthrow'
-import type { User } from '@robo-rally/game-events'
+import type { RobotSpriteId, User } from '@robo-rally/game-events'
 import { Lobby, type LobbyMember } from '@/domain/lobby/Lobby'
 import type { GameSocket, GameSocketServer } from '@/socket/gameServer'
 import { presentLobby } from '@/socket/presenters/lobbyPresenter'
 
-export type ConnectedLobbyMember = { user: User; connectionId: string; socket: GameSocket }
+export type ConnectedLobbyMember = {
+  user: User
+  connectionId: string
+  robotSpriteId: RobotSpriteId
+  socket: GameSocket
+}
 
 const LOBBY_RECONNECT_GRACE_MS = 10_000
 

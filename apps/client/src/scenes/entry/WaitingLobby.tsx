@@ -1,6 +1,6 @@
 import type { LobbyState } from '@robo-rally/game-events'
 import RobotPreview from './RobotPreview.tsx'
-import { tankPreview } from './robotPreviews.ts'
+import { robotOptionFor } from './robotPreviews.ts'
 import './WaitingLobby.css'
 
 type Props = { lobby: LobbyState; userId: string; disabled: boolean; onStart: () => void; onLeave: () => void }
@@ -19,9 +19,12 @@ export default function WaitingLobby({ lobby, userId, disabled, onStart, onLeave
           {lobby.players.map((player) => {
             const self = player.userId === userId
             const playerIsOwner = player.userId === lobby.ownerUserId
+            const robot = lobby.robots.find((option) => option.id === player.robotSpriteId)
             return (
               <li className={`waiting-lobby__seat${self ? ' waiting-lobby__seat--self' : ''}`} key={player.userId}>
-                <span className="waiting-lobby__portrait"><RobotPreview sprite={tankPreview} /></span>
+                <span className="waiting-lobby__portrait" role="img" aria-label={`${robot?.name ?? 'Unknown'} robot`}>
+                  <RobotPreview sprite={robotOptionFor(player.robotSpriteId).sprite} />
+                </span>
                 <span className="waiting-lobby__name">{player.username}</span>
                 <span className="waiting-lobby__roles">
                   {playerIsOwner && <span className="waiting-lobby__badge waiting-lobby__badge--owner">Owner</span>}

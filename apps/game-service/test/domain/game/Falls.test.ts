@@ -4,7 +4,7 @@ import type { Instruction } from '@robo-rally/game-events'
 import { Board, Card, Direction, EmptyTile, type Position } from '@/domain/game/index'
 import { Deck } from '@/domain/game/Deck'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestGame, placeTestPlayer } from '../../fixtures.ts'
+import { createEmptyTileGrid, createTestGame, placeTestPlayer, withRebootTiles } from '../../fixtures.ts'
 
 function createGame(
   instruction: Instruction = 'MOVE_3',
@@ -16,7 +16,7 @@ function createGame(
   tiles[2][1] = new EmptyTile([], 1)
   tiles[4][0] = new EmptyTile([], 2)
   const reboot = { x: Integer(1), y: Integer(2) }
-  const board = new Board(tiles, { x: Integer(0), y: Integer(0), angle: 0 }, reboot)
+  const board = new Board(withRebootTiles(tiles, reboot), { x: Integer(0), y: Integer(0), angle: 0 })
   const direction = instruction === 'BACK_UP' ? Direction.WEST : Direction.EAST
   const instructions: Instruction[] = [instruction, 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'MOVE_1']
   const program = instructions.map((instr, index) => new Card(`card-${index}`, instr))
@@ -102,7 +102,7 @@ describe('board-edge falls', () => {
 
   it('can reboot onto the only safe square after vacating it', () => {
     const reboot = { x: Integer(0), y: Integer(0) }
-    const board = new Board([[new EmptyTile(), new EmptyTile()]], { x: Integer(1), y: Integer(0), angle: 0 }, reboot)
+    const board = new Board(withRebootTiles([[new EmptyTile(), new EmptyTile()]], reboot), { x: Integer(1), y: Integer(0), angle: 0 })
     const program = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'MOVE_3'))
     const player = placeTestPlayer(board, reboot, { direction: Direction.WEST, deck: new Deck(program) })
     const robot = player.robot

@@ -37,6 +37,16 @@ describe('createBoardScene', () => {
     },
   )
 
+  it('lays the reboot pad flat on the surface of reboot tiles', () => {
+    const board = createBoardRenderModel(2, 1, { rebootTiles: [{ x: 1, y: 0 }] })
+    const scene = createBoardScene(board, BOARD_CONFIG, BOARD_COMPONENTS, BOARD_RECIPES)
+    const at = (x: number) => scene.planes.flat().filter(({ cell }) => cell.x === x)
+    expect(at(1).map(({ componentName, slice }) => `${componentName}@${slice.layer}`)).toEqual([
+      'ground@0', 'ground@1', 'ground@2', 'surface@3', 'reboot1@3', 'reboot2@3', 'reboot3@3', 'reboot4@3',
+    ])
+    expect(at(0).some(({ componentName }) => componentName.startsWith('reboot'))).toBe(false)
+  })
+
   it('keeps hole depths local to their apertures', () => {
     expect(scene.holes).toHaveLength(6)
     expect(scene.holes.every((hole) => hole.depths.length === 8)).toBe(true)

@@ -7,7 +7,7 @@ import type { Board } from '@/domain/game/Board'
 import { Player } from '@/domain/game/Player'
 import { Robot, ROBOT_COLOURS } from '@/domain/game/Robot'
 import { Direction, type Position } from '@/domain/game/spatial'
-import { EmptyTile, type Tile } from '@/domain/game/Tile'
+import { EmptyTile, RebootTile, type Tile } from '@/domain/game/Tile'
 
 type RobotOverrides = Partial<{
   id: string
@@ -65,6 +65,17 @@ export function addTestPlayer(game: Game, colour?: string): Player {
 
 export function createEmptyTileGrid(width: number, height: number): Tile[][] {
   return Array.from({ length: height }, () => Array.from({ length: width }, () => new EmptyTile()))
+}
+
+// Copies the grid with a RebootTile at each position, keeping that tile's walls and checkpoint.
+export function withRebootTiles(tiles: readonly (readonly Tile[])[], ...positions: Position[]): Tile[][] {
+  const grid = tiles.map((row) => [...row])
+  for (const { x, y } of positions) {
+    const tile = grid[y]?.[x]
+    if (tile?.kind !== 'EMPTY') throw new RangeError(`Reboot tile at ${x},${y} must replace an empty tile`)
+    grid[y][x] = new RebootTile(tile.walls, tile.checkpointNumber)
+  }
+  return grid
 }
 
 export function programLeadingWith(cards: readonly Card[], instruction: Instruction): Card[] {

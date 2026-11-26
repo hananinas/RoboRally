@@ -23,6 +23,9 @@ export const ROBOT_ID = '33333333-3333-4333-8333-333333333333'
 export const OTHER_PLAYER_ID = '22222222-2222-4222-8222-222222222223'
 export const OTHER_ROBOT_ID = '33333333-3333-4333-8333-333333333334'
 
+// Reboot tiles at (1,2), (9,2), (1,9) and (9,9), as indexes into the 11x11 tile list.
+const REBOOT_TILE_INDEXES = [23, 31, 100, 108]
+
 export function createPublicState(): PublicGameState {
   return {
     gameId: GAME_ID,
@@ -40,16 +43,18 @@ export function createPublicState(): PublicGameState {
       height: 11,
       tiles: Array.from({ length: 121 }, (_, index) => ({
         position: { x: index % 11, y: Math.floor(index / 11) },
-        type: 'EMPTY',
+        type: REBOOT_TILE_INDEXES.includes(index) ? 'REBOOT' : 'EMPTY',
       })),
     },
     robots: [{
       robotId: ROBOT_ID,
+      robotSpriteId: 'tank',
       colour: '#c74f4f',
       playerId: PLAYER_ID,
       position: { coordinate: { x: 5, y: 5 }, orientation: 'NORTH' },
     }, {
       robotId: OTHER_ROBOT_ID,
+      robotSpriteId: 'tank',
       colour: '#4D8DEB',
       playerId: OTHER_PLAYER_ID,
       position: { coordinate: { x: 7, y: 5 }, orientation: 'NORTH' },
@@ -63,11 +68,11 @@ export const HAND_INSTRUCTIONS = [
 ] as const
 
 export const ROUND_ACTIONS: readonly RobotActionResolved[] = [
-  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 0, pushedRobots: [], robotId: ROBOT_ID, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 5, y: 4 }, orientation: 'NORTH' } },
-  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 1, pushedRobots: [], robotId: ROBOT_ID, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 5, y: 3 }, orientation: 'NORTH' } },
-  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 2, pushedRobots: [], robotId: ROBOT_ID, instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 5, y: 3 }, orientation: 'WEST' } },
-  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 3, pushedRobots: [], robotId: ROBOT_ID, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 4, y: 3 }, orientation: 'WEST' } },
-  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 4, pushedRobots: [], robotId: ROBOT_ID, instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 4, y: 3 }, orientation: 'SOUTH' } },
+  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 0, pushedRobots: [], reboots: [], robotId: ROBOT_ID, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 5, y: 4 }, orientation: 'NORTH' } },
+  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 1, pushedRobots: [], reboots: [], robotId: ROBOT_ID, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 5, y: 3 }, orientation: 'NORTH' } },
+  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 2, pushedRobots: [], reboots: [], robotId: ROBOT_ID, instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 5, y: 3 }, orientation: 'WEST' } },
+  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 3, pushedRobots: [], reboots: [], robotId: ROBOT_ID, instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1', position: { coordinate: { x: 4, y: 3 }, orientation: 'WEST' } },
+  { gameId: GAME_ID, playerId: PLAYER_ID, registerIndex: 4, pushedRobots: [], reboots: [], robotId: ROBOT_ID, instruction: 'TURN_LEFT', resolvedInstruction: 'TURN_LEFT', position: { coordinate: { x: 4, y: 3 }, orientation: 'SOUTH' } },
 ]
 
 export type FixtureControl =

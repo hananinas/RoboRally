@@ -23,7 +23,7 @@ function errorMessage(code: string): string {
 function App() {
   const {
     connection, game, membership, busy, lobbies, maps, mapsLoaded, listError,
-    createLobby, joinLobby, startLobby, leaveMembership, refreshLobbies, retryMembership,
+    createLobby, joinLobby, startLobby, leaveMembership, refreshLobbies, retryMembership, selectRobot,
   } = useMembershipConnection()
 
   useEffect(() => {
@@ -64,20 +64,29 @@ function App() {
     </>
   }
   return (
-  <EntryScreen
-    onLogout={connection.status === 'connected' || membership.user ? logout : undefined}
-    onSettings={openSettings}
-    aside={membership.status === 'waiting' ? (
-      <>
-        <aside className="entry-panel" aria-label="Your robot"><RobotPicker /></aside>
-        <LobbyMapPanel lobby={membership.lobby} />
-      </>
-    ) : undefined}
-  >
-    {error && (membership.status === 'waiting' || membership.status === 'resyncing' || membership.status === 'sync-failed') &&
-      <p role="alert" className="entry-validation entry-validation--error">{error}</p>}
-    {content}
-  </EntryScreen>  
+    <EntryScreen
+      onLogout={connection.status === 'connected' || membership.user ? logout : undefined}
+      onSettings={openSettings}
+      aside={membership.status === 'waiting' ? (
+        <>
+          <LobbyMapPanel lobby={membership.lobby} />
+          <aside className="entry-panel" aria-label="Your robot">
+            <RobotPicker
+              robots={membership.lobby.robots}
+              selectedRobotId={membership.lobby.players.find((player) => player.userId === membership.user.userId)?.robotSpriteId
+                ?? membership.lobby.robots.find((robot) => robot.defaultForLobbyCreation)?.id
+                ?? ''}
+              disabled={busy || connection.status !== 'connected'}
+              onSelect={selectRobot}
+            />
+          </aside>
+        </>
+      ) : undefined}
+    >
+      {error && (membership.status === 'waiting' || membership.status === 'resyncing' || membership.status === 'sync-failed') &&
+        <p role="alert" className="entry-validation entry-validation--error">{error}</p>}
+      {content}
+    </EntryScreen>
   )
 }
 export default App

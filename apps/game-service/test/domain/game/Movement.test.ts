@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { Board, Card, Direction, EmptyTile, PitTile, type Tile } from '@/domain/game/index'
 import { Deck } from '@/domain/game/Deck'
 import { Integer } from '@/numbers'
-import { addTestPlayer, createEmptyTileGrid, createTestGame, createTestRobot, placeTestPlayer, programLeadingWith } from '../../fixtures.ts'
+import { addTestPlayer, createEmptyTileGrid, createTestGame, createTestRobot, placeTestPlayer, programLeadingWith, withRebootTiles } from '../../fixtures.ts'
 
 function createGame(
   pitWalls: readonly Direction[] = [],
@@ -16,7 +16,7 @@ function createGame(
   tiles[0][4] = new EmptyTile([], 1)
   tiles[2][3] = new EmptyTile([], 2)
   tiles[2][0] = new EmptyTile([], 3)
-  const board = new Board(tiles, { x: Integer(4), y: Integer(1), angle: Math.PI / 2 }, { x: Integer(3), y: Integer(2) })
+  const board = new Board(withRebootTiles(tiles, { x: Integer(3), y: Integer(2) }), { x: Integer(4), y: Integer(1), angle: Math.PI / 2 })
   const start = { x: Integer(0), y: Integer(1) }
   const pit = { x: Integer(1), y: Integer(1) }
   const reboot = { x: Integer(3), y: Integer(2) }
@@ -135,7 +135,7 @@ describe('shared gameplay movement', () => {
   it('still executes a pushed robot\'s own pending card after it reboots mid-register', () => {
     const tiles = [[new EmptyTile(), new EmptyTile(), new EmptyTile(), new PitTile(), new EmptyTile()]]
     const reboot = { x: Integer(4), y: Integer(0) }
-    const board = new Board(tiles, { x: Integer(0), y: Integer(0), angle: 0 }, reboot)
+    const board = new Board(withRebootTiles(tiles, reboot), { x: Integer(0), y: Integer(0), angle: 0 })
     const moverProgram = [
       new Card('mover-0', 'MOVE_1'),
       new Card('mover-1', 'TURN_LEFT'),

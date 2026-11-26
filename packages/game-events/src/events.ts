@@ -1,4 +1,4 @@
-import type { CreateLobbyRequest, EmptyRequest, LobbyRequest, LobbyState, LobbyListResult, LobbyJoinResult, LobbyLeaveResult, LobbyStartResult, MembershipResult } from './lobby.js'
+import type { CreateLobbyRequest, EmptyRequest, LobbyRequest, RobotSelectionRequest, LobbyState, LobbyListResult, LobbyJoinResult, LobbyLeaveResult, LobbyStartResult, RobotSelectionResult, MembershipResult } from './lobby.js'
 import type {
   CardsDealt,
   ClockResult,
@@ -27,6 +27,7 @@ export interface ClientToServerEvents {
   'lobby.list': (payload: EmptyRequest, acknowledge: (result: LobbyListResult) => void) => void
   'lobby.create': (payload: CreateLobbyRequest, acknowledge: (result: LobbyJoinResult) => void) => void
   'lobby.join': (payload: LobbyRequest, acknowledge: (result: LobbyJoinResult) => void) => void
+  'lobby.selectRobot': (payload: RobotSelectionRequest, acknowledge: (result: RobotSelectionResult) => void) => void
   'lobby.leave': (payload: EmptyRequest, acknowledge: (result: LobbyLeaveResult) => void) => void
   'lobby.start': (payload: EmptyRequest, acknowledge: (result: LobbyStartResult) => void) => void
   'membership.get': (payload: EmptyRequest, acknowledge: (result: MembershipResult) => void) => void

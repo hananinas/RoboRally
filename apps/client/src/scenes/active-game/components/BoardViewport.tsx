@@ -2,8 +2,10 @@ import { useMemo, useRef, type CSSProperties } from 'react'
 import antennaSprites from '../board/assets/antenna.hbls?raw'
 import laserSprites from '../board/assets/lasers.hbls?raw'
 import tankSprites from '../board/assets/tanks.hbls?raw'
+import { robotOptionFor } from '../../entry/robotPreviews.ts'
 import gearSprites from '../board/assets/gears.hbls?raw'
 import conveyorSprites from '../board/assets/conveyors.hbls?raw'
+import rebootSprites from '../board/assets/reboot.hbls?raw'
 import {
   BOARD_COMPONENTS,
   BOARD_CONFIG,
@@ -39,6 +41,7 @@ type PieceStyle = CSSProperties &
     '--board-piece-x'?: string
     '--board-piece-y'?: string
     '--tank-colour'?: string
+    '--robot-colour'?: string
     '--tank-move-duration'?: string
     '--tank-turn-duration'?: string
     '--pit-fall-duration'?: string
@@ -98,7 +101,7 @@ function pieceStyle(piece: BoardScenePiece): PieceStyle {
   return style
 }
 
-function BoardPiece({ piece }: Readonly<{ piece: BoardScenePiece }>) {
+function BoardPiece({ piece, rebooting }: Readonly<{ piece: BoardScenePiece; rebooting?: boolean }>) {
   const className = [
     'board-piece',
     piece.component.className,
@@ -114,6 +117,7 @@ function BoardPiece({ piece }: Readonly<{ piece: BoardScenePiece }>) {
     'data-board-tile-type': piece.cell.tile,
     'data-board-tile': `${piece.cell.x},${piece.cell.y}`,
     'data-board-wall': piece.slice.wall,
+    'data-reboot-active': rebooting || undefined,
     style: pieceStyle(piece),
   }
 
@@ -164,6 +168,10 @@ function RobotPiece({
 }>) {
   const component = BOARD_COMPONENTS[componentName]
   if (!component.asset) throw new Error(`Missing robot sprite ${componentName}`)
+  const sprite = robotOptionFor(robot.robotSpriteId).sprite
+  const componentIndex = ROBOT_COMPONENTS.indexOf(componentName)
+  const spriteLayer = sprite.layers[componentIndex]
+  if (spriteLayer === undefined) return null
   const centre = tileCentre(robot.position.coordinate, board, BOARD_CONFIG)
   const height = layer / BOARD_CONFIG.parallaxReferenceLayer
   const style: PieceStyle = {
@@ -173,12 +181,13 @@ function RobotPiece({
     zIndex: layer === 3 ? 1 : 0,
     '--board-piece-angle': `${robot.angle}deg`,
     '--tank-colour': robot.colour,
+    '--robot-colour': robot.colour,
   }
 
   return (
     <svg
       aria-hidden="true"
-      className={`board-piece ${component.className} board-piece--test-tank`}
+      className={`board-piece ${component.className} board-piece--selected-robot board-piece--test-tank`}
       data-board-component={componentName}
       data-board-height={height}
       data-board-lift-height={Math.min(
@@ -188,11 +197,12 @@ function RobotPiece({
       data-board-tile={`${robot.position.coordinate.x},${robot.position.coordinate.y}`}
       data-robot-id={robot.robotId}
       data-playback-phase={robot.phase}
+      data-robot-sprite-id={robot.robotSpriteId}
       preserveAspectRatio="xMidYMid meet"
       style={style}
-      viewBox={component.asset.viewBox}
+      viewBox={sprite.viewBox}
     >
-      <use href={`#${component.asset.symbol}`} />
+      <g dangerouslySetInnerHTML={{ __html: spriteLayer }} />
     </svg>
   )
 }
@@ -213,6 +223,9 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
   useBoardInteraction({ canvasRef, robots, scene, viewportRef })
   const checkpointTiles = scene.tiles.filter((tile) => tile.cell.checkpointNumber !== undefined)
   const fallingInto = new Set(robots.flatMap((robot) => robot.phase === 'pit-fall'
+    ? [`${robot.position.coordinate.x},${robot.position.coordinate.y}`] : []))
+  // Only the robot that is rebooting has this phase, so only its reboot tile spins.
+  const rebootingAt = new Set(robots.flatMap((robot) => robot.phase === 'pit-respawn'
     ? [`${robot.position.coordinate.x},${robot.position.coordinate.y}`] : []))
 
   return (
@@ -235,7 +248,7 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
       >
         <div
           aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: `${laserSprites}${antennaSprites}${tankSprites}${conveyorSprites}${gearSprites}` }}
+          dangerouslySetInnerHTML={{ __html: `${laserSprites}${antennaSprites}${tankSprites}${conveyorSprites}${gearSprites}${rebootSprites}` }}
         />
         {scene.planes.map((pieces, layer) => {
           const robotComponent = ROBOT_COMPONENTS[layer - 3]
@@ -247,7 +260,11 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
               style={{ zIndex: layer }}
             >
               {pieces.map((piece) => (
-                <BoardPiece key={piece.key} piece={piece} />
+                <BoardPiece
+                  key={piece.key}
+                  piece={piece}
+                  rebooting={piece.componentName.startsWith('reboot') && rebootingAt.has(`${piece.cell.x},${piece.cell.y}`)}
+                />
               ))}
               {checkpointTiles.map((tile) => (
                 <CheckpointPiece key={`${tile.cell.x},${tile.cell.y}`} tile={tile} layer={layer} />

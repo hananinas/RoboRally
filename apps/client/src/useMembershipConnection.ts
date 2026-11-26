@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { BoardMapName, BoardMapSummary, LobbySummary, ServerToClientEvents } from '@robo-rally/game-events'
+import type { BoardMapName, BoardMapSummary, LobbySummary, RobotSpriteId, ServerToClientEvents } from '@robo-rally/game-events'
 import useGameConnection from './scenes/active-game/useGameConnection.ts'
 import { createMembershipState, membershipReducer, type MembershipEvent } from './membershipState.ts'
 import useGameSocket, { ACKNOWLEDGEMENT_TIMEOUT_MS } from './useGameSocket.ts'
@@ -131,6 +131,35 @@ export default function useMembershipConnection() {
       result: await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.create', { mapName, name }),
     }))
   }
+  async function selectRobot(robotSpriteId: RobotSpriteId): Promise<boolean> {
+    if (pending.current || !socket.connected) return false
+    if (current.current.status !== 'waiting') return false
+    pending.current = true
+    setBusy(true)
+    const attempt = generation.current
+    try {
+      const result = await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS)
+        .emitWithAck('lobby.selectRobot', { robotSpriteId })
+      if (generation.current !== attempt || !socket.connected) return false
+      if (result.outcome === 'ROBOT_SELECTED') {
+        dispatch({ type: 'lobby-updated', lobby: result.lobby })
+        return true
+      }
+      dispatch({ type: 'error', error: result.outcome })
+      return false
+    } catch {
+      if (generation.current === attempt && socket.connected) {
+        dispatch({ type: 'sync-requested' })
+        dispatch({ type: 'error', error: 'TIMEOUT' })
+      }
+      return false
+    } finally {
+      if (generation.current === attempt) {
+        pending.current = false
+        setBusy(false)
+      }
+    }
+  }
   function startLobby() {
     if (membership.status !== 'waiting') return
     void run(async () => {
@@ -155,6 +184,7 @@ export default function useMembershipConnection() {
     connection, game, membership, busy, lobbies, maps, mapsLoaded, listError,
     joinLobby, startLobby, leaveMembership, refreshLobbies,
     createLobby,
+    selectRobot,
     retryMembership: () => socket.connected ? dispatch({ type: 'sync-requested' }) : connection.connect(),
   }
 }

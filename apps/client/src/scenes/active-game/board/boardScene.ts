@@ -61,7 +61,7 @@ export function createBoardScene(
     const pillar = hasAllWalls(cell.walls)
     const antenna = board.antenna?.x === cell.x && board.antenna.y === cell.y
       ? board.antenna : undefined
-    const recipe = recipes[antenna ? 'antenna' : pillar ? 'pillar' : cell.tile]
+    const recipe = recipes[antenna ? 'antenna' : pillar ? 'pillar' : cell.reboot ? 'reboot' : cell.tile]
     const centre = tileCentre(cell, board, config)
     tiles.push({ cell, hole: recipe.hole ?? false, tileCentre: centre })
 

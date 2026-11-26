@@ -1,6 +1,6 @@
 import type { GearRotation } from '@robo-rally/game-events'
 import type { Antenna } from '@/domain/game/Board'
-import { Direction, type Position } from '@/domain/game/spatial'
+import { Direction } from '@/domain/game/spatial'
 import { Integer } from '@/numbers'
 
 const { NORTH: N, WEST: W, SOUTH: S, EAST: E } = Direction
@@ -46,7 +46,8 @@ export type MapSpec = Readonly<{
   gears?: readonly GearSpec[]
   conveyors?: readonly ConveyorSpec[]
   startTiles: readonly (readonly [x: number, y: number])[]
-  rebootTile: Position
+  // Four tiles where robots reappear after falling; see Game.rebootRobot.
+  rebootTiles: readonly (readonly [x: number, y: number])[]
 }>
 
 export const boardMaps = {
@@ -58,7 +59,7 @@ export const boardMaps = {
     width: 21,
     height: 15,
     antenna: { x: Integer(10), y: Integer(0), angle: Math.PI / 2 },
-    rebootTile: { x: Integer(10), y: Integer(7) },
+    rebootTiles: [[3, 3], [17, 3], [3, 11], [17, 11]],
     walls: [],
     startTiles: [[10, 7], [9, 7], [8, 7], [7, 7], [6, 7], [5, 7]],
     checkpoints: [[10, 6], [8, 9]],
@@ -89,7 +90,7 @@ export const boardMaps = {
 
       { at: [4, 8], sprite: 'conveyor-1-straight', direction: N },
     ],
-    rebootTile: { x: Integer(10), y: Integer(7) },
+    rebootTiles: [[13, 2], [2, 6], [10, 10], [2, 13]],
     antenna: { x: Integer(10), y: Integer(0), angle: Math.PI / 2 },
     checkpoints: [[10, 6], [8, 9]],
     startTiles: [[8, 7], [3, 8], [10, 13], [1, 4], [10, 3], [5, 12]],
