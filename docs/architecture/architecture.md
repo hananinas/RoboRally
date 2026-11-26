@@ -42,9 +42,9 @@ On a successful login, a session is created in the **Session Store**. The Sessio
 
 Socket.IO connections are accepted by the **Game Socket Server**, which authenticates each connection against the Session Store and dispatches incoming events to one of two handler groups, matching the pre-game and in-game phases of a session. The Game Socket Server also re-validates the session on every subsequent command and before every broadcast, disconnecting the socket immediately if the session has since expired.
 
-**Lobby Handlers** implement listing, creating, joining, leaving, and starting a lobby. Lobby membership is tracked by the **Lobby Registry**, an in-memory-only component. Lobbies are not persisted in this version, since a waiting room carries no value worth protecting across a restart. Most other games also don't support lobby persistence so this is what a user would likely expect.
+**Lobby Handlers** implement listing, creating, joining, leaving, and starting a lobby. Lobby membership, and which lobby or game each user currently belongs to, is tracked by the **Membership Registry**, an in-memory-only component. Lobbies are not persisted in this version, since a waiting room carries no value worth protecting across a restart. Most other games also don't support lobby persistence so this is what a user would likely expect.
 
-**Game Handlers** implement the actions available once a game has started: reattaching after a reconnect, leaving, and submitting a program. A started lobby is converted into a **Game Session**, which holds the live state of one running game (e.g. connected players and Socket.IO rooms). Game state is persisted through the **Game Repository** to `robo-rally-db` so players can reload a game. Game Handlers resolve which game a user currently belongs to via the Game Repository.
+**Game Handlers** implement the actions available once a game has started: reattaching after a reconnect, leaving, and submitting a program. A started lobby is converted into a **Game Session**, which holds the live state of one running game (e.g. connected players and Socket.IO rooms). Game state is persisted through the **Game Repository** to `robo-rally-db` so players can reload a game. Game Handlers resolve which game a user currently belongs to via the **Membership Registry**, falling back to the Game Repository when a game isn't currently held in memory (e.g. after a restart).
 
 Turn resolution is delegated to the **Action Scheduler**, which resolves programmed robot actions against the **Domain Model**. The Domain Model is the RoboRally rules engine, comprising the board, robots, players, and cards. The **Game Presenter** reads from the Domain Model and serializes game state into the wire-format payloads sent back to clients.
 
@@ -66,7 +66,7 @@ Writes to game_snapshots happen at the beginning of the game and after a finishe
 
 ### Not persisted
 
-**Lobbies** — tracked only by the in-memory **Lobby Registry**. 
+**Membership** — which lobby or game a user is currently attached to, along with the set of open lobbies, is tracked only by the in-memory **Membership Registry**.
 
 **Sessions** — tracked only by the in-memory **Session Store**. Session have to be validated on every request and event emission. Storing them in a database would make this operation significantly more expensive. 
 

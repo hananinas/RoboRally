@@ -4,7 +4,7 @@ import type { CardsDealt, ClientToServerEvents, RobotActionResolved, ServerToCli
 import { io as connectSocket, type Socket } from 'socket.io-client'
 import { expect, it, vi, type MockInstance } from 'vitest'
 import { createGameSocketServer } from '@/socket/gameServer.ts'
-import * as gameContext from '@/socket/gameContext.ts'
+import * as gameSessionModule from '@/socket/gameSession/GameSession.ts'
 import { createSessionStore } from '@/auth/sessionStore.ts'
 import { authCookieHeader } from './authTestHelper.ts'
 
@@ -14,7 +14,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
     oidcClient: { refreshToken: () => Promise.reject(new Error('not used in this test')) },
     refreshBufferSeconds: 0,
   })
-  const contexts: MockInstance<typeof gameContext.createGameContext> = vi.spyOn(gameContext, 'createGameContext')
+  const contexts: MockInstance<typeof gameSessionModule.GameSession> = vi.spyOn(gameSessionModule, 'GameSession')
   const server = createGameSocketServer(httpServer, sessionStore)
   const clients: Socket<ServerToClientEvents, ClientToServerEvents>[] = []
   const events: { name: string; payload: unknown }[][] = [[], []]
@@ -38,16 +38,16 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
       socket.connect()
       await connected
     }
-    const created = await clients[0].emitWithAck('lobby.create', {})
+    const created = await clients[0].emitWithAck('lobby.create', { mapName: 'test-map' })
     if (created.outcome !== 'LOBBY_JOINED') throw new Error(created.outcome)
     await clients[1].emitWithAck('lobby.join', { lobbyId: created.lobby.lobbyId })
     await clients[0].emitWithAck('lobby.start', {})
-    const game: ReturnType<typeof gameContext.createGameContext>['game'] = contexts.mock.results.at(-1)!.value.game
+    const game: gameSessionModule.GameSession['game'] = contexts.mock.results.at(-1)!.value.game
     const players = game.players
     const robotIds = players.map((player) => player.robot.id)
 
     for (const socket of clients) {
-      await socket.timeout(1000).emitWithAck('session.get', {})
+      await socket.timeout(1000).emitWithAck('membership.get', {})
     }
     events[0] = []
     events[1] = []
@@ -60,7 +60,7 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
         .toEqual({ outcome: 'ACCEPTED' })
       // Session acknowledgements fence each connection's earlier deliveries.
       for (const socket of clients) {
-        const waiting = await socket.timeout(1000).emitWithAck('session.get', {})
+        const waiting = await socket.timeout(1000).emitWithAck('membership.get', {})
         expect(waiting).toMatchObject({ outcome: 'IN_GAME', initialization: { state: { phase: 'PROGRAMMING' } } })
       }
       expect(events[0].map((event) => event.name)).toEqual(['program.submitted'])

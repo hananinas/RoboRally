@@ -1,14 +1,14 @@
 import { mock } from 'node:test'
 import './deterministic-random.mjs'
 import { Integer } from '../../game-service/dist/numbers.js'
-import { createGame as realCreateGame } from '../../game-service/dist/game/GameFactory.js'
+import { createGame as realCreateGame } from '../../game-service/dist/domain/game/GameFactory.js'
 
 // Controlled row for browser tests; all gameplay uses the real service and the
 // real test-map. Clear of every pit/wall, with room to push two tiles west.
 const ROW_Y = 13
 const COLUMNS = [6, 5, 4]
 
-mock.module('../../game-service/dist/game/GameFactory.js', {
+mock.module('../../game-service/dist/domain/game/GameFactory.js', {
   cache: true,
   exports: {
     createGame: (mapName, name) => {

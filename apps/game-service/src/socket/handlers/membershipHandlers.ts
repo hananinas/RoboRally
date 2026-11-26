@@ -1,193 +1,57 @@
-import type { ZodError } from 'zod'
-import { withAcknowledgeOnce } from '@/socket/utilities/acknowledgeOnce'
-import { toRejection, type Rejection } from '@/socket/utilities/rejection'
-import { logError, logWarn } from '@/logger'
-import { err, ok, type Result } from 'neverthrow'
-import {
-  emptyRequestSchema,
-  type EmptyRequest,
-  type GameInitialization,
-  type SessionResult,
-  type LeaveResult,
-  type PublicGameState,
-  type User,
-} from '@robo-rally/game-events'
-import type { Player, Game } from '@/game/index'
-import { presentCardsDealt, presentProgrammingTimer } from '@/socket/gamePresenter'
-import type { ActionScheduler } from '@/actionScheduler'
-import type { ProgrammingTimer } from '@/programmingTimer'
-import type { GameSocket, GameSocketServer } from '@/socket/gameServer'
+import { ok } from 'neverthrow'
+import { emptyRequestSchema, type EmptyRequest, type MembershipResult, type User } from '@robo-rally/game-events'
+import type { GameSocket, SocketContext } from '@/socket/gameServer'
+import { leaveLobby } from '@/socket/handlers/lobbyHandlers'
+import { presentLobby } from '@/socket/presenters/lobbyPresenter'
+import { withValidatedRequest } from '@/socket/utilities/withValidatedRequest'
+import { logError } from '@/logger'
 
-export type GameMembership = {
-  user: User
-  player: Player
-  connectionId: string | null
+function resolveLobbyMembership(context: SocketContext, socket: GameSocket, user: User): MembershipResult {
+  const lobbySession = context.registry.getCurrentLobby(user.userId)
+  if (!lobbySession) throw new Error('Membership references a missing lobby')
+  return lobbySession.isMember(socket).isOk()
+    ? { outcome: 'IN_LOBBY', lobby: presentLobby(lobbySession.lobby), user }
+    : { outcome: 'ALREADY_HAS_MEMBERSHIP' }
 }
 
-export type MembershipContext = {
-  io: GameSocketServer
-  game: Game
-  publicRoom: string
-  playerRoom: (playerId: string) => string
-  memberships: Map<string, GameMembership>
-  publicState: () => PublicGameState
-  actionScheduler: ActionScheduler
-  programmingTimer: ProgrammingTimer
+function resolveGameMembership(context: SocketContext, socket: GameSocket, user: User): {
+  result: MembershipResult
+  announceReconnected: () => void
+} {
+  const gameSession = context.registry.getCurrentGame(user.userId)
+  if (!gameSession) throw new Error('Membership references a missing game')
+  const result = gameSession.reattach(socket)
+  if (result.isErr()) return { result: { outcome: result.error }, announceReconnected: () => {} }
+  const { initialization, announceReconnected } = result.value
+  return { result: { outcome: 'IN_GAME', initialization, user }, announceReconnected }
 }
 
-function anyDisconnected(ctx: MembershipContext): boolean {
-  return [...ctx.memberships.values()].some((membership) => membership.connectionId === null)
-}
-
-function reattachMembership(membership: GameMembership, socketId: string): boolean {
-  const wasDisconnected = membership.connectionId === null
-  membership.connectionId = socketId
-  return wasDisconnected
-}
-
-function resumeUnlessStillDisconnected(ctx: MembershipContext): void {
-  if (anyDisconnected(ctx)) return
-  const result = ctx.game.resume()
-  if (result.isOk()) ctx.actionScheduler.announceProgress(result.value)
-}
-
-function notifyReconnected(ctx: MembershipContext, playerId: string): void {
-  ctx.io.to(ctx.publicRoom).emit('game.playerConnectionChanged', {
-    gameId: ctx.game.id, playerId, connected: true, paused: ctx.game.paused,
-  })
-  ctx.io.to(ctx.playerRoom(playerId)).emit('program.timerChanged', presentProgrammingTimer(ctx.game.id, ctx.programmingTimer.state()))
-  ctx.actionScheduler.scheduleNextAction()
-}
-
-type ValidateMembershipRequestError = Rejection<'INVALID_REQUEST', ZodError>
-
-function validateMembershipRequest(
-  schema: typeof emptyRequestSchema,
-  payload: unknown,
-  user: User,
-): Result<User, ValidateMembershipRequestError> {
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return err({ outcome: 'INVALID_REQUEST', detail: parsed.error })
-  return ok(user)
-}
-
-export function ownedMembership(ctx: MembershipContext, socket: GameSocket): GameMembership | undefined {
-  const membership = ctx.memberships.get(socket.data.user.userId)
-  return membership?.connectionId === socket.id ? membership : undefined
-}
-
-export function reconnectIfRecovered(ctx: MembershipContext, socket: GameSocket): void {
-  if (!socket.recovered) return
-  const membership = ctx.memberships.get(socket.data.user.userId)
-  if (membership && reattachMembership(membership, socket.id)) {
-    resumeUnlessStillDisconnected(ctx)
-    notifyReconnected(ctx, membership.player.id)
-  }
-}
-
-// Published games have a fixed roster. Only an existing member can reattach.
-export function handleReattachGame(
-  ctx: MembershipContext,
-  socket: GameSocket,
-  acknowledge: (result: SessionResult) => void,
-): void {
-  const user = socket.data.user
-  const membership = ctx.memberships.get(user.userId)
-  if (!membership) return acknowledge({ outcome: 'INTERNAL_ERROR' })
-  if (membership.connectionId && membership.connectionId !== socket.id) {
-    return acknowledge({ outcome: 'USER_ALREADY_IN_SESSION' })
-  }
-  const previousRooms = new Set(socket.rooms)
-  const previousConnectionId = membership.connectionId
-  const wasPaused = ctx.game.paused
-  const reconnected = reattachMembership(membership, socket.id)
-  resumeUnlessStillDisconnected(ctx)
-  let initialization: GameInitialization
-  try {
-    initialization = presentInitialization(ctx, membership)
-    void socket.join([ctx.publicRoom, ctx.playerRoom(membership.player.id)])
-  } catch (error) {
-    for (const room of [ctx.publicRoom, ctx.playerRoom(membership.player.id)]) {
-      if (!previousRooms.has(room)) void socket.leave(room)
-    }
-    logError('Failed to reattach game membership', error, { command: 'session.get', gameId: ctx.game.id })
-    membership.connectionId = previousConnectionId
-    if (wasPaused) ctx.game.pause()
-    return acknowledge({ outcome: 'INTERNAL_ERROR' })
-  }
-  acknowledge({ outcome: 'IN_GAME', initialization, user })
-  if (reconnected) notifyReconnected(ctx, membership.player.id)
-}
-
-export function handleLeave(
-  ctx: MembershipContext,
+export function handleGetMembership(
+  context: SocketContext,
   socket: GameSocket,
   payload: EmptyRequest,
-  acknowledge: (result: LeaveResult) => void,
+  acknowledge: (result: MembershipResult) => void,
 ): void {
-  const { io, game, memberships, publicRoom, playerRoom, actionScheduler } = ctx
-  let playerId: string | undefined
-
-  withAcknowledgeOnce(acknowledge, (ack) => {
-    const result = validateMembershipRequest(emptyRequestSchema, payload, socket.data.user)
-      .andThen(() => {
-        const membership = ownedMembership(ctx, socket)
-        return membership ? ok(membership) : err('GAME_NOT_FOUND' as const)
-      })
-      .mapErr(toRejection)
-    if (result.isErr()) {
-      const { outcome, detail } = result.error
-      logWarn('Rejected game.leave request', { command: 'game.leave', gameId: game.id, outcome, detail, payload })
-      ack({ outcome })
-      return
-    }
-    const { player, user } = result.value
-    playerId = player.id
-
-    const { roundConcluded } = game.removePlayer(player.id)
-    memberships.delete(user.userId)
-    void socket.leave(publicRoom)
-    void socket.leave(playerRoom(player.id))
-    ack({ outcome: 'LEFT' })
-    io.to(publicRoom).emit('game.playerLeft', {
-      gameId: game.id, playerId: player.id, robotId: player.robot.id,
-    })
-    if (game.requirePhase('activation').isOk()) ctx.programmingTimer.close()
-    actionScheduler.announceProgress({ roundConcluded })
-    actionScheduler.scheduleNextAction()
-  }, (error) => {
-    logError('Failed to process player leaving', error, { command: 'game.leave', gameId: game.id, playerId })
-    return { outcome: 'INTERNAL_ERROR' } as const
+  withValidatedRequest({
+    socket, command: 'membership.get', schema: emptyRequestSchema, payload, acknowledge,
+    resolve: (user) => ok(user),
+    run: (user, ack) => {
+      const membership = context.registry.getActiveMembership(user.userId)
+      if (!membership) return ack({ outcome: 'NO_MEMBERSHIP', user })
+      if (membership.kind === 'lobby') return ack(resolveLobbyMembership(context, socket, user))
+      const { result, announceReconnected } = resolveGameMembership(context, socket, user)
+      ack(result)
+      announceReconnected()
+    },
   })
 }
 
-export function handleDisconnect(ctx: MembershipContext, socket: GameSocket): void {
-  const membership = ownedMembership(ctx, socket)
-  if (!membership) return
-
+export function handleSocketDisconnect(context: SocketContext, socket: GameSocket): void {
   try {
-    membership.connectionId = null
-    ctx.game.pause()
-    ctx.io.to(ctx.publicRoom).emit('game.playerConnectionChanged', {
-      gameId: ctx.game.id, playerId: membership.player.id, connected: false, paused: ctx.game.paused,
-    })
+    leaveLobby(context, socket)
+    const gameSession = context.registry.getCurrentGame(socket.data.user.userId)
+    if (gameSession) gameSession.markDisconnected(socket)
   } catch (error) {
-    logError('Failed to process player disconnect', error, { command: 'disconnect', gameId: ctx.game.id, playerId: membership.player.id })
-  }
-}
-
-export function presentInitialization(
-  ctx: MembershipContext,
-  membership: GameMembership,
-  state: PublicGameState = ctx.publicState(),
-): GameInitialization {
-  const { player } = membership
-  return {
-    outcome: 'JOINED',
-    assignment: { gameId: ctx.game.id, playerId: player.id, robotId: player.robot.id },
-    state,
-    hand: presentCardsDealt(ctx.game.id, player).cards,
-    program: player.program,
-    programSubmitted: ctx.game.hasSubmittedProgram(player.id),
+    logError('Failed to clean up disconnected socket', error, { userId: socket.data.user.userId })
   }
 }

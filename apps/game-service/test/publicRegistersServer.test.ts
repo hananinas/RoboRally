@@ -7,11 +7,10 @@ import type {
 } from '@robo-rally/game-events'
 import { io as createClient, type Socket } from 'socket.io-client'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
-import * as actionScheduler from '@/actionScheduler'
-import type { Game } from '@/game/Game'
+import * as actionScheduler from '@/socket/gameSession/actionScheduler'
+import type { Game } from '@/domain/game/Game'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
-import * as gameContext from '@/socket/gameContext'
-import { handleUpdateRegisters } from '@/socket/handlers/gameplayHandlers'
+import * as gameSessionModule from '@/socket/gameSession/GameSession'
 import { createSessionStore, type SessionStore } from '@/auth/sessionStore'
 import { authCookieHeader } from './authTestHelper.ts'
 
@@ -26,12 +25,12 @@ describe('public registers over Socket.IO', () => {
   let server: GameSocketServer
   let url: string
   let clients: Client[]
-  let contexts: MockInstance<typeof gameContext.createGameContext>
+  let contexts: MockInstance<typeof gameSessionModule.GameSession>
   let sessionStore: SessionStore
 
   beforeEach(async () => {
     clients = []
-    contexts = vi.spyOn(gameContext, 'createGameContext')
+    contexts = vi.spyOn(gameSessionModule, 'GameSession')
     const http = createServer()
     sessionStore = createSessionStore({ oidcClient: { refreshToken: vi.fn() }, refreshBufferSeconds: 0 })
     server = createGameSocketServer(http, sessionStore)
@@ -66,7 +65,7 @@ describe('public registers over Socket.IO', () => {
   }
 
   async function start(members: Client[]): Promise<GameInitialization[]> {
-    const created = await members[0].timeout(1000).emitWithAck('lobby.create', {})
+    const created = await members[0].timeout(1000).emitWithAck('lobby.create', { mapName: 'test-map' })
     if (created.outcome !== 'LOBBY_JOINED') throw new Error(created.outcome)
     const { lobbyId } = created.lobby
     for (const member of members.slice(1)) {
@@ -78,7 +77,7 @@ describe('public registers over Socket.IO', () => {
   }
 
   async function snapshot(client: Client): Promise<GameInitialization> {
-    const result = await client.timeout(1000).emitWithAck('session.get', {})
+    const result = await client.timeout(1000).emitWithAck('membership.get', {})
     if (result.outcome !== 'IN_GAME') throw new Error(result.outcome)
     return result.initialization
   }
@@ -109,7 +108,7 @@ describe('public registers over Socket.IO', () => {
     const first = await connect('First')
     const second = await connect('Second')
     const [a, b] = await start([first, second])
-    const ctx = contexts.mock.results[0].value as ReturnType<typeof gameContext.createGameContext>
+    const ctx = contexts.mock.results[0].value as gameSessionModule.GameSession
     vi.spyOn(ctx.actionScheduler, 'scheduleNextAction').mockImplementation(() => {})
     let now = Date.now()
     vi.spyOn(Date, 'now').mockImplementation(() => now)
@@ -220,18 +219,16 @@ describe('public registers over Socket.IO', () => {
     expect(await raw(first, update(a, [null, null, null, null, null]))).toEqual({ outcome: 'ACCEPTED' })
     await snapshot(first)
     events.length = 0
-    // Session routing selects the caller's own game; exercise the foreign-context guard directly.
-    const acknowledge = vi.fn()
-    handleUpdateRegisters(contexts.mock.results[0].value,
-      server.sockets.sockets.get(outsider.id!)!, { cardIds: [null, null, null, null, null] }, acknowledge)
-    expect(acknowledge.mock.calls).toEqual([[{ outcome: 'NOT_A_MEMBER' }]])
+    // Session routing selects the caller's own game; the per-session membership guard rejects a foreign socket directly.
+    const foreignGame = contexts.mock.results[0].value as gameSessionModule.GameSession
+    expect(foreignGame.isMember(server.sockets.sockets.get(outsider.id!)!).isErr()).toBe(true)
     expect(await raw(outsider, update(other))).toEqual({ outcome: 'ACCEPTED' })
     expect((await snapshot(outsider)).state.players[0].registers).toEqual([
       { status: 'HIDDEN' }, { status: 'EMPTY' }, { status: 'HIDDEN' },
       { status: 'EMPTY' }, { status: 'EMPTY' },
     ])
     expect(await raw(duplicate, update(a))).toEqual({ outcome: 'NOT_A_MEMBER' })
-    expect(await duplicate.timeout(1000).emitWithAck('session.get', {})).toEqual({ outcome: 'USER_ALREADY_IN_SESSION' })
+    expect(await duplicate.timeout(1000).emitWithAck('membership.get', {})).toEqual({ outcome: 'ALREADY_HAS_MEMBERSHIP' })
     expect((await snapshot(first)).state.players.map((player) => player.registers)).toEqual([empty, empty])
     expect(events).toEqual([])
     expect(await first.timeout(1000).emitWithAck('program.submit', {
@@ -278,8 +275,8 @@ describe('public registers over Socket.IO', () => {
     expect(await raw(returning, update(a))).toEqual({ outcome: 'NOT_A_MEMBER' })
     expect(await raw(second, update(b))).toEqual({ outcome: 'ACCEPTED' })
     await snapshot(second)
-    expect(await returning.timeout(1000).emitWithAck('session.get', {})).toEqual({
-      outcome: 'NO_SESSION', user: { userId: 'Returning', username: 'Returning' },
+    expect(await returning.timeout(1000).emitWithAck('membership.get', {})).toEqual({
+      outcome: 'NO_MEMBERSHIP', user: { userId: 'Returning', username: 'Returning' },
     })
     expect(departedEvents).toEqual([])
   })
@@ -438,7 +435,7 @@ describe('public registers over Socket.IO', () => {
     await snapshot(first)
     await snapshot(second)
     expect(result).toEqual({ outcome })
-    expect(acknowledgementIds).toHaveLength(2) // Command ACK, then the session.get barrier ACK.
+    expect(acknowledgementIds).toHaveLength(2) // Command ACK, then the membership.get barrier ACK.
     expect(new Set(acknowledgementIds).size).toBe(2)
     expect(events).toEqual([])
     expect(game.players.map((player) => player.registers)).toEqual(before)
@@ -477,7 +474,7 @@ describe('public registers over Socket.IO', () => {
       { status: 'REVEALED', instruction: action.instruction },
       { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' }, { status: 'HIDDEN' },
     ])
-    // session.get resumes a game with no disconnected members; activation still rejects edits.
+    // membership.get resumes a game with no disconnected members; activation still rejects edits.
     expect(executed.state.paused).toBe(false)
     expect(await raw(first, update(a))).toEqual({ outcome: 'WRONG_PHASE' })
     await disconnect(returning)

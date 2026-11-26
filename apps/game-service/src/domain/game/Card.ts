@@ -1,0 +1,6 @@
+import type { Instruction } from '@robo-rally/game-events'
+import type { CardId } from '@/domain/game/ids'
+
+export class Card {
+  constructor(readonly id: CardId, readonly instruction: Instruction) {}
+}
