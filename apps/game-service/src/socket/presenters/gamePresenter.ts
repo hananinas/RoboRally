@@ -10,7 +10,10 @@ import type {
   Orientation,
   Position as PositionPayload,
   PlayerConnectionChanged,
+  PrivateProgram,
   PublicGameState,
+  PublicRegisters,
+  PublicRegisterSlot,
   RegistersChanged,
   User,
   Winner,
@@ -29,6 +32,8 @@ import {
   type Player,
   type Position,
   type PlayerId,
+  type RegisterView,
+  type Registers,
 } from '@/domain/game/index'
 import { Integer } from '@/numbers'
 import type { EnvironmentStepResult } from '@/domain/game/Game'
@@ -52,6 +57,27 @@ function presentPosition(coordinate: Position, direction: Direction): PositionPa
 
 function presentCard(card: Card): CardPayload {
   return { id: card.id, instruction: card.instruction }
+}
+
+function presentProgram(registers: Registers): PrivateProgram {
+  const program: readonly (CardPayload | null)[] = registers.slots.map((card) => card === null ? null : presentCard(card))
+  return program as PrivateProgram
+}
+
+function presentRegister(view: RegisterView): PublicRegisterSlot {
+  switch (view.kind) {
+    case 'empty':
+      return { status: 'EMPTY' }
+    case 'hidden':
+      return { status: 'HIDDEN' }
+    case 'revealed':
+      return { status: 'REVEALED', instruction: view.instruction }
+  }
+}
+
+function presentRegisters(game: Game, player: Player): PublicRegisters {
+  const registers: readonly PublicRegisterSlot[] = game.registerViewsFor(player).map(presentRegister)
+  return registers as PublicRegisters
 }
 
 function presentTile(game: Game, x: number, y: number): TilePayload {
@@ -81,7 +107,7 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
 
   if (tile instanceof GearTile) return { ...common, type: tile.kind, rotation: tile.rotation }
 
-  if (tile.kind === 'EMPTY' || tile.kind === 'PIT' || tile.kind === 'REBOOT') {
+  if (tile.kind === 'EMPTY' || tile.kind === 'PIT' || tile.kind === 'REBOOT' || tile.kind === 'START') {
     return {
       ...common,
       type: tile.kind,
@@ -98,7 +124,7 @@ export function presentPlayerState(game: Game, player: Player, username: string,
     username,
     programSubmitted: game.hasSubmittedProgram(player.id),
     connected,
-    registers: player.registers,
+    registers: presentRegisters(game, player),
   }
 }
 
@@ -134,7 +160,7 @@ export function presentPublicGameState(
       playerId: player.id,
       robotSpriteId: player.robot.robotSpriteId,
       colour: player.robot.colour,
-      position: presentPosition(game.board.positionOf(player.robot.id), player.robot.direction),
+      position: presentPosition(game.getRobotPosition(player.robot.id), player.robot.direction),
     })),
     phase: phases[game.lastActivePhase],
     paused: game.paused,
@@ -160,13 +186,14 @@ export function presentInitialization(game: Game, player: Player, state: PublicG
     assignment: { gameId: game.id, playerId: player.id, robotId: player.robot.id },
     state,
     hand: presentCardsDealt(game.id, player).cards,
-    program: player.program,
+    program: presentProgram(player.registers),
     programSubmitted: game.hasSubmittedProgram(player.id),
   }
 }
 
-export function presentRegistersChanged(gameId: GameId, player: Player): RegistersChanged {
-  return { gameId, playerId: player.id, registers: player.registers as RegistersChanged['registers'] }
+export function presentRegistersChanged(game: Game, player: Player): RegistersChanged {
+  const registers = presentRegisters(game, player) as RegistersChanged['registers']
+  return { gameId: game.id, playerId: player.id, registers }
 }
 
 export function presentPlayerConnectionChanged(game: Game, player: Player, connected: boolean): PlayerConnectionChanged {

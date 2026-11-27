@@ -1874,13 +1874,16 @@ components:
           $ref: '#/components/schemas/Coordinate'
         type:
           type: string
-          enum: [ EMPTY, PIT, CONVEYOR, GEAR, REBOOT ]
+          enum: [ EMPTY, PIT, CONVEYOR, GEAR, REBOOT, START ]
           description: >-
             PIT triggers an immediate server-side reboot on entry during movement,
             discarding the remaining steps of that instruction. Walls can block entry.
             REBOOT is a reboot tile: a robot that falls into a pit or off the board
             reappears on the free REBOOT tile closest to where it fell. Robots can
             stand on and move across it like an EMPTY tile.
+            START marks a position where a robot spawns when the game begins; it
+            behaves like an EMPTY tile for the rest of the game, and the number of
+            START tiles is the map's player capacity.
         walls:
           type: array
           uniqueItems: true

@@ -1,16 +1,11 @@
 import { Board } from '@/domain/game/Board'
 import { boardMaps, type BoardMapName, type MapSpec } from '@/domain/game/boardMaps'
 import type { Direction } from '@/domain/game/spatial'
-import { EmptyTile, PitTile, ConveyorTile, GearTile, RebootTile, type Tile } from '@/domain/game/Tile'
-import { Integer } from '@/numbers'
+import { EmptyTile, PitTile, ConveyorTile, GearTile, RebootTile, StartTile, type Tile } from '@/domain/game/Tile'
 export type { BoardMapName } from '@/domain/game/boardMaps'
 
-const MAPS: Readonly<Record<BoardMapName, MapSpec>> = boardMaps
-
-const DEFAULT_MAP: BoardMapName = 'empty-map'
-
-export function createBoard(mapName: BoardMapName = DEFAULT_MAP): Board {
-  const { width, height, walls, checkpoints, antenna, rebootTiles, pits = [], conveyors = [], gears = [], startTiles, maxPlayers } = MAPS[mapName]
+export function createBoard(spec: MapSpec): Board {
+  const { name: mapName, width, height, walls, checkpoints, antenna, rebootTiles, pits = [], conveyors = [], gears = [], startTiles } = spec
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
     throw new RangeError(`Map "${mapName}" must have a positive integer width and height`)
   }
@@ -82,13 +77,23 @@ export function createBoard(mapName: BoardMapName = DEFAULT_MAP): Board {
     boardTiles[y][x] = new RebootTile(tile.walls)
   }
 
-  if (startTiles.length < maxPlayers) {
-    throw new RangeError(`Map "${mapName}" needs a starting tile for each of its ${maxPlayers} players`)
+  if (startTiles.length === 0) {
+    throw new RangeError(`Map "${mapName}" must declare at least one starting tile`)
   }
+  startTiles.forEach(([x, y], index) => {
+    const tile = boardTiles[y]?.[x]
+    if (!(tile instanceof EmptyTile) || tile.checkpointNumber !== undefined) {
+      throw new RangeError(`Starting tile at (${x}, ${y}) in map "${mapName}" must occupy an empty non-checkpoint board tile`)
+    }
+    boardTiles[y][x] = new StartTile(index + 1, tile.walls)
+  })
 
-  return new Board(
-    boardTiles,
-    antenna,
-    startTiles.map(([x, y]) => ({ x: Integer(x), y: Integer(y) })),
-  )
+  return new Board(boardTiles, antenna)
 }
+
+// One board per map, shared by every game on it: anything a game changes about a
+// space belongs to the game, not here. Building at import also fails a malformed
+// map at startup rather than on lobby.start.
+export const boards: Readonly<Record<BoardMapName, Board>> = Object.freeze(
+  Object.fromEntries(Object.entries(boardMaps).map(([name, spec]) => [name, createBoard(spec)])),
+) as Readonly<Record<BoardMapName, Board>>

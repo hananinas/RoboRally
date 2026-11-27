@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { Card, Direction, EmptyTile } from '@/domain/game/index'
 import { Deck } from '@/domain/game/Deck'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestBoard, createTestGame, placeTestPlayer } from '../../fixtures.ts'
+import { createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, instructionsOf } from '../../fixtures.ts'
 
 function createGame(starts = [{ x: 0, y: 1, direction: Direction.EAST }]) {
   const tiles = createEmptyTileGrid(5, 3)
@@ -19,9 +19,10 @@ function createGame(starts = [{ x: 0, y: 1, direction: Direction.EAST }]) {
     right: new Card('right', 'TURN_RIGHT'),
     uturn: new Card('uturn', 'U_TURN'),
   }
-  const players = starts.map(({ x, y, direction }) =>
-    placeTestPlayer(board, { x: Integer(x), y: Integer(y) }, { direction, deck: new Deck(Object.values(cards)) }))
-  const game = createTestGame({ board, players, deck: Object.values(cards) })
+  const placements = starts.map(({ x, y, direction }) =>
+    createTestPlacement({ x: Integer(x), y: Integer(y) }, { direction, deck: new Deck(Object.values(cards)) }))
+  const players = placements.map(({ player }) => player)
+  const game = createTestGame({ board, players: placements, deck: instructionsOf(Object.values(cards)) })
   return { board, players, cards, game }
 }
 
@@ -66,8 +67,8 @@ describe('checkpoint activation', () => {
 
     expect(game.winner).toBe(player.id)
     expect(game.lastActivePhase).toBe('activation')
-    expect(game.currentRegister).toBe(0)
-    expect(player.robot.program).toEqual([])
+    expect(game.currentRegister).toBe(1)
+    expect(player.registers.slots).toEqual(program)
     expect(game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrapErr()).toBe('GAME_FINISHED')
   })
 
@@ -90,7 +91,7 @@ describe('checkpoint activation', () => {
   })
 
   it('rejects register updates after a checkpoint win', () => {
-    const { board, players: [player], cards: c, game } = createGame()
+    const { players: [player], cards: c, game } = createGame()
     const program = [c.move2, c.back, c.step, c.stepAgain, c.left]
     game.updateRegisters(player.id, program.map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
@@ -99,15 +100,14 @@ describe('checkpoint activation', () => {
     expect(player.lastCheckpoint).toBe(2)
     expect(game.winner).toBe(player.id)
     expect(game.lastActivePhase).toBe('activation')
-    expect(game.currentRegister).toBe(0)
+    expect(game.currentRegister).toBe(4)
     expect(game.hasSubmittedProgram(player.id)).toBe(false)
-    expect(player.robot.program).toEqual([])
-    expect(player.registers).toEqual([
-      ...program.slice(0, 4).map((card) => ({ status: 'REVEALED', instruction: card.instruction })),
-      { status: 'HIDDEN' },
+    expect(player.registers.slots).toEqual(program)
+    expect(game.registerViewsFor(player)).toEqual([
+      ...program.slice(0, 4).map((card) => ({ kind: 'revealed', instruction: card.instruction })),
+      { kind: 'hidden' },
     ])
 
-    const registers = player.registers
     const state = () => ({
       phase: game.lastActivePhase,
       currentRegister: game.currentRegister,
@@ -115,19 +115,18 @@ describe('checkpoint activation', () => {
       aborted: game.aborted,
       winner: game.winner,
       players: game.players,
-      registers: player.registers.map((register) => ({ ...register })),
-      program: player.robot.program,
+      views: game.registerViewsFor(player),
+      registers: player.registers.slots,
       hand: player.hand,
       submitted: game.hasSubmittedProgram(player.id),
       lastCheckpoint: player.lastCheckpoint,
       direction: player.robot.direction,
-      position: board.positionOf(player.robot.id),
+      position: game.getRobotPosition(player.robot.id),
     })
     const expectRejected = (playerId: string, error: 'GAME_FINISHED') => {
       const before = state()
       expect(game.updateRegisters(playerId, [null, null, null, null, null])._unsafeUnwrapErr()).toBe(error)
       expect(game.completePrograms()._unsafeUnwrapErr()).toBe(error)
-      expect(player.registers).toBe(registers)
       expect(state()).toEqual(before)
     }
 

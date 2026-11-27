@@ -2,6 +2,7 @@ import type { GearRotation } from '@robo-rally/game-events'
 import type { Board } from '@/domain/game/Board'
 import type { PlayerId, RobotId } from '@/domain/game/ids'
 import type { Player } from '@/domain/game/Player'
+import type { RobotPlacements } from '@/domain/game/RobotPlacements'
 import { GearTile } from '@/domain/game/Tile'
 import { rotateDirection, type Direction, type Position } from '@/domain/game/spatial'
 
@@ -18,9 +19,13 @@ type EnvironmentSnapshot = readonly (EnvironmentRobotState & Readonly<{
   gearRotation?: GearRotation
 }>)[]
 
-export function captureEnvironmentSnapshot(board: Board, players: readonly Player[]): EnvironmentSnapshot {
+export function captureEnvironmentSnapshot(
+  board: Board,
+  robotPlacements: RobotPlacements,
+  players: readonly Player[],
+): EnvironmentSnapshot {
   return players.map((player) => {
-    const position = board.positionOf(player.robot.id)
+    const position = robotPlacements.positionOf(player.robot.id)
     const tile = board.getTile(position)
     return {
       robotId: player.robot.id,

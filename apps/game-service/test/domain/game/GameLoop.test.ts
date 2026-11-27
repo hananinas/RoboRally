@@ -4,15 +4,16 @@ import { describe, expect, it } from 'vitest'
 import { Direction, EmptyTile, Card } from '@/domain/game/index'
 import { Deck } from '@/domain/game/Deck'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestBoard, createTestGame, placeTestPlayer } from '../../fixtures.ts'
+import { createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, instructionsOf } from '../../fixtures.ts'
 
 function createGame(deck: Card[]) {
   const board = createTestBoard(createEmptyTileGrid(3, 3), { x: Integer(0), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(2) })
-  const player = placeTestPlayer(board, { x: Integer(1), y: Integer(1) }, {
+  const placement = createTestPlacement({ x: Integer(1), y: Integer(1) }, {
     id: 'robot-1', direction: Direction.EAST, deck: new Deck(deck),
   })
+  const { player } = placement
   const robot = player.robot
-  const game = createTestGame({ board, players: [player], deck })
+  const game = createTestGame({ board, players: [placement], deck: instructionsOf(deck) })
   return { board, robot, player, game }
 }
 
@@ -36,9 +37,6 @@ describe('Game activation loop', () => {
         registerIndex,
         pushedRobots: [],
         reboots: [],
-        registers: Array.from({ length: 5 }, (_, index) => index <= registerIndex
-          ? { status: 'REVEALED', instruction: 'TURN_LEFT' }
-          : { status: 'HIDDEN' }),
         action: {
           robotId: robot.id,
           card: deck[registerIndex],
@@ -52,7 +50,7 @@ describe('Game activation loop', () => {
       expect(game.lastActivePhase).toBe(registerIndex === 4 ? 'programming' : 'activation')
     }
 
-    expect(robot.program).toEqual([])
+    expect(player.registers.slots).toEqual([null, null, null, null, null])
     expect(player.hand).toEqual(deck)
     expect(() => resolveRobotAction(game)).toThrow()
 
@@ -69,14 +67,14 @@ describe('Game activation loop', () => {
       new Card('left-3', 'TURN_LEFT'),
       new Card('left-4', 'TURN_LEFT'),
     ]
-    const { board, player, game } = createGame(deck)
+    const { player, game } = createGame(deck)
     game.submitProgram(player.id, deck.map((card) => card.id))
 
     resolveRobotAction(game)
     const result = resolveRobotAction(game)
 
     expect(result.action.position).toEqual({ x: 1, y: 0 })
-    expect(board.positionOf('robot-1')).toEqual({ x: 1, y: 0 })
+    expect(game.getRobotPosition('robot-1')).toEqual({ x: 1, y: 0 })
     expect(result.action.card).toBe(deck[1])
     expect(result.action.direction).toBe(Direction.NORTH)
     expect(resolveRobotAction(game).action.direction).toBe(Direction.WEST)
@@ -84,21 +82,22 @@ describe('Game activation loop', () => {
 
   it('reports the position reached by movement', () => {
     const deck = Array.from({ length: 5 }, (_, index) => new Card(`move-${index}`, 'MOVE_1'))
-    const { board, player, game } = createGame(deck)
+    const { player, game } = createGame(deck)
     game.submitProgram(player.id, deck.map((card) => card.id))
 
     const result = resolveRobotAction(game)
 
     expect(result.action.position).toEqual({ x: 2, y: 1 })
-    expect(board.positionOf('robot-1')).toEqual({ x: 2, y: 1 })
+    expect(game.getRobotPosition('robot-1')).toEqual({ x: 2, y: 1 })
   })
 })
 
 function resolveCard(instruction: Instruction, direction: Direction, tiles: EmptyTile[][]) {
   const board = createTestBoard(tiles, { x: Integer(3), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
   const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, instruction))
-  const player = placeTestPlayer(board, { x: Integer(3), y: Integer(3) }, { direction, deck: new Deck(cards) })
-  const game = createTestGame({ board, players: [player], deck: cards })
+  const placement = createTestPlacement({ x: Integer(3), y: Integer(3) }, { direction, deck: new Deck(cards) })
+  const { player } = placement
+  const game = createTestGame({ board, players: [placement], deck: instructionsOf(cards) })
   game.submitProgram(player.id, cards.map((card) => card.id))
   return resolveRobotAction(game).action
 }

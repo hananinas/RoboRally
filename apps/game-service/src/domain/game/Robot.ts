@@ -1,8 +1,6 @@
-import type { Card } from '@/domain/game/Card'
 import type { RobotSpriteId } from '@robo-rally/game-events'
 import type { RobotId } from '@/domain/game/ids'
 import { Direction, rotateDirection } from '@/domain/game/spatial'
-import type { UnsignedInteger } from '@/numbers'
 
 export const ROBOT_COLOURS = [
   '#c74f4f', // 1. Red
@@ -18,50 +16,22 @@ export const ROBOT_COLOURS = [
 ]
 
 export class Robot {
-  private currentDirection: Direction
-  private programmedCards: readonly Card[] = []
+  #direction: Direction
 
   constructor(
     readonly id: RobotId,
     direction: Direction,
-    readonly colour: string = ROBOT_COLOURS[0],
-    readonly robotSpriteId: RobotSpriteId = 'tank',
+    readonly colour: string,
+    readonly robotSpriteId: RobotSpriteId,
   ) {
-    this.currentDirection = direction
+    this.#direction = direction
   }
 
   get direction(): Direction {
-    return this.currentDirection
-  }
-
-  get program(): readonly Card[] {
-    return [...this.programmedCards]
-  }
-
-  setProgram(program: readonly Card[]): void {
-    if (program.length !== 5) {
-      throw new RangeError('A program must contain five cards')
-    }
-    this.programmedCards = [...program]
-  }
-
-  clearProgram(): void {
-    this.programmedCards = []
-  }
-
-  getProgramCard(registerIndex: UnsignedInteger): Card {
-    if (registerIndex >= 5) {
-      throw new RangeError('Register index must be between 0 and 4')
-    }
-
-    const card = this.programmedCards[registerIndex]
-    if (!card) {
-      throw new Error('Robot has no program')
-    }
-    return card
+    return this.#direction
   }
 
   turn(quarterTurns: number): void {
-    this.currentDirection = rotateDirection(this.currentDirection, quarterTurns)
+    this.#direction = rotateDirection(this.#direction, quarterTurns)
   }
 }

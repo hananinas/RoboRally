@@ -35,7 +35,6 @@ export type GearSpec = Readonly<{ at: readonly [number, number]; rotation: GearR
 export type MapSpec = Readonly<{
   name: string
   icon: string
-  maxPlayers: number
   width: number
   height: number
   antenna: Antenna
@@ -53,7 +52,6 @@ export const boardMaps = {
   'empty-map': {
     name: 'Empty Map',
     icon: `data:image/svg+xml;base64,${Buffer.from(EMPTY_MAP_SVG).toString('base64')}`,
-    maxPlayers: 6,
     width: 21,
     height: 15,
     antenna: { x: Integer(10), y: Integer(0), angle: Math.PI / 2 },
@@ -65,7 +63,6 @@ export const boardMaps = {
   'test-map': {
     name: 'Test Map',
     icon: `data:image/svg+xml;base64,${Buffer.from(TEST_MAP_SVG).toString('base64')}`,
-    maxPlayers: 6,
     width: 16,
     height: 15,
     pits: [[3, 3], [13, 4], [12, 7], [15, 9], [5, 10], [12, 11]],

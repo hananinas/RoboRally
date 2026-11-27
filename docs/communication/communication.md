@@ -47,8 +47,8 @@ To log out, the client sends `GET /auth/logout` to the Game Service. The Game Se
 Source: [figures/auth-logout.mmd](figures/auth-logout.mmd)
 
 ## Lobby
-After successful authentication, the client sends a `session.get` request to determine if the user has an existent session. 
-If he does not, `session.get` acknowledges with `NO_SESSION {user}` and the client is shown the lobby screen.
+After successful authentication, the client sends a `membership.get` request to determine if the user has an existing membership. 
+If he does not, `membership.get` acknowledges with `NO_MEMBERSHIP {user}` and the client is shown the lobby screen.
 
 If a listed player disconnects before Start, `LOBBY_MEMBER_DISCONNECTED` leaves the lobby intact; the owner can retry after membership updates.
 
@@ -80,7 +80,7 @@ While waiting in a lobby, a client can select its player's robot with `lobby.sel
 
 The selection is scoped to the authenticated lobby member. The server acknowledges a successful selection with `ROBOT_SELECTED {lobby}`. Other lobby members receive the updated full lobby snapshot through `lobby.updated {lobby}`; the selecting connection is not sent a duplicate event because it receives the snapshot in the acknowledgement. Unknown robot IDs are rejected with `INVALID_REQUEST`; a connection that is not a member of a lobby is rejected with `NOT_LOBBY_MEMBER`.
 
-The robot catalog is authoritative. The server discovers the tank and fork-clamp designs from `tanks.hbls` and `fork-clamp.hbls` and returns one entry per robot asset in `lobby.list`, lobby joins, lobby snapshots, and `session.get`. Each file's SVG symbols form the layers of one robot design. The client must render the server list and must not independently truncate or substitute it. If a selection acknowledgement times out, the client performs `session.get` to refresh and reconcile the lobby snapshot.
+The robot catalog is authoritative. The server discovers the tank and fork-clamp designs from `tanks.hbls` and `fork-clamp.hbls` and returns one entry per robot asset in `lobby.list`, lobby joins, lobby snapshots, and `membership.get`. Each file's SVG symbols form the layers of one robot design. The client must render the server list and must not independently truncate or substitute it. If a selection acknowledgement times out, the client performs `membership.get` to refresh and reconcile the lobby snapshot.
 
 The selected sprite is included in each player's lobby roster as `robotSpriteId`. When the lobby starts, the same sprite ID is copied to that player's game robot; the robot's server-assigned colour remains a separate property.
 
@@ -153,11 +153,11 @@ This announces that the player's program is finalized. The service also sends th
 
 While programming, the client sends `game.updateRegisters {cardIds}` with its current register selection. Each of the five entries is a card ID or `null` for an empty slot. Sending the selected IDs lets the service preserve assigned cards when time expires.
 
-The service acknowledges the update and broadcasts `game.registersChanged {gameId, playerId, registers}` with HIDDEN and EMPTY slots. The private selection is also included in `game.started` and `session.get`.
+The service acknowledges the update and broadcasts `game.registersChanged {gameId, playerId, registers}` with HIDDEN and EMPTY slots. The private selection is also included in `game.started` and `membership.get`.
 
 `NOT_A_MEMBER` rejects a connection without valid transport ownership of the game and player; `PLAYER_NOT_IN_GAME` reports that the resolved player is absent from the domain game's roster. `GAME_PAUSED`, `GAME_ABORTED` and `GAME_FINISHED` report the corresponding lifecycle state rather than `WRONG_PHASE`. Rejected lifecycle updates do not mutate registers or broadcast `game.registersChanged`.
 
-The client reveals a slot from `robot.actionResolved`, which carries `playerId`, `registerIndex` and `instruction`. `game.started` and `session.get` include every player's registers, revealed slots included, until the next hand resets them to five EMPTY slots.
+The client reveals a slot from `robot.actionResolved`, which carries `playerId`, `registerIndex` and `instruction`. `game.started` and `membership.get` include every player's registers, revealed slots included, until the next hand resets them to five EMPTY slots.
 
 ### Programming timer
 
@@ -193,7 +193,7 @@ When all players submit or the deadline expires, the service finalizes the progr
 
 For both submission and timeout, the public room receives `game.registersChanged` with five HIDDEN slots and `program.submitted`. The service sends finalization events before the CLOSED timer event, followed by activation events. Further programming requests receive `WRONG_PHASE`.
 
-On reconnect, the service sends the current timer with a fresh `serverTime`; `session.get` includes the timer and the player's private program. The existing [reconnection flow](#game-membership) applies.
+On reconnect, the service sends the current timer with a fresh `serverTime`; `membership.get` includes the timer and the player's private program. The existing [reconnection flow](#game-membership) applies.
 
 A disconnect pauses gameplay without extending the programming deadline. At expiry, the service finalizes programs and sends CLOSED; activation waits until all remaining members are connected.
 
@@ -301,7 +301,7 @@ through the player's [private room](#rooms).
 
 A new hand may arrive while the client is still playing animations from the previous activation. The client stores the new hand immediately and enables programming after queued resolved actions have finished playing. If another player starts the shared timer first, the client finishes that playback immediately so the hand becomes available.
 
-The new hand also opens the next programming round, so the client resets every player's registers to five EMPTY slots when its own hand arrives. A player who reconnects after that point gets the reset registers from `session.get`.
+The new hand also opens the next programming round, so the client resets every player's registers to five EMPTY slots when its own hand arrives. A player who reconnects after that point gets the reset registers from `membership.get`.
 
 The service sends each private hand before broadcasting `program.timerChanged` with `IDLE` for the new round. If the next round timer starts while a client is still playing the previous round, the client finishes queued actions immediately and makes the new hand available.
 
@@ -309,7 +309,7 @@ The service sends each private hand before broadcasting `program.timerChanged` w
 
 The following sequence shows the general game flow while connected and unpaused. Timer and private finalization messages are shown in the [timer sequence](#timer-sequence).
 
-Both players have received their initial hands through game.started or session.get.
+Both players have received their initial hands through game.started or membership.get.
 ![Game round sequence](figures/game-round.svg)
 
 Source: [figures/game-round.mmd](figures/game-round.mmd)
@@ -319,7 +319,7 @@ Source: [figures/game-round.mmd](figures/game-round.mmd)
 
 A player's game membership and their authenticated session are both independent of their Socket.IO connection to the server. Losing the connection does not mean losing the player's spot in the game. When the connection is lost, the game is paused and the server rejects further gameplay submissions it receives. The client reflects this by indicating that it is disconnected and disables gameplay until the connection and game state have been restored.
 
-A membership can only be owned by one live connection at a time: the first connection to reclaim it — whether through automatic Socket.IO recovery or an explicit `session.get {}` — becomes its owner, and a later connection attempting the same claim receives `USER_ALREADY_IN_SESSION` instead, leaving the authenticated session unaffected.
+A membership can only be owned by one live connection at a time: the first connection to reclaim it — whether through automatic Socket.IO recovery or an explicit `membership.get {}` — becomes its owner, and a later connection attempting the same claim receives `ALREADY_HAS_MEMBERSHIP` instead, leaving the authenticated session unaffected.
 
 #### Pausing on disconnection
 When the server detects that a player has disconnected, it pauses the game. This is the `active` → `paused` transition: no further action executes until the game resumes, including one that was already scheduled when the disconnect was detected. The current game state is preserved, including the current phase (`programming` or `activation`).
@@ -337,19 +337,19 @@ After an unexpected connection loss, the client attempts to reconnect automatica
 There are two possible outcomes:
 
 1. Connection state recovery succeeds and missed events are replayed.
-2. Connection state recovery fails, so the client establishes a new authenticated Socket.IO connection and calls `session.get` to obtain a fresh authoritative snapshot.
+2. Connection state recovery fails, so the client establishes a new authenticated Socket.IO connection and calls `membership.get` to obtain a fresh authoritative snapshot.
 
 ##### Successful connection state recovery 
 If recovery succeeds, Socket.IO replays the missed events. The client applies them in order on top of its retained local game state.
 
 ![Successful connection state recovery sequence](figures/reconnect-recovery-success.svg)
 
-After connection recovery, a client with an unacknowledged or failed register save requests `session.get` before enabling programming. It restores the authoritative private selection or finalized program from that snapshot.
+After connection recovery, a client with an unacknowledged or failed register save requests `membership.get` before enabling programming. It restores the authoritative private selection or finalized program from that snapshot.
 
 Source: [figures/reconnect-recovery-success.mmd](figures/reconnect-recovery-success.mmd)
 
 ##### Failed connection state recovery
-If state recovery is unsuccessful, the client reinitializes by sending `session.get {}`, the same command used for normal game initialization. Because the user is already a game member, the server reattaches the connection to their existing player membership and returns the current authoritative state through `IN_GAME {initialization, user}`. The client replaces its local game state with this initialization before processing further game events.
+If state recovery is unsuccessful, the client reinitializes by sending `membership.get {}`, the same command used for normal game initialization. Because the user is already a game member, the server reattaches the connection to their existing player membership and returns the current authoritative state through `IN_GAME {initialization, user}`. The client replaces its local game state with this initialization before processing further game events.
 
 ![Failed connection state recovery sequence](figures/reconnect-recovery-failure.svg)
 

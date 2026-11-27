@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Card, Deck, Direction, EmptyTile } from '@/domain/game/index'
 import { Integer } from '@/numbers'
-import { createTestBoard, createTestGame, placeTestPlayer } from '../../fixtures.ts'
+import { createTestBoard, createTestGame, createTestPlacement, instructionsOf } from '../../fixtures.ts'
 
 function createGame(count = 2) {
   const tiles = Array.from({ length: 3 }, () => Array.from({ length: 5 }, () => new EmptyTile()))
@@ -9,9 +9,10 @@ function createGame(count = 2) {
   tiles[2][2] = new EmptyTile([], 2)
   const board = createTestBoard(tiles, { x: Integer(0), y: Integer(0), angle: 0 }, { x: Integer(0), y: Integer(2) }, [{ x: Integer(3), y: Integer(1) }])
   const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'TURN_LEFT'))
-  const players = Array.from({ length: count }, (_, index) =>
-    placeTestPlayer(board, { x: Integer(index + 1), y: Integer(1) }, { direction: Direction.NORTH, deck: new Deck(cards) }))
-  const game = createTestGame({ board, players, deck: cards })
+  const placements = Array.from({ length: count }, (_, index) =>
+    createTestPlacement({ x: Integer(index + 1), y: Integer(1) }, { direction: Direction.NORTH, deck: new Deck(cards) }))
+  const players = placements.map(({ player }) => player)
+  const game = createTestGame({ board, players: placements, deck: instructionsOf(cards) })
   for (const player of players) game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
   return { game, players, cards }
 }
@@ -33,7 +34,7 @@ describe('environment execution', () => {
           expect(game.currentRegister).toBe(registerIndex)
         }
         expect(game.lastActivePhase).toBe('activation')
-        expect(players[0].robot.program).toHaveLength(5)
+        expect(players[0].registers.slots.every((card) => card !== null)).toBe(true)
         expect(game.hasPendingEnvironment).toBe(true)
         if (roundNumber === 1 && registerIndex === 0) expect(players[0].lastCheckpoint).toBe(0)
         expect(() => game.executeNextAction()).toThrow()
@@ -45,7 +46,7 @@ describe('environment execution', () => {
         })
         expect(game.currentRegister).toBe(registerIndex)
         expect(game.lastActivePhase).toBe('activation')
-        expect(players[0].robot.program).toHaveLength(5)
+        expect(players[0].registers.slots.every((card) => card !== null)).toBe(true)
         expect(game.hasPendingEnvironment).toBe(true)
         expect(() => game.executeNextAction()).toThrow()
         expect(game.executeNextStep()).toEqual({
@@ -58,7 +59,9 @@ describe('environment execution', () => {
         expect(game.currentRegister).toBe((registerIndex + 1) % 5)
       }
       expect(game.lastActivePhase).toBe('programming')
-      expect(players.map((player) => player.robot.program)).toEqual([[], []])
+      expect(players.map((player) => player.registers.slots)).toEqual([
+        [null, null, null, null, null], [null, null, null, null, null],
+      ])
       expect(() => game.executeNextStep()).toThrow()
     }
   })

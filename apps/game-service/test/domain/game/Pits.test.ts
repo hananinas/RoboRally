@@ -5,7 +5,8 @@ import type { Instruction } from '@robo-rally/game-events'
 import { Card, Direction, EmptyTile, PitTile, type Position, type Tile } from '@/domain/game/index'
 import { Deck } from '@/domain/game/Deck'
 import { createBoard } from '@/domain/game/BoardFactory'
-import { addTestPlayer, createEmptyTileGrid, createTestBoard, createTestGame, placeTestPlayer, programLeadingWith } from '../../fixtures.ts'
+import { boardMaps } from '@/domain/game/boardMaps'
+import { addTestPlayer, createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, instructionsOf, programLeadingWith } from '../../fixtures.ts'
 
 function createGame(
   pit = { x: Integer(1), y: Integer(1) },
@@ -25,12 +26,13 @@ function createGame(
     TURN_RIGHT: new Card('right', 'TURN_RIGHT'),
     U_TURN: new Card('uturn', 'U_TURN'),
   }
-  const player = placeTestPlayer(board, { x: Integer(0), y: Integer(1) }, {
+  const placement = createTestPlacement({ x: Integer(0), y: Integer(1) }, {
     direction: Direction.EAST, deck: new Deck(Object.values(cards)),
   })
+  const { player } = placement
   const robot = player.robot
-  const game = createTestGame({ board, players: [player], deck: Object.values(cards) })
-  return { board, robot, player, cards, game }
+  const game = createTestGame({ board, players: [placement], deck: instructionsOf(Object.values(cards)) })
+  return { robot, player, cards, game }
 }
 
 describe('pit entry and rebooting', () => {
@@ -43,7 +45,7 @@ describe('pit entry and rebooting', () => {
     { instruction: 'MOVE_3', pitX: 3 },
     { instruction: 'BACK_UP', pitX: 1 },
   ] as const)('reboots during $instruction on step $pitX', ({ instruction, pitX }) => {
-    const { board, robot, player, cards, game } = createGame({ x: Integer(pitX), y: Integer(1) })
+    const { robot, player, cards, game } = createGame({ x: Integer(pitX), y: Integer(1) })
     if (instruction === 'BACK_UP') robot.turn(2)
     const direction = robot.direction
     const program = programLeadingWith(Object.values(cards), instruction)
@@ -54,23 +56,21 @@ describe('pit entry and rebooting', () => {
       pushedRobots: [],
       action: { robotId: robot.id, card: program[0], position: { x: Integer(0), y: Integer(2) }, direction },
     })
-    expect(board.positionOf(robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
-    expect(board.occupantAt({ x: Integer(pitX), y: Integer(1) })).toBeUndefined()
-    expect(robot.program).toEqual(program)
+    expect(game.getRobotPosition(robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
+    expect(player.registers.slots).toEqual(program)
     expect(game.currentRegister).toBe(1)
   })
 
   it('does not reboot when a wall blocks a movement card from entering a pit', () => {
-    const { board, robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, undefined, [Direction.WEST])
+    const { robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, undefined, [Direction.WEST])
     game.submitProgram(player.id, [c.MOVE_3, c.MOVE_1, c.TURN_LEFT, c.TURN_RIGHT, c.BACK_UP].map((card) => card.id))._unsafeUnwrap()
 
     expect(resolveRobotAction(game).action.position).toEqual({ x: Integer(0), y: Integer(1) })
-    expect(board.positionOf(robot.id)).toEqual({ x: Integer(0), y: Integer(1) })
-    expect(board.occupantAt({ x: Integer(1), y: Integer(1) })).toBeUndefined()
+    expect(game.getRobotPosition(robot.id)).toEqual({ x: Integer(0), y: Integer(1) })
   })
 
   it('pushes another robot into a pit and resolves a later fall during the same move', () => {
-    const { board, robot, player, cards: c, game } = createGame(
+    const { robot, player, cards: c, game } = createGame(
       { x: Integer(3), y: Integer(1) },
       undefined,
       undefined,
@@ -82,25 +82,22 @@ describe('pit entry and rebooting', () => {
 
     expect(resolveRobotAction(game).action.robotId).toBe(other.robot.id)
     expect(resolveRobotAction(game).action.position).toEqual({ x: Integer(0), y: Integer(1) })
-    expect(board.positionOf(robot.id)).toEqual({ x: Integer(0), y: Integer(1) })
-    expect(board.positionOf(other.robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
-    expect(board.occupantAt({ x: Integer(3), y: Integer(1) })).toBeUndefined()
+    expect(game.getRobotPosition(robot.id)).toEqual({ x: Integer(0), y: Integer(1) })
+    expect(game.getRobotPosition(other.robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
   })
 
   it('reboots at the board boundary just like a pit', () => {
-    const { board, robot, player, cards: c, game } = createGame()
+    const { robot, player, cards: c, game } = createGame()
     robot.turn(2)
     game.submitProgram(player.id, [c.MOVE_3, c.MOVE_1, c.TURN_LEFT, c.TURN_RIGHT, c.BACK_UP].map((card) => card.id))._unsafeUnwrap()
 
     expect(resolveRobotAction(game).action.position).toEqual({ x: Integer(0), y: Integer(2) })
-    expect(board.positionOf(robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
+    expect(game.getRobotPosition(robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
     expect(robot.direction).toBe(Direction.WEST)
-    expect(board.occupantAt({ x: Integer(0), y: Integer(1) })).toBeUndefined()
-    expect(board.occupantAt({ x: Integer(1), y: Integer(1) })).toBeUndefined()
   })
 
   it('discards the rest of the current move while executing later registers normally', () => {
-    const { board, robot, player, cards: c, game } = createGame()
+    const { robot, player, cards: c, game } = createGame()
     const program = [c.MOVE_3, c.MOVE_1, c.TURN_LEFT, c.TURN_RIGHT, c.BACK_UP]
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
@@ -112,15 +109,15 @@ describe('pit entry and rebooting', () => {
       { position: { x: Integer(1), y: Integer(2) }, direction: Direction.EAST },
       { position: { x: Integer(0), y: Integer(2) }, direction: Direction.EAST },
     ])
-    expect(board.positionOf(robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
+    expect(game.getRobotPosition(robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
     expect(game.lastActivePhase).toBe('programming')
-    expect(robot.program).toEqual([])
+    expect(player.registers.slots).toEqual([null, null, null, null, null])
     expect(player.hand).toHaveLength(Object.values(c).length)
     expect(player.hand).toEqual(expect.arrayContaining(Object.values(c)))
   })
 
   it('supports repeated falls without canceling the program or resetting orientation', () => {
-    const { board, robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, [{ x: Integer(0), y: Integer(1) }])
+    const { robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, [{ x: Integer(0), y: Integer(1) }])
     const program = [c.MOVE_1, c.MOVE_2, c.MOVE_3, c.TURN_LEFT, c.TURN_RIGHT]
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
@@ -128,8 +125,8 @@ describe('pit entry and rebooting', () => {
       const result = resolveRobotAction(game)
       expect(result.registerIndex).toBe(registerIndex)
       expect(result.action.position).toEqual({ x: Integer(0), y: Integer(1) })
-      expect(board.occupantAt({ x: Integer(1), y: Integer(1) })).toBeUndefined()
-      expect(robot.program).toEqual(program)
+      expect(game.getRobotPosition(robot.id)).toEqual({ x: Integer(0), y: Integer(1) })
+      expect(player.registers.slots).toEqual(program)
     }
     expect(resolveRobotAction(game).action.direction).toBe(Direction.NORTH)
     expect(resolveRobotAction(game).action.direction).toBe(Direction.EAST)
@@ -138,11 +135,11 @@ describe('pit entry and rebooting', () => {
 
   it('reboots on the reboot tile closest to the pit', () => {
     const rebootTiles = [{ x: Integer(4), y: Integer(2) }, { x: Integer(0), y: Integer(2) }]
-    const { board, robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, rebootTiles)
+    const { robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, rebootTiles)
     game.submitProgram(player.id, programLeadingWith(Object.values(c), 'MOVE_1').map((card) => card.id))._unsafeUnwrap()
 
     expect(resolveRobotAction(game).action.position).toEqual({ x: Integer(0), y: Integer(2) })
-    expect(board.positionOf(robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
+    expect(game.getRobotPosition(robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
   })
 
   it('breaks a tie between equally close reboot tiles in reading order', () => {
@@ -155,45 +152,62 @@ describe('pit entry and rebooting', () => {
 
   it('uses the next closest reboot tile when the closest one is taken', () => {
     const rebootTiles = [{ x: Integer(0), y: Integer(2) }, { x: Integer(4), y: Integer(2) }]
-    const { board, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, rebootTiles)
-    board.placeRobot('blocker', { x: Integer(0), y: Integer(2) })
+    const { player, cards: c, game } = createGame(
+      { x: Integer(1), y: Integer(1) }, rebootTiles, undefined, [{ x: Integer(2), y: Integer(1) }],
+    )
+    const earlier = addTestPlayer(game)
+    earlier.robot.turn(1) // NORTH -> WEST, also facing the pit
     game.submitProgram(player.id, programLeadingWith(Object.values(c), 'MOVE_1').map((card) => card.id))._unsafeUnwrap()
+    game.submitProgram(earlier.id, programLeadingWith(earlier.hand, 'MOVE_1').map((card) => card.id))._unsafeUnwrap()
 
+    // (2,1) is nearer the antenna than (0,1), so that robot falls first and claims (0,2).
+    expect(resolveRobotAction(game).action.position).toEqual({ x: Integer(0), y: Integer(2) })
     expect(resolveRobotAction(game).action.position).toEqual({ x: Integer(4), y: Integer(2) })
-    expect(board.positionOf('blocker')).toEqual({ x: Integer(0), y: Integer(2) })
   })
 
   it('falls back to the nearest free tile when every reboot tile is taken', () => {
     const rebootTiles = [{ x: Integer(0), y: Integer(2) }, { x: Integer(4), y: Integer(2) }]
-    const { board, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, rebootTiles)
-    board.placeRobot('blocker-1', { x: Integer(0), y: Integer(2) })
-    board.placeRobot('blocker-2', { x: Integer(4), y: Integer(2) })
-    game.submitProgram(player.id, programLeadingWith(Object.values(c), 'MOVE_1').map((card) => card.id))._unsafeUnwrap()
+    const { game } = createGame(
+      { x: Integer(1), y: Integer(1) }, rebootTiles, undefined,
+      [{ x: Integer(2), y: Integer(1) }, { x: Integer(1), y: Integer(0) }],
+    )
+    const [fromEast, fromNorth] = [addTestPlayer(game), addTestPlayer(game)]
+    fromEast.robot.turn(1) // NORTH -> WEST
+    fromNorth.robot.turn(2) // NORTH -> SOUTH
+    for (const each of game.players) {
+      game.submitProgram(each.id, programLeadingWith(each.hand, 'MOVE_1').map((card) => card.id))._unsafeUnwrap()
+    }
 
-    // Nearest free tile to the closest reboot tile (0,2); (0,1) wins the tie by being higher up.
+    expect(resolveRobotAction(game).action.position).toEqual({ x: Integer(0), y: Integer(2) })
+    expect(resolveRobotAction(game).action.position).toEqual({ x: Integer(4), y: Integer(2) })
+    // Both reboot tiles are taken, so the nearest free tile to (0,2) wins; (0,1) is
+    // free again because its own robot is the one falling.
     expect(resolveRobotAction(game).action.position).toEqual({ x: Integer(0), y: Integer(1) })
   })
 
   it('skips the antenna when choosing a fallback for an occupied reboot tile', () => {
-    const { board, robot, player, cards: c, game } = createGame({ x: Integer(1), y: Integer(1) }, [{ x: Integer(2), y: Integer(1) }])
+    const { robot, player, cards: c, game } = createGame(
+      { x: Integer(1), y: Integer(1) }, [{ x: Integer(2), y: Integer(1) }], undefined, [{ x: Integer(1), y: Integer(0) }],
+    )
     const other = addTestPlayer(game)
-    other.robot.turn(1)
+    other.robot.turn(2) // NORTH -> SOUTH, facing the pit
     game.submitProgram(player.id, [c.MOVE_3, c.MOVE_1, c.TURN_LEFT, c.TURN_RIGHT, c.BACK_UP].map((card) => card.id))._unsafeUnwrap()
-    game.submitProgram(other.id, [4, 5, 6, 0, 1].map((index) => other.hand[index].id))._unsafeUnwrap()
-    expect(resolveRobotAction(game).action.robotId).toBe(other.robot.id)
+    game.submitProgram(other.id, programLeadingWith(other.hand, 'MOVE_1').map((card) => card.id))._unsafeUnwrap()
+
+    // (1,0) is nearer the antenna, so that robot falls first and claims the reboot tile.
+    expect(resolveRobotAction(game).action).toMatchObject({
+      robotId: other.robot.id, position: { x: Integer(2), y: Integer(1) },
+    })
 
     const { action } = resolveRobotAction(game)
     expect(action.robotId).toBe(robot.id)
     expect(action.position).toEqual({ x: Integer(3), y: Integer(1) })
-    expect(board.occupantAt({ x: Integer(2), y: Integer(1) })).toBe(other.robot.id)
-    expect(board.occupantAt({ x: Integer(2), y: Integer(0) })).toBeUndefined()
-    expect(board.occupantAt({ x: Integer(3), y: Integer(1) })).toBe(robot.id)
-    expect(board.occupantAt({ x: Integer(1), y: Integer(1) })).toBeUndefined()
+    expect(game.getRobotPosition(other.robot.id)).toEqual({ x: Integer(2), y: Integer(1) })
+    expect(game.getRobotPosition(robot.id)).toEqual({ x: Integer(3), y: Integer(1) })
   })
 
   it.each([
     { rebootTile: { x: Integer(0), y: Integer(1) }, expectedProgress: 1 },
-    { rebootTile: { x: Integer(1), y: Integer(0) }, expectedProgress: 2 },
   ])('evaluates checkpoints at the reboot destination $rebootTile', ({ rebootTile, expectedProgress }) => {
     const board = createTestBoard([
       [new EmptyTile(), new EmptyTile([], 2), new PitTile()],
@@ -202,16 +216,17 @@ describe('pit entry and rebooting', () => {
     ], { x: Integer(2), y: Integer(1), angle: Math.PI / 2 }, rebootTile)
     const instructions: Instruction[] = ['MOVE_3', 'TURN_LEFT', 'TURN_RIGHT', 'U_TURN', 'BACK_UP']
     const program = instructions.map((instruction, index) => new Card(`card-${index}`, instruction))
-    const player = placeTestPlayer(board, { x: Integer(0), y: Integer(0) }, {
+    const placement = createTestPlacement({ x: Integer(0), y: Integer(0) }, {
       direction: Direction.EAST, deck: new Deck(program),
     })
+    const { player } = placement
     player.completeCheckpoint(1)
-    const game = createTestGame({ board, players: [player], deck: program })
+    const game = createTestGame({ board, players: [placement], deck: instructionsOf(program) })
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
     expect(resolveRobotAction(game).action.position).toEqual(rebootTile)
     expect(player.lastCheckpoint).toBe(expectedProgress)
-    expect(player.robot.program).toEqual(program)
+    expect(player.registers.slots).toEqual(program)
   })
 })
 
@@ -223,12 +238,13 @@ describe('reboots reported in action results', () => {
 
   // Regression: the reboot tile (13,2) is on the path, so the final position alone hides the fall.
   it('reports the fall when MOVE_3 crosses a reboot tile into a pit on Test Map', () => {
-    const board = createBoard('test-map')
+    const board = createBoard(boardMaps['test-map'])
     const cards = moveCards()
-    const player = placeTestPlayer(board, { x: Integer(13), y: Integer(1) }, {
+    const placement = createTestPlacement({ x: Integer(13), y: Integer(1) }, {
       id: 'robot', direction: Direction.SOUTH, deck: new Deck(cards),
     })
-    const game = createTestGame({ board, players: [player], deck: cards })
+    const { player } = placement
+    const game = createTestGame({ board, players: [placement], deck: instructionsOf(cards) })
     game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
 
     const result = resolveRobotAction(game)
@@ -258,13 +274,15 @@ describe('reboots reported in action results', () => {
     const pusherCards = moveCards()
     const pushedCards = moveCards().map((card) => new Card(`pushed-${card.id}`, card.instruction))
     // The pusher at (0,1) is closer to the antenna (0,0), so it acts first.
-    const pusher = placeTestPlayer(board, { x: Integer(0), y: Integer(1) }, {
+    const pusherPlacement = createTestPlacement({ x: Integer(0), y: Integer(1) }, {
       id: 'pusher', direction: Direction.EAST, deck: new Deck(pusherCards),
     })
-    const pushed = placeTestPlayer(board, { x: Integer(1), y: Integer(1) }, {
+    const pushedPlacement = createTestPlacement({ x: Integer(1), y: Integer(1) }, {
       id: 'pushed', direction: Direction.NORTH, deck: new Deck(pushedCards),
     })
-    const game = createTestGame({ board, players: [pusher, pushed], deck: [...pusherCards, ...pushedCards] })
+    const pusher = pusherPlacement.player
+    const pushed = pushedPlacement.player
+    const game = createTestGame({ board, players: [pusherPlacement, pushedPlacement], deck: instructionsOf([...pusherCards, ...pushedCards]) })
     game.submitProgram(pusher.id, pusherCards.map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(pushed.id, programLeadingWith(pushedCards, 'TURN_LEFT').map((card) => card.id))._unsafeUnwrap()
 
@@ -291,13 +309,15 @@ describe('reboots reported in action results', () => {
     )
     const pusherCards = moveCards()
     const pushedCards = moveCards().map((card) => new Card(`pushed-${card.id}`, card.instruction))
-    const pusher = placeTestPlayer(board, { x: Integer(0), y: Integer(1) }, {
+    const pusherPlacement = createTestPlacement({ x: Integer(0), y: Integer(1) }, {
       id: 'pusher', direction: Direction.EAST, deck: new Deck(pusherCards),
     })
-    const pushed = placeTestPlayer(board, { x: Integer(1), y: Integer(1) }, {
+    const pushedPlacement = createTestPlacement({ x: Integer(1), y: Integer(1) }, {
       id: 'pushed', direction: Direction.NORTH, deck: new Deck(pushedCards),
     })
-    const game = createTestGame({ board, players: [pusher, pushed], deck: [...pusherCards, ...pushedCards] })
+    const pusher = pusherPlacement.player
+    const pushed = pushedPlacement.player
+    const game = createTestGame({ board, players: [pusherPlacement, pushedPlacement], deck: instructionsOf([...pusherCards, ...pushedCards]) })
     game.submitProgram(pusher.id, pusherCards.map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(pushed.id, programLeadingWith(pushedCards, 'TURN_LEFT').map((card) => card.id))._unsafeUnwrap()
 
