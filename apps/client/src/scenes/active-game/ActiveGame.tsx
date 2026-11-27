@@ -18,6 +18,7 @@ import {
 import type useGameConnection from './useGameConnection.ts'
 import LeaveGameButton from './components/LeaveGameButton.tsx'
 import WinnerPopup from './components/WinnerPopup.tsx'
+import PlayerInteractionConsole from './components/PlayerInteractionConsole.tsx'
 
 
 function isGameOver(state: ClientGameState): boolean {
@@ -65,7 +66,9 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
   const handleUndo = () => dispatch({ type: 'undo' })
   const handleRedo = () => dispatch({ type: 'redo' })
   const hasHand = state.handVersion > 0
-  const handRetired = !state.handReady || state.phase !== 'PROGRAMMING' ||
+  const executing = state.phase === 'EXECUTING' || Boolean(state.playback.active)
+  const showInteractionConsole = executing && !state.aborted && !isGameOver(state)
+  const handRetired = executing || !state.handReady || state.phase !== 'PROGRAMMING' ||
     state.programmingTimer.status === 'CLOSED' || state.submission === 'accepted'
   const status = getGameStatus(state)
   const disconnectedNames = state.players.filter((player) => !player.connected).map((player) => player.username)
@@ -156,6 +159,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
             cardDrag={cardDrag}
           />
         )}
+        {showInteractionConsole && <PlayerInteractionConsole/>}
         {cardDrag.drag && <DraggedCard drag={cardDrag.drag} />}
       </div>
       {showWinner && (

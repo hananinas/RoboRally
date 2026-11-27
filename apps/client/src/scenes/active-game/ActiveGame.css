@@ -320,6 +320,10 @@
   translate: 0 var(--hand-travel);
 }
 
+.programming-hand:has(+ .interaction-console){
+  transition: none;
+}
+
 .programming-hand[data-retired] .programming-hand__slot {
   pointer-events: none;
 }
@@ -550,6 +554,34 @@
   }
 }
 
+/* Player interaction console */
+.interaction-console {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  z-index: 1;
+  display: grid;
+  align-content: start;
+  gap: var(--ui-space-sm);
+  width: min(calc(100% - 2 * var(--ui-space-md)), 36rem);
+  min-height: calc(var(--hud-hand-height) + 3rem);
+  margin-inline: auto;
+  padding: var(--ui-space-md);
+  border-radius: var(--hud-radius);
+  pointer-events: auto;
+}
+
+.interaction-console__body {
+  padding: var(--ui-space-sm) var(--ui-space-md);
+  border-radius: var(--ui-control-radius);
+  background: var(--hud-surface-inset);
+}
+
+.interaction-console__empty {
+  margin: 0;
+  color: var(--hud-text-muted);
+  line-height: 1.4;
+}
+
 /* Interaction states */
 .game :is(button, summary, .other-player):focus-visible {
   outline: 2px solid var(--hud-accent);
@@ -692,7 +724,8 @@
 
   .game-overlay > .other-players { grid-area: 2 / 1; }
 
-  .programming-hand { grid-row: 3; }
+  .programming-hand,
+  .interation-console{ grid-row: 3; }
 }
 
 /* Reduced motion */
