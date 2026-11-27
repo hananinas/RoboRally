@@ -58,10 +58,10 @@ export function handleVote(
     run: ({ gameSession, player }, ack) => {
       const result = gameSession.castVote(player, payload.proposalId)
       if (result.isErr()) return ack({ outcome: result.error })
-      const departure = result.value
-      if (departure) context.registry.clearActiveMembership(departure.userId)
+      const departures = result.value
+      for (const userId of departures?.removedUserIds ?? []) context.registry.clearActiveMembership(userId)
       ack({ outcome: 'ACCEPTED' })
-      departure?.announceDeparture()
+      departures?.announce()
     },
   })
 }
@@ -76,19 +76,19 @@ export function handleLeaveGame(
     socket, command: 'game.leave', schema: emptyRequestSchema, payload, acknowledge,
     resolve: (user) => {
       const gameSession = context.registry.getCurrentGame(user.userId)
-      return gameSession ? ok({ user, gameSession }) : err({ outcome: 'GAME_NOT_FOUND' as const })
+      return gameSession ? ok(gameSession) : err({ outcome: 'GAME_NOT_FOUND' as const })
     },
-    run: ({ user, gameSession }, ack) => {
+    run: (gameSession, ack) => {
       const result = gameSession.leave(socket)
       if (result.isErr()) return ack({ outcome: 'GAME_NOT_FOUND' })
-      context.registry.clearActiveMembership(user.userId)
+      const departures = result.value
+      for (const userId of departures.removedUserIds) context.registry.clearActiveMembership(userId)
       ack({ outcome: 'LEFT' })
       if (gameSession.seatCount === 0) {
         gameSession.actionScheduler.stop()
         context.registry.removeGame(gameSession.game.id)
       }
-      const announceDeparture = result.value
-      announceDeparture()
+      departures.announce()
     },
   })
 }
