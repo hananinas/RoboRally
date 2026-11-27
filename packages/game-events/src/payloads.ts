@@ -1,5 +1,6 @@
 import type { Instruction, ResolvedInstruction } from './instructions.js'
 import type { RobotSpriteId } from './lobby.js'
+import type { VoteProposal } from './vote.js'
 
 export type { UpdateRegisters } from './updateRegisters.js'
 
@@ -116,6 +117,7 @@ export type PublicGameState = Readonly<{
   robots: readonly Robot[]
   phase: GamePhase
   players: readonly PlayerState[]
+  proposals?: readonly VoteProposal[]
   paused: boolean
   aborted: boolean
   winner : Winner | null
@@ -130,7 +132,7 @@ export type PlayerState = Readonly<{
   registers: PublicRegisters
 }>
 
-export type PlayerLeft = Readonly<{ gameId: GameId; playerId: PlayerId; robotId: RobotId }>
+export type PlayerLeft = Readonly<{ gameId: GameId; playerId: PlayerId; robotId: RobotId; paused?: boolean }>
 
 export type GameAborted = Readonly<{ gameId: GameId }>
 export type Winner = Readonly<{ playerId: PlayerId; username: string }>

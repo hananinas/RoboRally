@@ -19,6 +19,7 @@ import type {
   UpdateRegistersResult,
 } from './payloads.js'
 import type { SubmitProgram } from './submitProgram.js'
+import type { Vote, VoteResult, VotesChanged } from './vote.js'
 
 export type ProgramResultAcknowledgement = (result: ProgramResult) => void
 
@@ -31,6 +32,7 @@ export interface ClientToServerEvents {
   'lobby.leave': (payload: EmptyRequest, acknowledge: (result: LobbyLeaveResult) => void) => void
   'lobby.start': (payload: EmptyRequest, acknowledge: (result: LobbyStartResult) => void) => void
   'membership.get': (payload: EmptyRequest, acknowledge: (result: MembershipResult) => void) => void
+  'game.vote': (payload: Vote, acknowledge: (result: VoteResult) => void) => void
   'game.leave': (payload: EmptyRequest, acknowledge: (result: LeaveResult) => void) => void
   'game.updateRegisters': (payload: UpdateRegisters, acknowledge: (result: UpdateRegistersResult) => void) => void
   'program.submit': (
@@ -43,6 +45,7 @@ export interface ServerToClientEvents {
   'lobby.updated': (payload: { lobby: LobbyState }) => void
   'game.started': (payload: { lobbyId: string; initialization: GameInitialization }) => void
   'game.registersChanged': (payload: RegistersChanged) => void
+  'game.votesChanged': (payload: VotesChanged) => void
   'game.playerLeft': (payload: PlayerLeft) => void
   'game.playerConnectionChanged': (payload: PlayerConnectionChanged) => void
   'cards.dealt': (payload: CardsDealt) => void

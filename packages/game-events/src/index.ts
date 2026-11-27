@@ -55,6 +55,9 @@ export type { ProgramCardIds, SubmitProgram } from './submitProgram.js'
 export { updateRegistersSchema } from './updateRegisters.js'
 export type { RegisterCardIds } from './updateRegisters.js'
 
+export { voteSchema } from './vote.js'
+export type { Vote, VoteProposal, VoteResult, VotesChanged } from './vote.js'
+
 export { effects } from './instructions.js'
 export type { Instruction, ResolvedInstruction } from './instructions.js'
 
