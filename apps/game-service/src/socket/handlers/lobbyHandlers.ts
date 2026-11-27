@@ -67,7 +67,7 @@ export function handleCreateLobby(
           ? { outcome: 'LOBBY_JOINED', lobby: presentLobby(existingLobbySession.lobby) }
           : { outcome: 'ALREADY_HAS_MEMBERSHIP' })
       }
-      const lobby = new Lobby(name, mapName, user, socket.id)
+      const lobby = new Lobby(name, mapName, user, socket.id, COLOR_PALETTE)
       void socket.join(LobbySession.roomFor(lobby.lobbyId))
       context.registry.addLobby(lobby)
       context.registry.setActiveMembership(user.userId, { kind: 'lobby', lobbyId: lobby.lobbyId })

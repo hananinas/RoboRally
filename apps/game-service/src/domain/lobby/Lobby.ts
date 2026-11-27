@@ -12,11 +12,15 @@ export class Lobby {
   readonly mapName: BoardMapName
   private readonly membersById = new Map<string, LobbyMember>()
 
-  constructor(name: string | undefined, mapName: BoardMapName, owner: User, connectionId: string) {
+  constructor(name: string | undefined, mapName: BoardMapName, owner: User, connectionId: string, palette?: readonly string[]) {
     this.lobbyId = randomUUID()
     this.name = name ?? `Lobby ${this.lobbyId.slice(0, 8)}`
     this.mapName = mapName
-    this.membersById.set(owner.userId, { user: owner, connectionId, robotSpriteId: DEFAULT_ROBOT_ID })
+    let colorHex: string | undefined
+    if (palette && palette.length > 0) {
+      colorHex = palette[0]
+    }
+    this.membersById.set(owner.userId, { user: owner, connectionId, robotSpriteId: DEFAULT_ROBOT_ID, colorHex })
   }
 
   get size(): number {
