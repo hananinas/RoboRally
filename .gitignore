@@ -26,3 +26,6 @@ npm-debug.log*
 kratos/data/
 hydra/data/
 infra/dev-tls/
+
+# Game service local dev data
+apps/game-service/data/

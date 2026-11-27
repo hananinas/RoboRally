@@ -183,6 +183,15 @@ let
           };
         };
 
+        migrate-game-db = {
+          command = ''
+            exec ${pkgs.dbmate}/bin/dbmate \
+              --url "sqlite:$GAME_DATA_DIR/robo-rally.db" \
+              --migrations-dir ${../../apps/game-service/migrations} \
+              --no-dump-schema up
+          '';
+        };
+
         game-service = {
           command = ''
             export PORT="$GAME_PORT"
@@ -200,6 +209,7 @@ let
             hydra.condition = "process_healthy";
             web.condition = "process_healthy";
             register-game-service-client.condition = "process_completed_successfully";
+            migrate-game-db.condition = "process_completed_successfully";
           };
 
           availability = {
@@ -275,7 +285,8 @@ pkgs.writeShellApplication {
     stateDir="''${XDG_STATE_HOME:-$HOME/.local/state}/robo-rally"
     export KRATOS_DATA_DIR="''${KRATOS_DATA_DIR:-$stateDir/kratos}"
     export HYDRA_DATA_DIR="''${HYDRA_DATA_DIR:-$stateDir/hydra}"
-    mkdir -p "$KRATOS_DATA_DIR" "$HYDRA_DATA_DIR"
+    export GAME_DATA_DIR="''${GAME_DATA_DIR:-$stateDir/game-service}"
+    mkdir -p "$KRATOS_DATA_DIR" "$HYDRA_DATA_DIR" "$GAME_DATA_DIR"
 
     logDir="$stateDir/$PC_PORT"
     mkdir -p "$logDir"

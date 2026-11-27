@@ -8,6 +8,7 @@ import { boardMaps } from '@/domain/game/boardMaps'
 import type { BoardMapName } from '@/domain/game/boardMaps'
 import { findRobotDefinition, robotCatalog } from '@/domain/game/robotCatalog'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
+import { createFakeGameRepository } from './repositoryTestHelper.ts'
 import { createSessionStore, type SessionStore } from '@/auth/sessionStore'
 import { authCookieHeader } from './authTestHelper.ts'
 
@@ -23,7 +24,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     createGame = vi.spyOn(GameFactory, 'createGame')
     const http = createServer()
     sessionStore = createSessionStore({ oidcClient: { refreshToken: vi.fn() }, refreshBufferSeconds: 0 })
-    server = createGameSocketServer(http, sessionStore)
+    server = createGameSocketServer(http, sessionStore, createFakeGameRepository())
     await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve))
     url = `http://127.0.0.1:${(http.address() as AddressInfo).port}`
   })

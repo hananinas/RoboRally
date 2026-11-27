@@ -63,11 +63,14 @@ export function parseKratosSettingsUrl(value: string | undefined): URL {
   return parseUrlEnv(value, DEFAULT_KRATOS_SETTINGS_URL)
 }
 
+export const DEFAULT_GAME_DATA_DIR = 'data'
+
 export type AppConfig = Readonly<{
   port: number
   kratosSettingsUrl: URL
   oidc: OidcConfig
   refreshTokenTtlSeconds: number
+  gameDataDir: string
 }>
 
 export function parseAppConfig(env: NodeJS.ProcessEnv): AppConfig {
@@ -76,5 +79,6 @@ export function parseAppConfig(env: NodeJS.ProcessEnv): AppConfig {
     kratosSettingsUrl: parseKratosSettingsUrl(env.KRATOS_SETTINGS_URL),
     oidc: parseOidcConfig(env),
     refreshTokenTtlSeconds: parseRefreshTokenTtlSeconds(env.REFRESH_TOKEN_TTL_SECONDS),
+    gameDataDir: env.GAME_DATA_DIR ?? DEFAULT_GAME_DATA_DIR,
   }
 }

@@ -1,10 +1,25 @@
 import { execFileSync, spawn } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test as base } from '@playwright/test'
 
 export const GAME_SERVICE_URL = 'http://127.0.0.1:3002'
 
 const mkcertCaRoot = execFileSync('mkcert', ['-CAROOT']).toString().trim()
+const migrationsDir = fileURLToPath(new URL('../../game-service/migrations', import.meta.url))
+
+function migratedDataDir(): string {
+  const dataDir = mkdtempSync(resolve(tmpdir(), 'robo-rally-e2e-'))
+  execFileSync('dbmate', [
+    '--url', `sqlite:${resolve(dataDir, 'robo-rally.db')}`,
+    '--migrations-dir', migrationsDir,
+    '--no-dump-schema',
+    'up',
+  ])
+  return dataDir
+}
 
 export const test = base.extend<{ realGameService: void; gameServiceArgs: readonly string[] }>({
   gameServiceArgs: [[
@@ -12,8 +27,14 @@ export const test = base.extend<{ realGameService: void; gameServiceArgs: readon
     fileURLToPath(new URL('../../game-service/dist/main.js', import.meta.url)),
   ], { option: true }],
   realGameService: [async ({ request, gameServiceArgs }, runTest) => {
+    const gameDataDir = migratedDataDir()
     const service = spawn(process.execPath, gameServiceArgs, {
-      env: { ...process.env, PORT: '3002', NODE_EXTRA_CA_CERTS: `${mkcertCaRoot}/rootCA.pem` },
+      env: {
+        ...process.env,
+        PORT: '3002',
+        GAME_DATA_DIR: gameDataDir,
+        NODE_EXTRA_CA_CERTS: `${mkcertCaRoot}/rootCA.pem`,
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     const closed = new Promise<void>((resolve) => service.once('close', () => resolve()))
@@ -58,6 +79,7 @@ export const test = base.extend<{ realGameService: void; gameServiceArgs: readon
       } finally {
         clearTimeout(timer)
         clearTimeout(timeout)
+        rmSync(gameDataDir, { recursive: true, force: true })
       }
     }
   }, { auto: true }],

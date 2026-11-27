@@ -36,7 +36,7 @@ function createGameWithPlayer() {
 describe('game presenter', () => {
   it('presents environment results without a card or domain directions', () => {
     const resolved = presentEnvironmentStepResolved('game', {
-      roundConcluded: true, kind: 'GEARS',
+      roundConcluded: true, declaredWinner: null, kind: 'GEARS',
       robots: [
         { robotId: 'robot', position: { x: Integer(2), y: Integer(3) }, direction: Direction.WEST },
         { robotId: 'other', position: { x: Integer(4), y: Integer(5) }, direction: Direction.EAST },
@@ -73,6 +73,7 @@ describe('game presenter', () => {
         { robotId: player.robot.id, fellAt: { x: Integer(2), y: Integer(4) }, landedAt: { x: Integer(2), y: Integer(3) } },
       ],
       roundConcluded: false,
+      declaredWinner: null,
     })
 
     expect(resolved.pushedRobots).toEqual([
@@ -248,7 +249,9 @@ describe('game presenter', () => {
       direction: Direction.SOUTH,
     }
 
-    const resolved = presentRobotActionResolved(game, { registerIndex: 4, action, pushedRobots: [], reboots: [], roundConcluded: false })
+    const resolved = presentRobotActionResolved(game, {
+      registerIndex: 4, action, pushedRobots: [], reboots: [], roundConcluded: false, declaredWinner: null,
+    })
 
     expectTypeOf(resolved).toEqualTypeOf<RobotActionResolved>()
     expect(resolved).toEqual({

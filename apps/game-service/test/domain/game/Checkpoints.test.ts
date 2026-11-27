@@ -87,6 +87,7 @@ describe('checkpoint activation', () => {
 
     expect(game.winner).toBe(player.id)
     expect(result.roundConcluded).toBe(false)
+    expect(game.completedRounds).toBe(0)
     expect(game.lastActivePhase).toBe('activation')
   })
 

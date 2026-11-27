@@ -5,6 +5,7 @@ import { effects, type Instruction, type ResolvedInstruction, type RobotSpriteId
 import { captureEnvironmentSnapshot, environmentSteps, type EnvironmentChanges } from '@/domain/game/environment'
 import { Card } from '@/domain/game/Card'
 import { Deck } from '@/domain/game/Deck'
+import type { GameSnapshot } from '@/domain/game/GameSnapshot'
 import type { CardId, GameId, PlayerId, RobotId } from '@/domain/game/ids'
 import { Player } from '@/domain/game/Player'
 import { REGISTER_COUNT, type RegisterView } from '@/domain/game/Registers'
@@ -39,7 +40,16 @@ export type RebootResult = Readonly<{
   landedAt: Position
 }>
 
-export type NextActionResult = Readonly<{
+// What an activation step changed about the game as a whole. declaredWinner is
+// set by the one step that wins the game, so callers act on it without polling.
+export type ActivationProgress = Readonly<{
+  roundConcluded: boolean
+  declaredWinner: PlayerId | null
+}>
+
+const NO_PROGRESS: ActivationProgress = Object.freeze({ roundConcluded: false, declaredWinner: null })
+
+export type NextActionResult = ActivationProgress & Readonly<{
   registerIndex: number
   action: RobotActionResult
   pushedRobots: readonly Readonly<{
@@ -49,12 +59,9 @@ export type NextActionResult = Readonly<{
   }>[]
   // Every reboot the action caused, in the order it happened.
   reboots: readonly RebootResult[]
-  roundConcluded: boolean
 }>
 
-export type EnvironmentStepResult = EnvironmentChanges & Readonly<{
-  roundConcluded: boolean
-}>
+export type EnvironmentStepResult = EnvironmentChanges & ActivationProgress
 
 export type ActivationStep =
   | Readonly<{ type: 'robot'; result: NextActionResult }>
@@ -98,6 +105,7 @@ export class Game {
   private readonly deck: readonly Instruction[]
   private readonly lifecycle = new GameLifecycle('programming')
   private registerIndex = 0
+  #completedRounds = 0
   // Reboots recorded while the current action resolves.
   private actionReboots: RebootResult[] = []
   private environmentStepIndex: number | null = null
@@ -134,6 +142,21 @@ export class Game {
     return this.registerIndex
   }
 
+  get completedRounds(): number {
+    return this.#completedRounds
+  }
+
+  get snapshot(): GameSnapshot {
+    if (this.roster.players.some((player) => player.registers.slots.some((card) => card !== null))) {
+      throw new Error('Cannot snapshot a game while cards sit in registers')
+    }
+    return {
+      completedRounds: this.#completedRounds,
+      players: this.roster.players.map((player) =>
+        player.snapshot(this.robotPlacements.positionOf(player.robot.id))),
+    }
+  }
+
   get players(): readonly Player[] {
     return Object.freeze([...this.roster.players])
   }
@@ -158,7 +181,7 @@ export class Game {
     return this.lifecycle.pause()
   }
 
-  resume(): Result<{ roundConcluded: boolean }, ResumeError> {
+  resume(): Result<ActivationProgress, ResumeError> {
     return this.lifecycle.resume().map(() => {
       this.recheckProgrammingPhase()
       return this.recheckActivationPhase()
@@ -204,16 +227,16 @@ export class Game {
     })
   }
 
-  removePlayer(playerId: PlayerId): { roundConcluded: boolean } {
+  removePlayer(playerId: PlayerId): ActivationProgress {
     const removed = this.roster.remove(playerId)
-    if (removed.isErr()) return { roundConcluded: false }
+    if (removed.isErr()) return NO_PROGRESS
     const player = removed.value
     this.robotPlacements.remove(player.robot.id)
     this.submittedPlayerIds.delete(playerId)
     this.activatedRobotIds.delete(player.robot.id)
-    const { roundConcluded } = this.recheckActivationPhase()
+    const progress = this.recheckActivationPhase()
     this.recheckProgrammingPhase()
-    return { roundConcluded }
+    return progress
   }
 
   private checkCanSubmitProgram(
@@ -308,15 +331,15 @@ export class Game {
     return this.environmentStepIndex !== null
   }
 
-  private recheckActivationPhase(): { roundConcluded: boolean } {
+  private recheckActivationPhase(): ActivationProgress {
     if (this.requirePhase('activation').isErr()) {
-      return { roundConcluded: false }
+      return NO_PROGRESS
     }
     if (this.roster.players.length === 0) return this.concludeRegister()
     if (!this.hasPendingEnvironment && this.activatedRobotIds.size === this.roster.players.length) {
       this.environmentStepIndex = 0
     }
-    return { roundConcluded: false }
+    return NO_PROGRESS
   }
 
   executeNextStep(): ActivationStep {
@@ -338,30 +361,31 @@ export class Game {
     }
 
     this.environmentStepIndex = index + 1
-    const { roundConcluded } = this.environmentStepIndex === environmentSteps.length
-      ? this.concludeRegister() : { roundConcluded: false }
+    const progress = this.environmentStepIndex === environmentSteps.length
+      ? this.concludeRegister() : NO_PROGRESS
     return {
       type: 'environment',
-      result: { ...changes, roundConcluded },
+      result: { ...changes, ...progress },
     }
   }
 
-  private concludeRegister(): { roundConcluded: boolean } {
+  private concludeRegister(): ActivationProgress {
     this.environmentStepIndex = null
     if (this.roster.players.length === 0) {
       this.finishRound()
-      return { roundConcluded: true }
+      return { roundConcluded: true, declaredWinner: null }
     }
     this.finishRegister()
-    if (this.winner !== undefined) {
+    const declaredWinner = this.winner
+    if (declaredWinner !== undefined) {
       this.discardPrograms()
-      return { roundConcluded: false }
+      return { roundConcluded: false, declaredWinner }
     }
     if (this.registerIndex === REGISTER_COUNT) {
       this.finishRound()
-      return { roundConcluded: true }
+      return { roundConcluded: true, declaredWinner: null }
     }
-    return { roundConcluded: false }
+    return NO_PROGRESS
   }
 
   // Gameplay movement resolves entry effects; Board movement only changes positions.
@@ -410,8 +434,8 @@ export class Game {
       return [{ robotId: other.id, position, direction: other.direction }]
     })
 
-    const { roundConcluded } = this.recheckActivationPhase()
-    return { registerIndex, action, pushedRobots, reboots, roundConcluded }
+    const progress = this.recheckActivationPhase()
+    return { registerIndex, action, pushedRobots, reboots, ...progress }
   }
 
   private dealInitialHands(): void {
@@ -525,6 +549,7 @@ export class Game {
     this.discardPrograms()
     this.registerIndex = 0
     this.dealNewHands()
+    this.#completedRounds++
     this.lifecycle.enterProgramming()
   }
 }

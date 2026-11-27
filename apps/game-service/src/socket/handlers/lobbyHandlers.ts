@@ -10,7 +10,7 @@ import {
 } from '@robo-rally/game-events'
 import { robotCatalog } from '@/domain/game/robotCatalog'
 import { GameSession } from '@/socket/gameSession/GameSession'
-import type { GameSocket, GameSocketServer, SocketContext } from '@/socket/gameServer'
+import type { GameSocket, SocketContext } from '@/socket/gameServer'
 import { LobbySession, type ConnectedLobbyMember } from '@/socket/LobbySession'
 import { presentInitialization } from '@/socket/presenters/gamePresenter'
 import { presentBoardMaps, presentLobby, presentLobbySummary } from '@/socket/presenters/lobbyPresenter'
@@ -144,12 +144,11 @@ export function handleLeaveLobby(
   })
 }
 
-function startGame(io: GameSocketServer, lobby: Lobby, connectedMembers: ConnectedLobbyMember[]) {
-  const gameSession = new GameSession(io, createGame(lobby.mapName, lobby.name))
-  for (const { user, connectionId, robotSpriteId } of connectedMembers) {
-    const result = gameSession.addSeat(user, connectionId, robotSpriteId)
-    if (result.isErr()) throw new Error(result.error)
-  }
+function startGame(context: SocketContext, lobby: Lobby, connectedMembers: ConnectedLobbyMember[]) {
+  const game = createGame(lobby.mapName, lobby.name)
+  const gameSession = new GameSession(context.io, game, context.repository, lobby.mapName)
+  const seated = gameSession.addSeats(connectedMembers)
+  if (seated.isErr()) throw new Error(seated.error)
   const state = gameSession.publicState()
   const seatedMembers = connectedMembers.map(({ user, socket }) => {
     const { player } = gameSession.getSeat(user.userId)!
@@ -182,7 +181,7 @@ export function handleStartLobby(
     },
     run: ({ lobbySession, connectedMembers }, ack) => {
       const { lobby } = lobbySession
-      const { gameSession, seatedMembers } = startGame(io, lobby, connectedMembers)
+      const { gameSession, seatedMembers } = startGame(context, lobby, connectedMembers)
       for (const seatedMember of seatedMembers) lobbySession.disconnect(seatedMember.socket)
       context.registry.promoteLobbyToGame(lobbySession, gameSession, seatedMembers.map((seatedMember) => seatedMember.user.userId))
       for (const seatedMember of seatedMembers) {

@@ -4,6 +4,8 @@ import { createGameSocketServer } from '@/socket/gameServer'
 import { createAuthApp } from '@/auth/httpRoutes'
 import { createSessionStore } from '@/auth/sessionStore'
 import { createOidcClient } from '@/infra/oidcClient'
+import { openDatabase } from '@/infra/database'
+import { createGameRepository } from '@/infra/GameRepository'
 import { logError } from '@/logger'
 
 process.on('uncaughtExceptionMonitor', (error, origin) => {
@@ -27,7 +29,8 @@ httpServer.on('request', (req, res) => {
   }
 })
 
-const io = createGameSocketServer(httpServer, sessionStore)
+const database = openDatabase(config.gameDataDir)
+const io = createGameSocketServer(httpServer, sessionStore, createGameRepository(database))
 
 httpServer.listen(config.port, host, () => {
   console.log(`Game Service listening at http://${host}:${config.port}`)
@@ -38,6 +41,7 @@ function shutdown(): void {
   if (shuttingDown) return
   shuttingDown = true
   void io.close((error) => {
+    database.close()
     if (!error) return
     console.error('Game Service failed to shut down cleanly', error)
     process.exitCode = 1

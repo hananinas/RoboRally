@@ -45,6 +45,7 @@ describe('Game activation loop', () => {
           direction: directions[registerIndex],
         },
         roundConcluded: registerIndex === 4,
+        declaredWinner: null,
       })
       expect(game.currentRegister).toBe(registerIndex === 4 ? 0 : registerIndex + 1)
       expect(game.lastActivePhase).toBe(registerIndex === 4 ? 'programming' : 'activation')
@@ -57,6 +58,22 @@ describe('Game activation loop', () => {
     game.submitProgram(player.id, deck.map((card) => card.id))
     expect(resolveRobotAction(game)).toMatchObject({ registerIndex: 0 })
     expect(robot.direction).toBe(Direction.WEST)
+  })
+
+  it('counts a round once its fifth register has resolved', () => {
+    const deck = Array.from({ length: 5 }, (_, index) => new Card(`left-${index}`, 'TURN_LEFT'))
+    const { player, game } = createGame(deck)
+    expect(game.completedRounds).toBe(0)
+
+    for (const round of [1, 2]) {
+      game.submitProgram(player.id, deck.map((card) => card.id))
+      for (let register = 0; register < 4; register++) {
+        resolveRobotAction(game)
+        expect(game.completedRounds).toBe(round - 1)
+      }
+      resolveRobotAction(game)
+      expect(game.completedRounds).toBe(round)
+    }
   })
 
   it('interprets movement through Board using the direction after a turn', () => {

@@ -1,8 +1,10 @@
 import type { Card } from '@/domain/game/Card'
 import { Deck, HAND_SIZE } from '@/domain/game/Deck'
+import { cardSnapshot, type PlayerSnapshot } from '@/domain/game/GameSnapshot'
 import type { PlayerId } from '@/domain/game/ids'
 import { Registers } from '@/domain/game/Registers'
 import type { Robot } from '@/domain/game/Robot'
+import { orientationOf, type Position } from '@/domain/game/spatial'
 
 export class Player {
   #hand: readonly Card[] = []
@@ -17,6 +19,20 @@ export class Player {
 
   get hand(): readonly Card[] {
     return [...this.#hand]
+  }
+
+  snapshot(position: Position): PlayerSnapshot {
+    return {
+      playerId: this.id,
+      robotId: this.robot.id,
+      robotColour: this.robot.colour,
+      robotSpriteId: this.robot.robotSpriteId,
+      position: { x: position.x, y: position.y },
+      orientation: orientationOf(this.robot.direction),
+      lastCheckpoint: this.completedCheckpoint,
+      hand: this.#hand.map(cardSnapshot),
+      deck: this.deck.snapshot,
+    }
   }
 
   drawHand(): void {

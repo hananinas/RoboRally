@@ -12,6 +12,7 @@ import type {
 } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
 import type { Session, SessionStore } from '@/auth/sessionStore'
+import type { GameRepository } from '@/infra/GameRepository'
 import { createAuthGatedAdapter } from '@/socket/connection/authGatedAdapter'
 
 export type GameSocketData = { user: User; authSession: Session; sessionId: string }
@@ -25,11 +26,12 @@ export type GameSocketServer = Server<
 
 export type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents, {}, GameSocketData>
 
-export type SocketContext = { io: GameSocketServer; registry: MembershipRegistry }
+export type SocketContext = { io: GameSocketServer; registry: MembershipRegistry; repository: GameRepository }
 
 export function createGameSocketServer(
   httpServer: HttpServer,
   sessionStore: SessionStore,
+  repository: GameRepository,
 ): GameSocketServer {
   const io = new Server<
     ClientToServerEvents,
@@ -42,7 +44,7 @@ export function createGameSocketServer(
     pingTimeout: 1000,
     adapter: createAuthGatedAdapter(sessionStore),
   })
-  const context: SocketContext = { io, registry: new MembershipRegistry() }
+  const context: SocketContext = { io, registry: new MembershipRegistry(), repository }
   httpServer.once('close', () => { for (const ctx of context.registry.games) ctx.actionScheduler.stop() })
 
   io.use((socket, next) => authenticateSocket(sessionStore, socket, next))
