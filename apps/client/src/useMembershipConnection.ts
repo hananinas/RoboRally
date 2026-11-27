@@ -121,7 +121,7 @@ export default function useMembershipConnection() {
       result: await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('lobby.create', { mapName, name }),
     }))
   }
-  async function selectRobot(robotSpriteId: RobotSpriteId, colour?: string): Promise<boolean> {
+  async function selectRobot(robotSpriteId: RobotSpriteId, colorIndex?: number): Promise<boolean> {
     if (pending.current || !socket.connected) return false
     if (current.current.status !== 'waiting') return false
     pending.current = true
@@ -129,11 +129,16 @@ export default function useMembershipConnection() {
     const attempt = generation.current
     try {
       const result = await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS)
-        .emitWithAck('lobby.selectRobot', { robotSpriteId, ...(colour ? { colour } : {}) })
+        .emitWithAck('lobby.selectRobot', { robotSpriteId, ...(colorIndex !== undefined ? { colorIndex } : {}) })
       if (generation.current !== attempt || !socket.connected) return false
       if (result.outcome === 'ROBOT_SELECTED') {
         dispatch({ type: 'lobby-updated', lobby: result.lobby })
         return true
+      }
+      if (result.outcome === 'COLOUR_TAKEN') {
+        dispatch({ type: 'lobby-updated', lobby: result.lobby })
+        dispatch({ type: 'error', error: 'COLOUR_TAKEN' })
+        return false
       }
       dispatch({ type: 'error', error: result.outcome })
       return false

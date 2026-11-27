@@ -3,46 +3,38 @@ import RobotPreview from './RobotPreview.tsx'
 import { robotOptionFor } from './robotPreviews.ts'
 import './RobotPicker.css'
 
-const PREVIEW_COLOURS = [
-  { name: 'Blue', hex: '#4d8deb' },
-  { name: 'Red', hex: '#e55f5f' },
-  { name: 'Yellow', hex: '#ffc107' },
-  { name: 'Green', hex: '#4caf70' },
-  { name: 'Purple', hex: '#a67de0' },
-  { name: 'Pink', hex: '#db79a8' },
-] as const
-
 type Props = {
   robots: readonly RobotDefinition[]
   selectedRobotId: string
-  selectedColor?: string
-  takenColors: string[]
+  selectedColorIndex?: number
+  takenColorIndices: number[]
+  colorPalette: readonly string[]
   disabled: boolean
-  onSelect: (robotSpriteId: string, color: string) => Promise<boolean>
+  onSelect: (robotSpriteId: string, colorIndex?: number) => Promise<boolean>
 }
 
-export default function RobotPicker({ robots, selectedRobotId, selectedColor, takenColors, disabled, onSelect }: Props) {
-  const defaultColor = PREVIEW_COLOURS[0].hex
-  const displayColor = selectedColor ?? defaultColor
-  
+export default function RobotPicker({ robots, selectedRobotId, selectedColorIndex, takenColorIndices, colorPalette, disabled, onSelect }: Props) {
   const selectedRobot = robots.find((option) => option.id === selectedRobotId)
   const choices = robots
   const robot = selectedRobot && choices.some((option) => option.id === selectedRobot.id)
     ? selectedRobot
     : choices[0]
   const preview = robot ? robotOptionFor(robot.id) : undefined
+  
+  const displayColorIndex = selectedColorIndex ?? 0
+  const displayColor = colorPalette[displayColorIndex] ?? colorPalette[0]
 
   function chooseRobot(robotSpriteId: string) {
-    if (!disabled && robotSpriteId !== robot?.id) void onSelect(robotSpriteId, displayColor)
+    if (!disabled && robotSpriteId !== robot?.id) void onSelect(robotSpriteId, displayColorIndex)
   }
 
-  function chooseColor(colorHex: string) {
-    if (!disabled && !takenColors.includes(colorHex)) {
-      if (robot) void onSelect(robot.id, colorHex)
+  function chooseColor(colorIndex: number) {
+    if (!disabled && !takenColorIndices.includes(colorIndex)) {
+      if (robot) void onSelect(robot.id, colorIndex)
     }
   }
 
-  const isColorTaken = (colorHex: string) => takenColors.includes(colorHex)
+  const isColorTaken = (colorIndex: number) => takenColorIndices.includes(colorIndex)
 
   return (
     <div className="robot-picker">
@@ -91,20 +83,22 @@ export default function RobotPicker({ robots, selectedRobotId, selectedColor, ta
       <fieldset className="robot-picker__colours" disabled={disabled}>
         <legend>Player colour</legend>
         <div className="robot-picker__swatches">
-          {PREVIEW_COLOURS.map((colour) => {
-            const taken = isColorTaken(colour.hex)
+          {colorPalette.map((hex, colorIndex) => {
+            const taken = isColorTaken(colorIndex)
+            const colorName = ['Blue', 'Red', 'Yellow', 'Green', 'Purple', 'Pink'][colorIndex] ?? `Color ${colorIndex}`
             return (
               <button
-                className={`robot-picker__swatch robot-picker__swatch--${colour.name.toLowerCase()}`}
+                className="robot-picker__swatch"
                 type="button"
-                key={colour.hex}
-                aria-label={colour.name}
-                aria-pressed={displayColor === colour.hex}
+                key={hex}
+                aria-label={colorName}
+                aria-pressed={displayColorIndex === colorIndex}
                 disabled={disabled || taken}
-                onClick={() => chooseColor(colour.hex)}
+                onClick={() => chooseColor(colorIndex)}
                 title={taken ? 'This color is already taken by another player' : ''}
+                style={{ backgroundColor: hex }}
               >
-                {displayColor === colour.hex && <span aria-hidden="true">✓</span>}
+                {displayColorIndex === colorIndex && <span aria-hidden="true">✓</span>}
                 {taken && <span className="robot-picker__swatch-unavailable" aria-hidden="true">✕</span>}
               </button>
             )

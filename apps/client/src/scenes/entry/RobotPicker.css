@@ -203,45 +203,34 @@
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--swatch-colour);
   color: var(--entry-text);
   font: inherit;
-  opacity: 0.65;
   cursor: pointer;
-  transition: opacity 0.2s ease, outline 0.2s ease, filter 0.2s ease;
+  transition: outline 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
   position: relative;
 }
 
 .robot-picker__swatch:hover:not(:disabled) {
-  opacity: 0.85;
+  opacity: 0.9;
 }
 
 .robot-picker__swatch:disabled {
   cursor: not-allowed;
-  opacity: 0.4;
-  filter: grayscale(1);
 }
 
 .robot-picker__swatch[aria-pressed='true'] {
-  outline: 2px solid var(--swatch-colour);
+  outline: 2px solid currentColor;
   outline-offset: 4px;
-  opacity: 1;
 }
 
 .robot-picker__swatch-unavailable {
   position: absolute;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: bold;
-  color: rgba(0, 0, 0, 0.5);
+  color: rgba(255, 255, 255, 0.8);
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
   pointer-events: none;
 }
-
-.robot-picker__swatch--blue { --swatch-colour: var(--entry-player-blue); }
-.robot-picker__swatch--red { --swatch-colour: var(--entry-player-red); }
-.robot-picker__swatch--yellow { --swatch-colour: var(--entry-accent); }
-.robot-picker__swatch--green { --swatch-colour: var(--entry-player-green); }
-.robot-picker__swatch--purple { --swatch-colour: var(--entry-player-purple); }
-.robot-picker__swatch--pink { --swatch-colour: var(--entry-player-pink); }
 
 .robot-picker__colours {
   min-width: 0;

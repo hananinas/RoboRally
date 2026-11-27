@@ -8,6 +8,7 @@ export type ConnectedLobbyMember = {
   user: User
   connectionId: string
   robotSpriteId: RobotSpriteId
+  colorIndex?: number
   socket: GameSocket
 }
 
