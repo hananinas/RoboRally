@@ -4,8 +4,8 @@ import useGameConnection from './scenes/active-game/useGameConnection.ts'
 import { createMembershipState, membershipReducer, type MembershipEvent } from './membershipState.ts'
 import useGameSocket, { ACKNOWLEDGEMENT_TIMEOUT_MS } from './useGameSocket.ts'
 
-// Allow one server heartbeat and ping timeout for the previous page to disconnect.
-const MEMBERSHIP_CONFLICT_RETRY_MS = 2_250
+const MEMBERSHIP_CONFLICT_RETRY_MS = 500
+const MAX_MEMBERSHIP_CONFLICT_RETRIES = 10
 
 export default function useMembershipConnection() {
   const connection = useGameSocket()
@@ -90,7 +90,7 @@ export default function useMembershipConnection() {
       const attempt = generation.current
       const getMembership = () => socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('membership.get', {})
       let result = await getMembership()
-      if (result.outcome === 'ALREADY_HAS_MEMBERSHIP') {
+      for (let retry = 0; retry < MAX_MEMBERSHIP_CONFLICT_RETRIES && result.outcome === 'ALREADY_HAS_MEMBERSHIP'; retry++) {
         await new Promise<void>((resolve) => window.setTimeout(resolve, MEMBERSHIP_CONFLICT_RETRY_MS))
         if (generation.current !== attempt || !socket.connected) return
         result = await getMembership()
