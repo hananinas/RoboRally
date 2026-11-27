@@ -2,7 +2,7 @@ import { resolveRobotAction } from '../../activationTestHelper.js'
 import { describe, expect, it } from 'vitest'
 import { Card, Deck, Direction, EmptyTile, PitTile, type Position } from '@/domain/game/index'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestBoard, createTestGame, placeTestPlayer } from '../../fixtures.ts'
+import { addTestPlayer, createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, instructionsOf } from '../../fixtures.ts'
 
 function createGame() {
   const board = createTestBoard(createEmptyTileGrid(2, 2), { x: Integer(1), y: Integer(1), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(1) }, [{ x: Integer(0), y: Integer(0) }])
@@ -14,9 +14,10 @@ function createGame() {
     new Card('move-3', 'MOVE_1'),
     new Card('left-3', 'TURN_LEFT'),
   ]
-  const player = placeTestPlayer(board, { x: Integer(0), y: Integer(0) }, { direction: Direction.EAST, deck: new Deck(deck) })
+  const placement = createTestPlacement({ x: Integer(0), y: Integer(0) }, { direction: Direction.EAST, deck: new Deck(deck) })
+  const { player } = placement
   const robot = player.robot
-  const game = createTestGame({ board, players: [player], deck })
+  const game = createTestGame({ board, players: [placement], deck: instructionsOf(deck) })
   return { board, robot, player, deck, game }
 }
 
@@ -30,8 +31,9 @@ describe('Game programming', () => {
       new Card('right', 'TURN_RIGHT'),
       new Card('u-turn', 'U_TURN'),
     ]
-    const player = placeTestPlayer(board, { x: Integer(5), y: Integer(5) }, { direction: Direction.EAST, deck: new Deck(deck) })
-    const game = createTestGame({ board, players: [player], deck })
+    const placement = createTestPlacement({ x: Integer(5), y: Integer(5) }, { direction: Direction.EAST, deck: new Deck(deck) })
+    const { player } = placement
+    const game = createTestGame({ board, players: [placement], deck: instructionsOf(deck) })
     game.submitProgram(player.id, deck.map((card) => card.id))
 
     const actions = Array.from({ length: 5 }, () => resolveRobotAction(game))
@@ -71,18 +73,20 @@ describe('Game programming', () => {
   it('resets existing register state for every player at the initial deal', () => {
     const board = createTestBoard(createEmptyTileGrid(2, 2), { x: Integer(1), y: Integer(1), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(1) }, [{ x: Integer(0), y: Integer(0) }, { x: Integer(1), y: Integer(0) }])
     const deck = Array.from({ length: 5 }, (_, index) => new Card(`left-${index}`, 'TURN_LEFT'))
-    const players = [0, 1].map((index) => {
-      const player = placeTestPlayer(board, { x: Integer(index), y: Integer(0) }, {
+    const placements = [0, 1].map((index) => {
+      const placement = createTestPlacement({ x: Integer(index), y: Integer(0) }, {
         id: `player-${index}`, direction: Direction.EAST, deck: new Deck(deck),
       })
+      const { player } = placement
       if (index === 0) player.drawHand()
       player.updateRegisters([deck[0], deck[1], deck[2], deck[3], deck[4]])
       player.revealRegister(0, 'TURN_LEFT')
-      return player
+      return placement
     })
+    const players = placements.map(({ player }) => player)
     const snapshots = players.map((player) => player.registers)
 
-    createTestGame({ board, players, deck })
+    createTestGame({ board, players: placements, deck: instructionsOf(deck) })
 
     for (const player of players) {
       expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
@@ -123,11 +127,17 @@ describe('Game programming', () => {
   })
 
   it('accepts an empty roster but requires unique players and at least five distinct cards', () => {
-    const { board, player, deck } = createGame()
-    expect(createTestGame({ board, players: [], deck }).players).toEqual([])
-    expect(() => createTestGame({ board, players: [player, player], deck })).toThrow(RangeError)
-    expect(() => createTestGame({ board, players: [player], deck: deck.slice(0, 4) })).toThrow(RangeError)
-    expect(() => createTestGame({ board, players: [player], deck: [deck[0], deck[0], ...deck.slice(1, 5)] })).toThrow(RangeError)
+    const { deck } = createGame()
+    const start = { x: Integer(0), y: Integer(0) }
+    const freshBoard = () => createTestBoard(
+      createEmptyTileGrid(2, 2), { x: Integer(1), y: Integer(1), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(1) }, [start],
+    )
+    const placement = createTestPlacement(start, { direction: Direction.EAST, deck: new Deck(deck) })
+
+    const composition = instructionsOf(deck)
+    expect(createTestGame({ board: freshBoard(), players: [], deck: composition }).players).toEqual([])
+    expect(() => createTestGame({ board: freshBoard(), players: [placement, placement], deck: composition })).toThrow(RangeError)
+    expect(() => createTestGame({ board: freshBoard(), players: [placement], deck: composition.slice(0, 4) })).toThrow(RangeError)
   })
 
   it('starts unpaused and toggles via pause/resume', () => {
@@ -176,7 +186,7 @@ describe('Game programming', () => {
 
 describe('Game.addPlayer', () => {
   function createEmptyGame(width = 3, startTiles: Position[] = [{ x: Integer(1), y: Integer(0) }, { x: Integer(0), y: Integer(0) }]) {
-    const board = createTestBoard(createEmptyTileGrid(width, 1), { x: Integer(width - 1), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) }, startTiles)
+    const board = createTestBoard(createEmptyTileGrid(width, 2), { x: Integer(width - 1), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(1) }, startTiles)
     const deck = [
       new Card('move-1', 'MOVE_1'),
       new Card('left-1', 'TURN_LEFT'),
@@ -184,19 +194,19 @@ describe('Game.addPlayer', () => {
       new Card('left-2', 'TURN_LEFT'),
       new Card('move-3', 'MOVE_1'),
     ]
-    return { board, deck, game: createTestGame({ board, players: [], deck }) }
+    return { board, deck, game: createTestGame({ board, players: [], deck: instructionsOf(deck) }) }
   }
 
   it('creates and places a player with a private hand drawn from the deck', () => {
-    const { board, deck, game } = createEmptyGame()
+    const { deck, game } = createEmptyGame()
 
-    const result = game.addPlayer('red')
+    const result = game.addPlayer('tank', 'red')
 
     expect(result.isOk()).toBe(true)
     const player = result._unsafeUnwrap()
     expect(game.players).toEqual([player])
     expect(player.robot.direction).toBe(Direction.NORTH)
-    expect(board.positionOf(player.robot.id)).toEqual({ x: 1, y: 0 })
+    expect(game.getRobotPosition(player.robot.id)).toEqual({ x: 1, y: 0 })
     expect(player.hand).toHaveLength(deck.length)
     expect(player.hand.map((card) => card.instruction).sort()).toEqual(deck.map((card) => card.instruction).sort())
     expect(player.hand.map((card) => card.id)).not.toEqual(deck.map((card) => card.id))
@@ -205,17 +215,17 @@ describe('Game.addPlayer', () => {
   it('gives each added player a hand with distinct card IDs', () => {
     const { game } = createEmptyGame()
 
-    const first = game.addPlayer('red')._unsafeUnwrap()
-    const second = game.addPlayer('blue')._unsafeUnwrap()
+    const first = addTestPlayer(game, 'red')
+    const second = addTestPlayer(game, 'blue')
 
     expect(second.hand.every((card) => !first.hand.some((other) => other.id === card.id))).toBe(true)
   })
 
   it('rejects adding a player when no spawn tile is free', () => {
     const { game } = createEmptyGame(2, [{ x: Integer(0), y: Integer(0) }])
-    game.addPlayer('red')._unsafeUnwrap()
+    addTestPlayer(game, 'red')
 
-    const result = game.addPlayer('blue')
+    const result = game.addPlayer('tank', 'blue')
 
     expect(result.isErr()).toBe(true)
     expect(result._unsafeUnwrapErr()).toBe('NO_SPAWN_AVAILABLE')
@@ -223,17 +233,16 @@ describe('Game.addPlayer', () => {
 
   it('spawns players at successive declared start tiles and reports exhaustion once they are all occupied', () => {
     const { deck } = createGame()
-    const board = createTestBoard(createEmptyTileGrid(3, 1), {
+    const board = createTestBoard(createEmptyTileGrid(3, 2), {
       x: Integer(1), y: Integer(0), angle: 0,
-    }, { x: Integer(0), y: Integer(0) }, [{ x: Integer(2), y: Integer(0) }, { x: Integer(0), y: Integer(0) }])
-    const game = createTestGame({ board, players: [], deck })
-    const first = game.addPlayer('red')._unsafeUnwrap()
-    const second = game.addPlayer('blue')._unsafeUnwrap()
+    }, { x: Integer(0), y: Integer(1) }, [{ x: Integer(2), y: Integer(0) }, { x: Integer(0), y: Integer(0) }])
+    const game = createTestGame({ board, players: [], deck: instructionsOf(deck) })
+    const first = addTestPlayer(game, 'red')
+    const second = addTestPlayer(game, 'blue')
 
-    expect(board.positionOf(first.robot.id)).toEqual({ x: 2, y: 0 })
-    expect(board.positionOf(second.robot.id)).toEqual({ x: 0, y: 0 })
-    expect(game.addPlayer('green')._unsafeUnwrapErr()).toBe('NO_SPAWN_AVAILABLE')
-    expect(board.occupantAt(board.antenna)).toBeUndefined()
+    expect(game.getRobotPosition(first.robot.id)).toEqual({ x: 2, y: 0 })
+    expect(game.getRobotPosition(second.robot.id)).toEqual({ x: 0, y: 0 })
+    expect(game.addPlayer('tank', 'green')._unsafeUnwrapErr()).toBe('NO_SPAWN_AVAILABLE')
     expect(game.players).toEqual([first, second])
   })
 
@@ -242,7 +251,7 @@ describe('Game.addPlayer', () => {
     const named = createTestGame({
       board: createTestBoard(createEmptyTileGrid(2, 1), { x: Integer(0), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(1), y: Integer(0) }),
       players: [],
-      deck,
+      deck: instructionsOf(deck),
       name: 'Shared game',
     })
     expect(named.name).toBe('Shared game')
@@ -250,28 +259,29 @@ describe('Game.addPlayer', () => {
 })
 
 describe('Game roster validation and spawn skipping', () => {
-  it('rejects a roster whose robot is already standing on a pit', () => {
+  it('rejects a roster whose robot starts on a pit', () => {
     const { deck } = createGame()
     const board = createTestBoard([[new EmptyTile(), new PitTile(), new EmptyTile()]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
-    const player = placeTestPlayer(board, { x: Integer(0), y: Integer(0) }, { direction: Direction.EAST, deck: new Deck(deck) })
-    board.pushRobot(player.robot.id, Direction.EAST)
+    const pit = { x: Integer(1), y: Integer(0) }
+    const placement = createTestPlacement(pit, { direction: Direction.EAST, deck: new Deck(deck) })
 
-    expect(() => createTestGame({ board, players: [player], deck }))
-      .toThrow('Robots cannot start on pits')
+    expect(() => createTestGame({ board, players: [placement], deck: instructionsOf(deck) }))
+      .toThrow('Robots cannot be placed on pits')
   })
 
   it('reports no safe spawn once the only declared start tile is occupied', () => {
     const { deck } = createGame()
-    const board = createTestBoard([[new EmptyTile(), new PitTile(), new EmptyTile()]], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) })
-    const game = createTestGame({ board, players: [], deck })
-    const first = game.addPlayer('red')._unsafeUnwrap()
+    const board = createTestBoard([
+      [new EmptyTile(), new PitTile(), new EmptyTile()],
+      [new EmptyTile(), new EmptyTile(), new EmptyTile()],
+    ], { x: Integer(2), y: Integer(0), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(1) }, [{ x: Integer(0), y: Integer(0) }])
+    const game = createTestGame({ board, players: [], deck: instructionsOf(deck) })
+    const first = addTestPlayer(game, 'red')
 
-    expect(board.positionOf(first.robot.id)).toEqual({ x: 0, y: 0 })
+    expect(game.getRobotPosition(first.robot.id)).toEqual({ x: 0, y: 0 })
     expect(first.hand).toHaveLength(deck.length)
     expect(first.hand.map((card) => card.instruction).sort()).toEqual(deck.map((card) => card.instruction).sort())
-    expect(game.addPlayer('blue')._unsafeUnwrapErr()).toBe('NO_SPAWN_AVAILABLE')
+    expect(game.addPlayer('tank', 'blue')._unsafeUnwrapErr()).toBe('NO_SPAWN_AVAILABLE')
     expect(game.players).toEqual([first])
-    expect(board.occupantAt({ x: Integer(1), y: Integer(0) })).toBeUndefined()
-    expect(board.occupantAt({ x: Integer(2), y: Integer(0) })).toBeUndefined()
   })
 })

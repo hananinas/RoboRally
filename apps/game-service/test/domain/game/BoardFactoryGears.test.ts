@@ -1,24 +1,19 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { GearSpec } from '@/domain/game/boardMaps'
+import { describe, expect, it } from 'vitest'
+import { boardMaps, type GearSpec } from '@/domain/game/boardMaps'
 import { Direction, GearTile, createBoard } from '@/domain/game/index'
 import { Integer } from '@/numbers'
 
-const gears = vi.hoisted(() => [] as GearSpec[])
-
-vi.mock('@/domain/game/boardMaps', async (importOriginal) => {
-  const { boardMaps } = await importOriginal<typeof import('@/domain/game/boardMaps')>()
-  return { boardMaps: { ...boardMaps, 'test-map': { ...boardMaps['test-map'], gears } } }
-})
+function boardWithGears(gears: readonly GearSpec[]) {
+  return createBoard({ ...boardMaps['test-map'], gears })
+}
 
 describe('board factory gear fixtures', () => {
-  beforeEach(() => { gears.length = 0 })
-
   it('creates both gear directions and preserves their walls', () => {
-    gears.push(
+    const gears: readonly GearSpec[] = [
       { at: [4, 1], rotation: 'CLOCKWISE' },
       { at: [6, 2], rotation: 'COUNTERCLOCKWISE' },
-    )
-    const board = createBoard('test-map')
+    ]
+    const board = boardWithGears(gears)
 
     for (const { at: [x, y], rotation } of gears) {
       const tile = board.getTile({ x: Integer(x), y: Integer(y) })
@@ -37,15 +32,14 @@ describe('board factory gear fixtures', () => {
     { location: 'on a pit', at: [3, 3] },
     { location: 'on a checkpoint', at: [10, 6] },
   ] as const)('rejects a gear $location', ({ at }) => {
-    gears.push({ at, rotation: 'CLOCKWISE' })
-    expect(() => createBoard('test-map')).toThrow('must occupy an empty non-checkpoint board tile')
+    expect(() => boardWithGears([{ at, rotation: 'CLOCKWISE' }]))
+      .toThrow('must occupy an empty non-checkpoint board tile')
   })
 
   it('rejects multiple gears on the same tile', () => {
-    gears.push(
+    expect(() => boardWithGears([
       { at: [4, 1], rotation: 'CLOCKWISE' },
       { at: [4, 1], rotation: 'COUNTERCLOCKWISE' },
-    )
-    expect(() => createBoard('test-map')).toThrow('must occupy an empty non-checkpoint board tile')
+    ])).toThrow('must occupy an empty non-checkpoint board tile')
   })
 })

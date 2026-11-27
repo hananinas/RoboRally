@@ -1,9 +1,9 @@
 import { resolveRobotAction } from '../../activationTestHelper.js'
 import { describe, expect, it } from 'vitest'
-import { Board, Card, Deck, Direction, EmptyTile, Player, Robot } from '@/domain/game/index.ts'
-import type { Antenna, Position, RobotId } from '@/domain/game/index.ts'
+import { Card, Deck, Direction, EmptyTile, Player, Robot } from '@/domain/game/index.ts'
+import type { Antenna, Position } from '@/domain/game/index.ts'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestBoard, createTestGame, gridWithRebootTiles, placeTestPlayer } from '../../fixtures.ts'
+import { createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, instructionsOf } from '../../fixtures.ts'
 
 function createMultiplayerGame(
   positions: readonly Position[],
@@ -11,9 +11,10 @@ function createMultiplayerGame(
   board = createTestBoard(createEmptyTileGrid(9, 9), antenna, { x: Integer(0), y: Integer(0) }),
   deck: readonly Card[] = Array.from({ length: 6 }, (_, index) => new Card(`left-${index}`, 'TURN_LEFT')),
 ) {
-  const players = positions.map((position) =>
-    placeTestPlayer(board, position, { direction: Direction.EAST, deck: new Deck(deck) }))
-  const game = createTestGame({ board, players, deck })
+  const placements = positions.map((position) =>
+    createTestPlacement(position, { direction: Direction.EAST, deck: new Deck(deck) }))
+  const players = placements.map(({ player }) => player)
+  const game = createTestGame({ board, players: placements, deck: instructionsOf(deck) })
   return { board, players, deck, game }
 }
 
@@ -57,19 +58,39 @@ describe('Game fixed-roster programming', () => {
     game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
     expect(game.lastActivePhase).toBe('activation')
 
-    const empty = createTestGame({ board, players: [], deck })
+    const empty = createTestGame({ board, players: [], deck: instructionsOf(deck) })
     expect(empty.lastActivePhase).toBe('programming')
     expect(empty.currentRegister).toBe(0)
     expect(() => empty.executeNextAction()).toThrow()
     expect(empty.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))._unsafeUnwrapErr()).toBe('PLAYER_NOT_IN_GAME')
   })
 
-  it('rejects duplicate player IDs, duplicate robot IDs, and unplaced robots', () => {
-    const { board, players, deck } = createMultiplayerGame([{ x: Integer(4), y: Integer(5) }, { x: Integer(5), y: Integer(4) }])
+  it('rejects duplicate player IDs and duplicate robot IDs', () => {
+    const first = { x: Integer(4), y: Integer(5) }
+    const second = { x: Integer(5), y: Integer(4) }
+    const { players, deck } = createMultiplayerGame([first, second])
     const emptyDeck = new Deck([])
-    expect(() => createTestGame({ board, players: [players[0], new Player(players[0].id, players[1].robot, emptyDeck)], deck })).toThrow(RangeError)
-    expect(() => createTestGame({ board, players: [players[0], new Player('other', new Robot(players[0].robot.id, Direction.NORTH, 'red'), emptyDeck)], deck })).toThrow(RangeError)
-    expect(() => createTestGame({ board, players: [new Player('unplaced', new Robot('unplaced', Direction.NORTH, 'red'), emptyDeck)], deck })).toThrow()
+    const freshBoard = () => createTestBoard(
+      createEmptyTileGrid(9, 9), { x: Integer(4), y: Integer(4), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(0) },
+    )
+
+    expect(() => createTestGame({
+      board: freshBoard(),
+      players: [
+        { player: players[0], position: first },
+        { player: new Player(players[0].id, players[1].robot, emptyDeck), position: second },
+      ],
+      deck: instructionsOf(deck),
+    })).toThrow(RangeError)
+
+    expect(() => createTestGame({
+      board: freshBoard(),
+      players: [
+        { player: players[0], position: first },
+        { player: new Player('other', new Robot(players[0].robot.id, Direction.NORTH, 'red', 'tank'), emptyDeck), position: second },
+      ],
+      deck: instructionsOf(deck),
+    })).toThrow(RangeError)
   })
 
   it('exposes the antenna of its board', () => {
@@ -180,27 +201,6 @@ describe('Game multiplayer activation', () => {
     ])
   })
 
-  it('retains roster order for exact priority ties', () => {
-    class TiedPositionBoard extends Board {
-      override positionOf(robotId: RobotId): Position {
-        super.positionOf(robotId)
-        return { x: Integer(4), y: Integer(5) }
-      }
-    }
-    const antenna = { x: Integer(4), y: Integer(4), angle: Math.PI / 2 }
-    const board = new TiedPositionBoard(
-      gridWithRebootTiles(createEmptyTileGrid(9, 9), { x: Integer(0), y: Integer(0) }),
-      antenna,
-      [{ x: Integer(0), y: Integer(0) }],
-    )
-    const { players, deck, game } = createMultiplayerGame(
-      [{ x: Integer(4), y: Integer(5) }, { x: Integer(5), y: Integer(4) }], antenna, board,
-    )
-    for (const player of [...players].reverse()) game.submitProgram(player.id, deck.slice(0, 5).map((card) => card.id))
-    expect(resolveRobotAction(game).action.robotId).toBe(players[0].robot.id)
-    expect(resolveRobotAction(game).action.robotId).toBe(players[1].robot.id)
-  })
-
   it('recalculates pending priority from positions changed by an earlier action', () => {
     const antenna = { x: Integer(4), y: Integer(4), angle: Math.PI / 2 }
     const board = createTestBoard(createEmptyTileGrid(9, 9), antenna, { x: Integer(0), y: Integer(0) })
@@ -211,7 +211,7 @@ describe('Game multiplayer activation', () => {
     players[0].robot.turn(3)
     for (const player of players) game.submitProgram(player.id, deck.map((card) => card.id))
     expect(resolveRobotAction(game).action.robotId).toBe(players[0].robot.id)
-    expect(board.positionOf(players[1].robot.id)).toEqual({ x: 4, y: 7 })
+    expect(game.getRobotPosition(players[1].robot.id)).toEqual({ x: 4, y: 7 })
     expect(resolveRobotAction(game).action.robotId).toBe(players[2].robot.id)
     expect(resolveRobotAction(game).action.robotId).toBe(players[1].robot.id)
     expect(game.currentRegister).toBe(1)
@@ -236,12 +236,10 @@ describe('Game multiplayer activation', () => {
     expect(robotBlocked.action).toMatchObject({ robotId: players[1].robot.id, card: deck[1], position: { x: 7, y: 4 } })
     expect(game.currentRegister).toBe(2)
 
-    board.relocateRobot(players[0].robot.id, { x: Integer(8), y: Integer(3) })
-    expect(board.positionOf(players[0].robot.id)).toEqual({ x: 8, y: 3 })
     expect(first.action.position).toEqual({ x: 8, y: 4 })
     expect(wallBlocked.action.position).toEqual({ x: 8, y: 4 })
     Object.assign(first.action.position, { x: 0 })
     expect(wallBlocked.action.position).toEqual({ x: 8, y: 4 })
-    expect(board.positionOf(players[0].robot.id)).toEqual({ x: 8, y: 3 })
+    expect(game.getRobotPosition(players[0].robot.id)).toEqual({ x: 8, y: 4 })
   })
 })

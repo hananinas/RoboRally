@@ -81,7 +81,7 @@ function presentTile(game: Game, x: number, y: number): TilePayload {
 
   if (tile instanceof GearTile) return { ...common, type: tile.kind, rotation: tile.rotation }
 
-  if (tile.kind === 'EMPTY' || tile.kind === 'PIT' || tile.kind === 'REBOOT') {
+  if (tile.kind === 'EMPTY' || tile.kind === 'PIT' || tile.kind === 'REBOOT' || tile.kind === 'START') {
     return {
       ...common,
       type: tile.kind,
@@ -134,7 +134,7 @@ export function presentPublicGameState(
       playerId: player.id,
       robotSpriteId: player.robot.robotSpriteId,
       colour: player.robot.colour,
-      position: presentPosition(game.board.positionOf(player.robot.id), player.robot.direction),
+      position: presentPosition(game.getRobotPosition(player.robot.id), player.robot.direction),
     })),
     phase: phases[game.lastActivePhase],
     paused: game.paused,

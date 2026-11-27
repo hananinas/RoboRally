@@ -15,7 +15,7 @@ export function presentLobbySummary(lobby: Lobby): LobbySummary {
   const map = boardMaps[lobby.mapName]
   return {
     lobbyId: lobby.lobbyId, name: lobby.name, mapName: lobby.mapName, mapDisplayName: map.name, mapIcon: map.icon,
-    playerCount: lobby.size, maxPlayers: Lobby.MAX_PLAYERS,
+    playerCount: lobby.size, maxPlayers: lobby.maxPlayers,
   }
 }
 

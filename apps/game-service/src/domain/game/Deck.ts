@@ -5,25 +5,6 @@ import type { CardId } from '@/domain/game/ids'
 
 export const HAND_SIZE = 9
 
-// Programming cards in each player's private deck (RoboRally 2017).
-// Power Up is omitted until energy is implemented.
-const DECK_COMPOSITION: readonly (readonly [Instruction, number])[] = [
-  ['MOVE_1', 4],
-  ['MOVE_2', 3],
-  ['MOVE_3', 1],
-  ['BACK_UP', 1],
-  ['TURN_RIGHT', 4],
-  ['TURN_LEFT', 4],
-  ['U_TURN', 1],
-  ['AGAIN', 1],
-]
-
-export function createDeckCards(): Card[] {
-  return DECK_COMPOSITION.flatMap(([instruction, count]) =>
-    Array.from({ length: count }, () => new Card(randomUUID(), instruction)),
-  )
-}
-
 export class Deck {
   private drawPile: Card[]
   private discardPile: Card[] = []
@@ -32,9 +13,9 @@ export class Deck {
     this.drawPile = [...cards]
   }
 
-  // A player's private deck: fresh copies of the template cards with new ids.
-  static fromTemplate(template: readonly Card[]): Deck {
-    return new Deck(template.map((card) => new Card(randomUUID(), card.instruction)))
+  // A player's private deck: one freshly identified card per listed instruction.
+  static fromTemplate(instructions: readonly Instruction[]): Deck {
+    return new Deck(instructions.map((instruction) => new Card(randomUUID(), instruction)))
   }
 
   get size(): number {

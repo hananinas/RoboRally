@@ -150,7 +150,7 @@ export class GameSession {
   }
 
   addSeat(user: User, connectionId: string, robotSpriteId: RobotSpriteId): Result<Player, AddPlayerError> {
-    return this.game.addPlayer(undefined, robotSpriteId).map((player) => {
+    return this.game.addPlayer(robotSpriteId).map((player) => {
       this.seats.set(user.userId, { user, player, connectionId })
       return player
     })

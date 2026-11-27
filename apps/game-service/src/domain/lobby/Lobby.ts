@@ -1,13 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import type { RobotSpriteId, User } from '@robo-rally/game-events'
+import { boards } from '@/domain/game/BoardFactory'
 import type { BoardMapName } from '@/domain/game/boardMaps'
 import { DEFAULT_ROBOT_ID } from '@/domain/game/robotCatalog'
 
 export type LobbyMember = { user: User; connectionId: string; robotSpriteId: RobotSpriteId }
 
 export class Lobby {
-  static readonly MAX_PLAYERS = 6
-
   readonly lobbyId: string
   readonly name: string
   readonly mapName: BoardMapName
@@ -28,8 +27,12 @@ export class Lobby {
     return this.membersById.keys().next().value!
   }
 
+  get maxPlayers(): number {
+    return boards[this.mapName].startTiles.length
+  }
+
   get isFull(): boolean {
-    return this.membersById.size >= Lobby.MAX_PLAYERS
+    return this.membersById.size >= this.maxPlayers
   }
 
   get members(): LobbyMember[] {

@@ -2,35 +2,40 @@ import { resolveRobotAction } from '../../activationTestHelper.js'
 import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
 import { Card } from '@/domain/game/Card'
-import { Deck, HAND_SIZE, createDeckCards } from '@/domain/game/Deck'
-import { Direction, EmptyTile, createGame } from '@/domain/game/index'
+import { Deck, HAND_SIZE } from '@/domain/game/Deck'
+import { DECK_INSTRUCTIONS, Direction, EmptyTile, createGame } from '@/domain/game/index'
 import { Integer } from '@/numbers'
-import { createTestBoard, createTestGame, createTestPlayer, createTestRobot } from '../../fixtures.ts'
+import { addTestPlayer, createTestBoard, createTestGame, createTestPlayer, createTestRobot, instructionsOf } from '../../fixtures.ts'
 
-function counts(cards: readonly Card[]): Record<string, number> {
+function counts(instructions: readonly Instruction[]): Record<string, number> {
   const result: Record<string, number> = {}
-  for (const card of cards) result[card.instruction] = (result[card.instruction] ?? 0) + 1
+  for (const instruction of instructions) result[instruction] = (result[instruction] ?? 0) + 1
   return result
 }
 
-describe('createDeckCards', () => {
-  it('matches the RoboRally 2017 composition with unique ids', () => {
-    const cards = createDeckCards()
-    expect(counts(cards)).toEqual({
+describe('deck composition', () => {
+  it('matches the RoboRally 2017 composition', () => {
+    expect(counts(DECK_INSTRUCTIONS)).toEqual({
       MOVE_1: 4, MOVE_2: 3, MOVE_3: 1, BACK_UP: 1,
       TURN_RIGHT: 4, TURN_LEFT: 4, U_TURN: 1, AGAIN: 1,
     })
+  })
+
+  it('builds a private deck of freshly identified cards from the composition', () => {
+    const cards = Deck.fromTemplate(DECK_INSTRUCTIONS).draw(DECK_INSTRUCTIONS.length)
+
+    expect(counts(instructionsOf(cards))).toEqual(counts(DECK_INSTRUCTIONS))
     expect(new Set(cards.map((card) => card.id)).size).toBe(cards.length)
   })
 })
 
 describe('Deck', () => {
   it('draws distinct cards from the draw pile', () => {
-    const deck = new Deck(createDeckCards())
+    const deck = Deck.fromTemplate(DECK_INSTRUCTIONS)
     const hand = deck.draw(HAND_SIZE)
     expect(hand).toHaveLength(HAND_SIZE)
     expect(new Set(hand.map((card) => card.id)).size).toBe(HAND_SIZE)
-    expect(deck.size).toBe(createDeckCards().length - HAND_SIZE)
+    expect(deck.size).toBe(DECK_INSTRUCTIONS.length - HAND_SIZE)
   })
 
   it('draws the remainder from the reshuffled discard pile when the draw pile runs short', () => {
@@ -73,8 +78,8 @@ describe('Deck.remove', () => {
 describe('Game card cycle', () => {
   it('gives each player a private hand of nine and cycles cards through the discard pile', () => {
     const game = createGame('empty-map', 'Test game')
-    const first = game.addPlayer('red')._unsafeUnwrap()
-    const second = game.addPlayer('blue')._unsafeUnwrap()
+    const first = addTestPlayer(game, 'red')
+    const second = addTestPlayer(game, 'blue')
     expect(first.hand).toHaveLength(HAND_SIZE)
     const firstIds = new Set(first.hand.map((card) => card.id))
     expect(second.hand.some((card) => firstIds.has(card.id))).toBe(false)
@@ -105,10 +110,10 @@ describe('Again card', () => {
       [{ x: Integer(4), y: Integer(0) }],
     )
     const robot = createTestRobot({ direction: Direction.EAST })
-    board.placeRobot(robot.id, { x: Integer(0), y: Integer(0) })
     const cards = instructions.map((instruction, index) => new Card(`card-${index}`, instruction))
     const player = createTestPlayer({ robot, deck: new Deck(cards) })
-    const game = createTestGame({ board, players: [player], deck: cards })
+    const position = { x: Integer(0), y: Integer(0) }
+    const game = createTestGame({ board, players: [{ player, position }], deck: instructionsOf(cards) })
     game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
     const results = cards.map(() => resolveRobotAction(game))
     return results.map(({ action }) => action)

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { Card, Direction, EmptyTile } from '@/domain/game/index'
 import { Deck } from '@/domain/game/Deck'
 import { Integer } from '@/numbers'
-import { createEmptyTileGrid, createTestBoard, createTestGame, placeTestPlayer } from '../../fixtures.ts'
+import { createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, instructionsOf } from '../../fixtures.ts'
 
 function createGame(starts = [{ x: 0, y: 1, direction: Direction.EAST }]) {
   const tiles = createEmptyTileGrid(5, 3)
@@ -19,9 +19,10 @@ function createGame(starts = [{ x: 0, y: 1, direction: Direction.EAST }]) {
     right: new Card('right', 'TURN_RIGHT'),
     uturn: new Card('uturn', 'U_TURN'),
   }
-  const players = starts.map(({ x, y, direction }) =>
-    placeTestPlayer(board, { x: Integer(x), y: Integer(y) }, { direction, deck: new Deck(Object.values(cards)) }))
-  const game = createTestGame({ board, players, deck: Object.values(cards) })
+  const placements = starts.map(({ x, y, direction }) =>
+    createTestPlacement({ x: Integer(x), y: Integer(y) }, { direction, deck: new Deck(Object.values(cards)) }))
+  const players = placements.map(({ player }) => player)
+  const game = createTestGame({ board, players: placements, deck: instructionsOf(Object.values(cards)) })
   return { board, players, cards, game }
 }
 
@@ -90,7 +91,7 @@ describe('checkpoint activation', () => {
   })
 
   it('rejects register updates after a checkpoint win', () => {
-    const { board, players: [player], cards: c, game } = createGame()
+    const { players: [player], cards: c, game } = createGame()
     const program = [c.move2, c.back, c.step, c.stepAgain, c.left]
     game.updateRegisters(player.id, program.map((card) => card.id))._unsafeUnwrap()
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
@@ -121,7 +122,7 @@ describe('checkpoint activation', () => {
       submitted: game.hasSubmittedProgram(player.id),
       lastCheckpoint: player.lastCheckpoint,
       direction: player.robot.direction,
-      position: board.positionOf(player.robot.id),
+      position: game.getRobotPosition(player.robot.id),
     })
     const expectRejected = (playerId: string, error: 'GAME_FINISHED') => {
       const before = state()
