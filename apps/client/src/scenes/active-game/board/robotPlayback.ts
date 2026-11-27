@@ -46,7 +46,7 @@ export type PlaybackAction = Readonly<{
 export const ROBOT_MOVE_DURATION_MS = 600
 export const ROBOT_TURN_DURATION_MS = 300
 export const PIT_FALL_DURATION_MS = 450
-export const PIT_RESPAWN_DURATION_MS = 300
+export const PIT_RESPAWN_DURATION_MS = 900
 export function robotActionDuration(action: PlaybackResult, reducedMotion: boolean): number {
   if ('kind' in action) return reducedMotion ? 200 : ROBOT_TURN_DURATION_MS
   return reducedMotion ? 200

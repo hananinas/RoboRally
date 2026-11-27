@@ -323,8 +323,8 @@ io.on('connection', (socket) => {
     'test-map': `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><rect width="4" height="3" fill="#6b7280"/><path d="M1 0V3M2 0V3M3 0V3M0 1H4M0 2H4" stroke="#d1d5db" stroke-width="0.05"/></svg>').toString('base64')}`,
   } as const
   const maps = [
-    { mapName: 'empty-map', name: 'Empty Map', icon: mapIcons['empty-map'], defaultForLobbyCreation: false },
-    { mapName: 'test-map', name: 'Test Map', icon: mapIcons['test-map'], defaultForLobbyCreation: true },
+    { mapName: 'empty-map', name: 'Empty Map', icon: mapIcons['empty-map'] },
+    { mapName: 'test-map', name: 'Test Map', icon: mapIcons['test-map'] },
   ]
   const robots = [
     {
@@ -378,10 +378,10 @@ io.on('connection', (socket) => {
     if (fixture.clock.deferred) fixture.pendingClocks.push({ socket, respond })
     else respond()
   })
-  socket.on('session.get', (_, acknowledge) => {
-    fixture.entryRequests.push({ event: 'session.get', socketId: socket.id, payload: {} })
+  socket.on('membership.get', (_, acknowledge) => {
+    fixture.entryRequests.push({ event: 'membership.get', socketId: socket.id, payload: {} })
     acknowledge(fixture.started ? { outcome: 'IN_GAME', initialization: initialization(), user }
-      : lobby ? { outcome: 'IN_LOBBY', lobby, user } : { outcome: 'NO_SESSION', user })
+      : lobby ? { outcome: 'IN_LOBBY', lobby, user } : { outcome: 'NO_MEMBERSHIP', user })
   })
   socket.on('lobby.list', (_, acknowledge) => acknowledge({ outcome: 'LOBBIES_FOUND', lobbies: [lobbyState()], maps, robots }))
   socket.on('lobby.create', (payload, acknowledge) => {
@@ -395,7 +395,7 @@ io.on('connection', (socket) => {
     acknowledge({ outcome: 'LOBBY_JOINED', lobby })
   })
   socket.on('lobby.selectRobot', (payload, acknowledge) => {
-    if (!lobby) return acknowledge({ outcome: 'NOT_LOBBY_MEMBER' })
+    if (!lobby) return acknowledge({ outcome: 'NOT_A_MEMBER' })
     lobby = {
       ...lobby,
       players: lobby.players.map((player) => player.userId === user.userId

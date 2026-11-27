@@ -104,7 +104,7 @@ export type FixtureSnapshot = {
   submissions: readonly SubmitProgram[]
   registerUpdates: readonly UpdateRegisters[]
   entryRequests: readonly (
-    | { event: 'session.get' | 'lobby.start'; socketId: string; payload: Record<string, never> }
+    | { event: 'membership.get' | 'lobby.start'; socketId: string; payload: Record<string, never> }
     | { event: 'lobby.create'; socketId: string; payload: { mapName?: BoardMapName } }
     | { event: 'lobby.join'; socketId: string; payload: { lobbyId: string } }
   )[]

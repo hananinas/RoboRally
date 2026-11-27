@@ -4,8 +4,8 @@ sequenceDiagram
     participant Server as Game Service
     participant Others as Lobby members
 
-    Client->>Server: session.get {}
-    Server-->>Client: Acknowledgement: NO_SESSION {user}
+    Client->>Server: membership.get {}
+    Server-->>Client: Acknowledgement: NO_MEMBERSHIP {user}
     Client->>Server: lobby.list {}
     Server-->>Client: Acknowledgement: LOBBIES_FOUND {lobbies}
     Note over Client: Creates a lobby or picks a lobbyId

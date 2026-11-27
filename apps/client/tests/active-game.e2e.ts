@@ -55,6 +55,18 @@ for (const antenna of [
   })
 }
 
+test('renders the reboot sprite on every reboot tile', async ({ page, game }) => {
+  await openGame(page)
+  const rebootTiles = game.initial.state.board.tiles.filter((tile) => tile.type === 'REBOOT')
+    .map(({ position }) => `${position.x},${position.y}`)
+  const tiles = page.getByRole('img', { name: 'Reboot tile' })
+  await expect(tiles).toHaveCount(rebootTiles.length)
+  expect(await tiles.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-board-tile'))))
+    .toEqual(expect.arrayContaining(rebootTiles))
+  expect(await page.locator('[data-board-component^="reboot"] use').evaluateAll((elements) =>
+    elements.every((element) => !!document.querySelector(element.getAttribute('href')!)))).toBe(true)
+})
+
 test('shows checkpoint counts from snapshots and broadcasts once queued playback lands', async ({ page, game }) => {
   await page.clock.install()
   const state = {

@@ -1,32 +1,24 @@
 import { mock } from 'node:test'
 import './deterministic-random.mjs'
-import { Integer } from '../../game-service/dist/numbers.js'
-import { createGame as realCreateGame } from '../../game-service/dist/game/GameFactory.js'
+import { boardMaps } from '../../game-service/dist/domain/game/boardMaps.js'
+import { createBoard } from '../../game-service/dist/domain/game/BoardFactory.js'
+import { DECK_INSTRUCTIONS } from '../../game-service/dist/domain/game/deckComposition.js'
+import { Game } from '../../game-service/dist/domain/game/Game.js'
 
 // Controlled row for browser tests; all gameplay uses the real service and the
 // real test-map. Clear of every pit/wall, with room to push two tiles west.
 const ROW_Y = 13
 const COLUMNS = [6, 5, 4]
 
-mock.module('../../game-service/dist/game/GameFactory.js', {
+mock.module('../../game-service/dist/domain/game/GameFactory.js', {
   cache: true,
   exports: {
-    createGame: (mapName, name) => {
-      const game = realCreateGame(mapName, name)
-      const realAddPlayer = game.addPlayer.bind(game)
-      let joined = 0
-      game.addPlayer = (colour) => {
-        const result = realAddPlayer(colour)
-        joined++
-        if (joined === COLUMNS.length) {
-          game.players.forEach((player, index) => {
-            game.board.relocateRobot(player.robot.id, { x: Integer(COLUMNS[index]), y: Integer(ROW_Y) })
-          })
-        }
-        return result
-      }
-      return game
-    },
+    createGame: (mapName, name) => new Game({
+      board: createBoard({ ...boardMaps[mapName], startTiles: COLUMNS.map((x) => [x, ROW_Y]) }),
+      players: [],
+      deck: DECK_INSTRUCTIONS,
+      name,
+    }),
   },
 })
 

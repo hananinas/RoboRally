@@ -7,11 +7,11 @@ import LobbyScreen from './scenes/entry/LobbyScreen.tsx'
 import WaitingLobby from './scenes/entry/WaitingLobby.tsx'
 import RobotPicker from './scenes/entry/RobotPicker.tsx'
 import { USER_ALREADY_IN_GAME_MESSAGE } from './scenes/active-game/gameState.ts'
-import useSessionConnection from './useSessionConnection.ts'
+import useMembershipConnection from './useMembershipConnection.ts'
 
 function errorMessage(code: string): string {
   switch (code) {
-    case 'USER_ALREADY_IN_SESSION': return USER_ALREADY_IN_GAME_MESSAGE
+    case 'ALREADY_HAS_MEMBERSHIP': return USER_ALREADY_IN_GAME_MESSAGE
     case 'LOBBY_NOT_FOUND': return 'This lobby is no longer available. Refresh and try again.'
     case 'LOBBY_MEMBER_DISCONNECTED': return 'A player disconnected before the game could start. Please try again.'
     case 'LOBBY_FULL': return 'This lobby is full. Choose another lobby.'
@@ -22,9 +22,9 @@ function errorMessage(code: string): string {
 
 function App() {
   const {
-    connection, game, session, busy, lobbies, maps, mapsLoaded, listError,
-    createLobby, joinLobby, startLobby, leaveSession, refreshLobbies, retrySession, selectRobot,
-  } = useSessionConnection()
+    connection, game, membership, busy, lobbies, maps, mapsLoaded, listError,
+    createLobby, joinLobby, startLobby, leaveMembership, refreshLobbies, retrySync, selectRobot,
+  } = useMembershipConnection()
 
   useEffect(() => {
     if (connection.status === 'unauthenticated') window.location.href = '/auth/login'
@@ -33,48 +33,48 @@ function App() {
   const logout = () => { window.location.href = '/auth/logout' }
   const openSettings = () => { window.location.href = '/auth/settings' }
 
-  // Keep the existing game visible while session.get restores membership after reconnecting.
-  if ((session.status === 'joined' || session.status === 'resyncing') && session.user && game.state.assignment) {
-    return <ActiveGame game={game} username={session.user.username} leaving={busy} onLeave={leaveSession} onLogout={logout} onSettings={openSettings} />
+  // Keep the existing game visible while membership.get restores membership after reconnecting.
+  if ((membership.status === 'joined' || membership.status === 'resyncing') && membership.user && game.state.assignment) {
+    return <ActiveGame game={game} username={membership.user.username} leaving={busy} onLeave={leaveMembership} onLogout={logout} onSettings={openSettings} />
   }
 
   if (connection.status === 'unauthenticated') {
     return <EntryScreen><p>Redirecting to login…</p></EntryScreen>
   }
 
-  const browsing = session.status === 'browsing' || session.status === 'joining'
-  const errorCode = ('error' in session && session.error) || (browsing && listError)
+  const browsing = membership.status === 'browsing' || membership.status === 'joining'
+  const errorCode = ('error' in membership && membership.error) || (browsing && listError)
   const error = errorCode ? errorMessage(errorCode) : connection.error
   let content: ReactNode
-  if (session.status === 'browsing' || session.status === 'joining') {
+  if (membership.status === 'browsing' || membership.status === 'joining') {
     content = <LobbyScreen
-      username={session.user.username} error={error} lobbies={lobbies} maps={maps} mapsLoaded={mapsLoaded}
-      pending={busy || session.status === 'joining'} connected={connection.status === 'connected'}
+      username={membership.user.username} error={error} lobbies={lobbies} maps={maps} mapsLoaded={mapsLoaded}
+      pending={busy || membership.status === 'joining'} connected={connection.status === 'connected'}
       onCreate={createLobby} onJoin={joinLobby} onRefresh={refreshLobbies}
     />
-  } else if (session.status === 'waiting') {
+  } else if (membership.status === 'waiting') {
     content = <WaitingLobby
-      lobby={session.lobby} userId={session.user.userId} disabled={busy || connection.status !== 'connected'}
-      onStart={startLobby} onLeave={leaveSession}
+      lobby={membership.lobby} userId={membership.user.userId} disabled={busy || connection.status !== 'connected'}
+      onStart={startLobby} onLeave={leaveMembership}
     />
   } else {
     content = <>
       <p>Restoring session…</p>
-      <button className="entry-secondary-button" type="button" disabled={busy || connection.status === 'connecting'} onClick={retrySession}>Retry</button>
+      <button className="entry-secondary-button" type="button" disabled={busy || connection.status === 'connecting'} onClick={retrySync}>Retry</button>
     </>
   }
   return (
     <EntryScreen
-      onLogout={connection.status === 'connected' || session.user ? logout : undefined}
+      onLogout={connection.status === 'connected' || membership.user ? logout : undefined}
       onSettings={openSettings}
-      aside={session.status === 'waiting' ? (
+      aside={membership.status === 'waiting' ? (
         <>
-          <LobbyMapPanel lobby={session.lobby} />
+          <LobbyMapPanel lobby={membership.lobby} />
           <aside className="entry-panel" aria-label="Your robot">
             <RobotPicker
-              robots={session.lobby.robots}
-              selectedRobotId={session.lobby.players.find((player) => player.userId === session.user.userId)?.robotSpriteId
-                ?? session.lobby.robots.find((robot) => robot.defaultForLobbyCreation)?.id
+              robots={membership.lobby.robots}
+              selectedRobotId={membership.lobby.players.find((player) => player.userId === membership.user.userId)?.robotSpriteId
+                ?? membership.lobby.robots[0]?.id
                 ?? ''}
               selectedColor={session.lobby.players.find((player) => player.userId === session.user.userId)?.colour}
               takenColors={session.lobby.players
@@ -88,7 +88,7 @@ function App() {
         </>
       ) : undefined}
     >
-      {error && (session.status === 'waiting' || session.status === 'resyncing' || session.status === 'sync-failed') &&
+      {error && (membership.status === 'waiting' || membership.status === 'resyncing' || membership.status === 'sync-failed') &&
         <p role="alert" className="entry-validation entry-validation--error">{error}</p>}
       {content}
     </EntryScreen>

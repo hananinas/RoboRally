@@ -1,6 +1,6 @@
 import { SessionAwareAdapter, type BroadcastOptions } from 'socket.io-adapter'
 import { describe, expect, it, vi } from 'vitest'
-import { createAuthGatedAdapter } from '@/socket/authGatedAdapter'
+import { createAuthGatedAdapter } from '@/socket/connection/authGatedAdapter'
 import type { SessionStore } from '@/auth/sessionStore'
 import type { GameSocket } from '@/socket/gameServer'
 
