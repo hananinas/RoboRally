@@ -134,7 +134,7 @@ These stories were moved to V3, including the remaining work on partially implem
 
 As a player, I want conveyor belts and robot pushing to affect robot positions consistently, so that I can predict how my robot interacts with the board and other players.
 
-Robot pushing is implemented; conveyor movement is still missing.
+Robot pushing is implemented; a robot can push only one robot at a time, and a step is blocked when another robot is behind the pushed one. Conveyor movement is still missing.
 
 #### V2-03 - Interactive commands
 
