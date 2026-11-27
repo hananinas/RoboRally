@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { User } from '@robo-rally/game-events'
 import type { GameSession } from '@/socket/gameSession/GameSession'
+import type { GameSocketServer } from '@/socket/gameServer'
 import { Lobby } from '@/domain/lobby/Lobby'
 import { MembershipRegistry } from '@/membership/MembershipRegistry'
+import { LobbySession } from '@/socket/LobbySession'
 
 function user(userId: string): User {
   return { userId, username: userId }
@@ -12,11 +14,15 @@ function fakeGameSession(gameId: string): GameSession {
   return { game: { id: gameId } } as unknown as GameSession
 }
 
+// The registry only stores sessions, so it never reaches the server these are built with.
+const io = {} as GameSocketServer
+
 describe('MembershipRegistry', () => {
   it('tracks lobbies independently of active membership', () => {
     const registry = new MembershipRegistry()
-    const lobby = new Lobby('Lobby', 'test-map', user('owner'), 'connection-1')
-    const session = registry.addLobby(lobby)
+    const lobby = new Lobby('Lobby', 'test-map', user('owner'))
+    const session = new LobbySession(io, lobby)
+    registry.addLobby(session)
 
     expect(registry.getLobby(lobby.lobbyId)).toBe(session)
     expect(registry.lobbies).toEqual([session])
@@ -28,8 +34,9 @@ describe('MembershipRegistry', () => {
 
   it("resolves a user's current lobby or game through their active membership", () => {
     const registry = new MembershipRegistry()
-    const lobby = new Lobby('Lobby', 'test-map', user('owner'), 'connection-1')
-    const session = registry.addLobby(lobby)
+    const lobby = new Lobby('Lobby', 'test-map', user('owner'))
+    const session = new LobbySession(io, lobby)
+    registry.addLobby(session)
     registry.setActiveMembership('owner', { kind: 'lobby', lobbyId: lobby.lobbyId })
 
     expect(registry.getActiveMembership('owner')).toEqual({ kind: 'lobby', lobbyId: lobby.lobbyId })
@@ -44,9 +51,10 @@ describe('MembershipRegistry', () => {
 
   it('promotes a lobby to a game, moving every member, then removes the game by id', () => {
     const registry = new MembershipRegistry()
-    const lobby = new Lobby('Lobby', 'test-map', user('owner'), 'connection-1')
-    lobby.addMember(user('second'), 'connection-2')
-    const session = registry.addLobby(lobby)
+    const lobby = new Lobby('Lobby', 'test-map', user('owner'))
+    lobby.addMember(user('second'))
+    const session = new LobbySession(io, lobby)
+    registry.addLobby(session)
     registry.setActiveMembership('owner', { kind: 'lobby', lobbyId: lobby.lobbyId })
     registry.setActiveMembership('second', { kind: 'lobby', lobbyId: lobby.lobbyId })
 

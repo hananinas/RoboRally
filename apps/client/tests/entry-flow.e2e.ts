@@ -91,7 +91,7 @@ test('selects a robot in the waiting lobby', async ({ page }) => {
   for (let index = 0; index < 6; index += 1) {
     await expect(choices.nth(index).locator('.robot-preview__layer').first()).toBeVisible()
   }
-  const tankPortrait = page.getByRole('list', { name: 'Connected players' })
+  const tankPortrait = page.getByRole('list', { name: 'Lobby seats' })
     .getByLabel('Tank robot').locator('.robot-preview')
   const tankPortraitBox = await tankPortrait.boundingBox()
   expect(tankPortraitBox?.width).toBe(28)
@@ -101,7 +101,7 @@ test('selects a robot in the waiting lobby', async ({ page }) => {
 
   await choices.nth(1).click()
   await expect(robotPanel.getByRole('heading', { name: 'Scout', exact: true })).toBeVisible()
-  const playerSprite = page.getByRole('list', { name: 'Connected players' })
+  const playerSprite = page.getByRole('list', { name: 'Lobby seats' })
     .getByLabel('Scout robot').locator('.robot-preview__layer')
   await expect(playerSprite).toBeVisible()
   await expect(playerSprite).toHaveAttribute('viewBox', '0 0 100 100')
@@ -123,7 +123,7 @@ test('shows robot selection only after entering the waiting lobby', async ({ pag
   await expect(page.getByRole('group', { name: 'Choose a robot' })).toHaveCount(0)
   await createLobby(page)
   await expect(page.getByRole('group', { name: 'Choose a robot' })).toBeVisible()
-  await expect(page.getByRole('list', { name: 'Connected players' }).getByLabel('Tank robot')).toBeVisible()
+  await expect(page.getByRole('list', { name: 'Lobby seats' }).getByLabel('Tank robot')).toBeVisible()
 })
 
 test('shows robot selection after joining an existing lobby', async ({ page }) => {
@@ -133,7 +133,7 @@ test('shows robot selection after joining an existing lobby', async ({ page }) =
   await page.getByRole('button', { name: 'Join game', exact: true }).click()
 
   await expect(page.getByRole('group', { name: 'Choose a robot' })).toBeVisible()
-  await expect(page.getByRole('list', { name: 'Connected players' }).getByLabel('Tank robot')).toBeVisible()
+  await expect(page.getByRole('list', { name: 'Lobby seats' }).getByLabel('Tank robot')).toBeVisible()
 })
 
 test('a disconnected member during Start leaves the owner waiting and able to retry', async ({ page, game }) => {

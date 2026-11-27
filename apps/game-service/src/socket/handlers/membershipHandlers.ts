@@ -1,7 +1,7 @@
 import { ok } from 'neverthrow'
 import { emptyRequestSchema, type EmptyRequest, type MembershipResult, type User } from '@robo-rally/game-events'
 import type { GameSocket, SocketContext } from '@/socket/gameServer'
-import { leaveLobby } from '@/socket/handlers/lobbyHandlers'
+import { releaseExpiredSeat } from '@/socket/handlers/lobbyHandlers'
 import { presentLobby } from '@/socket/presenters/lobbyPresenter'
 import { withValidatedRequest } from '@/socket/utilities/withValidatedRequest'
 import { logError } from '@/logger'
@@ -9,9 +9,10 @@ import { logError } from '@/logger'
 function resolveLobbyMembership(context: SocketContext, socket: GameSocket, user: User): MembershipResult {
   const lobbySession = context.registry.getCurrentLobby(user.userId)
   if (!lobbySession) throw new Error('Membership references a missing lobby')
-  return lobbySession.isMember(socket).isOk()
-    ? { outcome: 'IN_LOBBY', lobby: presentLobby(lobbySession.lobby), user }
-    : { outcome: 'ALREADY_HAS_MEMBERSHIP' }
+  const result = lobbySession.reattach(socket)
+  return result.isErr()
+    ? { outcome: result.error }
+    : { outcome: 'IN_LOBBY', lobby: presentLobby(lobbySession), user }
 }
 
 function resolveGameMembership(context: SocketContext, socket: GameSocket, user: User): {
@@ -47,11 +48,16 @@ export function handleGetMembership(
 }
 
 export function handleSocketDisconnect(context: SocketContext, socket: GameSocket): void {
+  const { userId } = socket.data.user
   try {
-    leaveLobby(context, socket)
-    const gameSession = context.registry.getCurrentGame(socket.data.user.userId)
+    const lobbySession = context.registry.getCurrentLobby(userId)
+    if (lobbySession) {
+      lobbySession.markDisconnected(socket, () => releaseExpiredSeat(context, lobbySession, userId))
+      return
+    }
+    const gameSession = context.registry.getCurrentGame(userId)
     if (gameSession) gameSession.markDisconnected(socket)
   } catch (error) {
-    logError('Failed to clean up disconnected socket', error, { userId: socket.data.user.userId })
+    logError('Failed to clean up disconnected socket', error, { userId })
   }
 }

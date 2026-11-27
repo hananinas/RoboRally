@@ -9,12 +9,11 @@ import { createActionScheduler, type ActionScheduler } from '@/socket/gameSessio
 import { createProgrammingTimer, type ProgrammingTimer, type ProgrammingTimerState } from '@/programmingTimer'
 import { publishProgramFinalized } from '@/socket/gameSession/programFinalization'
 import { logError } from '@/logger'
+import { Seats, type Seated } from '@/socket/seats'
 
-export type Seat = {
-  user: User
-  player: Player
-  connectionId: string | null
-}
+type GameOccupant = { user: User; player: Player }
+
+export type Seat = Seated<GameOccupant>
 
 export type ReattachedMembership = {
   initialization: GameInitialization
@@ -25,7 +24,7 @@ export class GameSession {
   readonly io: GameSocketServer
   readonly game: Game
   readonly publicRoom: string
-  private readonly seats = new Map<string, Seat>()
+  private readonly seats = new Seats<GameOccupant>()
   readonly actionScheduler: ActionScheduler
   readonly programmingTimer: ProgrammingTimer
   private recordedWinner: Winner | null = null
@@ -80,7 +79,7 @@ export class GameSession {
 
   winner(): Winner | null {
     if (this.recordedWinner === null && this.game.winner !== undefined) {
-      const seat = [...this.seats.values()].find(({ player }) => player.id === this.game.winner)
+      const seat = this.seats.values().find(({ player }) => player.id === this.game.winner)
       this.recordedWinner = presentWinner(this.game.winner, seat?.user.username ?? '')
     }
     return this.recordedWinner
@@ -97,8 +96,7 @@ export class GameSession {
   }
 
   isMember(socket: GameSocket): Result<Seat, 'NOT_A_MEMBER'> {
-    const seat = this.seatFor(socket)
-    return seat?.connectionId === socket.id ? ok(seat) : err('NOT_A_MEMBER')
+    return this.seats.activeSeat(socket.data.user.userId, socket.id)
   }
 
   expireProgrammingIfDue(): Result<void, 'WRONG_PHASE'> {
@@ -121,8 +119,15 @@ export class GameSession {
     return concluded
   }
 
-  getSeat(userId: string): Seat | undefined {
-    return this.seats.get(userId)
+  /** Whether a different connection of this user holds their seat. */
+  heldByAnotherConnection(userId: string, connectionId: string): boolean {
+    return this.seats.boundElsewhere(userId, connectionId)
+  }
+
+  /** The session's rooms this user belongs in, empty when they have no seat. */
+  roomsFor(userId: string): string[] {
+    const seat = this.seats.get(userId)
+    return seat ? [this.publicRoom, this.playerRoom(seat.player.id)] : []
   }
 
   get seatCount(): number {
@@ -131,12 +136,11 @@ export class GameSession {
 
   reconnectIfRecovered(socket: GameSocket): void {
     if (!socket.recovered) return
-    const seat = this.seatFor(socket)
-    if (seat && this.reattachSeat(seat, socket.id)) {
-      const announceResumed = this.resumeUnlessStillDisconnected()
-      announceResumed()
-      this.notifyReconnected(seat.player)
-    }
+    const bound = this.seats.bind(socket.data.user.userId, socket.id)
+    if (bound.isErr() || !bound.value.reconnected) return
+    const announceResumed = this.resumeUnlessStillDisconnected()
+    announceResumed()
+    this.notifyReconnected(bound.value.seat.player)
   }
 
   markDisconnected(socket: GameSocket): void {
@@ -144,14 +148,14 @@ export class GameSession {
     if (result.isErr()) return
     const seat = result.value
 
-    seat.connectionId = null
+    this.seats.unbind(seat.user.userId)
     this.game.pause()
     this.io.to(this.publicRoom).emit('game.playerConnectionChanged', presentPlayerConnectionChanged(this.game, seat.player, false))
   }
 
   addSeat(user: User, connectionId: string, robotSpriteId: RobotSpriteId): Result<Player, AddPlayerError> {
     return this.game.addPlayer(robotSpriteId).map((player) => {
-      this.seats.set(user.userId, { user, player, connectionId })
+      this.seats.add({ user, player, connectionId })
       return player
     })
   }
@@ -159,7 +163,7 @@ export class GameSession {
   leave(socket: GameSocket): Result<void, 'NOT_A_MEMBER'> {
     return this.isMember(socket).map(({ player, user }) => {
       const { roundConcluded } = this.game.removePlayer(player.id)
-      this.seats.delete(user.userId)
+      this.seats.remove(user.userId)
       void socket.leave(this.publicRoom)
       void socket.leave(this.playerRoom(player.id))
       this.io.to(this.publicRoom).emit('game.playerLeft', {
@@ -172,14 +176,13 @@ export class GameSession {
   }
 
   reattach(socket: GameSocket): Result<ReattachedMembership, 'ALREADY_HAS_MEMBERSHIP' | 'INTERNAL_ERROR'> {
-    const seat = this.seatFor(socket)
-    if (!seat) return err('INTERNAL_ERROR')
-    if (seat.connectionId && seat.connectionId !== socket.id) return err('ALREADY_HAS_MEMBERSHIP')
+    const { userId } = socket.data.user
+    const bound = this.seats.bind(userId, socket.id)
+    if (bound.isErr()) return err(bound.error)
+    const { seat, reconnected } = bound.value
 
     const previousRooms = new Set(socket.rooms)
-    const previousConnectionId = seat.connectionId
     const wasPaused = this.game.paused
-    const reconnected = this.reattachSeat(seat, socket.id)
     try {
       void socket.join([this.publicRoom, this.playerRoom(seat.player.id)])
       const announceResumed = this.resumeUnlessStillDisconnected()
@@ -196,20 +199,10 @@ export class GameSession {
         if (!previousRooms.has(room)) void socket.leave(room)
       }
       logError('Failed to reattach game membership', error, { command: 'membership.get', gameId: this.game.id })
-      seat.connectionId = previousConnectionId
+      if (reconnected) this.seats.unbind(userId)
       if (wasPaused) this.game.pause()
       return err('INTERNAL_ERROR')
     }
-  }
-
-  private seatFor(socket: GameSocket): Seat | undefined {
-    return this.seats.get(socket.data.user.userId)
-  }
-
-  private reattachSeat(seat: Seat, socketId: string): boolean {
-    const wasDisconnected = seat.connectionId === null
-    seat.connectionId = socketId
-    return wasDisconnected
   }
 
   private resumeUnlessStillDisconnected(): () => void {
@@ -226,6 +219,6 @@ export class GameSession {
   }
 
   private anyDisconnected(): boolean {
-    return [...this.seats.values()].some((seat) => seat.connectionId === null)
+    return this.seats.anyUnbound()
   }
 }

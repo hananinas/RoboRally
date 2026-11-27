@@ -39,7 +39,11 @@ export type LobbySummary = Readonly<{
   playerCount: number
   maxPlayers: number
 }>
-export type LobbyPlayer = User & Readonly<{ robotSpriteId: RobotSpriteId }>
+export type LobbyPlayer = User & Readonly<{
+  robotSpriteId: RobotSpriteId
+  /** False while the member's seat is held for them after a lost connection. */
+  connected: boolean
+}>
 export type LobbyState = LobbySummary & Readonly<{
   ownerUserId: string
   players: readonly LobbyPlayer[]
