@@ -77,11 +77,11 @@ function App() {
               selectedRobotId={membership.lobby.players.find((player) => player.userId === membership.user.userId)?.robotSpriteId
                 ?? membership.lobby.robots[0]?.id
                 ?? ''}
-              selectedColorIndex={membership.lobby.players.find((player) => player.userId === membership.user.userId)?.colorIndex}
-              takenColorIndices={membership.lobby.players
+              selectedColorHex={membership.lobby.players.find((player) => player.userId === membership.user.userId)?.colorHex}
+              takenColorHexes={new Set(membership.lobby.players
                 .filter((player) => player.userId !== membership.user.userId)
-                .map((player) => player.colorIndex)
-                .filter((index): index is number => index !== undefined)}
+                .map((player) => player.colorHex)
+                .filter((hex): hex is string => hex !== undefined))}
               colorPalette={membership.lobby.colorPalette}
               disabled={busy || connection.status !== 'connected'}
               onSelect={selectRobot}

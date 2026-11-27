@@ -16,7 +16,7 @@ export const COLOR_PALETTE = [
 export const lobbyRequestSchema = z.strictObject({ lobbyId: z.uuid() }).readonly()
 export const robotSelectionRequestSchema = z.looseObject({
   robotSpriteId: z.string().trim().min(1),
-  colorIndex: z.number().int().min(0).max(5).optional(),
+  colorHex: z.string().regex(/^#[0-9a-f]{6}$/i).optional(),
 }).readonly()
 export const createLobbyRequestSchema = z.strictObject({
   mapName: z.string().min(1),
@@ -48,7 +48,7 @@ export type LobbySummary = Readonly<{
   playerCount: number
   maxPlayers: number
 }>
-export type LobbyPlayer = User & Readonly<{ robotSpriteId: RobotSpriteId; colorIndex?: number }>
+export type LobbyPlayer = User & Readonly<{ robotSpriteId: RobotSpriteId; colorHex?: string }>
 export type LobbyState = LobbySummary & Readonly<{
   ownerUserId: string
   players: readonly LobbyPlayer[]

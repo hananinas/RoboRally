@@ -4,7 +4,7 @@ import { boards } from '@/domain/game/BoardFactory'
 import type { BoardMapName } from '@/domain/game/boardMaps'
 import { DEFAULT_ROBOT_ID } from '@/domain/game/robotCatalog'
 
-export type LobbyMember = { user: User; connectionId: string; robotSpriteId: RobotSpriteId; colorIndex?: number }
+export type LobbyMember = { user: User; connectionId: string; robotSpriteId: RobotSpriteId; colorHex?: string }
 
 export class Lobby {
   readonly lobbyId: string
@@ -52,16 +52,18 @@ export class Lobby {
     if (member) member.robotSpriteId = robotSpriteId
   }
 
-  selectColor(userId: string, colorIndex: number): 'OK' | 'TAKEN' {
+  selectColor(userId: string, colorHex: string, palette: readonly string[]): 'OK' | 'TAKEN' {
     const member = this.membersById.get(userId)
     if (!member) return 'TAKEN'
 
+    if (!palette.includes(colorHex)) return 'TAKEN'
+
     const isColorTaken = [...this.membersById.values()].some(
-      (m) => m.user.userId !== userId && m.colorIndex === colorIndex
+      (m) => m.user.userId !== userId && m.colorHex === colorHex
     )
     if (isColorTaken) return 'TAKEN'
 
-    member.colorIndex = colorIndex
+    member.colorHex = colorHex
     return 'OK'
   }
 

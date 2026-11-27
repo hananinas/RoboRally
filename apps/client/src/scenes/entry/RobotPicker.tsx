@@ -6,14 +6,14 @@ import './RobotPicker.css'
 type Props = {
   robots: readonly RobotDefinition[]
   selectedRobotId: string
-  selectedColorIndex?: number
-  takenColorIndices: number[]
+  selectedColorHex?: string
+  takenColorHexes: Set<string>
   colorPalette: readonly string[]
   disabled: boolean
-  onSelect: (robotSpriteId: string, colorIndex?: number) => Promise<boolean>
+  onSelect: (robotSpriteId: string, colorHex?: string) => Promise<boolean>
 }
 
-export default function RobotPicker({ robots, selectedRobotId, selectedColorIndex, takenColorIndices, colorPalette, disabled, onSelect }: Props) {
+export default function RobotPicker({ robots, selectedRobotId, selectedColorHex, takenColorHexes, colorPalette, disabled, onSelect }: Props) {
   const selectedRobot = robots.find((option) => option.id === selectedRobotId)
   const choices = robots
   const robot = selectedRobot && choices.some((option) => option.id === selectedRobot.id)
@@ -21,20 +21,19 @@ export default function RobotPicker({ robots, selectedRobotId, selectedColorInde
     : choices[0]
   const preview = robot ? robotOptionFor(robot.id) : undefined
   
-  const displayColorIndex = selectedColorIndex ?? 0
-  const displayColor = colorPalette[displayColorIndex] ?? colorPalette[0]
+  const displayColor = selectedColorHex ?? colorPalette[0]
 
   function chooseRobot(robotSpriteId: string) {
-    if (!disabled && robotSpriteId !== robot?.id) void onSelect(robotSpriteId, displayColorIndex)
+    if (!disabled && robotSpriteId !== robot?.id) void onSelect(robotSpriteId, displayColor)
   }
 
-  function chooseColor(colorIndex: number) {
-    if (!disabled && !takenColorIndices.includes(colorIndex)) {
-      if (robot) void onSelect(robot.id, colorIndex)
+  function chooseColor(colorHex: string) {
+    if (!disabled && !takenColorHexes.has(colorHex)) {
+      if (robot) void onSelect(robot.id, colorHex)
     }
   }
 
-  const isColorTaken = (colorIndex: number) => takenColorIndices.includes(colorIndex)
+  const isColorTaken = (colorHex: string) => takenColorHexes.has(colorHex)
 
   return (
     <div className="robot-picker">
@@ -83,22 +82,22 @@ export default function RobotPicker({ robots, selectedRobotId, selectedColorInde
       <fieldset className="robot-picker__colours" disabled={disabled}>
         <legend>Player colour</legend>
         <div className="robot-picker__swatches">
-          {colorPalette.map((hex, colorIndex) => {
-            const taken = isColorTaken(colorIndex)
-            const colorName = ['Blue', 'Red', 'Yellow', 'Green', 'Purple', 'Pink'][colorIndex] ?? `Color ${colorIndex}`
+          {colorPalette.map((hex) => {
+            const taken = isColorTaken(hex)
+            const colorName = ['Blue', 'Red', 'Yellow', 'Green', 'Purple', 'Pink'][colorPalette.indexOf(hex)] ?? `Color ${hex}`
             return (
               <button
                 className="robot-picker__swatch"
                 type="button"
                 key={hex}
                 aria-label={colorName}
-                aria-pressed={displayColorIndex === colorIndex}
+                aria-pressed={displayColor === hex}
                 disabled={disabled || taken}
-                onClick={() => chooseColor(colorIndex)}
+                onClick={() => chooseColor(hex)}
                 title={taken ? 'This color is already taken by another player' : ''}
                 style={{ backgroundColor: hex }}
               >
-                {displayColorIndex === colorIndex && <span aria-hidden="true">✓</span>}
+                {displayColor === hex && <span aria-hidden="true">✓</span>}
                 {taken && <span className="robot-picker__swatch-unavailable" aria-hidden="true">✕</span>}
               </button>
             )

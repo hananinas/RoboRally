@@ -24,8 +24,8 @@ export function presentLobby(lobby: Lobby): LobbyState {
   return {
     ...presentLobbySummary(lobby),
     ownerUserId: lobby.ownerUserId,
-    players: lobby.members.map(({ user, robotSpriteId, colorIndex }) => ({
-      userId: user.userId, username: user.username, robotSpriteId, ...(colorIndex !== undefined ? { colorIndex } : {}),
+    players: lobby.members.map(({ user, robotSpriteId, colorHex }) => ({
+      userId: user.userId, username: user.username, robotSpriteId, ...(colorHex !== undefined ? { colorHex } : {}),
     })),
     robots: robotCatalog,
     colorPalette: [...COLOR_PALETTE],

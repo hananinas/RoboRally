@@ -118,13 +118,13 @@ export function handleSelectRobot(
       }
       const lobbySession = context.registry.getCurrentLobby(user.userId)
       if (!lobbySession || lobbySession.isMember(socket).isErr()) return err({ outcome: 'NOT_A_MEMBER' as const })
-      return ok({ user, lobbySession, robotSpriteId: data.robotSpriteId, colorIndex: data.colorIndex })
+      return ok({ user, lobbySession, robotSpriteId: data.robotSpriteId, colorHex: data.colorHex })
     },
-    run: ({ user, lobbySession, robotSpriteId, colorIndex }, ack) => {
+    run: ({ user, lobbySession, robotSpriteId, colorHex }, ack) => {
       lobbySession.lobby.selectRobot(user.userId, robotSpriteId)
       
-      if (colorIndex !== undefined) {
-        const selectColorResult = lobbySession.lobby.selectColor(user.userId, colorIndex)
+      if (colorHex !== undefined) {
+        const selectColorResult = lobbySession.lobby.selectColor(user.userId, colorHex, COLOR_PALETTE)
         if (selectColorResult === 'TAKEN') {
           const lobby = presentLobby(lobbySession.lobby)
           return ack({ outcome: 'COLOUR_TAKEN', lobby })
@@ -156,8 +156,7 @@ export function handleLeaveLobby(
 
 function startGame(io: GameSocketServer, lobby: Lobby, connectedMembers: ConnectedLobbyMember[]) {
   const gameSession = new GameSession(io, createGame(lobby.mapName, lobby.name))
-  for (const { user, connectionId, robotSpriteId, colorIndex } of connectedMembers) {
-    const colorHex = colorIndex !== undefined ? COLOR_PALETTE[colorIndex] : undefined
+  for (const { user, connectionId, robotSpriteId, colorHex } of connectedMembers) {
     const result = gameSession.addSeat(user, connectionId, robotSpriteId, colorHex)
     if (result.isErr()) throw new Error(result.error)
   }
