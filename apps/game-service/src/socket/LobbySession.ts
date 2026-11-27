@@ -11,6 +11,7 @@ export type ConnectedLobbyMember = LobbyMember & { socket: GameSocket }
 const LOBBY_RECONNECT_GRACE_MS = 10_000
 
 export class LobbySession {
+  readonly io: GameSocketServer
   readonly lobby: Lobby
   readonly room: string
   private readonly seats = new Seats<{ user: User }>()
@@ -21,7 +22,8 @@ export class LobbySession {
     return `lobby:${lobbyId}`
   }
 
-  constructor(lobby: Lobby) {
+  constructor(io: GameSocketServer, lobby: Lobby) {
+    this.io = io
     this.lobby = lobby
     this.room = LobbySession.roomFor(lobby.lobbyId)
   }
@@ -47,7 +49,7 @@ export class LobbySession {
   join(socket: GameSocket): void {
     this.lobby.addMember(socket.data.user)
     this.attach(socket)
-    socket.to(this.room).emit('lobby.updated', { lobby: presentLobby(this) })
+    this.announceLobby()
   }
 
   /**
@@ -59,6 +61,7 @@ export class LobbySession {
     if (this.isMember(socket).isErr()) return
     this.seats.unbind(userId)
     this.pendingLeaves.set(userId, setTimeout(onExpiry, LOBBY_RECONNECT_GRACE_MS).unref())
+    this.announceLobby()
   }
 
   reattach(socket: GameSocket): Result<void, 'ALREADY_HAS_MEMBERSHIP' | 'INTERNAL_ERROR'> {
@@ -68,24 +71,36 @@ export class LobbySession {
     if (bound.value.reconnected) {
       void socket.join(this.room)
       this.cancelPendingLeave(userId)
+      this.announceLobby()
     }
     return ok(undefined)
   }
 
   /** Gives a seat up by user id, so an expired leave needs no socket of its own. */
-  releaseSeat(userId: string, io: GameSocketServer): void {
+  releaseSeat(userId: string): void {
     this.cancelPendingLeave(userId)
     this.seats.remove(userId)
     this.lobby.removeMember(userId)
-    if (this.lobby.size > 0) {
-      io.to(this.room).emit('lobby.updated', { lobby: presentLobby(this) })
-    }
+    if (this.lobby.size > 0) this.announceLobby()
   }
 
-  leave(socket: GameSocket, io: GameSocketServer): void {
+  leave(socket: GameSocket): void {
     // Out of the room first, so the roster update does not reach the member who is leaving.
     this.leaveRoom(socket)
-    this.releaseSeat(socket.data.user.userId, io)
+    this.releaseSeat(socket.data.user.userId)
+  }
+
+  resolveConnectedMembers(): Result<ConnectedLobbyMember[], 'LOBBY_MEMBER_DISCONNECTED'> {
+    const members: ConnectedLobbyMember[] = []
+    // Iterating the roster, not the seats: this order decides who gets which start tile.
+    for (const member of this.lobby.members) {
+      const connectionId = this.seats.get(member.user.userId)?.connectionId
+      if (!connectionId) return err('LOBBY_MEMBER_DISCONNECTED')
+      const socket = this.io.sockets.sockets.get(connectionId)
+      if (!socket?.connected) return err('LOBBY_MEMBER_DISCONNECTED')
+      members.push({ ...member, socket })
+    }
+    return ok(members)
   }
 
   /** Removes the socket from the lobby room. Does not close the connection. */
@@ -93,17 +108,8 @@ export class LobbySession {
     void socket.leave(this.room)
   }
 
-  resolveConnectedMembers(io: GameSocketServer): Result<ConnectedLobbyMember[], 'LOBBY_MEMBER_DISCONNECTED'> {
-    const members: ConnectedLobbyMember[] = []
-    // Iterating the roster, not the seats: this order decides who gets which start tile.
-    for (const member of this.lobby.members) {
-      const connectionId = this.seats.get(member.user.userId)?.connectionId
-      if (!connectionId) return err('LOBBY_MEMBER_DISCONNECTED')
-      const socket = io.sockets.sockets.get(connectionId)
-      if (!socket?.connected) return err('LOBBY_MEMBER_DISCONNECTED')
-      members.push({ ...member, socket })
-    }
-    return ok(members)
+  private announceLobby(): void {
+    this.io.to(this.room).emit('lobby.updated', { lobby: presentLobby(this) })
   }
 
   private cancelPendingLeave(userId: string): void {

@@ -188,18 +188,25 @@ describe('lobby lifecycle over Socket.IO', () => {
       playerCount: 2, maxPlayers: 6,
     })
 
-    const left = new Promise<LobbyState>((resolve) => other.once('lobby.updated', ({ lobby: state }) => resolve(state)))
-    if (departure === 'leave') await owner.emitWithAck('lobby.leave', {})
-    else await disconnectUntilExpiry(owner, async () => {
-      expect(await other.emitWithAck('membership.get', {})).toMatchObject({
-        outcome: 'IN_LOBBY',
-        lobby: {
+    const nextUpdate = () => new Promise<LobbyState>((resolve) => other.once('lobby.updated', ({ lobby: state }) => resolve(state)))
+    const departed = { ...roster, ownerUserId: roster.players[1]!.userId, playerCount: 1, players: [roster.players[1]!] }
+    if (departure === 'leave') {
+      const left = nextUpdate()
+      await owner.emitWithAck('lobby.leave', {})
+      expect(await left).toEqual(departed)
+    } else {
+      // The remaining member must be told the seat is being held, not just see it vanish later.
+      const held = nextUpdate()
+      let left: Promise<LobbyState> | undefined
+      await disconnectUntilExpiry(owner, async () => {
+        expect(await held).toMatchObject({
           playerCount: 2,
           players: [{ username: 'Owner', connected: false }, { username: 'Other', connected: true }],
-        },
+        })
+        left = nextUpdate()
       })
-    })
-    expect(await left).toEqual({ ...roster, ownerUserId: roster.players[1]!.userId, playerCount: 1, players: [roster.players[1]!] })
+      expect(await left!).toEqual(departed)
+    }
     await outsider.emitWithAck('membership.get', {})
     expect(foreignUpdates).not.toHaveBeenCalled()
   })

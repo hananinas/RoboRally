@@ -22,7 +22,7 @@ export function leaveLobby(context: SocketContext, socket: GameSocket): Result<v
   const lobbySession = context.registry.getCurrentLobby(userId)
   if (!lobbySession) return err('NOT_A_MEMBER')
   return lobbySession.isMember(socket).map(() => {
-    lobbySession.leave(socket, context.io)
+    lobbySession.leave(socket)
     dropMembership(context, lobbySession, userId)
   })
 }
@@ -31,7 +31,7 @@ export function leaveLobby(context: SocketContext, socket: GameSocket): Result<v
 export function releaseExpiredSeat(context: SocketContext, lobbySession: LobbySession, userId: string): void {
   try {
     if (context.registry.getCurrentLobby(userId) !== lobbySession) return
-    lobbySession.releaseSeat(userId, context.io)
+    lobbySession.releaseSeat(userId)
     dropMembership(context, lobbySession, userId)
   } catch (error) {
     logError('Failed to release expired lobby seat', error, { userId })
@@ -83,7 +83,7 @@ export function handleCreateLobby(
           : { outcome: 'ALREADY_HAS_MEMBERSHIP' })
       }
       // Seat the owner before registering anything, so a failed room join retains no lobby.
-      const lobbySession = new LobbySession(new Lobby(name, mapName, user))
+      const lobbySession = new LobbySession(context.io, new Lobby(name, mapName, user))
       lobbySession.attach(socket)
       context.registry.addLobby(lobbySession)
       context.registry.setActiveMembership(user.userId, { kind: 'lobby', lobbyId: lobbySession.lobby.lobbyId })
@@ -194,7 +194,7 @@ export function handleStartLobby(
       const lobbySession = context.registry.getCurrentLobby(user.userId)
       if (!lobbySession || lobbySession.isMember(socket).isErr()) return err({ outcome: 'NOT_A_MEMBER' as const })
       if (lobbySession.lobby.ownerUserId !== user.userId) return err({ outcome: 'NOT_LOBBY_OWNER' as const })
-      const connectedResult = lobbySession.resolveConnectedMembers(context.io)
+      const connectedResult = lobbySession.resolveConnectedMembers()
       if (connectedResult.isErr()) return err({ outcome: connectedResult.error })
       return ok({ lobbySession, connectedMembers: connectedResult.value })
     },
