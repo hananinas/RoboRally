@@ -2,6 +2,7 @@ import { resolveRobotAction } from '../../activationTestHelper.ts'
 import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
 import { Card, Direction, EmptyTile, PitTile, type Antenna, type Position, type Tile } from '@/domain/game/index'
+import { PUSH_LIMIT } from '@/domain/game/RobotPlacements'
 import { Deck } from '@/domain/game/Deck'
 import { Integer } from '@/numbers'
 import { createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, instructionsOf, programLeadingWith } from '../../fixtures.ts'
@@ -35,14 +36,14 @@ describe('robot pushing', () => {
   it('captures final pushed positions after every step and reboot, independently of later movement', () => {
     const tiles = grid()
     tiles[3][8] = new PitTile()
-    const { robots, players, cards, game, reboot } = createGame([position(5), position(6), position(7)], tiles)
+    const { robots, players, cards, game, reboot } = createGame([position(5), position(6)], tiles)
     const program = programLeadingWith(cards, 'MOVE_2')
     for (const player of players) game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
+    // Step 1 pushes robots[1] to x=7, step 2 pushes it into the pit at x=8.
     const result = resolveRobotAction(game)
     const expected = [
-      { robotId: robots[1].id, position: position(0, 4), direction: Direction.NORTH },
-      { robotId: robots[2].id, position: reboot, direction: Direction.WEST },
+      { robotId: robots[1].id, position: reboot, direction: Direction.NORTH },
     ]
     expect(result.pushedRobots).toEqual(expected)
     expect(game.registerViewsFor(players[0])[0]).toEqual({ kind: 'revealed', instruction: program[0].instruction })
@@ -53,12 +54,16 @@ describe('robot pushing', () => {
     expect(result.pushedRobots).toEqual(expected)
   })
 
+  it('limits a push to a single robot', () => {
+    expect(PUSH_LIMIT).toBe(1)
+  })
+
   it.each([
-    { direction: Direction.NORTH, starts: [position(4, 4), position(4, 3), position(4, 2)], ends: [position(4, 3), position(4, 2), position(4, 1)] },
-    { direction: Direction.EAST, starts: [position(1), position(2), position(3)], ends: [position(2), position(3), position(4)] },
-    { direction: Direction.SOUTH, starts: [position(4, 2), position(4, 3), position(4, 4)], ends: [position(4, 3), position(4, 4), position(4, 5)] },
-    { direction: Direction.WEST, starts: [position(5), position(4), position(3)], ends: [position(4), position(3), position(2)] },
-  ])('pushes a chain $direction and preserves all facing directions', ({ direction, starts, ends }) => {
+    { direction: Direction.NORTH, starts: [position(4, 4), position(4, 3)], ends: [position(4, 3), position(4, 2)] },
+    { direction: Direction.EAST, starts: [position(1), position(2)], ends: [position(2), position(3)] },
+    { direction: Direction.SOUTH, starts: [position(4, 2), position(4, 3)], ends: [position(4, 3), position(4, 4)] },
+    { direction: Direction.WEST, starts: [position(5), position(4)], ends: [position(4), position(3)] },
+  ])('pushes one robot $direction and preserves both facing directions', ({ direction, starts, ends }) => {
     const { robots, players, cards, game } = createGame(starts)
     robots[0].turn([Direction.EAST, Direction.NORTH, Direction.WEST, Direction.SOUTH].indexOf(direction))
     const facing = robots.map((robot) => robot.direction)
@@ -75,12 +80,34 @@ describe('robot pushing', () => {
     expect(robots.map((robot) => robot.direction)).toEqual(facing)
   })
 
-  it.each([0, 1, 2, 3])('rejects the entire chain when boundary %s has a wall on either side', (boundary) => {
+  it.each([
+    { direction: Direction.NORTH, starts: [position(4, 4), position(4, 3), position(4, 2)] },
+    { direction: Direction.EAST, starts: [position(1), position(2), position(3)] },
+    { direction: Direction.SOUTH, starts: [position(4, 2), position(4, 3), position(4, 4)] },
+    { direction: Direction.WEST, starts: [position(5), position(4), position(3)] },
+  ])('blocks the step $direction when another robot is behind the pushed robot', ({ direction, starts }) => {
+    const { robots, players, cards, game } = createGame(starts)
+    robots[0].turn([Direction.EAST, Direction.NORTH, Direction.WEST, Direction.SOUTH].indexOf(direction))
+    const facing = robots.map((robot) => robot.direction)
+    const moveProgram = programLeadingWith(cards, 'MOVE_1')
+    const waitProgram = programLeadingWith(cards, 'AGAIN')
+    game.submitProgram(players[0].id, moveProgram.map((card) => card.id))._unsafeUnwrap()
+    for (const player of players.slice(1)) game.submitProgram(player.id, waitProgram.map((card) => card.id))._unsafeUnwrap()
+
+    let result = game.executeNextAction()
+    while (result.action.robotId !== robots[0].id) result = game.executeNextAction()
+
+    expect(result.pushedRobots).toEqual([])
+    expect(robots.map((robot) => game.getRobotPosition(robot.id))).toEqual(starts)
+    expect(robots.map((robot) => robot.direction)).toEqual(facing)
+  })
+
+  it.each([0, 1])('rejects the push when boundary %s has a wall on either side', (boundary) => {
     for (const side of ['source', 'destination'] as const) {
       const tiles = grid()
       const x = 1 + boundary + (side === 'destination' ? 1 : 0)
       tiles[3][x] = new EmptyTile([side === 'source' ? Direction.EAST : Direction.WEST])
-      const starts = [position(1), position(2), position(3), position(4)]
+      const starts = [position(1), position(2)]
       const { robots, players, cards, game } = createGame(starts, tiles)
       const moveProgram = programLeadingWith(cards, 'MOVE_1')
       game.submitProgram(players[0].id, moveProgram.map((card) => card.id))._unsafeUnwrap()
@@ -92,9 +119,9 @@ describe('robot pushing', () => {
     }
   })
 
-  it('rejects the entire chain when its destination is the priority antenna', () => {
-    const starts = [position(1), position(2), position(3)]
-    const { robots, players, cards, game } = createGame(starts, grid(), { ...position(4), angle: 0 })
+  it('rejects the push when the pushed robot would enter the priority antenna', () => {
+    const starts = [position(1), position(2)]
+    const { robots, players, cards, game } = createGame(starts, grid(), { ...position(3), angle: 0 })
     const moveProgram = programLeadingWith(cards, 'MOVE_1')
     const waitProgram = programLeadingWith(cards, 'AGAIN')
     game.submitProgram(players[0].id, moveProgram.map((card) => card.id))._unsafeUnwrap()
@@ -106,17 +133,31 @@ describe('robot pushing', () => {
     expect(robots.map((robot) => game.getRobotPosition(robot.id))).toEqual(starts)
   })
 
-  it('keeps successful steps when a later push is blocked', () => {
+  it('keeps successful steps when a later push is blocked by a wall', () => {
     const tiles = grid()
-    tiles[3][5] = new EmptyTile([Direction.EAST])
-    const { robots, players, cards, game } = createGame(undefined, tiles)
+    tiles[3][4] = new EmptyTile([Direction.EAST])
+    const { robots, players, cards, game } = createGame([position(1), position(2)], tiles)
     const moveProgram = programLeadingWith(cards, 'MOVE_3')
     game.submitProgram(players[0].id, moveProgram.map((card) => card.id))._unsafeUnwrap()
     for (const player of players.slice(1)) game.submitProgram(player.id, cards.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
 
     expect(game.executeNextAction().action.robotId).toBe(robots[0].id)
 
-    expect(robots.map((robot) => game.getRobotPosition(robot.id))).toEqual([position(3), position(4), position(5)])
+    expect(robots.map((robot) => game.getRobotPosition(robot.id))).toEqual([position(3), position(4)])
+  })
+
+  it('keeps successful steps and stops when the pushed robot reaches another robot', () => {
+    const { robots, players, cards, game } = createGame([position(1), position(2), position(4)])
+    const moveProgram = programLeadingWith(cards, 'MOVE_3')
+    game.submitProgram(players[0].id, moveProgram.map((card) => card.id))._unsafeUnwrap()
+    for (const player of players.slice(1)) game.submitProgram(player.id, cards.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
+
+    const result = game.executeNextAction()
+    expect(result.action.robotId).toBe(robots[0].id)
+
+    // Step 1 pushes robots[1] next to robots[2]; step 2 would push two robots, so it is blocked.
+    expect(robots.map((robot) => game.getRobotPosition(robot.id))).toEqual([position(2), position(3), position(4)])
+    expect(result.pushedRobots).toEqual([{ robotId: robots[1].id, position: position(3), direction: Direction.NORTH }])
   })
 
   it.each([
@@ -125,7 +166,7 @@ describe('robot pushing', () => {
     { instruction: 'MOVE_3', steps: 3 },
     { instruction: 'BACK_UP', steps: 1 },
   ] as const)('pushes using $instruction without consuming another robot\'s action', ({ instruction, steps }) => {
-    const { robots, players, cards, game } = createGame()
+    const { robots, players, cards, game } = createGame([position(1), position(2)])
     if (instruction === 'BACK_UP') robots[0].turn(2)
     const facing = robots.map((robot) => robot.direction)
     const program = programLeadingWith(cards, instruction)
@@ -133,7 +174,7 @@ describe('robot pushing', () => {
 
     expect(resolveRobotAction(game).action.robotId).toBe(robots[0].id)
 
-    expect(robots.map((robot) => game.getRobotPosition(robot.id))).toEqual([position(1 + steps), position(2 + steps), position(3 + steps)])
+    expect(robots.map((robot) => game.getRobotPosition(robot.id))).toEqual([position(1 + steps), position(2 + steps)])
     expect(robots.map((robot) => robot.direction)).toEqual(facing)
     expect(players.map((player) => player.registers.slots)).toEqual(players.map(() => program))
     expect(game.currentRegister).toBe(0)
@@ -142,16 +183,15 @@ describe('robot pushing', () => {
       position: position(2 + steps, instruction === 'BACK_UP' ? 4 : 3 - steps),
       direction: Direction.NORTH,
     })
-    expect(resolveRobotAction(game).action.robotId).toBe(robots[2].id)
     expect(game.currentRegister).toBe(1)
   })
 
-  it.each(['pit', 'edge'] as const)('reboots the farthest robot pushed into a %s and continues the movement card', (hazard) => {
+  it.each(['pit', 'edge'] as const)('reboots a robot pushed into a %s and continues the movement card', (hazard) => {
     const tiles = grid()
     if (hazard === 'pit') tiles[3][8] = new PitTile()
     const starts = hazard === 'pit'
-      ? [position(5), position(6), position(7)]
-      : [position(6), position(7), position(8)]
+      ? [position(6), position(7)]
+      : [position(7), position(8)]
     const { robots, players, cards, reboot, game } = createGame(starts, tiles)
     const moveProgram = programLeadingWith(cards, 'MOVE_2')
     game.submitProgram(players[0].id, moveProgram.map((card) => card.id))._unsafeUnwrap()
@@ -159,16 +199,15 @@ describe('robot pushing', () => {
 
     expect(game.executeNextAction().action.robotId).toBe(robots[0].id)
 
-    expect(robots.map((robot) => game.getRobotPosition(robot.id))).toEqual([
-      position(starts[0].x + 2), position(0, 4), reboot,
-    ])
-    expect(robots.map((robot) => robot.direction)).toEqual([Direction.EAST, Direction.NORTH, Direction.WEST])
+    // Step 1 pushes robots[1] into the hazard; step 2 takes robots[0] in after it.
+    expect(robots.map((robot) => game.getRobotPosition(robot.id))).toEqual([position(0, 4), reboot])
+    expect(robots.map((robot) => robot.direction)).toEqual([Direction.EAST, Direction.NORTH])
   })
 
-  it('does not trigger a pit reboot through a wall at the end of the chain', () => {
+  it('does not trigger a pit reboot through a wall in front of the pushed robot', () => {
     const tiles = grid()
     tiles[3][4] = new PitTile([Direction.WEST])
-    const starts = [position(1), position(2), position(3)]
+    const starts = [position(2), position(3)]
     const { robots, players, cards, game } = createGame(starts, tiles)
     const moveProgram = programLeadingWith(cards, 'MOVE_1')
     game.submitProgram(players[0].id, moveProgram.map((card) => card.id))._unsafeUnwrap()

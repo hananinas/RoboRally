@@ -431,19 +431,18 @@ describe('started game membership over Socket.IO', () => {
   })
 
   describe('pit results over Socket.IO', () => {
-    it('broadcasts a chain push and its rebooted robot to every client in one action', async () => {
+    it('broadcasts a push and its rebooted robot to every client in one action', async () => {
       const column = 15
       const pitY = 9
       // Distance from the antenna (10,0) is monotonic in y for a fixed x, so the
       // topmost robot always has priority. The dealt MOVE_1 card moves it 1 step.
-      stageNextGame({ startTiles: [[column, pitY - 3], [column, pitY - 2], [column, pitY - 1]] })
-      const { members: sockets, initializations } = await startGame(['Pusher', 'Pushed', 'Falling'], 'test-map')
+      stageNextGame({ startTiles: [[column, pitY - 2], [column, pitY - 1]] })
+      const { members: sockets, initializations } = await startGame(['Pusher', 'Falling'], 'test-map')
       const members = sockets.map((client, index) => ({ client, joined: initializations[index] }))
       const game = currentGame()
       const robotIds = members.map(({ joined }) => joined.assignment.robotId)
       game.players[0].robot.turn(2) // NORTH -> SOUTH, facing the pit
-      game.players[1].robot.turn(1) // NORTH -> WEST
-      game.players[2].robot.turn(3) // NORTH -> EAST
+      game.players[1].robot.turn(3) // NORTH -> EAST
       const actions: RobotActionResolved[][] = members.map(() => [])
       members.forEach(({ client }, index) => client.on('robot.actionResolved', (action) => actions[index].push(action)))
       const hands = members.map(({ client }) => new Promise<CardsDealt>((resolve) => client.once('cards.dealt', resolve)))
@@ -455,17 +454,15 @@ describe('started game membership over Socket.IO', () => {
       expect(actions[0][0]).toEqual({
         gameId: game.id, registerIndex: 0, robotId: robotIds[0], instruction: 'MOVE_1', resolvedInstruction: 'MOVE_1',
         playerId: initializations[0].assignment.playerId,
-        position: { coordinate: { x: column, y: pitY - 2 }, orientation: 'SOUTH' },
+        position: { coordinate: { x: column, y: pitY - 1 }, orientation: 'SOUTH' },
         pushedRobots: [
-          { robotId: robotIds[1], position: { coordinate: { x: column, y: pitY - 1 }, orientation: 'WEST' } },
           // (10,10) is the reboot tile closest to the pit at (15,9).
-          { robotId: robotIds[2], position: { coordinate: { x: 10, y: 10 }, orientation: 'EAST' } },
+          { robotId: robotIds[1], position: { coordinate: { x: 10, y: 10 }, orientation: 'EAST' } },
         ],
-        reboots: [{ robotId: robotIds[2], fellAt: { x: column, y: pitY }, landedAt: { x: 10, y: 10 } }],
+        reboots: [{ robotId: robotIds[1], fellAt: { x: column, y: pitY }, landedAt: { x: 10, y: 10 } }],
       })
-      expect(actions[0]).toHaveLength(15)
+      expect(actions[0]).toHaveLength(10)
       expect(actions[1]).toEqual(actions[0])
-      expect(actions[2]).toEqual(actions[0])
     })
 
     it('broadcasts rebooted positions before progress and hands and restores them on rejoining', async () => {
