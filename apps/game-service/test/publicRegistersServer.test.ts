@@ -422,7 +422,7 @@ describe('public registers over Socket.IO', () => {
     await snapshot(first)
     await snapshot(second)
     const game = currentGame()
-    const before = game.players.map((player) => player.registers)
+    const before = game.players.map((player) => game.registerViewsFor(player))
     const events: RegistersChanged[] = []
     for (const client of [first, second]) client.on('game.registersChanged', (event) => events.push(event))
     const acknowledgementIds: (number | undefined)[] = []
@@ -438,8 +438,7 @@ describe('public registers over Socket.IO', () => {
     expect(acknowledgementIds).toHaveLength(2) // Command ACK, then the membership.get barrier ACK.
     expect(new Set(acknowledgementIds).size).toBe(2)
     expect(events).toEqual([])
-    expect(game.players.map((player) => player.registers)).toEqual(before)
-    game.players.forEach((player, index) => expect(player.registers).toBe(before[index]))
+    expect(game.players.map((player) => game.registerViewsFor(player))).toEqual(before)
   })
 
   it('rejects occupancy during disconnected programming and execution', async () => {

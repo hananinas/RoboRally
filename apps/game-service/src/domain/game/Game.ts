@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { err, ok, type Result } from 'neverthrow'
 import type { Board } from '@/domain/game/Board'
-import { effects, type Instruction, type PrivateProgram, type PublicRegisters, type ResolvedInstruction, type RobotSpriteId } from '@robo-rally/game-events'
+import { effects, type Instruction, type ResolvedInstruction, type RobotSpriteId } from '@robo-rally/game-events'
 import { captureEnvironmentSnapshot, environmentSteps, type EnvironmentChanges } from '@/domain/game/environment'
 import { Card } from '@/domain/game/Card'
 import { Deck } from '@/domain/game/Deck'
 import type { CardId, GameId, PlayerId, RobotId } from '@/domain/game/ids'
 import { Player } from '@/domain/game/Player'
+import { REGISTER_COUNT, type RegisterView } from '@/domain/game/Registers'
 import { Robot, ROBOT_COLOURS } from '@/domain/game/Robot'
 import { RobotPlacements } from '@/domain/game/RobotPlacements'
 import { Roster } from '@/domain/game/Roster'
@@ -41,7 +42,6 @@ export type RebootResult = Readonly<{
 export type NextActionResult = Readonly<{
   registerIndex: number
   action: RobotActionResult
-  registers: PublicRegisters
   pushedRobots: readonly Readonly<{
     robotId: RobotId
     position: Position
@@ -75,7 +75,6 @@ export type CompletedProgram = Readonly<{
   cards: readonly Card[]
 }>
 
-const REGISTERS_PER_ROUND = 5
 
 export type PlayerPlacement = Readonly<{
   player: Player
@@ -113,7 +112,7 @@ export class Game {
     deck,
     name,
   }: GameOptions) {
-    if (deck.length < REGISTERS_PER_ROUND) {
+    if (deck.length < REGISTER_COUNT) {
       throw new RangeError('The deck must contain at least five cards')
     }
 
@@ -178,6 +177,10 @@ export class Game {
     return this.robotPlacements.positionOf(robotId)
   }
 
+  registerViewsFor(player: Player): readonly RegisterView[] {
+    return player.registers.publicView(this.registerIndex, this.activatedRobotIds.has(player.robot.id))
+  }
+
   private findSpawn(): Result<Position, 'NO_SPAWN_AVAILABLE'> {
     const free = this.board.startTiles.filter((position) => this.robotPlacements.occupantAt(position) === undefined)
     if (free.length === 0) return err('NO_SPAWN_AVAILABLE')
@@ -206,7 +209,6 @@ export class Game {
     if (removed.isErr()) return { roundConcluded: false }
     const player = removed.value
     this.robotPlacements.remove(player.robot.id)
-    player.robot.clearProgram()
     this.submittedPlayerIds.delete(playerId)
     this.activatedRobotIds.delete(player.robot.id)
     const { roundConcluded } = this.recheckActivationPhase()
@@ -223,7 +225,7 @@ export class Game {
   }
 
   private checkProgram(player: Player, cardIds: readonly CardId[]): Result<readonly Card[], 'INVALID_PROGRAM'> {
-    if (cardIds.length !== REGISTERS_PER_ROUND || new Set(cardIds).size !== REGISTERS_PER_ROUND) {
+    if (cardIds.length !== REGISTER_COUNT || new Set(cardIds).size !== REGISTER_COUNT) {
       return err('INVALID_PROGRAM')
     }
     const hand = new Map(player.hand.map((card) => [card.id, card]))
@@ -234,15 +236,17 @@ export class Game {
     return ok(program)
   }
 
-  submitProgram(playerId: PlayerId, cardIds: readonly CardId[]): Result<void, SubmitProgramError> {
+  submitProgram(playerId: PlayerId, cardIds: readonly CardId[]): Result<CompletedProgram, SubmitProgramError> {
     return this.checkCanSubmitProgram(playerId).andThen((player) =>
-      this.checkProgram(player, cardIds).map((program) => this.applyProgram(player, program)),
+      this.checkProgram(player, cardIds).map((program) => {
+        this.applyProgram(player, program)
+        return { playerId: player.id, cards: program }
+      }),
     )
   }
 
   private applyProgram(player: Player, program: readonly Card[]): void {
-    player.robot.setProgram(program)
-    player.updateRegisters(program as PrivateProgram)
+    player.updateRegisters(program)
     // Programmed cards stay out of both piles until the round ends.
     player.discard(player.hand.filter((card) => !program.includes(card)))
     player.clearHand()
@@ -260,9 +264,9 @@ export class Game {
     const validatedPrograms: { player: Player; cards: readonly Card[] }[] = []
     for (const player of this.players) {
       if (this.submittedPlayerIds.has(player.id)) continue
-      const selectedIds = new Set(player.program.map((card) => card?.id))
+      const selectedIds = new Set(player.registers.slots.map((card) => card?.id))
       const available = player.hand.filter((card) => !selectedIds.has(card.id))
-      const cards = player.program.map((card) => card ?? available.shift())
+      const cards = player.registers.slots.map((card) => card ?? available.shift())
       if (!cards.every((card): card is Card => card !== undefined)) return err('INVALID_PROGRAM')
       const checked = this.checkProgram(player, cards.map((card) => card.id))
       if (checked.isErr()) return err(checked.error)
@@ -285,7 +289,7 @@ export class Game {
         return err('INVALID_PROGRAM')
       }
       const program: readonly (Card | null)[] = cardIds.map((id) => id === null ? null : hand.get(id)!)
-      player.updateRegisters(program as PrivateProgram)
+      player.updateRegisters(program)
       return ok(undefined)
     })
   }
@@ -350,10 +354,10 @@ export class Game {
     }
     this.finishRegister()
     if (this.winner !== undefined) {
-      this.clearRound()
+      this.discardPrograms()
       return { roundConcluded: false }
     }
-    if (this.registerIndex === REGISTERS_PER_ROUND) {
+    if (this.registerIndex === REGISTER_COUNT) {
       this.finishRound()
       return { roundConcluded: true }
     }
@@ -379,19 +383,18 @@ export class Game {
       throw new Error('Robot actions can only execute during activation')
     }
 
-    const robot = this.nextRobotByPriority()
-    if (!robot) throw new Error('No robots remain to activate')
+    const player = this.nextPlayerByPriority()
+    if (!player) throw new Error('No robots remain to activate')
 
+    const robot = player.robot
     const registerIndex = this.registerIndex
-    const card = robot.getProgramCard(UnsignedInteger(registerIndex))
+    const card = player.registers.cardAt(UnsignedInteger(registerIndex))
     const previousPositions = this.roster.players.map((player) => this.robotPlacements.positionOf(player.robot.id))
     this.actionReboots = []
     const resolvedInstruction = this.executeCard(robot, card, registerIndex)
     const reboots = this.actionReboots
     this.actionReboots = []
     this.activatedRobotIds.add(robot.id)
-    const player = this.roster.requireOwner(robot.id)
-    const registers = player.revealRegister(registerIndex, card.instruction)
     const action: RobotActionResult = {
       robotId: robot.id,
       card,
@@ -408,7 +411,7 @@ export class Game {
     })
 
     const { roundConcluded } = this.recheckActivationPhase()
-    return { registerIndex, action, registers, pushedRobots, reboots, roundConcluded }
+    return { registerIndex, action, pushedRobots, reboots, roundConcluded }
   }
 
   private dealInitialHands(): void {
@@ -432,8 +435,8 @@ export class Game {
     this.resolvedInstructions.clear()
   }
 
-  private nextRobotByPriority(): Robot | undefined {
-    let nextRobot: Robot | undefined
+  private nextPlayerByPriority(): Player | undefined {
+    let nextPlayer: Player | undefined
     let nearestDistance = Infinity
     let smallestOffset = Infinity
     const fullTurn = 2 * Math.PI
@@ -442,9 +445,9 @@ export class Game {
 
     // Radians start east and increase clockwise because board y increases south.
     // Recheck current positions every action; exact ties retain roster order.
-    for (const { robot } of this.players) {
-      if (this.activatedRobotIds.has(robot.id)) continue
-      const position = this.robotPlacements.positionOf(robot.id)
+    for (const player of this.players) {
+      if (this.activatedRobotIds.has(player.robot.id)) continue
+      const position = this.robotPlacements.positionOf(player.robot.id)
       const dx = position.x - antenna.x
       const dy = position.y - antenna.y
       const distance = Math.abs(dx) + Math.abs(dy)
@@ -452,12 +455,12 @@ export class Game {
       const angle = Math.atan2(dy, dx)
       const offset = ((angle - antennaAngle) % fullTurn + fullTurn) % fullTurn
       if (distance < nearestDistance || (distance === nearestDistance && offset < smallestOffset)) {
-        nextRobot = robot
+        nextPlayer = player
         nearestDistance = distance
         smallestOffset = offset
       }
     }
-    return nextRobot
+    return nextPlayer
   }
 
   private executeCard(robot: Robot, card: Card, registerIndex: number): ResolvedInstruction | undefined {
@@ -513,17 +516,14 @@ export class Game {
     this.registerIndex++
   }
 
-  private clearRound(): void {
-    for (const player of this.players) {
-      player.discard(player.robot.program)
-      player.robot.clearProgram()
-    }
+  private discardPrograms(): void {
+    for (const player of this.players) player.discardProgram()
     this.submittedPlayerIds.clear()
-    this.registerIndex = 0
   }
 
   private finishRound(): void {
-    this.clearRound()
+    this.discardPrograms()
+    this.registerIndex = 0
     this.dealNewHands()
     this.lifecycle.enterProgramming()
   }

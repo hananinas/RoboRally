@@ -119,7 +119,7 @@ describe('shared gameplay movement', () => {
     game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrap()
 
     expect(game.getRobotPosition(robot.id)).toEqual(start)
-    expect(robot.program).toEqual(program)
+    expect(player.registers.slots).toEqual(program)
     expect(player.hand).toEqual([])
     expect(robot.direction).toBe(Direction.NORTH)
     expect(player.lastCheckpoint).toBe(0)
@@ -164,7 +164,7 @@ describe('shared gameplay movement', () => {
     expect(ownAction.action.card).toBe(bystanderProgram[0])
     expect(ownAction.action.position).toEqual(reboot)
     expect(game.currentRegister).toBe(1)
-    expect(bystander.robot.program).toEqual(bystanderProgram)
+    expect(bystander.registers.slots).toEqual(bystanderProgram)
 
     const register1Actions = [resolveRobotAction(game), resolveRobotAction(game)]
     const bystanderAction = register1Actions.find((result) => result.action.robotId === bystander.robot.id)

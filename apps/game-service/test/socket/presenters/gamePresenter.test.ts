@@ -57,7 +57,6 @@ describe('game presenter', () => {
     const resolvedInstruction = player.hand[0].instruction === 'AGAIN' ? undefined : player.hand[0].instruction
     const resolved = presentRobotActionResolved(game, {
       registerIndex: 0,
-      registers: player.registers,
       action: {
         robotId: player.robot.id,
         card: player.hand[0],
@@ -249,7 +248,7 @@ describe('game presenter', () => {
       direction: Direction.SOUTH,
     }
 
-    const resolved = presentRobotActionResolved(game, { registerIndex: 4, action, pushedRobots: [], reboots: [], registers: player.registers, roundConcluded: false })
+    const resolved = presentRobotActionResolved(game, { registerIndex: 4, action, pushedRobots: [], reboots: [], roundConcluded: false })
 
     expectTypeOf(resolved).toEqualTypeOf<RobotActionResolved>()
     expect(resolved).toEqual({

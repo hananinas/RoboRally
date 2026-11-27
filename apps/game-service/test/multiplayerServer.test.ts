@@ -102,7 +102,9 @@ it('waits for the roster, broadcasts register-major actions, and deals two priva
         events[index] = []
       }
       expect(game.lastActivePhase).toBe('programming')
-      expect(players.map((player) => player.robot.program)).toEqual([[], []])
+      expect(players.map((player) => player.registers.slots)).toEqual([
+        [null, null, null, null, null], [null, null, null, null, null],
+      ])
     }
   } finally {
     for (const socket of clients) socket.disconnect()

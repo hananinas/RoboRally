@@ -17,7 +17,7 @@ Will update with a more conceptual domain diagram which will be used for present
         +submitProgram(PlayerId playerId, CardId[5] cardIds)
         +moveRobot(Robot robot, Direction direction, PositiveInteger steps)
         +executeNextAction() NextActionResult
-        -nextRobotByPriority() Robot
+        -nextPlayerByPriority() Player
         -executeCard(Robot robot, Card card)
         -resolveMovementEntry(Robot robot, Position position) continue_or_stop
         }
@@ -57,16 +57,16 @@ Will update with a more conceptual domain diagram which will be used for present
         class Player {
         -robot: Robot
         -hand: Card[] unordered
+        -registers: Card?[5] ordered
         +lastCheckpoint: int
+        +updateRegisters(Card?[5] registers)
+        +cardInRegister(int index) Card
         +completeCheckpoint(int number) bool
         }
 
         class Robot {
         +id: RobotId
         -direction: Direction
-        +program: Card[5] ordered
-        +setProgram(Card[5] program)
-        +getProgramCard(int registerIndex) Card
         +turn(int quarterTurns)
         }
 
@@ -97,7 +97,7 @@ Will update with a more conceptual domain diagram which will be used for present
 
         Game "1" --> "*" Card : deck
         Player "1" --> "*" Card : hand
-        Robot "1" --> "5" Card : program
+        Player "1" --> "5" Card : registers
 
 ```
 
@@ -158,11 +158,11 @@ pnpm --filter @robo-rally/client exec playwright test --config playwright.member
 
 # Robot
 
-Has an ID, its direction, and an ordered program of five cards. Game assigns the program through `setProgram()` and reads the card for each register. Robot does not know its position or which Tile it occupies.
+Has an ID and its direction. Robot does not know its position or which Tile it occupies.
 
 # Player
 
-Has an assigned Robot and an unordered hand of cards. A five-card program is submitted through Game rather than assigned directly to Robot.
+Has an assigned Robot, an unordered hand of cards, and five ordered register slots. A five-card program is submitted through Game, which writes it to the registers.
 
 # Cards
 
@@ -170,7 +170,7 @@ Each Card has an instance ID and an Instruction. The shared instruction catalog 
 
 The client keeps labels and icons in one presentation map and uses the shared effect kind to choose animation timing.
 
-A Player's hand and Game's deck are unordered Card collections. A Robot's program is an ordered list of five Cards. These are properties, not separate classes.
+A Player's hand and Game's deck are unordered Card collections. A Player's registers are an ordered list of five slots, each holding one Card or nothing. These are properties, not separate classes.
 
 # Direction
 

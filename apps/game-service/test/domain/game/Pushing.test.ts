@@ -45,10 +45,9 @@ describe('robot pushing', () => {
       { robotId: robots[2].id, position: reboot, direction: Direction.WEST },
     ]
     expect(result.pushedRobots).toEqual(expected)
-    expect(result.registers[0]).toEqual({ status: 'REVEALED', instruction: program[0].instruction })
-    expect(players[0].registers).toEqual(result.registers)
+    expect(game.registerViewsFor(players[0])[0]).toEqual({ kind: 'revealed', instruction: program[0].instruction })
     for (const player of players.slice(1)) {
-      expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'HIDDEN' })))
+      expect(game.registerViewsFor(player)).toEqual(Array.from({ length: 5 }, () => ({ kind: 'hidden' })))
     }
     game.executeNextAction()
     expect(result.pushedRobots).toEqual(expected)
@@ -136,7 +135,7 @@ describe('robot pushing', () => {
 
     expect(robots.map((robot) => game.getRobotPosition(robot.id))).toEqual([position(1 + steps), position(2 + steps), position(3 + steps)])
     expect(robots.map((robot) => robot.direction)).toEqual(facing)
-    expect(robots.map((robot) => robot.program)).toEqual(players.map(() => program))
+    expect(players.map((player) => player.registers.slots)).toEqual(players.map(() => program))
     expect(game.currentRegister).toBe(0)
     expect(resolveRobotAction(game).action).toMatchObject({
       robotId: robots[1].id,
@@ -189,7 +188,7 @@ describe('robot pushing', () => {
 
     expect(resolveRobotAction(game).action.robotId).toBe(robots[0].id)
     expect(game.getRobotPosition(robots[1].id)).toEqual(reboot)
-    expect(robots[1].program).toEqual(program)
+    expect(players[1].registers.slots).toEqual(program)
     expect(game.currentRegister).toBe(0)
     expect(resolveRobotAction(game).action).toMatchObject({
       robotId: robots[1].id, card: program[0], position: position(0, 4), direction: Direction.NORTH,

@@ -37,9 +37,6 @@ describe('Game activation loop', () => {
         registerIndex,
         pushedRobots: [],
         reboots: [],
-        registers: Array.from({ length: 5 }, (_, index) => index <= registerIndex
-          ? { status: 'REVEALED', instruction: 'TURN_LEFT' }
-          : { status: 'HIDDEN' }),
         action: {
           robotId: robot.id,
           card: deck[registerIndex],
@@ -53,7 +50,7 @@ describe('Game activation loop', () => {
       expect(game.lastActivePhase).toBe(registerIndex === 4 ? 'programming' : 'activation')
     }
 
-    expect(robot.program).toEqual([])
+    expect(player.registers.slots).toEqual([null, null, null, null, null])
     expect(player.hand).toEqual(deck)
     expect(() => resolveRobotAction(game)).toThrow()
 

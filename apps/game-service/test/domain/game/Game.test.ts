@@ -4,6 +4,8 @@ import { Card, Deck, Direction, EmptyTile, PitTile, type Position } from '@/doma
 import { Integer } from '@/numbers'
 import { addTestPlayer, createEmptyTileGrid, createTestBoard, createTestGame, createTestPlacement, instructionsOf } from '../../fixtures.ts'
 
+const emptyViews = Array.from({ length: 5 }, () => ({ kind: 'empty' }))
+
 function createGame() {
   const board = createTestBoard(createEmptyTileGrid(2, 2), { x: Integer(1), y: Integer(1), angle: Math.PI / 2 }, { x: Integer(0), y: Integer(1) }, [{ x: Integer(0), y: Integer(0) }])
   const deck: Card[] = [
@@ -48,15 +50,12 @@ describe('Game programming', () => {
       { registerIndex: 3, position: { x: 9, y: 5 }, direction: Direction.SOUTH },
       { registerIndex: 4, position: { x: 9, y: 5 }, direction: Direction.NORTH },
     ])
-    expect(actions.map(({ registers }, index) => registers[index])).toEqual(
-      deck.map((card) => ({ status: 'REVEALED', instruction: card.instruction })),
-    )
-    expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
+    expect(game.registerViewsFor(player)).toEqual(emptyViews)
     expect(game.lastActivePhase).toBe('programming')
   })
 
   it('starts in programming and deals its card supply to the player', () => {
-    const { board, robot, player, deck, game } = createGame()
+    const { board, player, deck, game } = createGame()
 
     expect(game.board).toBe(board)
     expect(game.players).toEqual([player])
@@ -64,7 +63,7 @@ describe('Game programming', () => {
     expect(game.currentRegister).toBe(0)
     expect(player.hand).toHaveLength(deck.length)
     expect(player.hand).toEqual(expect.arrayContaining(deck))
-    expect(robot.program).toEqual([])
+    expect(player.registers.slots).toEqual([null, null, null, null, null])
 
     deck.pop()
     expect(player.hand).toHaveLength(6)
@@ -80,39 +79,35 @@ describe('Game programming', () => {
       const { player } = placement
       if (index === 0) player.drawHand()
       player.updateRegisters([deck[0], deck[1], deck[2], deck[3], deck[4]])
-      player.revealRegister(0, 'TURN_LEFT')
       return placement
     })
     const players = placements.map(({ player }) => player)
-    const snapshots = players.map((player) => player.registers)
 
-    createTestGame({ board, players: placements, deck: instructionsOf(deck) })
+    const game = createTestGame({ board, players: placements, deck: instructionsOf(deck) })
 
     for (const player of players) {
-      expect(player.registers).toEqual(Array.from({ length: 5 }, () => ({ status: 'EMPTY' })))
+      expect(player.registers.slots).toEqual([null, null, null, null, null])
+      expect(game.registerViewsFor(player)).toEqual(emptyViews)
       expect(player.hand).toHaveLength(deck.length)
       expect(player.hand).toEqual(expect.arrayContaining(deck))
-    }
-    for (const snapshot of snapshots) {
-      expect(snapshot[0]).toEqual({ status: 'REVEALED', instruction: 'TURN_LEFT' })
     }
   })
 
   it('preserves the selected order and enters activation after a valid submission', () => {
-    const { robot, player, deck, game } = createGame()
+    const { player, deck, game } = createGame()
     const program = [deck[5], deck[0], deck[3], deck[2], deck[1]]
     const programIds = program.map((card) => card.id)
 
     game.submitProgram(player.id, programIds)
 
-    expect(robot.program).toEqual(program)
+    expect(player.registers.slots).toEqual(program)
     expect(game.lastActivePhase).toBe('activation')
     expect(game.currentRegister).toBe(0)
     expect(game.submitProgram(player.id, programIds)._unsafeUnwrapErr()).toBe('WRONG_PHASE')
   })
 
   it('rejects invalid submissions without changing the robot or game phase', () => {
-    const { robot, player, deck, game } = createGame()
+    const { player, deck, game } = createGame()
     const validIds = deck.slice(0, 5).map((card) => card.id)
 
     expect(game.submitProgram('unknown', validIds)._unsafeUnwrapErr()).toBe('PLAYER_NOT_IN_GAME')
@@ -121,7 +116,7 @@ describe('Game programming', () => {
     expect(game.submitProgram(player.id, [...deck.slice(0, 4).map((card) => card.id), 'foreign'])._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
 
     expect(game.lastActivePhase).toBe('programming')
-    expect(robot.program).toEqual([])
+    expect(player.registers.slots).toEqual([null, null, null, null, null])
     game.submitProgram(player.id, validIds)
     expect(game.lastActivePhase).toBe('activation')
   })
@@ -150,13 +145,13 @@ describe('Game programming', () => {
   })
 
   it('blocks program submission while paused without changing state', () => {
-    const { robot, player, deck, game } = createGame()
+    const { player, deck, game } = createGame()
     const validIds = deck.slice(0, 5).map((card) => card.id)
 
     game.pause()
     expect(game.submitProgram(player.id, validIds)._unsafeUnwrapErr()).toBe('GAME_PAUSED')
     expect(game.lastActivePhase).toBe('programming')
-    expect(robot.program).toEqual([])
+    expect(player.registers.slots).toEqual([null, null, null, null, null])
 
     game.resume()
     game.submitProgram(player.id, validIds)

@@ -34,7 +34,7 @@ describe('environment execution', () => {
           expect(game.currentRegister).toBe(registerIndex)
         }
         expect(game.lastActivePhase).toBe('activation')
-        expect(players[0].robot.program).toHaveLength(5)
+        expect(players[0].registers.slots.every((card) => card !== null)).toBe(true)
         expect(game.hasPendingEnvironment).toBe(true)
         if (roundNumber === 1 && registerIndex === 0) expect(players[0].lastCheckpoint).toBe(0)
         expect(() => game.executeNextAction()).toThrow()
@@ -46,7 +46,7 @@ describe('environment execution', () => {
         })
         expect(game.currentRegister).toBe(registerIndex)
         expect(game.lastActivePhase).toBe('activation')
-        expect(players[0].robot.program).toHaveLength(5)
+        expect(players[0].registers.slots.every((card) => card !== null)).toBe(true)
         expect(game.hasPendingEnvironment).toBe(true)
         expect(() => game.executeNextAction()).toThrow()
         expect(game.executeNextStep()).toEqual({
@@ -59,7 +59,9 @@ describe('environment execution', () => {
         expect(game.currentRegister).toBe((registerIndex + 1) % 5)
       }
       expect(game.lastActivePhase).toBe('programming')
-      expect(players.map((player) => player.robot.program)).toEqual([[], []])
+      expect(players.map((player) => player.registers.slots)).toEqual([
+        [null, null, null, null, null], [null, null, null, null, null],
+      ])
       expect(() => game.executeNextStep()).toThrow()
     }
   })
