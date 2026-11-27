@@ -3,6 +3,10 @@ import type { RobotId } from '@/domain/game/ids'
 import { neighbour, type Direction, type Position } from '@/domain/game/spatial'
 import { Integer } from '@/numbers'
 
+// Issue #273: a moving robot may push at most this many robots in a single step.
+// If more robots are lined up behind the pushed ones, the whole step is blocked.
+export const PUSH_LIMIT = 1
+
 export class RobotPlacements {
   readonly #board: Board
   readonly #positions = new Map<RobotId, Position>()
@@ -77,7 +81,8 @@ export class RobotPlacements {
     return nearest
   }
 
-  // One atomic step. Return displaced robots farthest first for entry effects.
+  // One atomic step. Pushes at most PUSH_LIMIT robots; a longer line blocks the step.
+  // Return displaced robots farthest first for entry effects.
   push(robotId: RobotId, direction: Direction): readonly RobotId[] {
     const chain = [robotId]
     let position = this.positionOf(robotId)
@@ -86,6 +91,7 @@ export class RobotPlacements {
       const nextPosition = neighbour(position, direction)
       const occupant = this.occupantAt(nextPosition)
       if (occupant === undefined) break
+      if (chain.length > PUSH_LIMIT) return []
       chain.push(occupant)
       position = nextPosition
     }
