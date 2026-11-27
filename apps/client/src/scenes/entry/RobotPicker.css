@@ -216,6 +216,8 @@
 
 .robot-picker__swatch:disabled {
   cursor: not-allowed;
+  opacity: 0.4;
+  filter: grayscale(30%);
 }
 
 .robot-picker__swatch[aria-pressed='true'] {

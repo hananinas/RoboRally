@@ -97,7 +97,7 @@ export function handleJoinLobby(
           : { outcome: 'ALREADY_HAS_MEMBERSHIP' })
       }
       if (lobbySession.lobby.isFull) return ack({ outcome: 'LOBBY_FULL' })
-      lobbySession.join(socket)
+      lobbySession.join(socket, COLOR_PALETTE)
       context.registry.setActiveMembership(user.userId, { kind: 'lobby', lobbyId: lobbySession.lobby.lobbyId })
       ack({ outcome: 'LOBBY_JOINED', lobby: presentLobby(lobbySession.lobby) })
     },

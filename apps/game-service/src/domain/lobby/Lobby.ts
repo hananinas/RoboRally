@@ -43,8 +43,13 @@ export class Lobby {
     return this.membersById.get(userId)
   }
 
-  addMember(user: User, connectionId: string): void {
-    this.membersById.set(user.userId, { user, connectionId, robotSpriteId: DEFAULT_ROBOT_ID })
+  addMember(user: User, connectionId: string, palette?: readonly string[]): void {
+    let colorHex: string | undefined
+    if (palette && palette.length > 0) {
+      const takenColors = new Set([...this.membersById.values()].map((m) => m.colorHex).filter(Boolean))
+      colorHex = palette.find((hex) => !takenColors.has(hex))
+    }
+    this.membersById.set(user.userId, { user, connectionId, robotSpriteId: DEFAULT_ROBOT_ID, colorHex })
   }
 
   selectRobot(userId: string, robotSpriteId: RobotSpriteId): void {
