@@ -256,16 +256,18 @@ export class GameSession {
       this.seats.delete(user.userId)
       const kicked = connectionId === null
       if (kicked) announceResumed = this.resumeUnlessStillDisconnected()
-      return {
-        gameId: this.game.id, playerId: player.id, robotId: player.robot.id,
-        ...(kicked && { paused: this.game.paused }),
-      }
+      return { playerId: player.id, robotId: player.robot.id, kicked }
     })
 
     // The handler clears all removed memberships before publishing the departures.
     const announce = () => {
       try {
-        for (const departure of departures) this.io.to(this.publicRoom).emit('game.playerLeft', departure)
+        for (const { playerId, robotId, kicked } of departures) {
+          this.io.to(this.publicRoom).emit('game.playerLeft', {
+            gameId: this.game.id, playerId, robotId,
+            ...(kicked && { paused: this.game.paused }),
+          })
+        }
         if (votesChanged) this.publishVotes()
       } finally {
         this.actionScheduler.scheduleNextAction()
