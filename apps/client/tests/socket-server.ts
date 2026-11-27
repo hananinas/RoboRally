@@ -368,7 +368,7 @@ io.on('connection', (socket) => {
     const map = maps.find((candidate) => candidate.mapName === mapName) ?? maps[1]!
     return {
     lobbyId: GAME_ID, name: lobbyName, mapName: map.mapName, mapDisplayName: map.name, mapIcon: map.icon, ownerUserId: user.userId,
-    playerCount: 1, maxPlayers: 6, players: [{ ...user, robotSpriteId: 'tank' }], robots,
+    playerCount: 1, maxPlayers: 6, players: [{ ...user, robotSpriteId: 'tank', connected: true }], robots,
     }
   }
   socket.on('clock.get', (_, acknowledge) => {

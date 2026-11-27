@@ -12,7 +12,7 @@ function resolveLobbyMembership(context: SocketContext, socket: GameSocket, user
   const result = lobbySession.reattach(socket)
   return result.isErr()
     ? { outcome: result.error }
-    : { outcome: 'IN_LOBBY', lobby: presentLobby(lobbySession.lobby), user }
+    : { outcome: 'IN_LOBBY', lobby: presentLobby(lobbySession), user }
 }
 
 function resolveGameMembership(context: SocketContext, socket: GameSocket, user: User): {

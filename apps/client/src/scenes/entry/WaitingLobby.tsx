@@ -8,11 +8,13 @@ type Props = { lobby: LobbyState; userId: string; disabled: boolean; onStart: ()
 export default function WaitingLobby({ lobby, userId, disabled, onStart, onLeave }: Props) {
   const owner = lobby.ownerUserId === userId
   const emptySeats = Math.max(0, lobby.maxPlayers - lobby.players.length)
+  const reconnecting = lobby.players.some((player) => !player.connected)
+  const ownerStatus = reconnecting ? 'Waiting for a player to reconnect.' : 'Waiting for players.'
 
   return (
     <section className="waiting-lobby" aria-labelledby="waiting-lobby-title">
       <h2 id="waiting-lobby-title" className="waiting-lobby__title">{lobby.name}</h2>
-      <p className="waiting-lobby__status">{owner ? 'Waiting for players.' : 'Waiting for the owner to start.'}</p>
+      <p className="waiting-lobby__status">{owner ? ownerStatus : 'Waiting for the owner to start.'}</p>
       <div aria-live="polite" aria-atomic="true">
         <p className="waiting-lobby__heading"><span>Players</span><span>{lobby.playerCount}/{lobby.maxPlayers} seats filled</span></p>
         <ul className="waiting-lobby__players" aria-label="Lobby seats">
@@ -20,8 +22,11 @@ export default function WaitingLobby({ lobby, userId, disabled, onStart, onLeave
             const self = player.userId === userId
             const playerIsOwner = player.userId === lobby.ownerUserId
             const robot = lobby.robots.find((option) => option.id === player.robotSpriteId)
+            const seatClasses = ['waiting-lobby__seat']
+            if (self) seatClasses.push('waiting-lobby__seat--self')
+            if (!player.connected) seatClasses.push('waiting-lobby__seat--away')
             return (
-              <li className={`waiting-lobby__seat${self ? ' waiting-lobby__seat--self' : ''}`} key={player.userId}>
+              <li className={seatClasses.join(' ')} key={player.userId}>
                 <span className="waiting-lobby__portrait" role="img" aria-label={`${robot?.name ?? 'Unknown'} robot`}>
                   <RobotPreview sprite={robotOptionFor(player.robotSpriteId).sprite} />
                 </span>
@@ -29,7 +34,8 @@ export default function WaitingLobby({ lobby, userId, disabled, onStart, onLeave
                 <span className="waiting-lobby__roles">
                   {playerIsOwner && <span className="waiting-lobby__badge waiting-lobby__badge--owner">Owner</span>}
                   {self && <span className="waiting-lobby__badge">You</span>}
-                  {!self && !playerIsOwner && <span className="waiting-lobby__joined">Joined</span>}
+                  {!player.connected && <span className="waiting-lobby__away">Reconnecting</span>}
+                  {player.connected && !self && !playerIsOwner && <span className="waiting-lobby__joined">Joined</span>}
                 </span>
               </li>
             )
@@ -47,7 +53,7 @@ export default function WaitingLobby({ lobby, userId, disabled, onStart, onLeave
         <button className="entry-secondary-button" type="button" disabled={disabled} onClick={onLeave}>Leave lobby</button>
         <button className="entry-primary-button" type="button" disabled title="Ready status is coming soon.">Ready</button>
       </div>
-      {owner && <button className="entry-primary-button waiting-lobby__start" type="button" disabled={disabled} onClick={onStart}>Start</button>}
+      {owner && <button className="entry-primary-button waiting-lobby__start" type="button" disabled={disabled || reconnecting} onClick={onStart}>Start</button>}
     </section>
   )
 }

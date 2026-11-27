@@ -2,6 +2,7 @@ import type { BoardMapSummary, LobbyState, LobbySummary } from '@robo-rally/game
 import { boardMaps } from '@/domain/game/boardMaps'
 import { robotCatalog } from '@/domain/game/robotCatalog'
 import { Lobby } from '@/domain/lobby/Lobby'
+import type { LobbySession } from '@/socket/LobbySession'
 
 export function presentBoardMaps(): readonly BoardMapSummary[] {
   return Object.entries(boardMaps).map(([mapName, map]) => ({
@@ -19,12 +20,16 @@ export function presentLobbySummary(lobby: Lobby): LobbySummary {
   }
 }
 
-export function presentLobby(lobby: Lobby): LobbyState {
+export function presentLobby(lobbySession: LobbySession): LobbyState {
+  const { lobby } = lobbySession
   return {
     ...presentLobbySummary(lobby),
     ownerUserId: lobby.ownerUserId,
     players: lobby.members.map(({ user, robotSpriteId }) => ({
-      userId: user.userId, username: user.username, robotSpriteId,
+      userId: user.userId,
+      username: user.username,
+      robotSpriteId,
+      connected: lobbySession.isConnected(user.userId),
     })),
     robots: robotCatalog,
   }

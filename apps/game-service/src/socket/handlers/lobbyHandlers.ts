@@ -79,16 +79,15 @@ export function handleCreateLobby(
       if (membership) {
         const existingLobbySession = context.registry.getCurrentLobby(user.userId)
         return ack(existingLobbySession && existingLobbySession.isMember(socket).isOk()
-          ? { outcome: 'LOBBY_JOINED', lobby: presentLobby(existingLobbySession.lobby) }
+          ? { outcome: 'LOBBY_JOINED', lobby: presentLobby(existingLobbySession) }
           : { outcome: 'ALREADY_HAS_MEMBERSHIP' })
       }
       // Seat the owner before registering anything, so a failed room join retains no lobby.
       const lobbySession = new LobbySession(new Lobby(name, mapName, user))
       lobbySession.attach(socket)
       context.registry.addLobby(lobbySession)
-      const { lobby } = lobbySession
-      context.registry.setActiveMembership(user.userId, { kind: 'lobby', lobbyId: lobby.lobbyId })
-      ack({ outcome: 'LOBBY_JOINED', lobby: presentLobby(lobby) })
+      context.registry.setActiveMembership(user.userId, { kind: 'lobby', lobbyId: lobbySession.lobby.lobbyId })
+      ack({ outcome: 'LOBBY_JOINED', lobby: presentLobby(lobbySession) })
     },
   })
 }
@@ -110,13 +109,13 @@ export function handleJoinLobby(
       if (membership) {
         return ack(membership.kind === 'lobby' && membership.lobbyId === lobbySession.lobby.lobbyId
           && lobbySession.isMember(socket).isOk()
-          ? { outcome: 'LOBBY_JOINED', lobby: presentLobby(lobbySession.lobby) }
+          ? { outcome: 'LOBBY_JOINED', lobby: presentLobby(lobbySession) }
           : { outcome: 'ALREADY_HAS_MEMBERSHIP' })
       }
       if (lobbySession.lobby.isFull) return ack({ outcome: 'LOBBY_FULL' })
       lobbySession.join(socket)
       context.registry.setActiveMembership(user.userId, { kind: 'lobby', lobbyId: lobbySession.lobby.lobbyId })
-      ack({ outcome: 'LOBBY_JOINED', lobby: presentLobby(lobbySession.lobby) })
+      ack({ outcome: 'LOBBY_JOINED', lobby: presentLobby(lobbySession) })
     },
   })
 }
@@ -139,7 +138,7 @@ export function handleSelectRobot(
     },
     run: ({ user, lobbySession, robotSpriteId }, ack) => {
       lobbySession.lobby.selectRobot(user.userId, robotSpriteId)
-      const lobby = presentLobby(lobbySession.lobby)
+      const lobby = presentLobby(lobbySession)
       ack({ outcome: 'ROBOT_SELECTED', lobby })
       socket.to(lobbySession.room).emit('lobby.updated', { lobby })
     },

@@ -161,7 +161,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     const owner = await connect('Owner')
     const lobby = await create(owner)
     const first = lobby.players[0]!
-    expect(first).toEqual({ userId: lobby.ownerUserId, username: 'Owner', robotSpriteId: 'tank' })
+    expect(first).toEqual({ userId: lobby.ownerUserId, username: 'Owner', robotSpriteId: 'tank', connected: true })
     expect(lobby.players).toHaveLength(lobby.playerCount)
     const outsider = await connect('Outsider')
     await create(outsider)
@@ -174,7 +174,9 @@ describe('lobby lifecycle over Socket.IO', () => {
     if (result.outcome !== 'LOBBY_JOINED') throw new Error(result.outcome)
     const roster = result.lobby
     expect(await joined).toEqual(roster)
-    expect(roster.players).toEqual([first, { userId: expect.any(String), username: 'Other', robotSpriteId: 'tank' }])
+    expect(roster.players).toEqual([
+      first, { userId: expect.any(String), username: 'Other', robotSpriteId: 'tank', connected: true },
+    ])
     expect(roster.playerCount).toBe(2)
     expect(await other.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })).toEqual(result)
     expect(await other.emitWithAck('membership.get', {})).toEqual({ outcome: 'IN_LOBBY', lobby: roster, user: { userId: 'Other', username: 'Other' } })
@@ -188,7 +190,15 @@ describe('lobby lifecycle over Socket.IO', () => {
 
     const left = new Promise<LobbyState>((resolve) => other.once('lobby.updated', ({ lobby: state }) => resolve(state)))
     if (departure === 'leave') await owner.emitWithAck('lobby.leave', {})
-    else await disconnectUntilExpiry(owner)
+    else await disconnectUntilExpiry(owner, async () => {
+      expect(await other.emitWithAck('membership.get', {})).toMatchObject({
+        outcome: 'IN_LOBBY',
+        lobby: {
+          playerCount: 2,
+          players: [{ username: 'Owner', connected: false }, { username: 'Other', connected: true }],
+        },
+      })
+    })
     expect(await left).toEqual({ ...roster, ownerUserId: roster.players[1]!.userId, playerCount: 1, players: [roster.players[1]!] })
     await outsider.emitWithAck('membership.get', {})
     expect(foreignUpdates).not.toHaveBeenCalled()

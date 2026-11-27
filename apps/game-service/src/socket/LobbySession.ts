@@ -30,6 +30,12 @@ export class LobbySession {
     return this.seats.activeSeat(socket.data.user.userId, socket.id).map(() => undefined)
   }
 
+  /** Whether this member has a connection bound to their seat, rather than one being held for them. */
+  isConnected(userId: string): boolean {
+    const seat = this.seats.get(userId)
+    return seat !== undefined && seat.connectionId !== null
+  }
+
   /** Joins the room and seats the member against this connection. */
   attach(socket: GameSocket): boolean {
     if (!this.lobby.getMember(socket.data.user.userId)) return false
@@ -41,7 +47,7 @@ export class LobbySession {
   join(socket: GameSocket): void {
     this.lobby.addMember(socket.data.user)
     this.attach(socket)
-    socket.to(this.room).emit('lobby.updated', { lobby: presentLobby(this.lobby) })
+    socket.to(this.room).emit('lobby.updated', { lobby: presentLobby(this) })
   }
 
   /**
@@ -72,7 +78,7 @@ export class LobbySession {
     this.seats.remove(userId)
     this.lobby.removeMember(userId)
     if (this.lobby.size > 0) {
-      io.to(this.room).emit('lobby.updated', { lobby: presentLobby(this.lobby) })
+      io.to(this.room).emit('lobby.updated', { lobby: presentLobby(this) })
     }
   }
 

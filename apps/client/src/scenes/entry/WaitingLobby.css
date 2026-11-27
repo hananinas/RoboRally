@@ -63,6 +63,11 @@
   background: var(--entry-selected);
 }
 
+.waiting-lobby__seat--away {
+  border-style: dashed;
+  box-shadow: none;
+}
+
 .waiting-lobby__portrait,
 .waiting-lobby__empty-icon {
   display: grid;
@@ -107,9 +112,14 @@
 }
 
 .waiting-lobby__joined,
+.waiting-lobby__away,
 .waiting-lobby__seat-number {
   color: var(--entry-muted);
   font-size: 10px;
+}
+
+.waiting-lobby__away {
+  font-style: italic;
 }
 
 .waiting-lobby__seat--empty {
