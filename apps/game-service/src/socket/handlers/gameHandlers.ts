@@ -2,6 +2,7 @@ import {
   emptyRequestSchema,
   submitProgramSchema,
   updateRegistersSchema,
+  voteSchema,
   type EmptyRequest,
   type LeaveResult,
   type ProgramResult,
@@ -9,6 +10,8 @@ import {
   type UpdateRegisters,
   type UpdateRegistersResult,
   type User,
+  type Vote,
+  type VoteResult,
 } from '@robo-rally/game-events'
 import { err, ok } from 'neverthrow'
 import { withValidatedRequest } from '@/socket/utilities/withValidatedRequest'
@@ -39,6 +42,24 @@ export function handleSubmitProgram(
       ack({ outcome: 'ACCEPTED' })
       publishProgramFinalized(gameSession, result.value, 'SUBMITTED')
       gameSession.noteProgramSubmitted()
+    },
+  })
+}
+
+export function handleVote(
+  context: SocketContext,
+  socket: GameSocket,
+  payload: Vote,
+  acknowledge: (result: VoteResult) => void,
+): void {
+  withValidatedRequest({
+    socket, command: 'game.vote', schema: voteSchema, payload, acknowledge,
+    resolve: (user) => resolveActiveMember(context, socket, user),
+    run: ({ gameSession, player }, ack) => {
+      const result = gameSession.castVote(player, payload.proposalId)
+      if (result.isErr()) return ack({ outcome: result.error })
+      if (result.value) context.registry.clearActiveMembership(result.value.userId)
+      ack({ outcome: 'ACCEPTED' })
     },
   })
 }

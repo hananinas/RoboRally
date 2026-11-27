@@ -1,4 +1,5 @@
-import type { GameInitialization, PublicGameState, RobotSpriteId, User, Winner } from '@robo-rally/game-events'
+import { randomUUID } from 'node:crypto'
+import type { GameInitialization, PublicGameState, RobotSpriteId, User, VoteProposal, Winner } from '@robo-rally/game-events'
 import { err, ok, type Result } from 'neverthrow'
 import type { GameSocket, GameSocketServer } from '@/socket/gameServer'
 import type { AddPlayerError, Game, Player } from '@/domain/game/index'
@@ -16,6 +17,13 @@ export type Seat = {
   connectionId: string | null
 }
 
+type Ballot = {
+  proposalId: string
+  action: VoteProposal['action']
+  votesRequired: number
+  voters: Set<string>
+}
+
 export type ReattachedMembership = {
   initialization: GameInitialization
   announceReconnected: () => void
@@ -26,6 +34,7 @@ export class GameSession {
   readonly game: Game
   readonly publicRoom: string
   private readonly seats = new Map<string, Seat>()
+  private ballots: Ballot[] = []
   readonly actionScheduler: ActionScheduler
   readonly programmingTimer: ProgrammingTimer
   private recordedWinner: Winner | null = null
@@ -64,6 +73,7 @@ export class GameSession {
       logError('Failed to complete programs at the deadline', error, { gameId: this.game.id, source: 'programmingTimer' })
       this.actionScheduler.stop()
       this.game.abort()
+      this.ballots = []
       this.io.to(this.publicRoom).emit('game.aborted', { gameId: this.game.id })
     }
   }
@@ -93,7 +103,51 @@ export class GameSession {
   }
 
   publicState(): PublicGameState {
-    return presentPublicGameState(this.game, this.programmingTimer.state(), this.seats.values(), this.winner())
+    return presentPublicGameState(this.game, this.programmingTimer.state(), this.seats.values(), this.winner(), this.voteSummaries())
+  }
+
+  private voteSummaries(): VoteProposal[] {
+    return this.ballots.map(({ proposalId, action, votesRequired, voters }) => ({
+      proposalId, action, votesRequired, votesCast: voters.size,
+    }))
+  }
+
+  private publishVotes(): void {
+    this.io.to(this.publicRoom).emit('game.votesChanged', { gameId: this.game.id, proposals: this.voteSummaries() })
+  }
+
+  // A change of electorate starts a fresh ballot for each remaining offline seat.
+  private resetDisconnectVotes(): boolean {
+    const hadVotes = this.ballots.length > 0
+    const offline = [...this.seats.values()].filter((seat) => seat.connectionId === null)
+    const eligibleCount = this.seats.size - offline.length
+    const votesRequired = Math.ceil(2 * eligibleCount / 3)
+    this.ballots = this.game.paused && eligibleCount > 0 ? offline.map(({ player }) => ({
+      proposalId: randomUUID(),
+      action: { kind: 'KICK_DISCONNECTED_PLAYER', targetPlayerId: player.id },
+      votesRequired,
+      voters: new Set<string>(),
+    })) : []
+    return hadVotes || this.ballots.length > 0
+  }
+
+  castVote(player: Player, proposalId: string): Result<User | null, 'PROPOSAL_CLOSED'> {
+    const ballot = this.ballots.find((candidate) => candidate.proposalId === proposalId)
+    if (!this.game.paused || !ballot) return err('PROPOSAL_CLOSED')
+    const target = [...this.seats.values()].find((seat) => seat.player.id === ballot.action.targetPlayerId)
+    if (!target || target.connectionId !== null) return err('PROPOSAL_CLOSED')
+    if (ballot.voters.has(player.id)) return ok(null)
+
+    ballot.voters.add(player.id)
+    if (ballot.voters.size < ballot.votesRequired) {
+      this.publishVotes()
+      return ok(null)
+    }
+
+    this.ballots = this.ballots.filter((other) => other !== ballot)
+    this.removeSeat(target)
+    this.publishVotes()
+    return ok(target.user)
   }
 
   isMember(socket: GameSocket): Result<Seat, 'NOT_A_MEMBER'> {
@@ -134,7 +188,9 @@ export class GameSession {
     const seat = this.seatFor(socket)
     if (seat && this.reattachSeat(seat, socket.id)) {
       const announceResumed = this.resumeUnlessStillDisconnected()
+      const votesChanged = this.resetDisconnectVotes()
       announceResumed()
+      if (votesChanged) this.publishVotes()
       this.notifyReconnected(seat.player)
     }
   }
@@ -146,7 +202,9 @@ export class GameSession {
 
     seat.connectionId = null
     this.game.pause()
+    const votesChanged = this.resetDisconnectVotes()
     this.io.to(this.publicRoom).emit('game.playerConnectionChanged', presentPlayerConnectionChanged(this.game, seat.player, false))
+    if (votesChanged) this.publishVotes()
   }
 
   addSeat(user: User, connectionId: string, robotSpriteId: RobotSpriteId): Result<Player, AddPlayerError> {
@@ -157,18 +215,27 @@ export class GameSession {
   }
 
   leave(socket: GameSocket): Result<void, 'NOT_A_MEMBER'> {
-    return this.isMember(socket).map(({ player, user }) => {
-      const { roundConcluded } = this.game.removePlayer(player.id)
-      this.seats.delete(user.userId)
+    return this.isMember(socket).map((seat) => {
       void socket.leave(this.publicRoom)
-      void socket.leave(this.playerRoom(player.id))
-      this.io.to(this.publicRoom).emit('game.playerLeft', {
-        gameId: this.game.id, playerId: player.id, robotId: player.robot.id,
-      })
-      this.closeTimerIfRoundConcluded()
-      this.actionScheduler.announceProgress({ roundConcluded })
-      this.actionScheduler.scheduleNextAction()
+      void socket.leave(this.playerRoom(seat.player.id))
+      this.removeSeat(seat)
+      if (this.resetDisconnectVotes()) this.publishVotes()
     })
+  }
+
+  private removeSeat({ user, player, connectionId }: Seat): void {
+    const { roundConcluded } = this.game.removePlayer(player.id)
+    this.seats.delete(user.userId)
+    const kicked = connectionId === null
+    const announceResumed = kicked ? this.resumeUnlessStillDisconnected() : undefined
+    this.io.to(this.publicRoom).emit('game.playerLeft', {
+      gameId: this.game.id, playerId: player.id, robotId: player.robot.id,
+      ...(kicked && { paused: this.game.paused }),
+    })
+    this.closeTimerIfRoundConcluded()
+    if (announceResumed) announceResumed()
+    else this.actionScheduler.announceProgress({ roundConcluded })
+    this.actionScheduler.scheduleNextAction()
   }
 
   reattach(socket: GameSocket): Result<ReattachedMembership, 'ALREADY_HAS_MEMBERSHIP' | 'INTERNAL_ERROR'> {
@@ -178,16 +245,19 @@ export class GameSession {
 
     const previousRooms = new Set(socket.rooms)
     const previousConnectionId = seat.connectionId
+    const previousBallots = this.ballots
     const wasPaused = this.game.paused
     const reconnected = this.reattachSeat(seat, socket.id)
     try {
       void socket.join([this.publicRoom, this.playerRoom(seat.player.id)])
       const announceResumed = this.resumeUnlessStillDisconnected()
+      const votesChanged = reconnected && this.resetDisconnectVotes()
       const initialization = presentInitialization(this.game, seat.player, this.publicState())
       return ok({
         initialization,
         announceReconnected: () => {
           announceResumed()
+          if (votesChanged) this.publishVotes()
           if (reconnected) this.notifyReconnected(seat.player)
         },
       })
@@ -196,6 +266,7 @@ export class GameSession {
         if (!previousRooms.has(room)) void socket.leave(room)
       }
       logError('Failed to reattach game membership', error, { command: 'membership.get', gameId: this.game.id })
+      this.ballots = previousBallots
       seat.connectionId = previousConnectionId
       if (wasPaused) this.game.pause()
       return err('INTERNAL_ERROR')

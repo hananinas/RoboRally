@@ -1,6 +1,6 @@
 import { handleListLobbies, handleCreateLobby, handleJoinLobby, handleSelectRobot, handleLeaveLobby, handleStartLobby } from '@/socket/handlers/lobbyHandlers'
 import { handleGetMembership, handleSocketDisconnect } from '@/socket/handlers/membershipHandlers'
-import { handleLeaveGame, handleSubmitProgram, handleUpdateRegisters } from '@/socket/handlers/gameHandlers'
+import { handleLeaveGame, handleSubmitProgram, handleUpdateRegisters, handleVote } from '@/socket/handlers/gameHandlers'
 import { handleClockGet } from '@/socket/handlers/clockHandlers'
 import { authenticateSocket, rejectExpiredSession, validateSocketSession, recoverSocketSession } from '@/socket/connection/socketConnection'
 import { MembershipRegistry } from '@/membership/MembershipRegistry'
@@ -64,6 +64,7 @@ export function createGameSocketServer(
     socket.on('lobby.start', (payload, ack) => handleStartLobby(context, socket, payload, ack))
     socket.on('membership.get', (payload, ack) => handleGetMembership(context, socket, payload, ack))
 
+    socket.on('game.vote', (payload, ack) => handleVote(context, socket, payload, ack))
     socket.on('game.leave', (payload, ack) => handleLeaveGame(context, socket, payload, ack))
     socket.on('disconnect', () => handleSocketDisconnect(context, socket))
     socket.on('program.submit', (payload, ack) => handleSubmitProgram(context, socket, payload, ack))
