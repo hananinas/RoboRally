@@ -146,15 +146,16 @@ export function handleLeaveLobby(
 
 function startGame(io: GameSocketServer, lobby: Lobby, connectedMembers: ConnectedLobbyMember[]) {
   const gameSession = new GameSession(io, createGame(lobby.mapName, lobby.name))
-  for (const { user, connectionId, robotSpriteId } of connectedMembers) {
-    const result = gameSession.addSeat(user, connectionId, robotSpriteId)
+  const seated = connectedMembers.map((member) => {
+    const result = gameSession.addSeat(member.user, member.connectionId, member.robotSpriteId)
     if (result.isErr()) throw new Error(result.error)
-  }
-  const state = gameSession.publicState()
-  const seatedMembers = connectedMembers.map(({ user, socket }) => {
-    const { player } = gameSession.getSeat(user.userId)!
-    return { user, player, socket, initialization: presentInitialization(gameSession.game, player, state) }
+    return { member, player: result.value }
   })
+  const state = gameSession.publicState()
+  const seatedMembers = seated.map(({ member, player }) => ({
+    user: member.user, player, socket: member.socket,
+    initialization: presentInitialization(gameSession.game, player, state),
+  }))
   for (const seatedMember of seatedMembers) {
     for (const room of [gameSession.publicRoom, gameSession.playerRoom(seatedMember.player.id)]) {
       void seatedMember.socket.join(room)

@@ -36,13 +36,12 @@ export function rejectExpiredSession(sessionStore: SessionStore, socket: GameSoc
 
 export function validateSocketSession(context: SocketContext, socket: GameSocket, next: (error?: Error) => void): void {
   if (socket.recovered) {
-    const gameSession = context.registry.getCurrentGame(socket.data.user.userId)
-    const seat = gameSession?.getSeat(socket.data.user.userId)
-    if (seat?.connectionId && seat.connectionId !== socket.id) {
+    const { userId } = socket.data.user
+    const gameSession = context.registry.getCurrentGame(userId)
+    if (gameSession?.heldByAnotherConnection(userId, socket.id)) {
       return next(new Error('USER_ALREADY_IN_GAME'))
     }
-    const expectedRooms = new Set(seat && gameSession
-      ? [socket.id, gameSession.publicRoom, gameSession.playerRoom(seat.player.id)] : [socket.id])
+    const expectedRooms = new Set([socket.id, ...(gameSession?.roomsFor(userId) ?? [])])
     if ([...socket.rooms].some((room) => !expectedRooms.has(room))) {
       return next(new Error('SOCKET_SESSION_EXPIRED'))
     }
