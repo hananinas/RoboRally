@@ -4,7 +4,7 @@ import { boards } from '@/domain/game/BoardFactory'
 import type { BoardMapName } from '@/domain/game/boardMaps'
 import { DEFAULT_ROBOT_ID } from '@/domain/game/robotCatalog'
 
-export type LobbyMember = { user: User; connectionId: string; robotSpriteId: RobotSpriteId }
+export type LobbyMember = { user: User; robotSpriteId: RobotSpriteId }
 
 export class Lobby {
   readonly lobbyId: string
@@ -12,11 +12,11 @@ export class Lobby {
   readonly mapName: BoardMapName
   private readonly membersById = new Map<string, LobbyMember>()
 
-  constructor(name: string | undefined, mapName: BoardMapName, owner: User, connectionId: string) {
+  constructor(name: string | undefined, mapName: BoardMapName, owner: User) {
     this.lobbyId = randomUUID()
     this.name = name ?? `Lobby ${this.lobbyId.slice(0, 8)}`
     this.mapName = mapName
-    this.membersById.set(owner.userId, { user: owner, connectionId, robotSpriteId: DEFAULT_ROBOT_ID })
+    this.membersById.set(owner.userId, { user: owner, robotSpriteId: DEFAULT_ROBOT_ID })
   }
 
   get size(): number {
@@ -43,8 +43,8 @@ export class Lobby {
     return this.membersById.get(userId)
   }
 
-  addMember(user: User, connectionId: string): void {
-    this.membersById.set(user.userId, { user, connectionId, robotSpriteId: DEFAULT_ROBOT_ID })
+  addMember(user: User): void {
+    this.membersById.set(user.userId, { user, robotSpriteId: DEFAULT_ROBOT_ID })
   }
 
   selectRobot(userId: string, robotSpriteId: RobotSpriteId): void {

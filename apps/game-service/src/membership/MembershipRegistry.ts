@@ -1,6 +1,5 @@
 import type { GameSession } from '@/socket/gameSession/GameSession'
-import type { Lobby } from '@/domain/lobby/Lobby'
-import { LobbySession } from '@/socket/LobbySession'
+import type { LobbySession } from '@/socket/LobbySession'
 
 export type ActiveMembership = { kind: 'lobby'; lobbyId: string } | { kind: 'game'; gameId: string }
 
@@ -43,10 +42,8 @@ export class MembershipRegistry {
     return this.lobbiesById.get(lobbyId)
   }
 
-  addLobby(lobby: Lobby): LobbySession {
-    const lobbySession = new LobbySession(lobby)
-    this.lobbiesById.set(lobby.lobbyId, lobbySession)
-    return lobbySession
+  addLobby(lobbySession: LobbySession): void {
+    this.lobbiesById.set(lobbySession.lobby.lobbyId, lobbySession)
   }
 
   removeLobby(lobbyId: string): void {
