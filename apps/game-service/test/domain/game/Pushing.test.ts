@@ -135,7 +135,7 @@ describe('robot pushing', () => {
 
     expect(robots.map((robot) => game.getRobotPosition(robot.id))).toEqual([position(1 + steps), position(2 + steps), position(3 + steps)])
     expect(robots.map((robot) => robot.direction)).toEqual(facing)
-    expect(players.map((player) => player.registers)).toEqual(players.map(() => program))
+    expect(players.map((player) => player.registers.slots)).toEqual(players.map(() => program))
     expect(game.currentRegister).toBe(0)
     expect(resolveRobotAction(game).action).toMatchObject({
       robotId: robots[1].id,
@@ -188,7 +188,7 @@ describe('robot pushing', () => {
 
     expect(resolveRobotAction(game).action.robotId).toBe(robots[0].id)
     expect(game.getRobotPosition(robots[1].id)).toEqual(reboot)
-    expect(players[1].registers).toEqual(program)
+    expect(players[1].registers.slots).toEqual(program)
     expect(game.currentRegister).toBe(0)
     expect(resolveRobotAction(game).action).toMatchObject({
       robotId: robots[1].id, card: program[0], position: position(0, 4), direction: Direction.NORTH,

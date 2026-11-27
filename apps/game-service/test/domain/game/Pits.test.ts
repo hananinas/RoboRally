@@ -57,7 +57,7 @@ describe('pit entry and rebooting', () => {
       action: { robotId: robot.id, card: program[0], position: { x: Integer(0), y: Integer(2) }, direction },
     })
     expect(game.getRobotPosition(robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
-    expect(player.registers).toEqual(program)
+    expect(player.registers.slots).toEqual(program)
     expect(game.currentRegister).toBe(1)
   })
 
@@ -111,7 +111,7 @@ describe('pit entry and rebooting', () => {
     ])
     expect(game.getRobotPosition(robot.id)).toEqual({ x: Integer(0), y: Integer(2) })
     expect(game.lastActivePhase).toBe('programming')
-    expect(player.registers).toEqual([null, null, null, null, null])
+    expect(player.registers.slots).toEqual([null, null, null, null, null])
     expect(player.hand).toHaveLength(Object.values(c).length)
     expect(player.hand).toEqual(expect.arrayContaining(Object.values(c)))
   })
@@ -126,7 +126,7 @@ describe('pit entry and rebooting', () => {
       expect(result.registerIndex).toBe(registerIndex)
       expect(result.action.position).toEqual({ x: Integer(0), y: Integer(1) })
       expect(game.getRobotPosition(robot.id)).toEqual({ x: Integer(0), y: Integer(1) })
-      expect(player.registers).toEqual(program)
+      expect(player.registers.slots).toEqual(program)
     }
     expect(resolveRobotAction(game).action.direction).toBe(Direction.NORTH)
     expect(resolveRobotAction(game).action.direction).toBe(Direction.EAST)
@@ -226,7 +226,7 @@ describe('pit entry and rebooting', () => {
 
     expect(resolveRobotAction(game).action.position).toEqual(rebootTile)
     expect(player.lastCheckpoint).toBe(expectedProgress)
-    expect(player.registers).toEqual(program)
+    expect(player.registers.slots).toEqual(program)
   })
 })
 

@@ -19,7 +19,7 @@ function expectRejectedWithoutMutation(game: Game, playerId: string, error: Upda
     players: game.players.map((player) => ({
       id: player.id,
       views: game.registerViewsFor(player),
-      registers: player.registers,
+      registers: player.registers.slots,
       hand: player.hand,
       submitted: game.hasSubmittedProgram(player.id),
       lastCheckpoint: player.lastCheckpoint,
@@ -49,14 +49,14 @@ describe('public register lifecycle', () => {
       { kind: 'empty' }, { kind: 'hidden' },
     ])
     expect(game.registerViewsFor(second)).toEqual(empty)
-    expect(first.registers).toEqual([hand[0], null, hand[2], null, hand[4]])
+    expect(first.registers.slots).toEqual([hand[0], null, hand[2], null, hand[4]])
     expect(first.hand).toEqual(hand)
     expect(game.lastActivePhase).toBe('programming')
     expect(game.currentRegister).toBe(0)
     expect(game.hasSubmittedProgram(first.id)).toBe(false)
     expect(game.updateRegisters(first.id, [null, null, null, null, null])._unsafeUnwrap()).toBeUndefined()
     expect(game.registerViewsFor(first)).toEqual(empty)
-    expect(first.registers).toEqual([null, null, null, null, null])
+    expect(first.registers.slots).toEqual([null, null, null, null, null])
   })
 
   it('rejects unavailable writes without changing slots or stored programs', () => {
@@ -69,12 +69,12 @@ describe('public register lifecycle', () => {
     expectRejectedWithoutMutation(game, first.id, 'GAME_PAUSED')
     game.resume()
     game.submitProgram(first.id, first.hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
-    const program = first.registers
+    const program = first.registers.slots
     expect(game.registerViewsFor(first)).toEqual(Array.from({ length: 5 }, () => ({ kind: 'hidden' })))
     expectRejectedWithoutMutation(game, first.id, 'ALREADY_SUBMITTED')
     game.submitProgram(second.id, second.hand.slice(0, 5).map((card) => card.id))._unsafeUnwrap()
     expectRejectedWithoutMutation(game, first.id, 'WRONG_PHASE')
-    expect(first.registers).toEqual(program)
+    expect(first.registers.slots).toEqual(program)
   })
 
   it('rejects register updates after aborting', () => {
@@ -134,7 +134,7 @@ describe('public register lifecycle', () => {
     expect(game.lastActivePhase).toBe('programming')
     expect(game.registerViewsFor(player)).toEqual(empty)
     expect(game.hasSubmittedProgram(player.id)).toBe(false)
-    expect(player.registers).toEqual([null, null, null, null, null])
+    expect(player.registers.slots).toEqual([null, null, null, null, null])
     expect(game.updateRegisters(player.id, selection(player))._unsafeUnwrap()).toBeUndefined()
   })
 

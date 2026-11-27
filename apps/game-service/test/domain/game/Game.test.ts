@@ -63,7 +63,7 @@ describe('Game programming', () => {
     expect(game.currentRegister).toBe(0)
     expect(player.hand).toHaveLength(deck.length)
     expect(player.hand).toEqual(expect.arrayContaining(deck))
-    expect(player.registers).toEqual([null, null, null, null, null])
+    expect(player.registers.slots).toEqual([null, null, null, null, null])
 
     deck.pop()
     expect(player.hand).toHaveLength(6)
@@ -86,7 +86,7 @@ describe('Game programming', () => {
     const game = createTestGame({ board, players: placements, deck: instructionsOf(deck) })
 
     for (const player of players) {
-      expect(player.registers).toEqual([null, null, null, null, null])
+      expect(player.registers.slots).toEqual([null, null, null, null, null])
       expect(game.registerViewsFor(player)).toEqual(emptyViews)
       expect(player.hand).toHaveLength(deck.length)
       expect(player.hand).toEqual(expect.arrayContaining(deck))
@@ -100,7 +100,7 @@ describe('Game programming', () => {
 
     game.submitProgram(player.id, programIds)
 
-    expect(player.registers).toEqual(program)
+    expect(player.registers.slots).toEqual(program)
     expect(game.lastActivePhase).toBe('activation')
     expect(game.currentRegister).toBe(0)
     expect(game.submitProgram(player.id, programIds)._unsafeUnwrapErr()).toBe('WRONG_PHASE')
@@ -116,7 +116,7 @@ describe('Game programming', () => {
     expect(game.submitProgram(player.id, [...deck.slice(0, 4).map((card) => card.id), 'foreign'])._unsafeUnwrapErr()).toBe('INVALID_PROGRAM')
 
     expect(game.lastActivePhase).toBe('programming')
-    expect(player.registers).toEqual([null, null, null, null, null])
+    expect(player.registers.slots).toEqual([null, null, null, null, null])
     game.submitProgram(player.id, validIds)
     expect(game.lastActivePhase).toBe('activation')
   })
@@ -151,7 +151,7 @@ describe('Game programming', () => {
     game.pause()
     expect(game.submitProgram(player.id, validIds)._unsafeUnwrapErr()).toBe('GAME_PAUSED')
     expect(game.lastActivePhase).toBe('programming')
-    expect(player.registers).toEqual([null, null, null, null, null])
+    expect(player.registers.slots).toEqual([null, null, null, null, null])
 
     game.resume()
     game.submitProgram(player.id, validIds)

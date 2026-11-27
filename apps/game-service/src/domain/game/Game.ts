@@ -6,8 +6,8 @@ import { captureEnvironmentSnapshot, environmentSteps, type EnvironmentChanges }
 import { Card } from '@/domain/game/Card'
 import { Deck } from '@/domain/game/Deck'
 import type { CardId, GameId, PlayerId, RobotId } from '@/domain/game/ids'
-import { Player, type Registers } from '@/domain/game/Player'
-import { registerViews, type RegisterView } from '@/domain/game/registers'
+import { Player } from '@/domain/game/Player'
+import { REGISTER_COUNT, type RegisterView } from '@/domain/game/Registers'
 import { Robot, ROBOT_COLOURS } from '@/domain/game/Robot'
 import { RobotPlacements } from '@/domain/game/RobotPlacements'
 import { Roster } from '@/domain/game/Roster'
@@ -75,7 +75,6 @@ export type CompletedProgram = Readonly<{
   cards: readonly Card[]
 }>
 
-const REGISTERS_PER_ROUND = 5
 
 export type PlayerPlacement = Readonly<{
   player: Player
@@ -113,7 +112,7 @@ export class Game {
     deck,
     name,
   }: GameOptions) {
-    if (deck.length < REGISTERS_PER_ROUND) {
+    if (deck.length < REGISTER_COUNT) {
       throw new RangeError('The deck must contain at least five cards')
     }
 
@@ -179,7 +178,7 @@ export class Game {
   }
 
   registerViewsFor(player: Player): readonly RegisterView[] {
-    return registerViews(player.registers, this.registerIndex, this.activatedRobotIds.has(player.robot.id))
+    return player.registers.publicView(this.registerIndex, this.activatedRobotIds.has(player.robot.id))
   }
 
   private findSpawn(): Result<Position, 'NO_SPAWN_AVAILABLE'> {
@@ -226,7 +225,7 @@ export class Game {
   }
 
   private checkProgram(player: Player, cardIds: readonly CardId[]): Result<readonly Card[], 'INVALID_PROGRAM'> {
-    if (cardIds.length !== REGISTERS_PER_ROUND || new Set(cardIds).size !== REGISTERS_PER_ROUND) {
+    if (cardIds.length !== REGISTER_COUNT || new Set(cardIds).size !== REGISTER_COUNT) {
       return err('INVALID_PROGRAM')
     }
     const hand = new Map(player.hand.map((card) => [card.id, card]))
@@ -247,7 +246,7 @@ export class Game {
   }
 
   private applyProgram(player: Player, program: readonly Card[]): void {
-    player.updateRegisters(program as Registers)
+    player.updateRegisters(program)
     // Programmed cards stay out of both piles until the round ends.
     player.discard(player.hand.filter((card) => !program.includes(card)))
     player.clearHand()
@@ -265,9 +264,9 @@ export class Game {
     const validatedPrograms: { player: Player; cards: readonly Card[] }[] = []
     for (const player of this.players) {
       if (this.submittedPlayerIds.has(player.id)) continue
-      const selectedIds = new Set(player.registers.map((card) => card?.id))
+      const selectedIds = new Set(player.registers.slots.map((card) => card?.id))
       const available = player.hand.filter((card) => !selectedIds.has(card.id))
-      const cards = player.registers.map((card) => card ?? available.shift())
+      const cards = player.registers.slots.map((card) => card ?? available.shift())
       if (!cards.every((card): card is Card => card !== undefined)) return err('INVALID_PROGRAM')
       const checked = this.checkProgram(player, cards.map((card) => card.id))
       if (checked.isErr()) return err(checked.error)
@@ -290,7 +289,7 @@ export class Game {
         return err('INVALID_PROGRAM')
       }
       const program: readonly (Card | null)[] = cardIds.map((id) => id === null ? null : hand.get(id)!)
-      player.updateRegisters(program as Registers)
+      player.updateRegisters(program)
       return ok(undefined)
     })
   }
@@ -358,7 +357,7 @@ export class Game {
       this.discardPrograms()
       return { roundConcluded: false }
     }
-    if (this.registerIndex === REGISTERS_PER_ROUND) {
+    if (this.registerIndex === REGISTER_COUNT) {
       this.finishRound()
       return { roundConcluded: true }
     }
@@ -389,7 +388,7 @@ export class Game {
 
     const robot = player.robot
     const registerIndex = this.registerIndex
-    const card = player.cardInRegister(UnsignedInteger(registerIndex))
+    const card = player.registers.cardAt(UnsignedInteger(registerIndex))
     const previousPositions = this.roster.players.map((player) => this.robotPlacements.positionOf(player.robot.id))
     this.actionReboots = []
     const resolvedInstruction = this.executeCard(robot, card, registerIndex)

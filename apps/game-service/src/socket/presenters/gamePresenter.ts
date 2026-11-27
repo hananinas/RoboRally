@@ -60,7 +60,7 @@ function presentCard(card: Card): CardPayload {
 }
 
 function presentProgram(registers: Registers): PrivateProgram {
-  const program: readonly (CardPayload | null)[] = registers.map((card) => card === null ? null : presentCard(card))
+  const program: readonly (CardPayload | null)[] = registers.slots.map((card) => card === null ? null : presentCard(card))
   return program as PrivateProgram
 }
 

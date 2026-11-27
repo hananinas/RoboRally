@@ -1,15 +1,12 @@
 import type { Card } from '@/domain/game/Card'
 import { Deck, HAND_SIZE } from '@/domain/game/Deck'
 import type { PlayerId } from '@/domain/game/ids'
+import { Registers } from '@/domain/game/Registers'
 import type { Robot } from '@/domain/game/Robot'
-import type { UnsignedInteger } from '@/numbers'
-
-// Five register slots. A null slot is a register not yet filled; five filled slots are a program.
-export type Registers = readonly [Card | null, Card | null, Card | null, Card | null, Card | null]
 
 export class Player {
   #hand: readonly Card[] = []
-  #registers: Registers = Object.freeze([null, null, null, null, null])
+  #registers = Registers.empty()
   private completedCheckpoint = 0
 
   constructor(
@@ -46,25 +43,16 @@ export class Player {
     return this.#registers
   }
 
-  updateRegisters(registers: Registers): void {
-    this.#registers = Object.freeze([...registers]) as Registers
-  }
-
-  cardInRegister(index: UnsignedInteger): Card {
-    if (index >= this.#registers.length) {
-      throw new RangeError('Register index must be between 0 and 4')
-    }
-    const card = this.#registers[index]
-    if (card === null) throw new Error(`Register ${index} holds no card`)
-    return card
+  updateRegisters(slots: readonly (Card | null)[]): void {
+    this.#registers = Registers.of(slots)
   }
 
   discardProgram(): void {
-    this.discard(this.#registers.filter((card): card is Card => card !== null))
+    this.discard(this.#registers.program)
   }
 
   resetRegisters(): void {
-    this.#registers = Object.freeze([null, null, null, null, null])
+    this.#registers = Registers.empty()
   }
 
   completeCheckpoint(checkpointNumber: number): boolean {

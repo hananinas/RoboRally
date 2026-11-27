@@ -50,7 +50,7 @@ describe('Game activation loop', () => {
       expect(game.lastActivePhase).toBe(registerIndex === 4 ? 'programming' : 'activation')
     }
 
-    expect(player.registers).toEqual([null, null, null, null, null])
+    expect(player.registers.slots).toEqual([null, null, null, null, null])
     expect(player.hand).toEqual(deck)
     expect(() => resolveRobotAction(game)).toThrow()
 

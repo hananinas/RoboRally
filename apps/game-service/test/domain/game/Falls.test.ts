@@ -44,7 +44,7 @@ describe('board-edge falls', () => {
 
     expect(result.action.position).toEqual(reboot)
     expect(game.getRobotPosition(robot.id)).toEqual(reboot)
-    expect(player.registers).toEqual(program)
+    expect(player.registers.slots).toEqual(program)
     expect(player.hand).toEqual([])
     expect(game.currentRegister).toBe(1)
   })
@@ -82,7 +82,7 @@ describe('board-edge falls', () => {
     })
     expect(game.getRobotPosition(robot.id)).toEqual(reboot)
     expect(robot.direction).toBe(direction)
-    expect(player.registers).toEqual(program)
+    expect(player.registers.slots).toEqual(program)
     expect(player.hand).toEqual([])
     expect(player.lastCheckpoint).toBe(0)
     expect(game.currentRegister).toBe(1)
@@ -90,7 +90,7 @@ describe('board-edge falls', () => {
 
     expect(resolveRobotAction(game).action.card).toBe(program[1])
     expect(game.getRobotPosition(robot.id)).toEqual(reboot)
-    expect(player.registers).toEqual(program)
+    expect(player.registers.slots).toEqual(program)
     expect(game.currentRegister).toBe(2)
   })
 

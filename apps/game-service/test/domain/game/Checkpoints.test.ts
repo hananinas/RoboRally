@@ -68,7 +68,7 @@ describe('checkpoint activation', () => {
     expect(game.winner).toBe(player.id)
     expect(game.lastActivePhase).toBe('activation')
     expect(game.currentRegister).toBe(1)
-    expect(player.registers).toEqual(program)
+    expect(player.registers.slots).toEqual(program)
     expect(game.submitProgram(player.id, program.map((card) => card.id))._unsafeUnwrapErr()).toBe('GAME_FINISHED')
   })
 
@@ -102,7 +102,7 @@ describe('checkpoint activation', () => {
     expect(game.lastActivePhase).toBe('activation')
     expect(game.currentRegister).toBe(4)
     expect(game.hasSubmittedProgram(player.id)).toBe(false)
-    expect(player.registers).toEqual(program)
+    expect(player.registers.slots).toEqual(program)
     expect(game.registerViewsFor(player)).toEqual([
       ...program.slice(0, 4).map((card) => ({ kind: 'revealed', instruction: card.instruction })),
       { kind: 'hidden' },
@@ -116,7 +116,7 @@ describe('checkpoint activation', () => {
       winner: game.winner,
       players: game.players,
       views: game.registerViewsFor(player),
-      registers: player.registers,
+      registers: player.registers.slots,
       hand: player.hand,
       submitted: game.hasSubmittedProgram(player.id),
       lastCheckpoint: player.lastCheckpoint,
