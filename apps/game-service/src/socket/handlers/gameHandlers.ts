@@ -58,8 +58,10 @@ export function handleVote(
     run: ({ gameSession, player }, ack) => {
       const result = gameSession.castVote(player, payload.proposalId)
       if (result.isErr()) return ack({ outcome: result.error })
-      if (result.value) context.registry.clearActiveMembership(result.value.userId)
+      const departure = result.value
+      if (departure) context.registry.clearActiveMembership(departure.userId)
       ack({ outcome: 'ACCEPTED' })
+      departure?.announceDeparture()
     },
   })
 }
@@ -85,6 +87,8 @@ export function handleLeaveGame(
         gameSession.actionScheduler.stop()
         context.registry.removeGame(gameSession.game.id)
       }
+      const announceDeparture = result.value
+      announceDeparture()
     },
   })
 }

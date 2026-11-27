@@ -17,6 +17,8 @@ export type Seat = {
   connectionId: string | null
 }
 
+type Departure = { userId: string; announceDeparture: () => void }
+
 type Ballot = {
   proposalId: string
   action: VoteProposal['action']
@@ -131,7 +133,7 @@ export class GameSession {
     return hadVotes || this.ballots.length > 0
   }
 
-  castVote(player: Player, proposalId: string): Result<User | null, 'PROPOSAL_CLOSED'> {
+  castVote(player: Player, proposalId: string): Result<Departure | null, 'PROPOSAL_CLOSED'> {
     const ballot = this.ballots.find((candidate) => candidate.proposalId === proposalId)
     if (!this.game.paused || !ballot) return err('PROPOSAL_CLOSED')
     const target = [...this.seats.values()].find((seat) => seat.player.id === ballot.action.targetPlayerId)
@@ -145,9 +147,8 @@ export class GameSession {
     }
 
     this.ballots = this.ballots.filter((other) => other !== ballot)
-    this.removeSeat(target)
-    this.publishVotes()
-    return ok(target.user)
+    const announceDeparture = this.removeSeat(target)
+    return ok({ userId: target.user.userId, announceDeparture })
   }
 
   isMember(socket: GameSocket): Result<Seat, 'NOT_A_MEMBER'> {
@@ -214,28 +215,36 @@ export class GameSession {
     })
   }
 
-  leave(socket: GameSocket): Result<void, 'NOT_A_MEMBER'> {
+  leave(socket: GameSocket): Result<() => void, 'NOT_A_MEMBER'> {
     return this.isMember(socket).map((seat) => {
       void socket.leave(this.publicRoom)
       void socket.leave(this.playerRoom(seat.player.id))
-      this.removeSeat(seat)
-      if (this.resetDisconnectVotes()) this.publishVotes()
+      return this.removeSeat(seat)
     })
   }
 
-  private removeSeat({ user, player, connectionId }: Seat): void {
+  private removeSeat({ user, player, connectionId }: Seat): () => void {
     const { roundConcluded } = this.game.removePlayer(player.id)
     this.seats.delete(user.userId)
     const kicked = connectionId === null
     const announceResumed = kicked ? this.resumeUnlessStillDisconnected() : undefined
-    this.io.to(this.publicRoom).emit('game.playerLeft', {
-      gameId: this.game.id, playerId: player.id, robotId: player.robot.id,
-      ...(kicked && { paused: this.game.paused }),
-    })
-    this.closeTimerIfRoundConcluded()
-    if (announceResumed) announceResumed()
-    else this.actionScheduler.announceProgress({ roundConcluded })
-    this.actionScheduler.scheduleNextAction()
+    const votesChanged = kicked || this.resetDisconnectVotes()
+
+    // The handler clears the registry before publishing the committed departure.
+    return () => {
+      try {
+        this.io.to(this.publicRoom).emit('game.playerLeft', {
+          gameId: this.game.id, playerId: player.id, robotId: player.robot.id,
+          ...(kicked && { paused: this.game.paused }),
+        })
+        if (votesChanged) this.publishVotes()
+      } finally {
+        this.actionScheduler.scheduleNextAction()
+        this.closeTimerIfRoundConcluded()
+        if (announceResumed) announceResumed()
+        else this.actionScheduler.announceProgress({ roundConcluded })
+      }
+    }
   }
 
   reattach(socket: GameSocket): Result<ReattachedMembership, 'ALREADY_HAS_MEMBERSHIP' | 'INTERNAL_ERROR'> {
