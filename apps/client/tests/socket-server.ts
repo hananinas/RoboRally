@@ -15,6 +15,7 @@ import type {
   UpdateRegisters,
   User,
 } from '@robo-rally/game-events'
+import { COLOR_PALETTE } from '@robo-rally/game-events'
 import { Server, type Socket } from 'socket.io'
 import {
   createPublicState,
@@ -367,8 +368,9 @@ io.on('connection', (socket) => {
   const lobbyState = (mapName = 'test-map', lobbyName = 'Lobby 1'): LobbyState => {
     const map = maps.find((candidate) => candidate.mapName === mapName) ?? maps[1]!
     return {
-    lobbyId: GAME_ID, name: lobbyName, mapName: map.mapName, mapDisplayName: map.name, mapIcon: map.icon, ownerUserId: user.userId,
-    playerCount: 1, maxPlayers: 6, players: [{ ...user, robotSpriteId: 'tank' }], robots,
+      lobbyId: GAME_ID, name: lobbyName, mapName: map.mapName, mapDisplayName: map.name, mapIcon: map.icon, ownerUserId: user.userId,
+      playerCount: 1, maxPlayers: 6, players: [{ ...user, robotSpriteId: 'tank' }], robots,
+      colorPalette: [...COLOR_PALETTE],
     }
   }
   socket.on('clock.get', (_, acknowledge) => {
@@ -383,7 +385,7 @@ io.on('connection', (socket) => {
     acknowledge(fixture.started ? { outcome: 'IN_GAME', initialization: initialization(), user }
       : lobby ? { outcome: 'IN_LOBBY', lobby, user } : { outcome: 'NO_MEMBERSHIP', user })
   })
-  socket.on('lobby.list', (_, acknowledge) => acknowledge({ outcome: 'LOBBIES_FOUND', lobbies: [lobbyState()], maps, robots }))
+  socket.on('lobby.list', (_, acknowledge) => acknowledge({ outcome: 'LOBBIES_FOUND', lobbies: [lobbyState()], maps, robots, colorPalette: [...COLOR_PALETTE] }))
   socket.on('lobby.create', (payload, acknowledge) => {
     fixture.entryRequests.push({ event: 'lobby.create', socketId: socket.id, payload })
     lobby = lobbyState(payload.mapName, payload.name)

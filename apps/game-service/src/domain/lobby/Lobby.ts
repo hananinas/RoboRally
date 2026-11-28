@@ -4,7 +4,7 @@ import { boards } from '@/domain/game/BoardFactory'
 import type { BoardMapName } from '@/domain/game/boardMaps'
 import { DEFAULT_ROBOT_ID } from '@/domain/game/robotCatalog'
 
-export type LobbyMember = { user: User; connectionId: string; robotSpriteId: RobotSpriteId }
+export type LobbyMember = { user: User; connectionId: string; robotSpriteId: RobotSpriteId; colorHex?: string }
 
 export class Lobby {
   readonly lobbyId: string
@@ -12,11 +12,15 @@ export class Lobby {
   readonly mapName: BoardMapName
   private readonly membersById = new Map<string, LobbyMember>()
 
-  constructor(name: string | undefined, mapName: BoardMapName, owner: User, connectionId: string) {
+  constructor(name: string | undefined, mapName: BoardMapName, owner: User, connectionId: string, palette?: readonly string[]) {
     this.lobbyId = randomUUID()
     this.name = name ?? `Lobby ${this.lobbyId.slice(0, 8)}`
     this.mapName = mapName
-    this.membersById.set(owner.userId, { user: owner, connectionId, robotSpriteId: DEFAULT_ROBOT_ID })
+    let colorHex: string | undefined
+    if (palette && palette.length > 0) {
+      colorHex = palette[0]
+    }
+    this.membersById.set(owner.userId, { user: owner, connectionId, robotSpriteId: DEFAULT_ROBOT_ID, colorHex })
   }
 
   get size(): number {
@@ -43,13 +47,33 @@ export class Lobby {
     return this.membersById.get(userId)
   }
 
-  addMember(user: User, connectionId: string): void {
-    this.membersById.set(user.userId, { user, connectionId, robotSpriteId: DEFAULT_ROBOT_ID })
+  addMember(user: User, connectionId: string, palette?: readonly string[]): void {
+    let colorHex: string | undefined
+    if (palette && palette.length > 0) {
+      const takenColors = new Set([...this.membersById.values()].map((m) => m.colorHex).filter(Boolean))
+      colorHex = palette.find((hex) => !takenColors.has(hex))
+    }
+    this.membersById.set(user.userId, { user, connectionId, robotSpriteId: DEFAULT_ROBOT_ID, colorHex })
   }
 
   selectRobot(userId: string, robotSpriteId: RobotSpriteId): void {
     const member = this.membersById.get(userId)
     if (member) member.robotSpriteId = robotSpriteId
+  }
+
+  selectColor(userId: string, colorHex: string, palette: readonly string[]): 'OK' | 'TAKEN' {
+    const member = this.membersById.get(userId)
+    if (!member) return 'TAKEN'
+
+    if (!palette.includes(colorHex)) return 'TAKEN'
+
+    const isColorTaken = [...this.membersById.values()].some(
+      (m) => m.user.userId !== userId && m.colorHex === colorHex
+    )
+    if (isColorTaken) return 'TAKEN'
+
+    member.colorHex = colorHex
+    return 'OK'
   }
 
   removeMember(userId: string): void {

@@ -13,7 +13,7 @@
   ],
   "scripts": {
     "install-dev": "pnpm --filter @robo-rally/kratos-hydra-ui... install --frozen-lockfile --prod=false",
-    "build": "rm -rf lib/* && npx tsc",
+    "build": "node -e \"const fs = require('fs'); const path = require('path'); const dir = path.join(__dirname, 'lib'); if (fs.existsSync(dir)) { fs.rmSync(dir, { recursive: true, force: true }); }\" && npx tsc",
     "serve": "node lib/index.js",
     "start": "nodemon",
     "test": "exit 0",

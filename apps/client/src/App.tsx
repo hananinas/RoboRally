@@ -16,6 +16,7 @@ function errorMessage(code: string): string {
     case 'LOBBY_MEMBER_DISCONNECTED': return 'A player disconnected before the game could start. Please try again.'
     case 'LOBBY_FULL': return 'This lobby is full. Choose another lobby.'
     case 'TIMEOUT': return 'The Game Service did not respond. Please try again.'
+    case 'COLOUR_TAKEN': return 'That color was selected by another player. Please choose a different color.'
     default: return 'The request could not be completed. Please try again.'
   }
 }
@@ -76,6 +77,12 @@ function App() {
               selectedRobotId={membership.lobby.players.find((player) => player.userId === membership.user.userId)?.robotSpriteId
                 ?? membership.lobby.robots[0]?.id
                 ?? ''}
+              selectedColorHex={membership.lobby.players.find((player) => player.userId === membership.user.userId)?.colorHex}
+              takenColorHexes={new Set(membership.lobby.players
+                .filter((player) => player.userId !== membership.user.userId)
+                .map((player) => player.colorHex)
+                .filter((hex): hex is string => hex !== undefined))}
+              colorPalette={membership.lobby.colorPalette}
               disabled={busy || connection.status !== 'connected'}
               onSelect={selectRobot}
             />

@@ -8,6 +8,7 @@ export type ConnectedLobbyMember = {
   user: User
   connectionId: string
   robotSpriteId: RobotSpriteId
+  colorHex?: string
   socket: GameSocket
 }
 
@@ -37,9 +38,9 @@ export class LobbySession {
     void socket.leave(this.room)
   }
 
-  join(socket: GameSocket): void {
+  join(socket: GameSocket, palette?: readonly string[]): void {
     this.connect(socket)
-    this.lobby.addMember(socket.data.user, socket.id)
+    this.lobby.addMember(socket.data.user, socket.id, palette)
     socket.to(this.room).emit('lobby.updated', { lobby: presentLobby(this.lobby) })
   }
 

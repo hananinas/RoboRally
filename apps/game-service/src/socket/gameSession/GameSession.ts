@@ -149,8 +149,8 @@ export class GameSession {
     this.io.to(this.publicRoom).emit('game.playerConnectionChanged', presentPlayerConnectionChanged(this.game, seat.player, false))
   }
 
-  addSeat(user: User, connectionId: string, robotSpriteId: RobotSpriteId): Result<Player, AddPlayerError> {
-    return this.game.addPlayer(robotSpriteId).map((player) => {
+  addSeat(user: User, connectionId: string, robotSpriteId: RobotSpriteId, colour?: string): Result<Player, AddPlayerError> {
+    return this.game.addPlayer(robotSpriteId, colour).map((player) => {
       this.seats.set(user.userId, { user, player, connectionId })
       return player
     })

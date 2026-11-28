@@ -20,10 +20,11 @@ export default function WaitingLobby({ lobby, userId, disabled, onStart, onLeave
             const self = player.userId === userId
             const playerIsOwner = player.userId === lobby.ownerUserId
             const robot = lobby.robots.find((option) => option.id === player.robotSpriteId)
+            const playerColor = player.colorHex
             return (
               <li className={`waiting-lobby__seat${self ? ' waiting-lobby__seat--self' : ''}`} key={player.userId}>
                 <span className="waiting-lobby__portrait" role="img" aria-label={`${robot?.name ?? 'Unknown'} robot`}>
-                  <RobotPreview sprite={robotOptionFor(player.robotSpriteId).sprite} />
+                  <RobotPreview sprite={robotOptionFor(player.robotSpriteId).sprite} color={playerColor} />
                 </span>
                 <span className="waiting-lobby__name">{player.username}</span>
                 <span className="waiting-lobby__roles">

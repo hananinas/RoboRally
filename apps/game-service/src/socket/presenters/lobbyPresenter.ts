@@ -1,4 +1,5 @@
 import type { BoardMapSummary, LobbyState, LobbySummary } from '@robo-rally/game-events'
+import { COLOR_PALETTE } from '@robo-rally/game-events'
 import { boardMaps } from '@/domain/game/boardMaps'
 import { robotCatalog } from '@/domain/game/robotCatalog'
 import { Lobby } from '@/domain/lobby/Lobby'
@@ -23,9 +24,10 @@ export function presentLobby(lobby: Lobby): LobbyState {
   return {
     ...presentLobbySummary(lobby),
     ownerUserId: lobby.ownerUserId,
-    players: lobby.members.map(({ user, robotSpriteId }) => ({
-      userId: user.userId, username: user.username, robotSpriteId,
+    players: lobby.members.map(({ user, robotSpriteId, colorHex }) => ({
+      userId: user.userId, username: user.username, robotSpriteId, ...(colorHex !== undefined ? { colorHex } : {}),
     })),
     robots: robotCatalog,
+    colorPalette: [...COLOR_PALETTE],
   }
 }

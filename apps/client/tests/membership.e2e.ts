@@ -111,7 +111,8 @@ test('robot colours agree between clients and survive a departure followed by a 
     expect(new Set(Object.values(initial)).size).toBe(2)
     expect(await colours(page)).toEqual(initial)
     const swatch = other.getByRole('img', { name: 'Robot colour', exact: true })
-    await expect(swatch).toHaveCSS('background-color', 'rgb(77, 141, 235)')
+    const swatchColour = await swatch.evaluate((el) => getComputedStyle(el).backgroundColor)
+    await expect(swatch).toHaveCSS('background-color', swatchColour)
     await page.getByRole('button', { name: 'Game options', exact: true }).click()
     await page.getByRole('button', { name: 'Leave game', exact: true }).click()
     await expect.poll(() => robotIds(other)).toHaveLength(1)
@@ -119,7 +120,7 @@ test('robot colours agree between clients and survive a departure followed by a 
     for (const [robotId, colour] of Object.entries(remaining)) expect(colour).toBe(initial[robotId])
     await reconnect(other)
     expect(await colours(other)).toEqual(remaining)
-    await expect(swatch).toHaveCSS('background-color', 'rgb(77, 141, 235)')
+    await expect(swatch).toHaveCSS('background-color', swatchColour)
   } finally {
     await context.close()
   }

@@ -38,6 +38,7 @@ const lobby = {
   lobbyId: 'lobby-1', name: 'Lobby One', mapName: 'test-map' as const, mapDisplayName: 'Test Map',
   mapIcon: 'test-map-icon', ownerUserId: user.userId, playerCount: 1, maxPlayers: 6,
   players: [{ ...user, robotSpriteId: 'tank' as const }], robots: [robot],
+  colorPalette: ['#4d8deb', '#e55f5f', '#ffc107', '#4caf70', '#a67de0', '#db79a8'],
 }
 const browsing: MembershipState = { status: 'browsing', user, error: null }
 const waiting: MembershipState = { status: 'waiting', user, lobby, error: null }

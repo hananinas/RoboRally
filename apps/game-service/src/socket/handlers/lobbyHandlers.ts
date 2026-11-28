@@ -4,7 +4,7 @@ import { withValidatedRequest } from '@/socket/utilities/withValidatedRequest'
 import { isBoardMapName } from '@/domain/game/boardMaps'
 import { createGame } from '@/domain/game/GameFactory'
 import {
-  emptyRequestSchema, lobbyRequestSchema, createLobbyRequestSchema, robotSelectionRequestSchema,
+  emptyRequestSchema, lobbyRequestSchema, createLobbyRequestSchema, robotSelectionRequestSchema, COLOR_PALETTE,
   type EmptyRequest, type LobbyRequest, type CreateLobbyRequest, type RobotSelectionRequest,
   type LobbyListResult, type LobbyJoinResult, type LobbyLeaveResult, type LobbyStartResult, type RobotSelectionResult,
 } from '@robo-rally/game-events'
@@ -41,6 +41,7 @@ export function handleListLobbies(
         outcome: 'LOBBIES_FOUND',
         maps: presentBoardMaps(),
         robots: robotCatalog,
+        colorPalette: [...COLOR_PALETTE],
         lobbies: context.registry.lobbies.map((lobbySession) => presentLobbySummary(lobbySession.lobby)),
       })
     },
@@ -66,7 +67,7 @@ export function handleCreateLobby(
           ? { outcome: 'LOBBY_JOINED', lobby: presentLobby(existingLobbySession.lobby) }
           : { outcome: 'ALREADY_HAS_MEMBERSHIP' })
       }
-      const lobby = new Lobby(name, mapName, user, socket.id)
+      const lobby = new Lobby(name, mapName, user, socket.id, COLOR_PALETTE)
       void socket.join(LobbySession.roomFor(lobby.lobbyId))
       context.registry.addLobby(lobby)
       context.registry.setActiveMembership(user.userId, { kind: 'lobby', lobbyId: lobby.lobbyId })
@@ -96,7 +97,7 @@ export function handleJoinLobby(
           : { outcome: 'ALREADY_HAS_MEMBERSHIP' })
       }
       if (lobbySession.lobby.isFull) return ack({ outcome: 'LOBBY_FULL' })
-      lobbySession.join(socket)
+      lobbySession.join(socket, COLOR_PALETTE)
       context.registry.setActiveMembership(user.userId, { kind: 'lobby', lobbyId: lobbySession.lobby.lobbyId })
       ack({ outcome: 'LOBBY_JOINED', lobby: presentLobby(lobbySession.lobby) })
     },
@@ -117,10 +118,19 @@ export function handleSelectRobot(
       }
       const lobbySession = context.registry.getCurrentLobby(user.userId)
       if (!lobbySession || lobbySession.isMember(socket).isErr()) return err({ outcome: 'NOT_A_MEMBER' as const })
-      return ok({ user, lobbySession, robotSpriteId: data.robotSpriteId })
+      return ok({ user, lobbySession, robotSpriteId: data.robotSpriteId, colorHex: data.colorHex })
     },
-    run: ({ user, lobbySession, robotSpriteId }, ack) => {
+    run: ({ user, lobbySession, robotSpriteId, colorHex }, ack) => {
       lobbySession.lobby.selectRobot(user.userId, robotSpriteId)
+      
+      if (colorHex !== undefined) {
+        const selectColorResult = lobbySession.lobby.selectColor(user.userId, colorHex, COLOR_PALETTE)
+        if (selectColorResult === 'TAKEN') {
+          const lobby = presentLobby(lobbySession.lobby)
+          return ack({ outcome: 'COLOUR_TAKEN', lobby })
+        }
+      }
+      
       const lobby = presentLobby(lobbySession.lobby)
       ack({ outcome: 'ROBOT_SELECTED', lobby })
       socket.to(lobbySession.room).emit('lobby.updated', { lobby })
@@ -146,8 +156,8 @@ export function handleLeaveLobby(
 
 function startGame(io: GameSocketServer, lobby: Lobby, connectedMembers: ConnectedLobbyMember[]) {
   const gameSession = new GameSession(io, createGame(lobby.mapName, lobby.name))
-  for (const { user, connectionId, robotSpriteId } of connectedMembers) {
-    const result = gameSession.addSeat(user, connectionId, robotSpriteId)
+  for (const { user, connectionId, robotSpriteId, colorHex } of connectedMembers) {
+    const result = gameSession.addSeat(user, connectionId, robotSpriteId, colorHex)
     if (result.isErr()) throw new Error(result.error)
   }
   const state = gameSession.publicState()

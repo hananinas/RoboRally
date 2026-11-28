@@ -97,7 +97,10 @@ test('selects a robot in the waiting lobby', async ({ page }) => {
   expect(tankPortraitBox?.width).toBe(28)
   await expect(tankPortrait.locator('.robot-preview__layer').first()).toHaveAttribute('viewBox', '0 0 57 87')
   await expect(page.getByText('Player colour', { exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Blue', exact: true })).toBeDisabled()
+  const colorButtons = page.getByRole('button', { name: /^(Blue|Red|Yellow|Green|Purple|Pink)$/ })
+  await expect(colorButtons).toHaveCount(6)
+  await expect(colorButtons.nth(0)).toHaveAttribute('aria-pressed', 'true')
+  await expect(colorButtons.nth(0)).toBeEnabled()
 
   await choices.nth(1).click()
   await expect(robotPanel.getByRole('heading', { name: 'Scout', exact: true })).toBeVisible()
