@@ -12,12 +12,14 @@ import {
   canProgram, 
   registersAreFilled, 
   getOtherPlayers,
+  getFinalStandings,
   type ClientGameState , 
   type ProgramCard 
 } from './gameState.ts'
 import type useGameConnection from './useGameConnection.ts'
 import LeaveGameButton from './components/LeaveGameButton.tsx'
 import GameOverBanner from './components/GameOverBanner.tsx'
+import FinalStandings from './components/FinalStandings.tsx'
 
 
 function isGameOver(state: ClientGameState): boolean {
@@ -150,7 +152,10 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
             />
           </div>
         </aside>
-        {state.phase && (
+        {gameOver && (
+          <FinalStandings standings={getFinalStandings(state)} checkpointCount={state.checkpointCount} />
+        )}
+        {state.phase && !gameOver && (
           <OtherPlayersPanel
             players={getOtherPlayers(state)}
             checkpointCount={state.checkpointCount}

@@ -55,6 +55,11 @@
   padding-block: var(--ui-space-xs) var(--hud-panel-shadow-gutter);
 }
 
+.game-overlay > .final-standings {
+  grid-area: 1 / 1;
+  align-self: start;
+}
+
 /* Panels */
 .hud-panel-surface {
   background: var(--hud-surface);
@@ -696,7 +701,8 @@
     max-height: 53dvh;
   }
 
-  .game-overlay > .other-players { grid-area: 2 / 1; }
+  .game-overlay > .other-players,
+  .game-overlay > .final-standings { grid-area: 2 / 1; }
 
   .programming-hand,
   .game-over-banner { grid-row: 3; }

@@ -174,6 +174,44 @@ export function getOtherPlayers(state: ClientGameState): readonly OpponentPlayer
   })
 }
 
+export type Standing = Readonly<{
+  playerId: string
+  username: string
+  colour: string | undefined
+  lastCheckpoint: number
+  // Players with the same number of checkpoints share a place (1, 2, 2, 4).
+  place: number
+  isWinner: boolean
+  isYou: boolean
+  left: boolean
+}>
+
+// Final standings: the winner first, then everyone else by checkpoints collected.
+export function getFinalStandings(state: ClientGameState): readonly Standing[] {
+  const { winner } = state
+  if (winner === null) return []
+  const entries = state.players.map((player) => ({
+    playerId: player.playerId,
+    username: player.username,
+    colour: state.playback.robots.find((robot) => robot.robotId === player.robotId)?.colour,
+    lastCheckpoint: state.playback.checkpoints.get(player.playerId) ?? 0,
+    left: false,
+  }))
+  // A winner who has already left still heads the standings.
+  if (!entries.some((entry) => entry.playerId === winner.playerId)) {
+    entries.push({ ...winner, colour: undefined, lastCheckpoint: state.checkpointCount, left: true })
+  }
+  const score = (entry: (typeof entries)[number]) =>
+    entry.playerId === winner.playerId ? Number.POSITIVE_INFINITY : entry.lastCheckpoint
+  const ranked = entries.toSorted((first, second) => score(second) - score(first))
+  return ranked.map((entry) => ({
+    ...entry,
+    place: 1 + ranked.filter((other) => score(other) > score(entry)).length,
+    isWinner: entry.playerId === winner.playerId,
+    isYou: entry.playerId === state.assignment?.playerId,
+  }))
+}
+
 export function createSubmission(state: ClientGameState): SubmitProgram | null {
   if (!canProgram(state) || state.assignment === null) return null
   const [first, second, third, fourth, fifth] = state.registers
