@@ -1,10 +1,11 @@
 import LeaveGameButton from './LeaveGameButton.tsx'
 
 // Sits where the programming hand was, so the board stays visible and can still be explored.
-function GameOverBanner({ winnerName, isWinner, winnerColour, leaving, onLeave }: {
+function GameOverBanner({ winnerName, isWinner, winnerColour, onShowWinner, leaving, onLeave }: {
   winnerName: string
   isWinner: boolean
   winnerColour: string | undefined
+  onShowWinner: (() => void) | undefined
   leaving: boolean
   onLeave: () => void
 }) {
@@ -22,7 +23,14 @@ function GameOverBanner({ winnerName, isWinner, winnerColour, leaving, onLeave }
           {' '}Look around the board, then leave when you are ready.
         </p>
       </div>
-      <LeaveGameButton onLeave={onLeave} disabled={leaving} />
+      <div className="game-over-banner__actions">
+        {onShowWinner && (
+          <button className="game-over-banner__show" type="button" onClick={onShowWinner}>
+            {isWinner ? 'Show my robot' : 'Show winner'}
+          </button>
+        )}
+        <LeaveGameButton onLeave={onLeave} disabled={leaving} />
+      </div>
     </section>
   )
 }

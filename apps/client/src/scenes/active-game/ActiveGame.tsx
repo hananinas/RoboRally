@@ -83,7 +83,12 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
   const gameOver = isGameOver(state) && state.connected
   const robotColour = state.playback.robots.find((robot) => robot.robotId === state.assignment?.robotId)?.colour
   const winnerRobotId = state.players.find((candidate) => candidate.playerId === state.winner?.playerId)?.robotId
-  const winnerColour = state.playback.robots.find((robot) => robot.robotId === winnerRobotId)?.colour
+  const winnerRobot = state.playback.robots.find((robot) => robot.robotId === winnerRobotId)
+  const winnerColour = winnerRobot?.colour
+  const [winnerFocusRequest, setWinnerFocusRequest] = useState(0)
+  const winnerFocus = gameOver && winnerRobot
+    ? { ...winnerRobot.position.coordinate, request: winnerFocusRequest }
+    : null
   const registeredCardIds = new Set(
     state.registers.flatMap((card) => (card ? [card.id] : [])),
   )
@@ -105,7 +110,9 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
   })
   return (
     <div className="game">
-      {state.board && <BoardViewport board={state.board} robots={state.playback.robots} />}
+      {state.board && (
+        <BoardViewport board={state.board} robots={state.playback.robots} focus={winnerFocus} />
+      )}
       <div className="game-overlay">
         <aside className="game-hud" aria-label="Game controls">
           <div className="game-hud__content">
@@ -163,6 +170,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
             winnerName={state.winner?.username ?? ''}
             isWinner={state.winner?.playerId === state.assignment?.playerId}
             winnerColour={winnerColour}
+            onShowWinner={winnerRobot ? () => setWinnerFocusRequest((request) => request + 1) : undefined}
             leaving={leaving}
             onLeave={onLeave}
           />

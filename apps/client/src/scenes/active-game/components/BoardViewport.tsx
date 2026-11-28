@@ -26,12 +26,13 @@ import type {
   BoardTileWalls,
   BoardWallSide,
 } from '../board/boardModel.ts'
-import useBoardInteraction from '../board/useBoardInteraction.ts'
+import useBoardInteraction, { type BoardFocus } from '../board/useBoardInteraction.ts'
 import CheckpointPiece from './CheckpointPiece.tsx'
 import '../board/BoardViewport.css'
 type BoardViewportProps = Readonly<{
   board: BoardRenderModel
   robots: readonly DisplayRobot[]
+  focus?: BoardFocus | null
 }>
 
 type PieceStyle = CSSProperties &
@@ -207,7 +208,7 @@ function RobotPiece({
   )
 }
 
-function BoardViewport({ board, robots }: BoardViewportProps) {
+function BoardViewport({ board, robots, focus = null }: BoardViewportProps) {
   const viewportRef = useRef<HTMLElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const scene = useMemo(
@@ -220,7 +221,7 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
       ),
     [board],
   )
-  useBoardInteraction({ canvasRef, robots, scene, viewportRef })
+  useBoardInteraction({ canvasRef, focus, robots, scene, viewportRef })
   const checkpointTiles = scene.tiles.filter((tile) => tile.cell.checkpointNumber !== undefined)
   const fallingInto = new Set(robots.flatMap((robot) => robot.phase === 'pit-fall'
     ? [`${robot.position.coordinate.x},${robot.position.coordinate.y}`] : []))

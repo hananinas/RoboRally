@@ -596,7 +596,8 @@
   }
 }
 
-.game-popup__leave {
+.game-popup__leave,
+.game-over-banner__show {
   min-height: var(--ui-control-size);
   margin-top: 1.5rem;
   padding: var(--ui-space-sm) var(--ui-space-md);
@@ -608,7 +609,8 @@
   cursor: pointer;
 }
 
-.game-popup__leave:enabled:hover {
+.game-popup__leave:enabled:hover,
+.game-over-banner__show:hover {
   background: var(--hud-surface-raised);
 }
 
@@ -654,8 +656,14 @@
   font-size: var(--hud-font-small);
 }
 
-.game-over-banner .game-popup__leave {
+.game-over-banner__actions {
+  display: flex;
   flex: none;
+  gap: var(--ui-space-sm);
+}
+
+.game-over-banner .game-popup__leave,
+.game-over-banner .game-over-banner__show {
   margin-top: 0;
 }
 
