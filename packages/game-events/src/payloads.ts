@@ -98,6 +98,12 @@ export type EnvironmentStepResolved = Readonly<{
       checkpointProgress?: never
     }>
   | Readonly<{
+      kind: 'CONVEYORS'
+      robots: readonly Pick<Robot, 'robotId' | 'position'>[]
+      reboots: readonly RebootEffect[]
+      checkpointProgress?: never
+    }>
+  | Readonly<{
       kind: 'CHECKPOINTS'
       checkpointProgress: readonly Pick<PlayerState, 'playerId' | 'lastCheckpoint'>[]
       robots?: never

@@ -5,6 +5,7 @@ import type {
   Orientation,
   PlayerId,
   PublicRegisters,
+  RebootEffect,
   Position,
   RobotSpriteId,
   RobotActionResolved,
@@ -48,10 +49,10 @@ export const ROBOT_TURN_DURATION_MS = 300
 export const PIT_FALL_DURATION_MS = 450
 export const PIT_RESPAWN_DURATION_MS = 900
 export function robotActionDuration(action: PlaybackResult, reducedMotion: boolean): number {
-  if ('kind' in action) return reducedMotion ? 200 : ROBOT_TURN_DURATION_MS
-  return reducedMotion ? 200
-    : action.resolvedInstruction !== null && effects[action.resolvedInstruction].kind === 'turn'
-      ? ROBOT_TURN_DURATION_MS : ROBOT_MOVE_DURATION_MS
+  if (reducedMotion) return 200
+  if ('kind' in action) return action.kind === 'CONVEYORS' ? ROBOT_MOVE_DURATION_MS : ROBOT_TURN_DURATION_MS
+  return action.resolvedInstruction !== null && effects[action.resolvedInstruction].kind === 'turn'
+    ? ROBOT_TURN_DURATION_MS : ROBOT_MOVE_DURATION_MS
 }
 
 export type RobotPlaybackState = Readonly<{
@@ -82,7 +83,7 @@ export const orientationAngle: Record<Orientation, number> = {
 // there, then appears on its reboot tile. A reboot keeps the robot's facing. Only that robot
 // animates; robots that reboot later in the same action wait where they started.
 export function playbackPhases(
-  action: ResolvedRobotAction,
+  action: { reboots: readonly RebootEffect[] },
   startOf: (robotId: string) => Position | undefined,
 ): readonly PlaybackPhase[] {
   return action.reboots.flatMap(({ robotId, fellAt, landedAt }, index) => {
@@ -229,7 +230,7 @@ export function robotPlaybackReducer(
   const entry: PlaybackAction = {
     action,
     // Without a board on screen (or with reduced motion) the action jumps to its result.
-    phases: event.board && !('kind' in action)
+    phases: event.board && 'reboots' in action
       ? playbackPhases(action, (robotId) => settledPosition(state, robotId)) : [],
   }
   const queued = { ...state, pending: [...state.pending, entry] }

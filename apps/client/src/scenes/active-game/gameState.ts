@@ -78,7 +78,7 @@ export type GameStateEvent =
   | { type: 'joined'; result: GameInitialization }
   | { type: 'player-left'; payload: PlayerLeft }
   | { type: 'player-connection-changed'; payload: PlayerConnectionChanged }
-  | { type: 'environment'; result: EnvironmentStepResolved }
+  | { type: 'environment'; result: EnvironmentStepResolved; reducedMotion?: boolean }
   | { type: 'registers-changed'; payload: RegistersChanged }
   | { type: 'program-submitted'; payload: ProgramSubmitted }
   | { type: 'disconnected' }
@@ -281,14 +281,15 @@ export function gameStateReducer(
     case 'environment': {
       const { result } = event
       if (result.gameId !== state.assignment?.gameId) return state
-      const action = result.kind === 'GEARS' ? result : {
+      const action = result.kind === 'CHECKPOINTS' ? {
         ...result,
         checkpointProgress: result.checkpointProgress.filter(({ playerId, lastCheckpoint }) =>
           Number.isSafeInteger(lastCheckpoint) && lastCheckpoint > 0 && lastCheckpoint <= state.checkpointCount &&
           state.players.some((player) => player.playerId === playerId)),
-      }
-      return updatePlayback(state,
-        robotPlaybackReducer(state.playback, { type: 'enqueue', action }))
+      } : result
+      return updatePlayback(state, robotPlaybackReducer(state.playback, {
+        type: 'enqueue', action, board: event.reducedMotion ? null : state.board,
+      }))
     }
     case 'player-connection-changed': {
       const { gameId, playerId, connected, paused } = event.payload

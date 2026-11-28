@@ -143,7 +143,11 @@ export default function useGameConnection(socket: GameSocket) {
       receive({ type: 'player-connection-changed', payload })
     const handleAborted = (_payload: GameAborted) => receive({ type: 'aborted' })
     const handleWon = (payload: GameWon) => receive({ type: 'won', payload })
-    const handleEnvironmentStep = (result: EnvironmentStepResolved) => receive({ type: 'environment', result })
+    const handleEnvironmentStep = (result: EnvironmentStepResolved) => receive({
+      type: 'environment',
+      result,
+      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    })
     const handleRegistersChanged = (payload: RegistersChanged) => receive({ type: 'registers-changed', payload })
     const handleProgramSubmitted = (payload: ProgramSubmitted) => receive({ type: 'program-submitted', payload })
 

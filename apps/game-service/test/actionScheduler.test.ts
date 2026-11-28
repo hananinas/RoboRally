@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Card, Deck, Direction, EmptyTile, GearTile } from '@/domain/game/index'
+import { Card, ConveyorTile, Deck, Direction, EmptyTile, GearTile } from '@/domain/game/index'
 import { createActionScheduler, type ActionScheduler } from '@/socket/gameSession/actionScheduler'
 import { createGameSocketServer, type GameSocketServer } from '@/socket/gameServer'
 import { createSessionStore } from '@/auth/sessionStore'
@@ -19,16 +19,19 @@ describe('activation scheduler', () => {
     vi.useRealTimers()
   })
 
-  function createGame(onGear = false) {
+  function createGame(start: 'checkpoint' | 'gear' | 'conveyor' = 'checkpoint') {
+    const middle = start === 'conveyor'
+      ? [new ConveyorTile(2, 'straight', Direction.EAST), new ConveyorTile(2, 'straight', Direction.EAST, [], 1), new EmptyTile()]
+      : [new GearTile('CLOCKWISE'), new EmptyTile([], 1), new EmptyTile()]
     const board = createTestBoard([
       [new EmptyTile(), new EmptyTile(), new EmptyTile()],
-      [new GearTile('CLOCKWISE'), new EmptyTile([], 1), new EmptyTile()],
+      middle,
       [new EmptyTile(), new EmptyTile([], 2), new EmptyTile()],
     ], { x: Integer(0), y: Integer(0), angle: 0 }, { x: Integer(2), y: Integer(0) })
     const cards = Array.from({ length: 5 }, (_, index) => new Card(`card-${index}`, 'TURN_LEFT'))
     const robot = createTestRobot({ direction: Direction.NORTH })
     const player = createTestPlayer({ id: 'player', robot, deck: new Deck(cards) })
-    const position = { x: Integer(onGear ? 0 : 1), y: Integer(1) }
+    const position = { x: Integer(start === 'checkpoint' ? 1 : 0), y: Integer(1) }
     const game = createTestGame({ board, players: [{ player, position }], deck: instructionsOf(cards) })
     game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
     io = createGameSocketServer(createServer(), createSessionStore({ oidcClient: { refreshToken: vi.fn() }, refreshBufferSeconds: 0 }))
@@ -78,7 +81,7 @@ describe('activation scheduler', () => {
   })
 
   it('broadcasts gear changes before the next action and deals after the last register', () => {
-    const { game, player, events } = createGame(true)
+    const { game, player, events } = createGame('gear')
     scheduler.scheduleNextAction()
     vi.runAllTimers()
     expect(events().map(({ name }) => name)).toEqual([
@@ -89,6 +92,20 @@ describe('activation scheduler', () => {
       .toEqual(Array.from({ length: 5 }, () => 'GEARS'))
     expect(player.robot.direction).toBe(Direction.NORTH)
     expect(game.lastActivePhase).toBe('programming')
+  })
+
+  it('broadcasts each blue move before the next action and omits empty conveyor passes', () => {
+    const { game, player, events } = createGame('conveyor')
+    scheduler.scheduleNextAction()
+    vi.runAllTimers()
+    expect(events().slice(0, 4).map(({ name }) => name)).toEqual([
+      'robot.actionResolved', 'environment.stepResolved', 'environment.stepResolved', 'robot.actionResolved',
+    ])
+    expect(events().filter(({ name }) => name === 'environment.stepResolved').map(({ payload }) => payload))
+      .toEqual([1, 2].map((x) => ({
+        gameId: game.id, kind: 'CONVEYORS', reboots: [],
+        robots: [{ robotId: player.robot.id, position: { coordinate: { x, y: 1 }, orientation: 'WEST' } }],
+      })))
   })
 
   it.each(['abort', 'stop'] as const)('does not execute an already queued callback after %s', (action) => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Instruction } from '@robo-rally/game-events'
-import { Card, Deck, Direction, EmptyTile, GearTile, RobotPlacements, type Position, type Tile } from '@/domain/game/index'
+import { Card, Deck, Direction, EmptyTile, GearTile, RobotPlacements, type Game, type Position, type Tile } from '@/domain/game/index'
 import { Integer } from '@/numbers'
 import { createTestBoard, createTestGame, createTestPlacement, createTestPlayer, createTestRobot, instructionsOf } from '../../fixtures.ts'
 
@@ -61,6 +61,13 @@ function createGearGame(tiles: readonly Tile[], directions: readonly Direction[]
   return { game, players, cards }
 }
 
+function resolveGearStep(game: Game) {
+  for (let pass = 0; pass < 3; pass++) {
+    expect(game.executeNextStep()).toMatchObject({ type: 'environment', result: { kind: 'CONVEYORS', robots: [] } })
+  }
+  return game.executeNextStep()
+}
+
 describe('gear activation', () => {
   const { NORTH: N, EAST: E, SOUTH: S, WEST: W } = Direction
 
@@ -80,7 +87,7 @@ describe('gear activation', () => {
     expect(robot.direction).toBe(facing)
     const position = game.getRobotPosition(robot.id)
 
-    expect(game.executeNextStep()).toEqual({
+    expect(resolveGearStep(game)).toEqual({
       type: 'environment', result: {
         kind: 'GEARS', roundConcluded: false,
         robots: [{ robotId: robot.id, position, direction: expected }],
@@ -100,7 +107,7 @@ describe('gear activation', () => {
     const positions = players.map(({ robot }) => game.getRobotPosition(robot.id))
     expect(players.map(({ robot }) => robot.direction)).toEqual([S, S, S, W])
 
-    const step = game.executeNextStep()
+    const step = resolveGearStep(game)
     expect(step.type).toBe('environment')
     if (step.type !== 'environment' || step.result.kind !== 'GEARS') throw new Error('Expected gear step')
     expect(step.result.robots).toEqual([
@@ -122,7 +129,7 @@ describe('gear activation', () => {
       if (round > 0) game.submitProgram(player.id, cards.map((card) => card.id))._unsafeUnwrap()
       for (let register = 0; register < 5; register++) {
         game.executeNextStep()
-        game.executeNextStep()
+        resolveGearStep(game)
         const direction = expected[(round * 5 + register) % 4]
         expect(player.robot.direction).toBe(direction)
         expect(game.getRobotPosition(player.robot.id)).toEqual({ x: 0, y: 1 })
@@ -142,7 +149,7 @@ describe('gear activation', () => {
     const robot = players[0].robot
     game.executeNextStep()
     expect(robot.direction).toBe(E)
-    const step = game.executeNextStep()
+    const step = resolveGearStep(game)
     expect(step.type).toBe('environment')
     if (step.type !== 'environment' || step.result.kind !== 'GEARS') throw new Error('Expected gear step')
     expect(step.result.robots).toHaveLength(changed ? 1 : 0)
@@ -175,7 +182,7 @@ describe('gear activation', () => {
     })
     expect([pushed.direction, pusher.direction]).toEqual([N, E])
 
-    const step = game.executeNextStep()
+    const step = resolveGearStep(game)
     expect(step).toMatchObject({ type: 'environment', result: { kind: 'GEARS' } })
     if (step.type !== 'environment' || step.result.kind !== 'GEARS') throw new Error('Expected gear step')
     expect(new Map(step.result.robots.map(({ robotId, direction }) => [robotId, direction])))
@@ -192,7 +199,7 @@ describe('gear activation', () => {
     const { game, players } = createGearGame([new GearTile('CLOCKWISE')], [N])
     const robot = players[0].robot
     game.executeNextStep()
-    game.executeNextStep()
+    resolveGearStep(game)
     expect(robot.direction).toBe(W)
     const pending = game.hasPendingEnvironment
     game.pause()

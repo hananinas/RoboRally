@@ -54,7 +54,10 @@ export type NextActionResult = Readonly<{
 
 export type EnvironmentStepResult = EnvironmentChanges & Readonly<{
   roundConcluded: boolean
-}>
+}> & (
+  | Readonly<{ kind: 'CONVEYORS'; reboots: readonly RebootResult[] }>
+  | Readonly<{ kind: 'GEARS' | 'CHECKPOINTS' }>
+)
 
 export type ActivationStep =
   | Readonly<{ type: 'robot'; result: NextActionResult }>
@@ -98,8 +101,6 @@ export class Game {
   private readonly deck: readonly Instruction[]
   private readonly lifecycle = new GameLifecycle('programming')
   private registerIndex = 0
-  // Reboots recorded while the current action resolves.
-  private actionReboots: RebootResult[] = []
   private environmentStepIndex: number | null = null
   private readonly submittedPlayerIds = new Set<PlayerId>()
   private readonly activatedRobotIds = new Set<RobotId>()
@@ -324,26 +325,33 @@ export class Game {
     const index = this.environmentStepIndex
     if (index === null) return { type: 'robot', result: this.executeNextAction() }
 
-    const changes = environmentSteps[index](captureEnvironmentSnapshot(this.board, this.robotPlacements, this.roster.players))
-    if (changes.kind === 'GEARS') {
-      for (const { robotId, direction } of changes.robots) {
-        const robot = this.roster.requireOwner(robotId).robot
-        robot.turn(direction - robot.direction)
-      }
-    } else {
+    const snapshot = captureEnvironmentSnapshot(this.board, this.robotPlacements, this.roster.players)
+    const changes = environmentSteps[index](snapshot, this.board)
+    const reboots: RebootResult[] = []
+    if (changes.kind === 'CHECKPOINTS') {
       for (const { playerId, lastCheckpoint } of changes.checkpointProgress) {
         this.roster.requirePlayer(playerId).completeCheckpoint(lastCheckpoint)
         if (lastCheckpoint === this.board.checkpointCount) this.lifecycle.finish(playerId)
+      }
+    } else {
+      if (changes.kind === 'CONVEYORS') this.robotPlacements.applyConveyorMoves(changes.robots)
+      for (const { robotId, position, direction } of changes.robots) {
+        const robot = this.roster.requireOwner(robotId).robot
+        robot.turn(direction - robot.direction)
+        if (changes.kind === 'CONVEYORS') this.resolveMovementEntry(robot, position, reboots)
       }
     }
 
     this.environmentStepIndex = index + 1
     const { roundConcluded } = this.environmentStepIndex === environmentSteps.length
       ? this.concludeRegister() : { roundConcluded: false }
-    return {
-      type: 'environment',
-      result: { ...changes, roundConcluded },
-    }
+    const result = changes.kind === 'CONVEYORS' ? {
+      ...changes,
+      robots: changes.robots.map((robot) => ({ ...robot, position: this.robotPlacements.positionOf(robot.robotId) })),
+      reboots,
+      roundConcluded,
+    } : { ...changes, roundConcluded }
+    return { type: 'environment', result }
   }
 
   private concludeRegister(): { roundConcluded: boolean } {
@@ -365,14 +373,14 @@ export class Game {
   }
 
   // Gameplay movement resolves entry effects; Board movement only changes positions.
-  private moveRobot(robot: Robot, direction: Direction, steps: PositiveInteger): void {
+  private moveRobot(robot: Robot, direction: Direction, steps: PositiveInteger, reboots: RebootResult[]): void {
     for (let step = 0; step < steps; step++) {
       const movedRobotIds = this.robotPlacements.push(robot.id, direction)
       if (movedRobotIds.length === 0) return
 
       for (const id of movedRobotIds) {
         const movedRobot = this.roster.requireOwner(id).robot
-        const entry = this.resolveMovementEntry(movedRobot, this.robotPlacements.positionOf(id))
+        const entry = this.resolveMovementEntry(movedRobot, this.robotPlacements.positionOf(id), reboots)
         if (id === robot.id && entry === 'stop') return
       }
     }
@@ -390,10 +398,8 @@ export class Game {
     const registerIndex = this.registerIndex
     const card = player.registers.cardAt(UnsignedInteger(registerIndex))
     const previousPositions = this.roster.players.map((player) => this.robotPlacements.positionOf(player.robot.id))
-    this.actionReboots = []
-    const resolvedInstruction = this.executeCard(robot, card, registerIndex)
-    const reboots = this.actionReboots
-    this.actionReboots = []
+    const reboots: RebootResult[] = []
+    const resolvedInstruction = this.executeCard(robot, card, registerIndex, reboots)
     this.activatedRobotIds.add(robot.id)
     const action: RobotActionResult = {
       robotId: robot.id,
@@ -463,7 +469,7 @@ export class Game {
     return nextPlayer
   }
 
-  private executeCard(robot: Robot, card: Card, registerIndex: number): ResolvedInstruction | undefined {
+  private executeCard(robot: Robot, card: Card, registerIndex: number, reboots: RebootResult[]): ResolvedInstruction | undefined {
     // Again repeats what the previous register resolved to (nothing in register 0).
     // TODO: With damage cards, Again after a damage card instead draws the top
     // card of the player's deck and resolves that.
@@ -476,21 +482,21 @@ export class Game {
     const effect = effects[resolved]
     if (effect.kind === 'move') {
       const direction = effect.steps < 0 ? opposite(robot.direction) : robot.direction
-      this.moveRobot(robot, direction, PositiveInteger(Math.abs(effect.steps)))
+      this.moveRobot(robot, direction, PositiveInteger(Math.abs(effect.steps)), reboots)
     } else {
       robot.turn(effect.quarterTurns)
     }
     return resolved
   }
 
-  private resolveMovementEntry(robot: Robot, position: Position): 'continue' | 'stop' {
+  private resolveMovementEntry(robot: Robot, position: Position, reboots: RebootResult[]): 'continue' | 'stop' {
     const tile = this.board.getTile(position)
     const effect = tile === undefined ? 'reboot' : tile.entryEffect
     switch (effect) {
       case undefined:
         return 'continue'
       case 'reboot':
-        this.rebootRobot(robot, position)
+        reboots.push(this.rebootRobot(robot, position))
         return 'stop'
       default: {
         const unexpectedEffect: never = effect
@@ -500,15 +506,15 @@ export class Game {
   }
 
   // Reboots on the free reboot tile closest to where the robot fell; ties keep board order.
-  private rebootRobot(robot: Robot, fellAt: Position): void {
+  private rebootRobot(robot: Robot, fellAt: Position): RebootResult {
     const distance = (tile: Position) => Math.abs(tile.x - fellAt.x) + Math.abs(tile.y - fellAt.y)
     const closestFirst = [...this.board.rebootTiles].sort((a, b) => distance(a) - distance(b))
     const destination = closestFirst.find((tile) => this.robotPlacements.occupantAt(tile) === undefined)
       ?? this.robotPlacements.nearestFreePosition(closestFirst[0])
     if (destination === undefined) throw new Error('No safe reboot destination is available')
     this.robotPlacements.relocate(robot.id, destination)
-    this.actionReboots.push({ robotId: robot.id, fellAt: { ...fellAt }, landedAt: { ...destination } })
     // TODO: Add two SPAM cards and cancel this robot's remaining registers.
+    return { robotId: robot.id, fellAt: { ...fellAt }, landedAt: { ...destination } }
   }
 
   private finishRegister(): void {
