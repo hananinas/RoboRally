@@ -89,6 +89,9 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
   const winnerFocus = gameOver && winnerRobot
     ? { ...winnerRobot.position.coordinate, request: winnerFocusRequest }
     : null
+  const celebration = gameOver && winnerRobot
+    ? { robotId: winnerRobot.robotId, colour: winnerRobot.colour, checkpointNumber: state.checkpointCount }
+    : null
   const registeredCardIds = new Set(
     state.registers.flatMap((card) => (card ? [card.id] : [])),
   )
@@ -111,7 +114,12 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
   return (
     <div className="game">
       {state.board && (
-        <BoardViewport board={state.board} robots={state.playback.robots} focus={winnerFocus} />
+        <BoardViewport
+          board={state.board}
+          robots={state.playback.robots}
+          focus={winnerFocus}
+          celebration={celebration}
+        />
       )}
       <div className="game-overlay">
         <aside className="game-hud" aria-label="Game controls">
