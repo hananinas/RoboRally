@@ -20,6 +20,8 @@ import type {
   RegistersChanged,
   RobotActionResolved,
   SubmitProgram,
+  VoteProposal,
+  VotesChanged,
 } from '@robo-rally/game-events'
 import { type BoardRenderModel } from './board/boardModel.ts'
 import { createBoardFromSnapshot } from './board/boardFromSnapshot.ts'
@@ -54,6 +56,7 @@ export type ClientGameState = {
   phase: GamePhase | null
   programmingTimer: ProgrammingTimer
   paused: boolean
+  proposals: readonly VoteProposal[]
   players: readonly Player[]
   checkpointCount: number
   board: BoardRenderModel | null
@@ -76,6 +79,7 @@ export type ClientGameState = {
 
 export type GameStateEvent =
   | { type: 'joined'; result: GameInitialization }
+  | { type: 'votes-changed'; payload: VotesChanged }
   | { type: 'player-left'; payload: PlayerLeft }
   | { type: 'player-connection-changed'; payload: PlayerConnectionChanged }
   | { type: 'environment'; result: EnvironmentStepResolved }
@@ -124,6 +128,7 @@ export function createClientGameState(): ClientGameState {
     phase: null,
     programmingTimer: { status: 'IDLE' },
     paused: false,
+    proposals: [],
     players: [],
     checkpointCount: 0,
     board: null,
@@ -269,12 +274,16 @@ export function gameStateReducer(
         players: state.players.map((player) => player.playerId === playerId ? { ...player, programSubmitted: true } : player),
       }
     }
+    case 'votes-changed':
+      if (event.payload.gameId !== state.assignment?.gameId) return state
+      return { ...state, proposals: event.payload.proposals }
     case 'player-left': {
       const { gameId, playerId, robotId } = event.payload
       if (gameId !== state.assignment?.gameId ||
         !state.players.some((player) => player.playerId === playerId)) return state
       return finishPlayback(updatePlayback({
         ...state,
+        paused: event.payload.paused ?? state.paused,
         players: state.players.filter((player) => player.playerId !== playerId),
       }, robotPlaybackReducer(state.playback, { type: 'remove', robotId })))
     }
@@ -346,6 +355,7 @@ export function gameStateReducer(
         phase: snapshot.phase,
         programmingTimer: snapshot.programmingTimer,
         paused: snapshot.paused,
+        proposals: snapshot.proposals ?? [],
         aborted: snapshot.aborted,
         winner: snapshot.winner,
         error: snapshot.aborted ? 'This game has encountered an error and cannot continue.' : null,

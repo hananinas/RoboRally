@@ -50,7 +50,11 @@ export function handleSocketDisconnect(context: SocketContext, socket: GameSocke
   try {
     leaveLobby(context, socket)
     const gameSession = context.registry.getCurrentGame(socket.data.user.userId)
-    if (gameSession) gameSession.markDisconnected(socket)
+    const change = gameSession?.markDisconnected(socket)
+    if (change) {
+      for (const userId of change.removedUserIds) context.registry.clearActiveMembership(userId)
+      change.announce()
+    }
   } catch (error) {
     logError('Failed to clean up disconnected socket', error, { userId: socket.data.user.userId })
   }

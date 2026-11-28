@@ -1,6 +1,7 @@
 import { parseCookie } from 'cookie'
 import { SESSION_COOKIE_NAME, type SessionStore } from '@/auth/sessionStore'
 import type { GameSocket, SocketContext } from '@/socket/gameServer'
+import type { MembershipRegistry } from '@/membership/MembershipRegistry'
 import { logError } from '@/logger'
 
 export function authenticateSocket(sessionStore: SessionStore, socket: GameSocket, next: (error?: Error) => void): void {
@@ -34,20 +35,19 @@ export function rejectExpiredSession(sessionStore: SessionStore, socket: GameSoc
   next(new Error('UNAUTHENTICATED'))
 }
 
+export function recoveryError(registry: MembershipRegistry, userId: string, socketId: string, rooms: Iterable<string>) {
+  const gameSession = registry.getCurrentGame(userId)
+  const seat = gameSession?.getSeat(userId)
+  if (seat?.connectionId && seat.connectionId !== socketId) return 'USER_ALREADY_IN_GAME'
+  const expectedRooms = new Set(seat && gameSession
+    ? [socketId, gameSession.publicRoom, gameSession.playerRoom(seat.player.id)] : [socketId])
+  if ([...rooms].some((room) => !expectedRooms.has(room))) return 'SOCKET_SESSION_EXPIRED'
+  return undefined
+}
+
 export function validateSocketSession(context: SocketContext, socket: GameSocket, next: (error?: Error) => void): void {
-  if (socket.recovered) {
-    const gameSession = context.registry.getCurrentGame(socket.data.user.userId)
-    const seat = gameSession?.getSeat(socket.data.user.userId)
-    if (seat?.connectionId && seat.connectionId !== socket.id) {
-      return next(new Error('USER_ALREADY_IN_GAME'))
-    }
-    const expectedRooms = new Set(seat && gameSession
-      ? [socket.id, gameSession.publicRoom, gameSession.playerRoom(seat.player.id)] : [socket.id])
-    if ([...socket.rooms].some((room) => !expectedRooms.has(room))) {
-      return next(new Error('SOCKET_SESSION_EXPIRED'))
-    }
-  }
-  next()
+  const error = socket.recovered && recoveryError(context.registry, socket.data.user.userId, socket.id, socket.rooms)
+  next(error ? new Error(error) : undefined)
 }
 
 export function recoverSocketSession(context: SocketContext, socket: GameSocket): void {

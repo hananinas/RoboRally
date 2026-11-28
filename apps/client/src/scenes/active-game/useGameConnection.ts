@@ -12,6 +12,7 @@ import type {
   ProgramFinalized,
   ProgramTimerChanged,
   ProgramSubmitted,
+  VotesChanged,
 } from '@robo-rally/game-events'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -138,6 +139,7 @@ export default function useGameConnection(socket: GameSocket) {
       action,
       reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     })
+    const handleVotesChanged = (payload: VotesChanged) => receive({ type: 'votes-changed', payload })
     const handlePlayerLeft = (payload: PlayerLeft) => receive({ type: 'player-left', payload })
     const handlePlayerConnectionChanged = (payload: PlayerConnectionChanged) =>
       receive({ type: 'player-connection-changed', payload })
@@ -154,6 +156,7 @@ export default function useGameConnection(socket: GameSocket) {
     socket.on('program.finalized', handleProgramFinalized)
     socket.on('program.timerChanged', handleTimerChanged)
     socket.on('robot.actionResolved', handleActionResolved)
+    socket.on('game.votesChanged', handleVotesChanged)
     socket.on('game.playerLeft', handlePlayerLeft)
     socket.on('game.playerConnectionChanged', handlePlayerConnectionChanged)
     socket.on('game.aborted', handleAborted)
@@ -170,6 +173,7 @@ export default function useGameConnection(socket: GameSocket) {
       socket.off('program.finalized', handleProgramFinalized)
       socket.off('program.timerChanged', handleTimerChanged)
       socket.off('robot.actionResolved', handleActionResolved)
+      socket.off('game.votesChanged', handleVotesChanged)
       socket.off('game.playerLeft', handlePlayerLeft)
       socket.off('game.playerConnectionChanged', handlePlayerConnectionChanged)
       socket.off('game.aborted', handleAborted)
@@ -197,5 +201,16 @@ export default function useGameConnection(socket: GameSocket) {
     })
   }, [dispatch, socket])
 
-  return { state, localDeadline, dispatch, submit, initialize, needsReconciliation }
+  const vote = useCallback(async (proposalId: string): Promise<boolean> => {
+    if (!socket.connected) return false
+    const requestGeneration = generation.current
+    try {
+      const result = await socket.timeout(ACKNOWLEDGEMENT_TIMEOUT_MS).emitWithAck('game.vote', { proposalId })
+      return generation.current === requestGeneration && result.outcome === 'ACCEPTED'
+    } catch {
+      return false
+    }
+  }, [socket])
+
+  return { state, localDeadline, dispatch, submit, vote, initialize, needsReconciliation }
 }

@@ -1,6 +1,6 @@
 import { handleListLobbies, handleCreateLobby, handleJoinLobby, handleSelectRobot, handleLeaveLobby, handleStartLobby } from '@/socket/handlers/lobbyHandlers'
 import { handleGetMembership, handleSocketDisconnect } from '@/socket/handlers/membershipHandlers'
-import { handleLeaveGame, handleSubmitProgram, handleUpdateRegisters } from '@/socket/handlers/gameHandlers'
+import { handleLeaveGame, handleSubmitProgram, handleUpdateRegisters, handleVote } from '@/socket/handlers/gameHandlers'
 import { handleClockGet } from '@/socket/handlers/clockHandlers'
 import { authenticateSocket, rejectExpiredSession, validateSocketSession, recoverSocketSession } from '@/socket/connection/socketConnection'
 import { MembershipRegistry } from '@/membership/MembershipRegistry'
@@ -31,6 +31,7 @@ export function createGameSocketServer(
   httpServer: HttpServer,
   sessionStore: SessionStore,
 ): GameSocketServer {
+  const registry = new MembershipRegistry()
   const io = new Server<
     ClientToServerEvents,
     ServerToClientEvents,
@@ -40,9 +41,9 @@ export function createGameSocketServer(
     connectionStateRecovery: { skipMiddlewares: false },
     pingInterval: 1000,
     pingTimeout: 1000,
-    adapter: createAuthGatedAdapter(sessionStore),
+    adapter: createAuthGatedAdapter(sessionStore, registry),
   })
-  const context: SocketContext = { io, registry: new MembershipRegistry() }
+  const context: SocketContext = { io, registry }
   httpServer.once('close', () => { for (const ctx of context.registry.games) ctx.actionScheduler.stop() })
 
   io.use((socket, next) => authenticateSocket(sessionStore, socket, next))
@@ -64,6 +65,7 @@ export function createGameSocketServer(
     socket.on('lobby.start', (payload, ack) => handleStartLobby(context, socket, payload, ack))
     socket.on('membership.get', (payload, ack) => handleGetMembership(context, socket, payload, ack))
 
+    socket.on('game.vote', (payload, ack) => handleVote(context, socket, payload, ack))
     socket.on('game.leave', (payload, ack) => handleLeaveGame(context, socket, payload, ack))
     socket.on('disconnect', () => handleSocketDisconnect(context, socket))
     socket.on('program.submit', (payload, ack) => handleSubmitProgram(context, socket, payload, ack))

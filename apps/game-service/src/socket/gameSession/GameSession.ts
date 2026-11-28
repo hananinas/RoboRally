@@ -1,4 +1,5 @@
-import type { GameInitialization, PublicGameState, RobotSpriteId, User, Winner } from '@robo-rally/game-events'
+import { randomUUID } from 'node:crypto'
+import type { GameInitialization, PublicGameState, RobotSpriteId, User, VoteProposal, Winner } from '@robo-rally/game-events'
 import { err, ok, type Result } from 'neverthrow'
 import type { GameSocket, GameSocketServer } from '@/socket/gameServer'
 import type { AddPlayerError, Game, Player } from '@/domain/game/index'
@@ -16,6 +17,15 @@ export type Seat = {
   connectionId: string | null
 }
 
+type MembershipChange = { removedUserIds: string[]; announce: () => void }
+
+type Ballot = {
+  proposalId: string
+  action: VoteProposal['action']
+  votesRequired: number
+  voters: Set<string>
+}
+
 export type ReattachedMembership = {
   initialization: GameInitialization
   announceReconnected: () => void
@@ -26,6 +36,7 @@ export class GameSession {
   readonly game: Game
   readonly publicRoom: string
   private readonly seats = new Map<string, Seat>()
+  private ballots: Ballot[] = []
   readonly actionScheduler: ActionScheduler
   readonly programmingTimer: ProgrammingTimer
   private recordedWinner: Winner | null = null
@@ -64,6 +75,7 @@ export class GameSession {
       logError('Failed to complete programs at the deadline', error, { gameId: this.game.id, source: 'programmingTimer' })
       this.actionScheduler.stop()
       this.game.abort()
+      this.ballots = []
       this.io.to(this.publicRoom).emit('game.aborted', { gameId: this.game.id })
     }
   }
@@ -93,7 +105,62 @@ export class GameSession {
   }
 
   publicState(): PublicGameState {
-    return presentPublicGameState(this.game, this.programmingTimer.state(), this.seats.values(), this.winner())
+    return presentPublicGameState(this.game, this.programmingTimer.state(), this.seats.values(), this.winner(), this.voteSummaries())
+  }
+
+  private voteSummaries(): VoteProposal[] {
+    return this.ballots.map(({ proposalId, action, votesRequired, voters }) => ({
+      proposalId, action, votesRequired, votesCast: voters.size,
+    }))
+  }
+
+  private publishVotes(): void {
+    this.io.to(this.publicRoom).emit('game.votesChanged', { gameId: this.game.id, proposals: this.voteSummaries() })
+  }
+
+  private updateDisconnectVotes(leaving?: Seat): { shouldPublishVotes: boolean; kicks: Seat[] } {
+    const remaining = [...this.seats.values()].filter((seat) => seat !== leaving)
+    const eligible = new Set(remaining.filter((seat) => seat.connectionId !== null).map(({ player }) => player.id))
+    const votesRequired = Math.ceil(2 * eligible.size / 3)
+    const open: Ballot[] = []
+    const kicks: Seat[] = []
+
+    if (this.game.paused && votesRequired > 0) {
+      for (const seat of remaining) {
+        if (seat.connectionId !== null) continue
+        const previous = this.ballots.find(({ action }) => action.targetPlayerId === seat.player.id)
+        const voters = new Set(Array.from(previous?.voters ?? []).filter((id) => eligible.has(id)))
+        if (voters.size >= votesRequired) {
+          kicks.push(seat)
+        } else {
+          open.push({
+            proposalId: previous?.proposalId ?? randomUUID(),
+            action: { kind: 'KICK_DISCONNECTED_PLAYER', targetPlayerId: seat.player.id },
+            votesRequired, voters,
+          })
+        }
+      }
+    }
+    const shouldPublishVotes = this.ballots.length > 0 || open.length > 0
+    this.ballots = open
+    return { shouldPublishVotes, kicks }
+  }
+
+  castVote(player: Player, proposalId: string): Result<MembershipChange | null, 'PROPOSAL_CLOSED'> {
+    const ballot = this.ballots.find((candidate) => candidate.proposalId === proposalId)
+    if (!this.game.paused || !ballot) return err('PROPOSAL_CLOSED')
+    const target = [...this.seats.values()].find((seat) => seat.player.id === ballot.action.targetPlayerId)
+    if (!target || target.connectionId !== null) return err('PROPOSAL_CLOSED')
+    if (ballot.voters.has(player.id)) return ok(null)
+
+    ballot.voters.add(player.id)
+    if (ballot.voters.size < ballot.votesRequired) {
+      this.publishVotes()
+      return ok(null)
+    }
+
+    this.ballots = this.ballots.filter((other) => other !== ballot)
+    return ok(this.removeSeats([target], true))
   }
 
   isMember(socket: GameSocket): Result<Seat, 'NOT_A_MEMBER'> {
@@ -134,19 +201,34 @@ export class GameSession {
     const seat = this.seatFor(socket)
     if (seat && this.reattachSeat(seat, socket.id)) {
       const announceResumed = this.resumeUnlessStillDisconnected()
+      const { shouldPublishVotes } = this.updateDisconnectVotes()
       announceResumed()
+      if (shouldPublishVotes) this.publishVotes()
       this.notifyReconnected(seat.player)
     }
   }
 
-  markDisconnected(socket: GameSocket): void {
+  markDisconnected(socket: GameSocket): MembershipChange | undefined {
     const result = this.isMember(socket)
     if (result.isErr()) return
     const seat = result.value
 
     seat.connectionId = null
     this.game.pause()
-    this.io.to(this.publicRoom).emit('game.playerConnectionChanged', presentPlayerConnectionChanged(this.game, seat.player, false))
+    const { shouldPublishVotes, kicks } = this.updateDisconnectVotes()
+    const disconnected = presentPlayerConnectionChanged(this.game, seat.player, false)
+    const departures = kicks.length > 0 ? this.removeSeats(kicks, shouldPublishVotes) : undefined
+    return {
+      removedUserIds: departures?.removedUserIds ?? [],
+      announce: () => {
+        try {
+          this.io.to(this.publicRoom).emit('game.playerConnectionChanged', disconnected)
+        } finally {
+          if (departures) departures.announce()
+          else if (shouldPublishVotes) this.publishVotes()
+        }
+      },
+    }
   }
 
   addSeat(user: User, connectionId: string, robotSpriteId: RobotSpriteId, colour?: string): Result<Player, AddPlayerError> {
@@ -156,19 +238,43 @@ export class GameSession {
     })
   }
 
-  leave(socket: GameSocket): Result<void, 'NOT_A_MEMBER'> {
-    return this.isMember(socket).map(({ player, user }) => {
-      const { roundConcluded } = this.game.removePlayer(player.id)
-      this.seats.delete(user.userId)
+  leave(socket: GameSocket): Result<MembershipChange, 'NOT_A_MEMBER'> {
+    return this.isMember(socket).map((seat) => {
       void socket.leave(this.publicRoom)
-      void socket.leave(this.playerRoom(player.id))
-      this.io.to(this.publicRoom).emit('game.playerLeft', {
-        gameId: this.game.id, playerId: player.id, robotId: player.robot.id,
-      })
-      this.closeTimerIfRoundConcluded()
-      this.actionScheduler.announceProgress({ roundConcluded })
-      this.actionScheduler.scheduleNextAction()
+      void socket.leave(this.playerRoom(seat.player.id))
+      const { shouldPublishVotes, kicks } = this.updateDisconnectVotes(seat)
+      return this.removeSeats([seat, ...kicks], shouldPublishVotes)
     })
+  }
+
+  private removeSeats(seats: Seat[], shouldPublishVotes: boolean): MembershipChange {
+    let roundConcluded = false
+    let announceResumed: (() => void) | undefined
+    for (const { user, player, connectionId } of seats) {
+      const removal = this.game.removePlayer(player.id)
+      roundConcluded ||= removal.roundConcluded
+      this.seats.delete(user.userId)
+      if (connectionId === null) announceResumed = this.resumeUnlessStillDisconnected()
+    }
+
+    // The handler clears all removed memberships before publishing the departures.
+    const announce = () => {
+      try {
+        for (const { player, connectionId } of seats) {
+          this.io.to(this.publicRoom).emit('game.playerLeft', {
+            gameId: this.game.id, playerId: player.id, robotId: player.robot.id,
+            ...(connectionId === null && { paused: this.game.paused }),
+          })
+        }
+        if (shouldPublishVotes) this.publishVotes()
+      } finally {
+        this.actionScheduler.scheduleNextAction()
+        this.closeTimerIfRoundConcluded()
+        if (announceResumed) announceResumed()
+        else this.actionScheduler.announceProgress({ roundConcluded })
+      }
+    }
+    return { removedUserIds: seats.map(({ user }) => user.userId), announce }
   }
 
   reattach(socket: GameSocket): Result<ReattachedMembership, 'ALREADY_HAS_MEMBERSHIP' | 'INTERNAL_ERROR'> {
@@ -178,16 +284,19 @@ export class GameSession {
 
     const previousRooms = new Set(socket.rooms)
     const previousConnectionId = seat.connectionId
+    const previousBallots = this.ballots
     const wasPaused = this.game.paused
     const reconnected = this.reattachSeat(seat, socket.id)
     try {
       void socket.join([this.publicRoom, this.playerRoom(seat.player.id)])
       const announceResumed = this.resumeUnlessStillDisconnected()
+      const shouldPublishVotes = reconnected && this.updateDisconnectVotes().shouldPublishVotes
       const initialization = presentInitialization(this.game, seat.player, this.publicState())
       return ok({
         initialization,
         announceReconnected: () => {
           announceResumed()
+          if (shouldPublishVotes) this.publishVotes()
           if (reconnected) this.notifyReconnected(seat.player)
         },
       })
@@ -196,6 +305,7 @@ export class GameSession {
         if (!previousRooms.has(room)) void socket.leave(room)
       }
       logError('Failed to reattach game membership', error, { command: 'membership.get', gameId: this.game.id })
+      this.ballots = previousBallots
       seat.connectionId = previousConnectionId
       if (wasPaused) this.game.pause()
       return err('INTERNAL_ERROR')

@@ -596,9 +596,23 @@
   }
 }
 
+.disconnect-popup {
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.disconnect-vote {
+  display: grid;
+  gap: var(--ui-space-sm);
+  margin-top: var(--ui-space-md);
+}
+
 .game-popup__leave {
-  min-height: var(--ui-control-size);
   margin-top: 1.5rem;
+}
+
+.game-popup__leave, .disconnect-vote button {
+  min-height: var(--ui-control-size);
   padding: var(--ui-space-sm) var(--ui-space-md);
   border: 0;
   border-radius: var(--ui-control-radius);
@@ -608,11 +622,11 @@
   cursor: pointer;
 }
 
-.game-popup__leave:enabled:hover {
+.game-popup__leave:enabled:hover, .disconnect-vote button:enabled:hover {
   background: var(--hud-surface-raised);
 }
 
-.game-popup__leave:disabled {
+.game-popup__leave:disabled, .disconnect-vote button:disabled {
   opacity: 0.6;
   cursor: default;
 }

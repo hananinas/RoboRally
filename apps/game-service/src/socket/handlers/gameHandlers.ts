@@ -2,6 +2,7 @@ import {
   emptyRequestSchema,
   submitProgramSchema,
   updateRegistersSchema,
+  voteSchema,
   type EmptyRequest,
   type LeaveResult,
   type ProgramResult,
@@ -9,6 +10,8 @@ import {
   type UpdateRegisters,
   type UpdateRegistersResult,
   type User,
+  type Vote,
+  type VoteResult,
 } from '@robo-rally/game-events'
 import { err, ok } from 'neverthrow'
 import { withValidatedRequest } from '@/socket/utilities/withValidatedRequest'
@@ -43,6 +46,26 @@ export function handleSubmitProgram(
   })
 }
 
+export function handleVote(
+  context: SocketContext,
+  socket: GameSocket,
+  payload: Vote,
+  acknowledge: (result: VoteResult) => void,
+): void {
+  withValidatedRequest({
+    socket, command: 'game.vote', schema: voteSchema, payload, acknowledge,
+    resolve: (user) => resolveActiveMember(context, socket, user),
+    run: ({ gameSession, player }, ack) => {
+      const result = gameSession.castVote(player, payload.proposalId)
+      if (result.isErr()) return ack({ outcome: result.error })
+      const departures = result.value
+      for (const userId of departures?.removedUserIds ?? []) context.registry.clearActiveMembership(userId)
+      ack({ outcome: 'ACCEPTED' })
+      departures?.announce()
+    },
+  })
+}
+
 export function handleLeaveGame(
   context: SocketContext,
   socket: GameSocket,
@@ -53,17 +76,19 @@ export function handleLeaveGame(
     socket, command: 'game.leave', schema: emptyRequestSchema, payload, acknowledge,
     resolve: (user) => {
       const gameSession = context.registry.getCurrentGame(user.userId)
-      return gameSession ? ok({ user, gameSession }) : err({ outcome: 'GAME_NOT_FOUND' as const })
+      return gameSession ? ok(gameSession) : err({ outcome: 'GAME_NOT_FOUND' as const })
     },
-    run: ({ user, gameSession }, ack) => {
+    run: (gameSession, ack) => {
       const result = gameSession.leave(socket)
       if (result.isErr()) return ack({ outcome: 'GAME_NOT_FOUND' })
-      context.registry.clearActiveMembership(user.userId)
+      const departures = result.value
+      for (const userId of departures.removedUserIds) context.registry.clearActiveMembership(userId)
       ack({ outcome: 'LEFT' })
       if (gameSession.seatCount === 0) {
         gameSession.actionScheduler.stop()
         context.registry.removeGame(gameSession.game.id)
       }
+      departures.announce()
     },
   })
 }

@@ -17,6 +17,7 @@ import {
 } from './gameState.ts'
 import type useGameConnection from './useGameConnection.ts'
 import LeaveGameButton from './components/LeaveGameButton.tsx'
+import DisconnectVote from './components/DisconnectVote.tsx'
 import WinnerPopup from './components/WinnerPopup.tsx'
 
 
@@ -172,10 +173,17 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
             <h2>{!state.connected
                   ? 'Connection to server lost'
                   : disconnectedNames.length > 0
-                    ? `${disconnectedNames.join(', ')} has disconnected`
+                    ? `${disconnectedNames.join(', ')} ${disconnectedNames.length === 1 ? 'has' : 'have'} disconnected`
                     : 'A player has disconnected'}
             </h2>
             <div className="disconnect-spinner" role="status"/>
+            {state.connected && !state.aborted && state.winner === null && state.proposals.map((proposal) => {
+              const target = state.players.find((member) => member.playerId === proposal.action.targetPlayerId)
+              return target && !target.connected && (
+                <DisconnectVote key={proposal.proposalId} proposal={proposal} username={target.username}
+                  disabled={leaving} vote={game.vote} />
+              )
+            })}
             <LeaveGameButton onLeave={onLeave} disabled={leaving || !state.connected} />
           </div>
         </div>

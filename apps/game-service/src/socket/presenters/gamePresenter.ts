@@ -12,6 +12,7 @@ import type {
   PlayerConnectionChanged,
   PrivateProgram,
   PublicGameState,
+  VoteProposal,
   PublicRegisters,
   PublicRegisterSlot,
   RegistersChanged,
@@ -137,6 +138,7 @@ export function presentPublicGameState(
   programmingTimer: ProgrammingTimer,
   seats: Iterable<{ user: User; player: Player; connectionId: string | null }>,
   winner: Winner | null,
+  proposals: readonly VoteProposal[] = [],
 ): PublicGameState {
   const tiles = Array.from({ length: game.board.height }, (_, y) =>
     Array.from({ length: game.board.width }, (_, x) => presentTile(game, x, y)),
@@ -146,6 +148,7 @@ export function presentPublicGameState(
     gameId: game.id,
     serverTime: Date.now(),
     programmingTimer,
+    proposals,
     checkpointCount: game.board.checkpointCount,
     players: [...seats].map(({ user, player, connectionId }) =>
       presentPlayerState(game, player, user.username, connectionId !== null)),
