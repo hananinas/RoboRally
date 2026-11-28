@@ -107,7 +107,7 @@ test('a disconnected waiting owner returns to browsing while the remaining membe
     }
     await expect(other.getByText('Waiting for the owner to start.', { exact: true })).toBeVisible()
     await page.context().setOffline(true)
-    await expect(other.getByRole('button', { name: 'Start', exact: true })).toBeEnabled({ timeout: 10000 })
+    await expect(other.getByRole('button', { name: 'Start', exact: true })).toBeEnabled({ timeout: 15_000 })
     await page.context().setOffline(false)
     await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeVisible({ timeout: 10000 })
     await expect(page.getByRole('main', { name: 'Game board' })).toHaveCount(0)

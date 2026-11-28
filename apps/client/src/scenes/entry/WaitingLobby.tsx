@@ -14,8 +14,8 @@ export default function WaitingLobby({ lobby, userId, disabled, onStart, onLeave
       <h2 id="waiting-lobby-title" className="waiting-lobby__title">{lobby.name}</h2>
       <p className="waiting-lobby__status">{owner ? 'Waiting for players.' : 'Waiting for the owner to start.'}</p>
       <div aria-live="polite" aria-atomic="true">
-        <p className="waiting-lobby__heading"><span>Players</span><span>{lobby.playerCount}/{lobby.maxPlayers} connected</span></p>
-        <ul className="waiting-lobby__players" aria-label="Connected players">
+        <p className="waiting-lobby__heading"><span>Players</span><span>{lobby.playerCount}/{lobby.maxPlayers} seats filled</span></p>
+        <ul className="waiting-lobby__players" aria-label="Lobby seats">
           {lobby.players.map((player) => {
             const self = player.userId === userId
             const playerIsOwner = player.userId === lobby.ownerUserId

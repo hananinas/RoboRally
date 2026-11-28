@@ -9,7 +9,7 @@ import { logError } from '@/logger'
 function resolveLobbyMembership(context: SocketContext, socket: GameSocket, user: User): MembershipResult {
   const lobbySession = context.registry.getCurrentLobby(user.userId)
   if (!lobbySession) throw new Error('Membership references a missing lobby')
-  return lobbySession.isMember(socket).isOk()
+  return lobbySession.reattach(socket)
     ? { outcome: 'IN_LOBBY', lobby: presentLobby(lobbySession.lobby), user }
     : { outcome: 'ALREADY_HAS_MEMBERSHIP' }
 }
@@ -48,8 +48,19 @@ export function handleGetMembership(
 
 export function handleSocketDisconnect(context: SocketContext, socket: GameSocket): void {
   try {
-    leaveLobby(context, socket)
-    const gameSession = context.registry.getCurrentGame(socket.data.user.userId)
+    const { userId } = socket.data.user
+    const lobbySession = context.registry.getCurrentLobby(userId)
+    if (lobbySession) {
+      lobbySession.deferLeave(socket, () => {
+        try {
+          if (context.registry.getCurrentLobby(userId) === lobbySession) leaveLobby(context, socket)
+        } catch (error) {
+          logError('Failed to release expired lobby seat', error, { userId })
+        }
+      })
+      return
+    }
+    const gameSession = context.registry.getCurrentGame(userId)
     if (gameSession) gameSession.markDisconnected(socket)
   } catch (error) {
     logError('Failed to clean up disconnected socket', error, { userId: socket.data.user.userId })

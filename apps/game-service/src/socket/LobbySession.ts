@@ -12,9 +12,12 @@ export type ConnectedLobbyMember = {
   socket: GameSocket
 }
 
+const LOBBY_RECONNECT_GRACE_MS = 10_000
+
 export class LobbySession {
   readonly lobby: Lobby
   readonly room: string
+  private readonly pendingLeaves = new Map<string, ReturnType<typeof setTimeout>>()
 
   static roomFor(lobbyId: string): string {
     return `lobby:${lobbyId}`
@@ -28,6 +31,28 @@ export class LobbySession {
   isMember(socket: GameSocket): Result<LobbyMember, 'NOT_A_MEMBER'> {
     const member = this.lobby.getMember(socket.data.user.userId)
     return member?.connectionId === socket.id ? ok(member) : err('NOT_A_MEMBER')
+  }
+
+  deferLeave(socket: GameSocket, onExpiry: () => void): void {
+    const { userId } = socket.data.user
+    if (this.isMember(socket).isErr() || this.pendingLeaves.has(userId)) return
+    this.pendingLeaves.set(userId, setTimeout(onExpiry, LOBBY_RECONNECT_GRACE_MS).unref())
+  }
+
+  reattach(socket: GameSocket): boolean {
+    const { userId } = socket.data.user
+    const member = this.lobby.getMember(userId)
+    if (!member) return false
+    if (!this.pendingLeaves.has(userId)) return member.connectionId === socket.id
+    this.connect(socket)
+    member.connectionId = socket.id
+    this.cancelPendingLeave(userId)
+    return true
+  }
+
+  private cancelPendingLeave(userId: string): void {
+    clearTimeout(this.pendingLeaves.get(userId))
+    this.pendingLeaves.delete(userId)
   }
 
   private connect(socket: GameSocket): void {
@@ -45,6 +70,7 @@ export class LobbySession {
   }
 
   leave(socket: GameSocket): void {
+    this.cancelPendingLeave(socket.data.user.userId)
     this.disconnect(socket)
     this.lobby.removeMember(socket.data.user.userId)
     if (this.lobby.size > 0) {
@@ -53,6 +79,7 @@ export class LobbySession {
   }
 
   resolveConnectedMembers(io: GameSocketServer): Result<ConnectedLobbyMember[], 'LOBBY_MEMBER_DISCONNECTED'> {
+    if (this.pendingLeaves.size > 0) return err('LOBBY_MEMBER_DISCONNECTED')
     const members: ConnectedLobbyMember[] = []
     for (const member of this.lobby.members) {
       const socket = io.sockets.sockets.get(member.connectionId)

@@ -56,6 +56,17 @@ describe('lobby lifecycle over Socket.IO', () => {
     client.disconnect()
     await closed
   }
+  async function disconnectUntilExpiry(client: Client, whileReserved?: () => Promise<void>) {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      await disconnect(client)
+      vi.advanceTimersByTime(9_999)
+      await whileReserved?.()
+      vi.advanceTimersByTime(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  }
   it('validates requests without allocating games or rooms', async () => {
     const client = await connect('Bence')
     const raw = client.emitWithAck.bind(client) as (event: string, payload: unknown) => Promise<unknown>
@@ -177,7 +188,7 @@ describe('lobby lifecycle over Socket.IO', () => {
 
     const left = new Promise<LobbyState>((resolve) => other.once('lobby.updated', ({ lobby: state }) => resolve(state)))
     if (departure === 'leave') await owner.emitWithAck('lobby.leave', {})
-    else await disconnect(owner)
+    else await disconnectUntilExpiry(owner)
     expect(await left).toEqual({ ...roster, ownerUserId: roster.players[1]!.userId, playerCount: 1, players: [roster.players[1]!] })
     await outsider.emitWithAck('membership.get', {})
     expect(foreignUpdates).not.toHaveBeenCalled()
@@ -268,7 +279,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     expect((await ready).state.players).toHaveLength(2)
   })
 
-  it('transfers ownership in join order and removes the last waiting member on disconnect', async () => {
+  it('transfers ownership in join order and removes the last waiting member after the reconnect grace period', async () => {
     const owner = await connect('Owner')
     const lobby = await create(owner)
     const other = await connect('Other')
@@ -276,7 +287,11 @@ describe('lobby lifecycle over Socket.IO', () => {
     const updated = new Promise<LobbyState>((resolve) => other.once('lobby.updated', ({ lobby: state }) => resolve(state)))
     expect(await owner.emitWithAck('lobby.leave', {})).toEqual({ outcome: 'LEFT' })
     expect((await updated).ownerUserId).toBe('Other')
-    await disconnect(other)
+    await disconnectUntilExpiry(other, async () => {
+      expect(await owner.emitWithAck('lobby.list', {})).toMatchObject({
+        lobbies: [{ lobbyId: lobby.lobbyId, playerCount: 1 }],
+      })
+    })
     expect(await owner.emitWithAck('lobby.list', {})).toMatchObject({
       outcome: 'LOBBIES_FOUND', lobbies: [], maps: expect.any(Array), robots: expect.any(Array),
     })
@@ -346,7 +361,9 @@ describe('lobby lifecycle over Socket.IO', () => {
     const lobby = await create(owner)
     const other = await connect('Other')
     await other.emitWithAck('lobby.join', { lobbyId: lobby.lobbyId })
-    await disconnect(other)
+    await disconnectUntilExpiry(other, async () => {
+      expect(await owner.emitWithAck('lobby.start', {})).toEqual({ outcome: 'LOBBY_MEMBER_DISCONNECTED' })
+    })
     const ready = started(owner)
     await owner.emitWithAck('lobby.start', {})
     expect((await ready).state.players).toHaveLength(1)
@@ -357,7 +374,7 @@ describe('lobby lifecycle over Socket.IO', () => {
     const result = await returnedOwner.emitWithAck('membership.get', {})
     expect(result.outcome).toBe('IN_GAME')
   })
-  it('rejects recovery of a stale waiting room instead of restoring a removed membership', async () => {
+  it('rejects stale socket recovery and restores the waiting owner on a fresh connection', async () => {
     const owner = await connect('Owner')
     const lobby = await create(owner)
     const other = await connect('Other')
@@ -371,10 +388,11 @@ describe('lobby lifecycle over Socket.IO', () => {
     owner.connect()
     expect((await rejected).message).toBe('SOCKET_SESSION_EXPIRED')
     const replacement = await connect('Owner')
-    expect(await replacement.emitWithAck('membership.get', {})).toEqual({ outcome: 'NO_MEMBERSHIP', user: { userId: 'Owner', username: 'Owner' } })
-    const state = await other.emitWithAck('membership.get', {})
-    expect(state.outcome).toBe('IN_LOBBY')
-    if (state.outcome === 'IN_LOBBY') expect(state.lobby.playerCount).toBe(1)
+    for (const client of [replacement, other]) {
+      expect(await client.emitWithAck('membership.get', {})).toMatchObject({
+        outcome: 'IN_LOBBY', lobby: { lobbyId: lobby.lobbyId, ownerUserId: 'Owner', playerCount: 2 },
+      })
+    }
   })
   it('returns an internal error without retaining a failed lobby creation', async () => {
     const owner = await connect('Owner')
