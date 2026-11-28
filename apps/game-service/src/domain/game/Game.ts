@@ -101,7 +101,7 @@ export class Game {
   private readonly deck: readonly Instruction[]
   private readonly lifecycle = new GameLifecycle('programming')
   private registerIndex = 0
-  private environmentStepIndex: number | null = null
+  private environment: { stepIndex: number; rebooted?: Set<RobotId> } | null = null
   private readonly submittedPlayerIds = new Set<PlayerId>()
   private readonly activatedRobotIds = new Set<RobotId>()
   // What each robot's registers resolved to this round, so Again repeats the real action.
@@ -306,7 +306,7 @@ export class Game {
   }
 
   get hasPendingEnvironment(): boolean {
-    return this.environmentStepIndex !== null
+    return this.environment !== null
   }
 
   private recheckActivationPhase(): { roundConcluded: boolean } {
@@ -315,18 +315,18 @@ export class Game {
     }
     if (this.roster.players.length === 0) return this.concludeRegister()
     if (!this.hasPendingEnvironment && this.activatedRobotIds.size === this.roster.players.length) {
-      this.environmentStepIndex = 0
+      this.environment = { stepIndex: 0 }
     }
     return { roundConcluded: false }
   }
 
   executeNextStep(): ActivationStep {
     if (this.requirePhase('activation').isErr()) throw new Error('Game is not executing')
-    const index = this.environmentStepIndex
-    if (index === null) return { type: 'robot', result: this.executeNextAction() }
+    const environment = this.environment
+    if (environment === null) return { type: 'robot', result: this.executeNextAction() }
 
     const snapshot = captureEnvironmentSnapshot(this.board, this.robotPlacements, this.roster.players)
-    const changes = environmentSteps[index](snapshot, this.board)
+    const changes = environmentSteps[environment.stepIndex](snapshot, this.board, environment.rebooted)
     const reboots: RebootResult[] = []
     if (changes.kind === 'CHECKPOINTS') {
       for (const { playerId, lastCheckpoint } of changes.checkpointProgress) {
@@ -342,8 +342,12 @@ export class Game {
       }
     }
 
-    this.environmentStepIndex = index + 1
-    const { roundConcluded } = this.environmentStepIndex === environmentSteps.length
+    if (reboots.length > 0) {
+      const rebooted = environment.rebooted ??= new Set()
+      for (const { robotId } of reboots) rebooted.add(robotId)
+    }
+    environment.stepIndex++
+    const { roundConcluded } = environment.stepIndex === environmentSteps.length
       ? this.concludeRegister() : { roundConcluded: false }
     const result = changes.kind === 'CONVEYORS' ? {
       ...changes,
@@ -355,7 +359,7 @@ export class Game {
   }
 
   private concludeRegister(): { roundConcluded: boolean } {
-    this.environmentStepIndex = null
+    this.environment = null
     if (this.roster.players.length === 0) {
       this.finishRound()
       return { roundConcluded: true }

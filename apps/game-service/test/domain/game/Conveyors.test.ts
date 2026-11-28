@@ -2,6 +2,7 @@ import type { Instruction } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'
 import { Card, ConveyorTile, Deck, Direction, EmptyTile, GearTile, PitTile, type Game, type Tile } from '@/domain/game/index'
 import { Integer } from '@/numbers'
+import { resolveEnvironment } from '../../activationTestHelper.ts'
 import { createTestBoard, createTestGame, createTestPlacement } from '../../fixtures.ts'
 
 const { NORTH, EAST, SOUTH, WEST } = Direction
@@ -91,6 +92,25 @@ describe('conveyor activation', () => {
       robots: [{ robotId: robot.id, position: at(0, 2), direction: EAST }],
     })
     expect(pass(game).robots).toEqual([])
+  })
+
+  it.each([1, 2] as const)('ends the ride when an occupied reboot tile sends a robot to a speed-%i belt', (speed) => {
+    const { game, robots: [robot] } = startRegister([
+      [new EmptyTile(), blueEast(), new PitTile()],
+      [new ConveyorTile(speed, 'straight', EAST), new EmptyTile(), new EmptyTile()],
+      [new EmptyTile(), new EmptyTile(), new EmptyTile()],
+    ], [{ x: 1, y: 0 }, { x: 0, y: 2 }])
+    game.executeNextAction()
+    game.executeNextAction()
+    expect(pass(game).reboots).toEqual([{ robotId: robot.id, fellAt: at(2, 0), landedAt: at(0, 1) }])
+    expect(pass(game).robots).toEqual([])
+    expect(pass(game).robots).toEqual([])
+    expect(game.getRobotPosition(robot.id)).toEqual(at(0, 1))
+    resolveEnvironment(game)
+    game.executeNextAction()
+    game.executeNextAction()
+    resolveEnvironment(game)
+    expect(game.getRobotPosition(robot.id)).toEqual(at(1, 1))
   })
 
   it('blocks a head-on swap and the robot behind it', () => {

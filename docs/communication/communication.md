@@ -373,4 +373,9 @@ After all robots execute their cards, the server resolves the implemented board
 effects in rulebook order. Each step uses the board state left by the previous
 step and applies its changes together. The client plays the results in server order.
 
+The conveyor passes run blue, blue, then green. Each pass with movement emits
+one `environment.stepResolved` event of kind `CONVEYORS`, with final robot poses
+and any reboots. A robot rebooted by a belt sits out the remaining conveyor
+passes of that register.
+
 `Robot actions → Board effects → Next register or hand`

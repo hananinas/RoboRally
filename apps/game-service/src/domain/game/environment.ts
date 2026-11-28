@@ -51,10 +51,10 @@ const curvedEntries: Record<ConveyorLayout, readonly number[]> = {
 }
 
 function conveyorPass(speed: ConveyorSpeed) {
-  return (snapshot: EnvironmentSnapshot, board: Board) => {
+  return (snapshot: EnvironmentSnapshot, board: Board, rebooted?: ReadonlySet<RobotId>) => {
     const candidates = snapshot.flatMap(({ robotId, position, direction }) => {
       const tile = board.getTile(position)
-      if (!(tile instanceof ConveyorTile) || tile.speed !== speed ||
+      if (rebooted?.has(robotId) || !(tile instanceof ConveyorTile) || tile.speed !== speed ||
           board.blocksMovementFrom(position, tile.direction)) return []
 
       const destination = neighbour(position, tile.direction)
