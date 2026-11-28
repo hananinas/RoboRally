@@ -1,4 +1,5 @@
 import type { GearRotation } from '@robo-rally/game-events'
+import type { ConveyorLayout, ConveyorSpeed } from '@/domain/game/Tile'
 import type { Antenna } from '@/domain/game/Board'
 import { Direction } from '@/domain/game/spatial'
 import { Integer } from '@/numbers'
@@ -26,7 +27,8 @@ export type WallSpec = Readonly<{
 
 export type ConveyorSpec = Readonly<{
   at: readonly [x: number, y: number]
-  sprite: string
+  speed: ConveyorSpeed
+  layout: ConveyorLayout
   direction: Direction
 }>
 
@@ -72,17 +74,17 @@ export const boardMaps = {
     ],
     conveyors: [
       // Conveyor loop
-      { at: [4, 7], sprite: 'conveyor-1-from-right', direction: E },
-      { at: [5, 7], sprite: 'conveyor-1-straight', direction: E },
-      { at: [6, 7], sprite: 'conveyor-1-from-right', direction: S },
+      { at: [4, 7], speed: 1, layout: 'from-right', direction: E },
+      { at: [5, 7], speed: 1, layout: 'straight', direction: E },
+      { at: [6, 7], speed: 1, layout: 'from-right', direction: S },
 
-      { at: [6, 8], sprite: 'conveyor-1-straight', direction: S },
+      { at: [6, 8], speed: 1, layout: 'straight', direction: S },
 
-      { at: [6, 9], sprite: 'conveyor-1-from-right', direction: W },
-      { at: [5, 9], sprite: 'conveyor-1-straight', direction: W },
-      { at: [4, 9], sprite: 'conveyor-1-from-right', direction: N },
+      { at: [6, 9], speed: 1, layout: 'from-right', direction: W },
+      { at: [5, 9], speed: 1, layout: 'straight', direction: W },
+      { at: [4, 9], speed: 1, layout: 'from-right', direction: N },
 
-      { at: [4, 8], sprite: 'conveyor-1-straight', direction: N },
+      { at: [4, 8], speed: 1, layout: 'straight', direction: N },
     ],
     rebootTiles: [[13, 2], [2, 6], [10, 10], [2, 13]],
     antenna: { x: Integer(10), y: Integer(0), angle: Math.PI / 2 },
