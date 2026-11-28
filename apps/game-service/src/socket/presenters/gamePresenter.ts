@@ -239,11 +239,9 @@ export function presentRobotActionResolved(
 export function presentEnvironmentStepResolved(gameId: GameId, result: EnvironmentStepResult): EnvironmentStepResolved {
   const { kind } = result
   if (kind === 'CHECKPOINTS') return { gameId, kind, checkpointProgress: result.checkpointProgress }
-  return {
-    gameId, kind,
-    robots: result.robots.map(({ robotId, position, direction }) => ({
-      robotId,
-      position: presentPosition(position, direction),
-    })),
-  }
+  const robots = result.robots.map(({ robotId, position, direction }) => ({
+    robotId,
+    position: presentPosition(position, direction),
+  }))
+  return kind === 'CONVEYORS' ? { gameId, kind, robots, reboots: result.reboots } : { gameId, kind, robots }
 }

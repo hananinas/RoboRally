@@ -1,4 +1,4 @@
-import { resolveRobotAction } from '../../activationTestHelper.js'
+import { resolveEnvironment, resolveRobotAction } from '../../activationTestHelper.js'
 import { describe, expect, it } from 'vitest'
 import { Card, Deck, Direction, EmptyTile, Player, Robot } from '@/domain/game/index.ts'
 import type { Antenna, Position } from '@/domain/game/index.ts'
@@ -113,8 +113,7 @@ describe('Game multiplayer activation', () => {
 
     expect(roundConcluded).toBe(false)
     expect(game.currentRegister).toBe(0)
-    game.executeNextStep()
-    game.executeNextStep()
+    resolveEnvironment(game)
     expect(game.currentRegister).toBe(1)
     expect(resolveRobotAction(game).action.robotId).toBe(players[0].robot.id)
     expect(game.currentRegister).toBe(2)

@@ -1,4 +1,4 @@
-import { resolveRobotAction } from '../../activationTestHelper.js'
+import { resolveEnvironment, resolveRobotAction } from '../../activationTestHelper.js'
 import { describe, expect, it } from 'vitest'
 import { Card, Direction, EmptyTile } from '@/domain/game/index'
 import { Deck } from '@/domain/game/Deck'
@@ -187,8 +187,7 @@ describe('checkpoint activation', () => {
     resolveRobotAction(game)
     expect(players[0].lastCheckpoint).toBe(0)
     game.removePlayer(players[1].id)
-    game.executeNextStep()
-    game.executeNextStep()
+    resolveEnvironment(game)
     expect(players.map((player) => player.lastCheckpoint)).toEqual([1, 0])
     expect(game.currentRegister).toBe(1)
   })
@@ -204,8 +203,7 @@ describe('checkpoint activation', () => {
     expect(game.winner).toBeUndefined()
 
     game.removePlayer(players[1].id)
-    game.executeNextStep()
-    game.executeNextStep()
+    resolveEnvironment(game)
 
     expect(game.winner).toBe(players[0].id)
     expect(game.lastActivePhase).toBe('activation')

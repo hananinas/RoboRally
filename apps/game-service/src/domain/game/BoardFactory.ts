@@ -44,7 +44,7 @@ export function createBoard(spec: MapSpec): Board {
     boardTiles[y][x] = new PitTile(tiles[y][x])
   }
 
-  for (const { at: [x, y], sprite, direction } of conveyors) {
+  for (const { at: [x, y], speed, layout, direction } of conveyors) {
     const tile = boardTiles[y]?.[x]
 
     if (!(tile instanceof EmptyTile)) {
@@ -54,7 +54,8 @@ export function createBoard(spec: MapSpec): Board {
     }
 
     boardTiles[y][x] = new ConveyorTile(
-      sprite,
+      speed,
+      layout,
       direction,
       tile.walls,
       tile.checkpointNumber,

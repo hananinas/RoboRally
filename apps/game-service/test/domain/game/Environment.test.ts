@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Card, Deck, Direction, EmptyTile } from '@/domain/game/index'
 import { Integer } from '@/numbers'
+import { resolveEnvironment } from '../../activationTestHelper.ts'
 import { createTestBoard, createTestGame, createTestPlacement, instructionsOf } from '../../fixtures.ts'
 
 function createGame(count = 2) {
@@ -38,6 +39,12 @@ describe('environment execution', () => {
         expect(game.hasPendingEnvironment).toBe(true)
         if (roundNumber === 1 && registerIndex === 0) expect(players[0].lastCheckpoint).toBe(0)
         expect(() => game.executeNextAction()).toThrow()
+        for (let pass = 0; pass < 3; pass++) {
+          expect(game.executeNextStep()).toEqual({
+            type: 'environment', result: { kind: 'CONVEYORS', robots: [], reboots: [], roundConcluded: false },
+          })
+          expect(game.currentRegister).toBe(registerIndex)
+        }
         expect(game.executeNextStep()).toEqual({
           type: 'environment', result: {
             kind: 'GEARS', roundConcluded: false,
@@ -103,10 +110,8 @@ describe('environment execution', () => {
     expect(game.hasPendingEnvironment).toBe(pending)
     game.executeNextStep()
     expect(game.currentRegister).toBe(0)
-    const step = game.executeNextStep()
-    expect(step.type).toBe('environment')
-    if (step.type !== 'environment' || step.result.kind !== 'CHECKPOINTS') throw new Error('Expected checkpoint step')
-    expect(step.result.checkpointProgress).toEqual([{ playerId: players[0].id, lastCheckpoint: 1 }])
+    resolveEnvironment(game)
+    expect(players[0].lastCheckpoint).toBe(1)
     expect(game.currentRegister).toBe(1)
   })
 
@@ -120,7 +125,7 @@ describe('environment execution', () => {
     expect(players[0].lastCheckpoint).toBe(0)
     game.executeNextStep()
     expect(players[0].lastCheckpoint).toBe(0)
-    game.executeNextStep()
+    resolveEnvironment(game)
     expect(players[0].lastCheckpoint).toBe(1)
   })
 

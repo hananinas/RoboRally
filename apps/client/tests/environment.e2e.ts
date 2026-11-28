@@ -197,3 +197,40 @@ test('keeps a queued environment result when the active robot leaves', async ({ 
   await expect(page.getByRole('status')).toHaveText('Programming')
   await expect(page.getByRole('heading', { name: 'Checkpoints', exact: true }).locator('..')).toContainText('1/2')
 })
+
+test('plays each conveyor pass in order and reuses pit playback', async ({ page, game }) => {
+  await page.clock.install()
+  await openGame(page)
+  await pauseClock(page)
+  const move: EnvironmentStepResolved = {
+    gameId: GAME_ID, kind: 'CONVEYORS',
+    robots: [
+      { robotId: ROBOT_ID, position: { coordinate: { x: 6, y: 4 }, orientation: 'EAST' } },
+      { robotId: OTHER_ROBOT_ID, position: { coordinate: { x: 8, y: 5 }, orientation: 'EAST' } },
+    ],
+    reboots: [],
+  }
+  const reboot: EnvironmentStepResolved = {
+    gameId: GAME_ID, kind: 'CONVEYORS',
+    robots: [{ robotId: ROBOT_ID, position: { coordinate: { x: 1, y: 9 }, orientation: 'EAST' } }],
+    reboots: [{ robotId: ROBOT_ID, fellAt: { x: 7, y: 4 }, landedAt: { x: 1, y: 9 } }],
+  }
+
+  await game.control({ type: 'round', actions: [ROUND_ACTIONS[0], move, reboot], deferHand: true })
+  const robot = page.locator(`[data-robot-id="${ROBOT_ID}"]`).first()
+  const other = page.locator(`[data-robot-id="${OTHER_ROBOT_ID}"]`).first()
+  await expect(robot).toHaveAttribute('data-board-tile', '5,4')
+  await page.clock.runFor(600)
+  await expect(robot).toHaveAttribute('data-board-tile', '6,4')
+  await expect(other).toHaveAttribute('data-board-tile', '8,5')
+  await page.clock.runFor(599)
+  await expect(robot).toHaveAttribute('data-board-tile', '6,4')
+  await page.clock.runFor(1)
+  await expect(robot).toHaveAttribute('data-board-tile', '7,4')
+  await expect(robot).toHaveAttribute('data-playback-phase', 'pit-enter')
+  await page.clock.runFor(600)
+  await expect(robot).toHaveAttribute('data-playback-phase', 'pit-fall')
+  await page.clock.runFor(450)
+  await expect(robot).toHaveAttribute('data-board-tile', '1,9')
+  await expect(robot).toHaveAttribute('data-playback-phase', 'pit-respawn')
+})

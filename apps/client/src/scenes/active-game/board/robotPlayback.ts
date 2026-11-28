@@ -5,6 +5,7 @@ import type {
   Orientation,
   PlayerId,
   PublicRegisters,
+  RebootEffect,
   Position,
   RobotSpriteId,
   RobotActionResolved,
@@ -29,12 +30,11 @@ export type ResolvedRobotAction = RobotActionResolved & Readonly<{
 export type PlaybackResult = ResolvedRobotAction | EnvironmentStepResolved
 
 type PlacedRobot = Readonly<{ robotId: string; position: Position }>
-// One step of one reboot. Only robotId shows the phase; waiting robots stand still without it.
+// Robots in the same phase animate together; waiting robots stand still.
 export type PlaybackPhase = Readonly<{
   kind: string
   durationMs: number
-  robotId: string
-  position: Position
+  robots: readonly PlacedRobot[]
   waiting: readonly PlacedRobot[]
 }>
 export type DisplayRobot = Robot & Readonly<{ angle: number; phase?: string }>
@@ -48,10 +48,10 @@ export const ROBOT_TURN_DURATION_MS = 300
 export const PIT_FALL_DURATION_MS = 450
 export const PIT_RESPAWN_DURATION_MS = 900
 export function robotActionDuration(action: PlaybackResult, reducedMotion: boolean): number {
-  if ('kind' in action) return reducedMotion ? 200 : ROBOT_TURN_DURATION_MS
-  return reducedMotion ? 200
-    : action.resolvedInstruction !== null && effects[action.resolvedInstruction].kind === 'turn'
-      ? ROBOT_TURN_DURATION_MS : ROBOT_MOVE_DURATION_MS
+  if (reducedMotion) return 200
+  if ('kind' in action) return action.kind === 'CONVEYORS' ? ROBOT_MOVE_DURATION_MS : ROBOT_TURN_DURATION_MS
+  return action.resolvedInstruction !== null && effects[action.resolvedInstruction].kind === 'turn'
+    ? ROBOT_TURN_DURATION_MS : ROBOT_MOVE_DURATION_MS
 }
 
 export type RobotPlaybackState = Readonly<{
@@ -78,27 +78,38 @@ export const orientationAngle: Record<Orientation, number> = {
   WEST: -90,
 }
 
-// Plays each reboot the server reported, in order: the robot drives to where it fell, sinks
-// there, then appears on its reboot tile. A reboot keeps the robot's facing. Only that robot
-// animates; robots that reboot later in the same action wait where they started.
+function pitPhases(
+  inPit: readonly PlacedRobot[],
+  landed: readonly PlacedRobot[],
+  waiting: readonly PlacedRobot[] = [],
+): readonly PlaybackPhase[] {
+  return [
+    { kind: 'pit-enter', durationMs: ROBOT_MOVE_DURATION_MS, robots: inPit, waiting },
+    { kind: 'pit-fall', durationMs: PIT_FALL_DURATION_MS, robots: inPit, waiting },
+    { kind: 'pit-respawn', durationMs: PIT_RESPAWN_DURATION_MS, robots: landed, waiting },
+  ]
+}
+
 export function playbackPhases(
-  action: ResolvedRobotAction,
+  action: { kind?: 'CONVEYORS'; reboots: readonly RebootEffect[] },
   startOf: (robotId: string) => Position | undefined,
 ): readonly PlaybackPhase[] {
-  return action.reboots.flatMap(({ robotId, fellAt, landedAt }, index) => {
+  const arrivals = action.reboots.flatMap(({ robotId, fellAt, landedAt }) => {
     const start = startOf(robotId)
     if (!start) return []
-    const waiting = action.reboots.slice(index + 1).flatMap((later) => {
-      const position = later.robotId === robotId ? undefined : startOf(later.robotId)
-      return position ? [{ robotId: later.robotId, position }] : []
-    })
-    const inPit = { coordinate: fellAt, orientation: start.orientation }
-    const landed = { coordinate: landedAt, orientation: start.orientation }
-    return [
-      { kind: 'pit-enter', durationMs: ROBOT_MOVE_DURATION_MS, robotId, position: inPit, waiting },
-      { kind: 'pit-fall', durationMs: PIT_FALL_DURATION_MS, robotId, position: inPit, waiting },
-      { kind: 'pit-respawn', durationMs: PIT_RESPAWN_DURATION_MS, robotId, position: landed, waiting },
-    ]
+    return [{
+      origin: { robotId, position: start },
+      inPit: { robotId, position: { ...start, coordinate: fellAt } },
+      landed: { robotId, position: { ...start, coordinate: landedAt } },
+    }]
+  })
+  if (action.kind === 'CONVEYORS' && arrivals.length > 0) {
+    return pitPhases(arrivals.map(({ inPit }) => inPit), arrivals.map(({ landed }) => landed))
+  }
+  return arrivals.flatMap(({ inPit, landed }, index) => {
+    const waiting = arrivals.slice(index + 1).map(({ origin }) => origin)
+      .filter(({ robotId }) => robotId !== inPit.robotId)
+    return pitPhases([inPit], [landed], waiting)
   })
 }
 
@@ -146,7 +157,8 @@ function clearPhase(robot: DisplayRobot): DisplayRobot {
 
 function showPhase(robots: readonly DisplayRobot[], phase: PlaybackPhase): readonly DisplayRobot[] {
   return robots.map((robot) => {
-    if (robot.robotId === phase.robotId) return { ...placeRobot(robot, phase.position), phase: phase.kind }
+    const moving = phase.robots.find(({ robotId }) => robotId === robot.robotId)
+    if (moving) return { ...placeRobot(robot, moving.position), phase: phase.kind }
     const waiting = phase.waiting.find(({ robotId }) => robotId === robot.robotId)
     return waiting ? placeRobot(clearPhase(robot), waiting.position) : clearPhase(robot)
   })
@@ -229,7 +241,7 @@ export function robotPlaybackReducer(
   const entry: PlaybackAction = {
     action,
     // Without a board on screen (or with reduced motion) the action jumps to its result.
-    phases: event.board && !('kind' in action)
+    phases: event.board && 'reboots' in action
       ? playbackPhases(action, (robotId) => settledPosition(state, robotId)) : [],
   }
   const queued = { ...state, pending: [...state.pending, entry] }

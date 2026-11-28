@@ -97,6 +97,11 @@ export class RobotPlacements {
     return chain
   }
 
+  // Destinations are already resolved together. Entry effects run after the batch.
+  applyConveyorMoves(moves: readonly { robotId: RobotId; position: Position }[]): void {
+    for (const { robotId, position } of moves) this.#moveTo(robotId, position)
+  }
+
   #requirePlaceable(position: Position): void {
     if (!this.#board.allowsPlacement(position)) {
       throw new RangeError('Robots cannot be placed on pits or the priority antenna')

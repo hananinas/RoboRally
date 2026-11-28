@@ -902,7 +902,7 @@ components:
       name: environment.stepResolved
       description: >-
         Reports changed robots or checkpoint progress. Apply changes together after
-        the register's robot actions. Steps without changes produce no event.
+        the register's robot actions, in event order. Steps without changes produce no event.
       payload:
         $ref: '#/components/schemas/EnvironmentStepResolved'
       examples:
@@ -1676,8 +1676,26 @@ components:
 
     EnvironmentStepResolved:
       oneOf:
+        - $ref: '#/components/schemas/ConveyorsResolved'
         - $ref: '#/components/schemas/GearsResolved'
         - $ref: '#/components/schemas/CheckpointsResolved'
+
+    ConveyorsResolved:
+      type: object
+      additionalProperties: false
+      description: One conveyor pass, with reboots in destination assignment order.
+      required: [gameId, kind, robots, reboots]
+      properties:
+        gameId:
+          $ref: '#/components/schemas/GameId'
+        kind:
+          const: CONVEYORS
+        robots:
+          $ref: '#/components/schemas/EnvironmentRobotPositions'
+        reboots:
+          type: array
+          items:
+            $ref: '#/components/schemas/RebootEffect'
 
     GearsResolved:
       type: object
@@ -1689,17 +1707,20 @@ components:
         kind:
           const: GEARS
         robots:
-          type: array
-          description: Final positions of changed robots. Apply together; each robotId appears at most once.
-          items:
-            type: object
-            additionalProperties: false
-            required: [ robotId, position ]
-            properties:
-              robotId:
-                $ref: '#/components/schemas/RobotId'
-              position:
-                $ref: '#/components/schemas/Position'
+          $ref: '#/components/schemas/EnvironmentRobotPositions'
+
+    EnvironmentRobotPositions:
+      type: array
+      description: Final poses, including any reboot destinations. Each robotId appears at most once.
+      items:
+        type: object
+        additionalProperties: false
+        required: [ robotId, position ]
+        properties:
+          robotId:
+            $ref: '#/components/schemas/RobotId'
+          position:
+            $ref: '#/components/schemas/Position'
 
     CheckpointsResolved:
       type: object
@@ -1804,7 +1825,7 @@ components:
       type: object
       additionalProperties: false
       description: >-
-        One robot rebooting during an instruction. The robot keeps its facing
+        One robot rebooting during movement. The robot keeps its facing
         direction.
       required: [ robotId, fellAt, landedAt ]
       properties:

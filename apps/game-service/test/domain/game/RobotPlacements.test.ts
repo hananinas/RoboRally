@@ -19,7 +19,7 @@ describe('robot ownership', () => {
     EMPTY: { tile: new EmptyTile(), canOccupy: true },
     PIT: { tile: new PitTile(), canOccupy: false},
     GEAR: { tile: new GearTile('CLOCKWISE'), canOccupy: true },
-    CONVEYOR: { tile: new ConveyorTile('conveyor-1-straight', Direction.NORTH), canOccupy: true },
+    CONVEYOR: { tile: new ConveyorTile(1, 'straight', Direction.NORTH), canOccupy: true },
     REBOOT: { tile: new RebootTile(), canOccupy: true },
     START: { tile: new StartTile(1), canOccupy: true },
   }

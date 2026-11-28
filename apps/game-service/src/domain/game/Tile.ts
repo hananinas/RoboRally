@@ -53,16 +53,26 @@ export class PitTile extends Tile {
   }
 }
 
+export type ConveyorSpeed = 1 | 2
+export type ConveyorLayout =
+  | 'straight' | 'from-left' | 'from-right' | 'left-right'
+  | 'straight-left' | 'straight-right' | 'three-way'
+
 export class ConveyorTile extends Tile {
   readonly kind = 'CONVEYOR'
 
   constructor(
-    readonly sprite: string,
+    readonly speed: ConveyorSpeed,
+    readonly layout: ConveyorLayout,
     readonly direction: Direction,
     walls: Iterable<Direction> = [],
     checkpointNumber?: number
   ) {
     super(walls, checkpointNumber)
+  }
+
+  get sprite(): string {
+    return `conveyor-${this.speed}-${this.layout}`
   }
 }
 

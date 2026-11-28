@@ -1,3 +1,4 @@
+import type { EnvironmentStepResolved } from '@robo-rally/game-events'
 import { describe, expect, it } from 'vitest'
 import { createBoardRenderModel } from './boardModel.ts'
 import { DEMO_ROBOTS } from './demoBoard.ts'
@@ -171,7 +172,7 @@ describe('reboot playback', () => {
     const from = { coordinate: { x: 13, y: 1 }, orientation: 'SOUTH' as const }
     const landed = { coordinate: { x: 13, y: 2 }, orientation: 'SOUTH' as const }
     const action = fall('MOVE_3', { x: 13, y: 4 }, landed)
-    expect(playbackPhases(action, startAt({ red: from })).map(({ kind, robotId, position }) => [kind, robotId, position])).toEqual([
+    expect(playbackPhases(action, startAt({ red: from })).map(({ kind, robots: [robot] }) => [kind, robot.robotId, robot.position])).toEqual([
       ['pit-enter', 'red', { coordinate: { x: 13, y: 4 }, orientation: 'SOUTH' }],
       ['pit-fall', 'red', { coordinate: { x: 13, y: 4 }, orientation: 'SOUTH' }],
       ['pit-respawn', 'red', landed],
@@ -182,7 +183,7 @@ describe('reboot playback', () => {
     const from = { coordinate: { x: 0, y: 1 }, orientation: 'WEST' as const }
     const landed = { coordinate: { x: 0, y: 2 }, orientation: 'WEST' as const }
     const phases = playbackPhases(fall('MOVE_1', { x: -1, y: 1 }, landed), startAt({ red: from }))
-    expect(phases.map(({ kind, position }) => [kind, position.coordinate])).toEqual([
+    expect(phases.map(({ kind, robots: [robot] }) => [kind, robot.position.coordinate])).toEqual([
       ['pit-enter', { x: -1, y: 1 }], ['pit-fall', { x: -1, y: 1 }], ['pit-respawn', { x: 0, y: 2 }],
     ])
   })
@@ -202,8 +203,8 @@ describe('reboot playback', () => {
 
   it('plays each reboot in order on the robot that rebooted, even without a pushed state', () => {
     const phases = playbackPhases(pushIntoPit, startAt({ red: pusherStart, blue: pushedStart }))
-    expect(phases.map(({ kind, robotId, position, waiting }) => [
-      kind, `${robotId}@${at(position.coordinate)}`, waiting.map((robot) => `${robot.robotId}@${at(robot.position.coordinate)}`),
+    expect(phases.map(({ kind, robots: [robot], waiting }) => [
+      kind, `${robot.robotId}@${at(robot.position.coordinate)}`, waiting.map((robot) => `${robot.robotId}@${at(robot.position.coordinate)}`),
     ])).toEqual([
       ['pit-enter', 'blue@3,1', ['red@0,1']],
       ['pit-fall', 'blue@3,1', ['red@0,1']],
@@ -212,7 +213,35 @@ describe('reboot playback', () => {
       ['pit-fall', 'red@3,1', []],
       ['pit-respawn', 'red@4,2', []],
     ])
-    expect(phases[2].position.orientation).toBe('NORTH')
+    expect(phases[2].robots[0].position.orientation).toBe('NORTH')
+  })
+
+  it('vacates both origins before showing simultaneous conveyor falls', () => {
+    const pose = (x: number, y: number) => ({ ...start, coordinate: { x, y } })
+    const robots = DEMO_ROBOTS.map((robot, index) => ({ ...robot, position: pose(index + 1, 2) }))
+    const action: EnvironmentStepResolved = {
+      kind: 'CONVEYORS', gameId: 'demo',
+      robots: [
+        { robotId: robots[0].robotId, position: pose(1, 0) },
+        { robotId: robots[1].robotId, position: pose(2, 0) },
+        { robotId: robots[2].robotId, position: pose(2, 2) },
+      ],
+      reboots: [
+        { robotId: robots[0].robotId, fellAt: { x: 1, y: 1 }, landedAt: { x: 1, y: 0 } },
+        { robotId: robots[1].robotId, fellAt: { x: 2, y: 1 }, landedAt: { x: 2, y: 0 } },
+      ],
+    }
+    let state = robotPlaybackReducer(createRobotPlaybackState(robots), { type: 'enqueue', action, board })
+    const shown = () => state.robots.map(({ phase, position }) => [phase, position.coordinate])
+    expect(shown()).toEqual([
+      ['pit-enter', { x: 1, y: 1 }], ['pit-enter', { x: 2, y: 1 }], [undefined, { x: 2, y: 2 }],
+    ])
+    state = robotPlaybackReducer(state, { type: 'advance' })
+    expect(state.robots.map(({ phase }) => phase)).toEqual(['pit-fall', 'pit-fall', undefined])
+    state = robotPlaybackReducer(state, { type: 'advance' })
+    expect(shown()).toEqual([
+      ['pit-respawn', { x: 1, y: 0 }], ['pit-respawn', { x: 2, y: 0 }], [undefined, { x: 2, y: 2 }],
+    ])
   })
 
   it('keeps the waiting robot visible and still while another robot falls', () => {
@@ -272,7 +301,7 @@ describe('reboot playback', () => {
     let state = createRobotPlaybackState(robots)
     state = robotPlaybackReducer(state, { type: 'enqueue', action: move('MOVE_1', { ...start, orientation: 'EAST' }), board })
     state = robotPlaybackReducer(state, { type: 'enqueue', action: fall('MOVE_2', { x: 4, y: 3 }), board })
-    expect(state.pending.map((entry) => entry.phases[0]?.position))
+    expect(state.pending.map((entry) => entry.phases[0]?.robots[0].position))
       .toEqual([{ coordinate: { x: 4, y: 3 }, orientation: 'EAST' }])
   })
 
