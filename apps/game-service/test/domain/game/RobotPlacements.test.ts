@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Direction, EmptyTile, PitTile, ConveyorTile, GearTile, RebootTile, RobotPlacements, StartTile } from '@/domain/game/index.ts'
+import { PUSH_LIMIT } from '@/domain/game/RobotPlacements'
 import type { Position, Tile, TileKind } from '@/domain/game/index.ts'
 import { Integer } from '@/numbers'
 import { createEmptyTileGrid, createTestBoard } from '../../fixtures.ts'
@@ -153,6 +154,21 @@ describe('robot ownership', () => {
     expect(robotPlacements.occupantAt({ x: Integer(0), y: Integer(0) })).toBeUndefined()
     expect(robotPlacements.occupantAt({ x: Integer(1), y: Integer(0) })).toBe('alpha')
     expect(robotPlacements.occupantAt({ x: Integer(2), y: Integer(0) })).toBe('beta')
+  })
+
+  it('blocks the whole step when more than PUSH_LIMIT robots are in the way', () => {
+    expect(PUSH_LIMIT).toBe(1)
+    const board = createTestBoard(createEmptyTileGrid(4, 2), { ...antenna, y: Integer(1) }, { x: Integer(3), y: Integer(1) })
+    const robotPlacements = new RobotPlacements(board)
+    robotPlacements.place('alpha', { x: Integer(0), y: Integer(0) })
+    robotPlacements.place('beta', { x: Integer(1), y: Integer(0) })
+    robotPlacements.place('gamma', { x: Integer(2), y: Integer(0) })
+
+    expect(robotPlacements.push('alpha', Direction.EAST)).toEqual([])
+    expect(robotPlacements.positionOf('alpha')).toEqual({ x: 0, y: 0 })
+    expect(robotPlacements.positionOf('beta')).toEqual({ x: 1, y: 0 })
+    expect(robotPlacements.positionOf('gamma')).toEqual({ x: 2, y: 0 })
+    expect(robotPlacements.occupantAt({ x: Integer(3), y: Integer(0) })).toBeUndefined()
   })
 
   it('moves into a pit without resolving its entry effect', () => {

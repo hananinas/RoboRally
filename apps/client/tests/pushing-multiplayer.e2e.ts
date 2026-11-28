@@ -44,15 +44,17 @@ test('keeps three clients synchronized through pushing and a fresh snapshot', as
     const ids = await robotIds(page)
     for (const client of pages) await client.clock.pauseAt(await client.evaluate(() => Date.now() + 100))
 
-    const initialTiles = ['6,13', '5,13', '4,13']
+    const initialTiles = ['6,13', '5,13', '3,13']
     for (const client of pages) {
       for (const [index, id] of ids.entries()) {
         await expect(client.locator(`[data-robot-id="${id}"]`).first()).toHaveAttribute('data-board-tile', initialTiles[index])
       }
     }
 
-    // The pusher turns to face west and moves, pushing the other two. Those
-    // two submit only turns, so their own cards never move them.
+    // The pusher turns to face west and plays Move 2. Step 1 pushes the robot at
+    // x=5 onto x=4; step 2 is blocked because the robot at x=3 is behind it and
+    // only one robot can be pushed at a time. The other two submit only turns,
+    // so their own cards never move them.
     await program(pages[0], ['Turn Left', 'Move 2', 'Turn Right', 'Turn Right', 'Turn Right'])
     for (const client of pages.slice(1)) {
       await program(client, ['Turn Right', 'Turn Right', 'Turn Right', 'Turn Right', 'Turn Left'])
@@ -66,8 +68,8 @@ test('keeps three clients synchronized through pushing and a fresh snapshot', as
       await expect(client.getByRole('status')).toHaveText('Programming')
     }
 
-    const pushedTile = await tileOf(page, ids[0])
-    expect(pushedTile).not.toBe(initialTiles[0])
+    const finalTiles = ['5,13', '4,13', '3,13']
+    for (const [index, id] of ids.entries()) expect(await tileOf(page, id)).toBe(finalTiles[index])
     for (const client of pages.slice(1)) {
       for (const id of ids) {
         await expect(client.locator(`[data-robot-id="${id}"]`).first()).toHaveAttribute('data-board-tile', (await tileOf(page, id))!)

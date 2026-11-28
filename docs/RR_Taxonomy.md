@@ -182,7 +182,7 @@ This document collects the important domain nouns and verbs in Robo Rally. Highl
 - fall into a pit
 - collide
 - push robot
-- push a chain of robots
+- push a chain of robots (not allowed in our game: a robot pushes at most one robot, `PUSH_LIMIT = 1`)
 - bump into robot
 - shoot robot
 - hit robot
