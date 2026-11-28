@@ -11,6 +11,7 @@ import {
   createClientGameState,
   createSubmission,
   gameStateReducer,
+  getFinalStandings,
   moveCard,
   placeCard,
   REGISTER_COUNT,
@@ -943,6 +944,51 @@ describe('winning', () => {
     expect(state.winner).toEqual(winner)
     expect(canProgram(state)).toBe(false)
     expect(gameStateReducer(state, { type: 'reset' }).winner).toBeNull()
+  })
+})
+
+describe('final standings', () => {
+  const [first, second] = publicState.players
+  const third = { ...second, playerId: '50000000-0000-4000-8000-000000000003', username: 'Third' }
+  const fourth = { ...second, playerId: '50000000-0000-4000-8000-000000000004', username: 'Fourth' }
+
+  function finishedState(players: typeof publicState.players, winner = first) {
+    return gameStateReducer(createClientGameState(), {
+      type: 'joined',
+      result: {
+        ...result,
+        state: {
+          ...publicState,
+          checkpointCount: 3,
+          players,
+          winner: { playerId: winner.playerId, username: winner.username },
+        },
+      },
+    })
+  }
+
+  it('is empty while the game is still running', () => {
+    expect(getFinalStandings(programmingState())).toEqual([])
+  })
+
+  it('puts the winner first, then ranks by checkpoints with shared places', () => {
+    const standings = getFinalStandings(finishedState([
+      { ...first, lastCheckpoint: 3 },
+      { ...second, lastCheckpoint: 1 },
+      { ...third, lastCheckpoint: 2 },
+      { ...fourth, lastCheckpoint: 1 },
+    ]))
+    expect(standings.map(({ username, place }) => [username, place])).toEqual([
+      ['First', 1], ['Third', 2], ['Second', 3], ['Fourth', 3],
+    ])
+    expect(standings[0]).toMatchObject({ isWinner: true, isYou: true, colour: '#A66BE0', left: false })
+    expect(standings[2]).toMatchObject({ isWinner: false, isYou: false, colour: '#4DC9C0' })
+  })
+
+  it('keeps a winner who has left at the top', () => {
+    const standings = getFinalStandings(finishedState([{ ...first, lastCheckpoint: 1 }], second))
+    expect(standings.map(({ username, place, left, lastCheckpoint }) => [username, place, left, lastCheckpoint]))
+      .toEqual([['Second', 1, true, 3], ['First', 2, false, 1]])
   })
 })
 

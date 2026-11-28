@@ -112,6 +112,8 @@ As a player, I want to see my robot's checkpoint progress, so that I can plan my
 
 As a player, I want the game to end when a robot reaches the final checkpoint, so that the winner is clearly determined and visible to everyone.
 
+Implemented scope: the game end is shown on the board instead of in a popup. The camera moves to the winning robot, which celebrates on the final checkpoint; a banner names the winner, final standings rank everyone by checkpoints collected, and players can keep looking at the board until they choose to leave.
+
 #### V2-04 - Sign up and log in
 
 As a user, I want to register and log in using an external identity provider, so that I can participate under my own authenticated identity.

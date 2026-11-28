@@ -17,9 +17,11 @@ const PUSHCAP_SLICES = [
   { radius: 9.75, fill: '#c74f4f' },
 ] as const
 
-export default function CheckpointPiece({ tile, layer }: {
+export default function CheckpointPiece({ tile, layer, claimedColour }: {
   tile: BoardSceneTile
   layer: number
+  // The winner's colour, once the final checkpoint has been claimed.
+  claimedColour?: string
 }) {
   const number = tile.cell.checkpointNumber
   const slice = PUSHCAP_SLICES[layer - BASE_LAYER]
@@ -37,6 +39,7 @@ export default function CheckpointPiece({ tile, layer }: {
       aria-hidden={isCap ? undefined : true}
       data-board-checkpoint={isCap ? number : undefined}
       data-board-checkpoint-slice={number}
+      data-claimed={claimedColour !== undefined || undefined}
       data-board-tile={`${tile.cell.x},${tile.cell.y}`}
       data-board-height={height}
       data-board-lift-height={liftHeight}
@@ -48,7 +51,7 @@ export default function CheckpointPiece({ tile, layer }: {
       }}
       viewBox="-11 -11 22 22"
     >
-      <circle r={slice.radius} fill={slice.fill} />
+      <circle r={slice.radius} fill={isCap && claimedColour ? claimedColour : slice.fill} />
       {isCap && (
         <text className="board-checkpoint-number" textAnchor="middle" dy=".35em">
           {number}

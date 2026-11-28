@@ -16,8 +16,12 @@ import {
 import type { BoardScene } from './boardScene.ts'
 import type { DisplayRobot } from './robotPlayback.ts'
 
+// A tile the camera should glide to. Changing `request` glides there again.
+export type BoardFocus = Readonly<{ x: number; y: number; request: number }>
+
 type BoardInteractionOptions = Readonly<{
   canvasRef: RefObject<HTMLDivElement | null>
+  focus?: BoardFocus | null
   robots: readonly DisplayRobot[]
   scene: BoardScene
   viewportRef: RefObject<HTMLElement | null>
@@ -49,6 +53,19 @@ type RuntimeTile = {
   tileCentre: BoardScene['tiles'][number]['tileCentre']
 }
 
+type CameraGlide = {
+  from: Camera
+  to: Camera
+  startedAt: number | null
+}
+
+const FOCUS_ZOOM = 1.4
+const FOCUS_DURATION_MS = 1200
+
+function easeInOut(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2
+}
+
 type DragState = {
   camera: Camera
   id: number
@@ -59,6 +76,7 @@ type DragState = {
 
 export default function useBoardInteraction({
   canvasRef,
+  focus = null,
   robots,
   scene,
   viewportRef,
@@ -72,6 +90,11 @@ export default function useBoardInteraction({
       BOARD_CONFIG.camera.maxZoom,
     ),
   })
+  const appliedFocusRef = useRef<BoardFocus | null>(null)
+  // Primitive deps, so a new focus object for the same tile does not glide again.
+  const focusX = focus?.x
+  const focusY = focus?.y
+  const focusRequest = focus?.request
 
   useLayoutEffect(() => {
     const currentView = viewportRef.current
@@ -123,6 +146,7 @@ export default function useBoardInteraction({
     let pointer: ScreenPoint | null = null
     let frameId = 0
     let previousFrame: number | null = null
+    let glide: CameraGlide | null = null
     function render(now: number) {
       canvas.style.transform = `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`
 
@@ -177,6 +201,37 @@ export default function useBoardInteraction({
       return active
     }
 
+    function updateGlide(now: number): boolean {
+      if (!glide) return false
+      glide.startedAt ??= now
+      const progress = Math.min(1, (now - glide.startedAt) / FOCUS_DURATION_MS)
+      const eased = easeInOut(progress)
+      camera.x = glide.from.x + (glide.to.x - glide.from.x) * eased
+      camera.y = glide.from.y + (glide.to.y - glide.from.y) * eased
+      camera.zoom = glide.from.zoom + (glide.to.zoom - glide.from.zoom) * eased
+      if (progress < 1) return true
+      glide = null
+      return false
+    }
+
+    function glideTo(x: number, y: number) {
+      const tile = runtimeTiles.find(({ cell }) => cell.x === x && cell.y === y)
+      if (!tile) return
+      const zoom = clamp(
+        Math.max(camera.zoom, FOCUS_ZOOM),
+        BOARD_CONFIG.camera.minZoom,
+        BOARD_CONFIG.camera.maxZoom,
+      )
+      const to = { x: -tile.tileCentre.worldX * zoom, y: -tile.tileCentre.worldY * zoom, zoom }
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        Object.assign(camera, to)
+        glide = null
+      } else {
+        glide = { from: { ...camera }, to, startedAt: null }
+      }
+      requestFrame()
+    }
+
     function animate(now: number) {
       frameId = 0
       const delta =
@@ -185,6 +240,7 @@ export default function useBoardInteraction({
           : Math.min(0.05, (now - previousFrame) / 1000)
       previousFrame = now
       const hoverActive = updateHover(delta)
+      const glideActive = updateGlide(now)
       const lifetime = BOARD_CONFIG.ripple.lifetime * 1000
 
       for (let index = ripples.length - 1; index >= 0; index -= 1) {
@@ -194,7 +250,7 @@ export default function useBoardInteraction({
       }
 
       render(now)
-      if (hoverActive || ripples.length > 0) requestFrame()
+      if (hoverActive || glideActive || ripples.length > 0) requestFrame()
       else previousFrame = null
     }
 
@@ -308,6 +364,7 @@ export default function useBoardInteraction({
           drag.moved = true
         }
         if (drag.moved) {
+          glide = null
           camera.x = drag.camera.x + x
           camera.y = drag.camera.y + y
           view.classList.add('board-viewport--dragging')
@@ -333,6 +390,7 @@ export default function useBoardInteraction({
     function onWheel(event: WheelEvent) {
       event.preventDefault()
       if (drag) return
+      glide = null
       pointer = { x: event.clientX, y: event.clientY }
 
       const unit =
@@ -374,6 +432,7 @@ export default function useBoardInteraction({
       }
 
       finishDrag(null, true)
+      glide = null
       Object.assign(camera, {
         x: 0,
         y: 0,
@@ -409,6 +468,14 @@ export default function useBoardInteraction({
     window.addEventListener('blur', onBlur)
     window.addEventListener('keydown', onKeyDown)
     resizeObserver.observe(view)
+    const applied = appliedFocusRef.current
+    if (
+      focusX !== undefined && focusY !== undefined && focusRequest !== undefined &&
+      (applied?.x !== focusX || applied.y !== focusY || applied.request !== focusRequest)
+    ) {
+      appliedFocusRef.current = { x: focusX, y: focusY, request: focusRequest }
+      glideTo(focusX, focusY)
+    }
     requestFrame()
 
     return () => {
@@ -425,5 +492,5 @@ export default function useBoardInteraction({
       window.removeEventListener('blur', onBlur)
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [canvasRef, robots, scene, viewportRef])
+  }, [canvasRef, focusRequest, focusX, focusY, robots, scene, viewportRef])
 }

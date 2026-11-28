@@ -12,12 +12,14 @@ import {
   canProgram, 
   registersAreFilled, 
   getOtherPlayers,
+  getFinalStandings,
   type ClientGameState , 
   type ProgramCard 
 } from './gameState.ts'
 import type useGameConnection from './useGameConnection.ts'
 import LeaveGameButton from './components/LeaveGameButton.tsx'
-import WinnerPopup from './components/WinnerPopup.tsx'
+import GameOverBanner from './components/GameOverBanner.tsx'
+import FinalStandings from './components/FinalStandings.tsx'
 
 
 function isGameOver(state: ClientGameState): boolean {
@@ -80,8 +82,18 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
   const playedCardIds = new Set(displayedRegisters.flatMap((card, index) =>
     card && publicRegisters?.[index]?.status === 'REVEALED' && index !== activeRegister ? [card.id] : [],
   ))
-  const showWinner = isGameOver(state) && state.connected
+  const gameOver = isGameOver(state) && state.connected
   const robotColour = state.playback.robots.find((robot) => robot.robotId === state.assignment?.robotId)?.colour
+  const winnerRobotId = state.players.find((candidate) => candidate.playerId === state.winner?.playerId)?.robotId
+  const winnerRobot = state.playback.robots.find((robot) => robot.robotId === winnerRobotId)
+  const winnerColour = winnerRobot?.colour
+  const [winnerFocusRequest, setWinnerFocusRequest] = useState(0)
+  const winnerFocus = gameOver && winnerRobot
+    ? { ...winnerRobot.position.coordinate, request: winnerFocusRequest }
+    : null
+  const celebration = gameOver && winnerRobot
+    ? { robotId: winnerRobot.robotId, colour: winnerRobot.colour, checkpointNumber: state.checkpointCount }
+    : null
   const registeredCardIds = new Set(
     state.registers.flatMap((card) => (card ? [card.id] : [])),
   )
@@ -103,7 +115,14 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
   })
   return (
     <div className="game">
-      {state.board && <BoardViewport board={state.board} robots={state.playback.robots} />}
+      {state.board && (
+        <BoardViewport
+          board={state.board}
+          robots={state.playback.robots}
+          focus={winnerFocus}
+          celebration={celebration}
+        />
+      )}
       <div className="game-overlay">
         <aside className="game-hud" aria-label="Game controls">
           <div className="game-hud__content">
@@ -133,7 +152,10 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
             />
           </div>
         </aside>
-        {state.phase && (
+        {gameOver && (
+          <FinalStandings standings={getFinalStandings(state)} checkpointCount={state.checkpointCount} />
+        )}
+        {state.phase && !gameOver && (
           <OtherPlayersPanel
             players={getOtherPlayers(state)}
             checkpointCount={state.checkpointCount}
@@ -143,7 +165,7 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
             paused={state.paused || !state.connected}
           />
         )}
-        {hasHand && (
+        {hasHand && !gameOver && (
           <ProgrammingHand
             key={state.handVersion}
             cards={hand}
@@ -156,17 +178,19 @@ function ActiveGame({ game, username, leaving, onLeave, onLogout, onSettings }: 
             cardDrag={cardDrag}
           />
         )}
+        {gameOver && (
+          <GameOverBanner
+            winnerName={state.winner?.username ?? ''}
+            isWinner={state.winner?.playerId === state.assignment?.playerId}
+            winnerColour={winnerColour}
+            onShowWinner={winnerRobot ? () => setWinnerFocusRequest((request) => request + 1) : undefined}
+            leaving={leaving}
+            onLeave={onLeave}
+          />
+        )}
         {cardDrag.drag && <DraggedCard drag={cardDrag.drag} />}
       </div>
-      {showWinner && (
-        <WinnerPopup
-          winnerName={state.winner?.username ?? ''}
-          isWinner={state.winner?.playerId === state.assignment?.playerId}
-          leaving={leaving}
-          onLeave={onLeave}
-        />
-      )}
-      {!showWinner && (state.paused || !state.connected) && (
+      {!gameOver && (state.paused || !state.connected) && (
         <div className="disconnect-overlay">
           <div className="disconnect-popup">
             <h2>{!state.connected

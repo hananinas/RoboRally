@@ -55,6 +55,11 @@
   padding-block: var(--ui-space-xs) var(--hud-panel-shadow-gutter);
 }
 
+.game-overlay > .final-standings {
+  grid-area: 1 / 1;
+  align-self: start;
+}
+
 /* Panels */
 .hud-panel-surface {
   background: var(--hud-surface);
@@ -557,7 +562,7 @@
 }
 
 /* Disconnect overlay */
-.disconnect-overlay, .winner-overlay {
+.disconnect-overlay {
   position: absolute;
   inset: 0;
   z-index: 100;
@@ -567,7 +572,7 @@
   backdrop-filter: blur(6px);
 }
 
-.disconnect-popup, .winner-popup {
+.disconnect-popup {
   padding: 2rem;
   max-width: calc(100% - 2 * var(--ui-space-lg));
   border-radius: var(--hud-radius);
@@ -576,7 +581,7 @@
   text-align: center;
 }
 
-.disconnect-popup h2, .winner-popup h2 {
+.disconnect-popup h2 {
   margin: 0;
 }
 
@@ -596,7 +601,8 @@
   }
 }
 
-.game-popup__leave {
+.game-popup__leave,
+.game-over-banner__show {
   min-height: var(--ui-control-size);
   margin-top: 1.5rem;
   padding: var(--ui-space-sm) var(--ui-space-md);
@@ -608,7 +614,8 @@
   cursor: pointer;
 }
 
-.game-popup__leave:enabled:hover {
+.game-popup__leave:enabled:hover,
+.game-over-banner__show:hover {
   background: var(--hud-surface-raised);
 }
 
@@ -617,54 +624,58 @@
   cursor: default;
 }
 
-/* Winner celebration */
-.winner-popup {
-  position: relative;
-  z-index: 1;
+/* Game over */
+.game-over-banner {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-md);
+  max-width: min(40rem, calc(100% - 2 * var(--ui-space-lg)));
+  padding: var(--ui-space-md) var(--ui-space-lg);
+  border-radius: var(--hud-radius);
+  box-shadow: var(--hud-panel-shadow);
+  pointer-events: auto;
+  animation: game-over-banner-rise 0.4s var(--hud-card-motion-ease) both;
 }
 
-.winner-popup__trophy {
-  font-size: 3.5rem;
-  line-height: 1;
-  margin-bottom: 0.75rem;
-  animation: winner-trophy-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+.game-over-banner__colour {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
 }
 
-@keyframes winner-trophy-pop {
+.game-over-banner__text {
+  min-width: 0;
+}
+
+.game-over-banner h2 {
+  margin: 0;
+  font-size: var(--hud-font-heading);
+}
+
+.game-over-banner p {
+  margin: var(--ui-space-xs) 0 0;
+  color: var(--hud-text-muted);
+  font-size: var(--hud-font-small);
+}
+
+.game-over-banner__actions {
+  display: flex;
+  flex: none;
+  gap: var(--ui-space-sm);
+}
+
+.game-over-banner .game-popup__leave,
+.game-over-banner .game-over-banner__show {
+  margin-top: 0;
+}
+
+@keyframes game-over-banner-rise {
   from {
     opacity: 0;
-    transform: scale(0) rotate(-20deg);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) rotate(0);
-  }
-}
-
-.winner-confetti {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.winner-confetti__piece {
-  position: absolute;
-  top: -1rem;
-  width: 0.6rem;
-  height: 1rem;
-  border-radius: 2px;
-  animation-name: winner-confetti-fall;
-  animation-timing-function: linear;
-  animation-iteration-count: 3;
-}
-
-@keyframes winner-confetti-fall {
-  from {
-    transform: translateY(0) rotate(var(--confetti-spin));
-  }
-  to {
-    transform: translateY(110vh) rotate(calc(var(--confetti-spin) + 720deg));
+    transform: translateY(1.5rem);
   }
 }
 
@@ -690,17 +701,22 @@
     max-height: 53dvh;
   }
 
-  .game-overlay > .other-players { grid-area: 2 / 1; }
+  .game-overlay > .other-players,
+  .game-overlay > .final-standings { grid-area: 2 / 1; }
 
-  .programming-hand { grid-row: 3; }
+  .programming-hand,
+  .game-over-banner { grid-row: 3; }
+
+  .game-over-banner {
+    flex-wrap: wrap;
+    justify-content: center;
+    text-align: center;
+  }
 }
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .winner-confetti {
-    display: none;
-  }
-  .winner-popup__trophy {
+  .game-over-banner {
     animation: none;
   }
 }

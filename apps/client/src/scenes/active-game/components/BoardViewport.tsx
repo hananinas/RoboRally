@@ -26,12 +26,20 @@ import type {
   BoardTileWalls,
   BoardWallSide,
 } from '../board/boardModel.ts'
-import useBoardInteraction from '../board/useBoardInteraction.ts'
+import useBoardInteraction, { type BoardFocus } from '../board/useBoardInteraction.ts'
 import CheckpointPiece from './CheckpointPiece.tsx'
 import '../board/BoardViewport.css'
+export type BoardCelebration = Readonly<{
+  robotId: string
+  colour: string
+  checkpointNumber: number
+}>
+
 type BoardViewportProps = Readonly<{
   board: BoardRenderModel
   robots: readonly DisplayRobot[]
+  focus?: BoardFocus | null
+  celebration?: BoardCelebration | null
 }>
 
 type PieceStyle = CSSProperties &
@@ -46,6 +54,11 @@ type PieceStyle = CSSProperties &
     '--tank-turn-duration'?: string
     '--pit-fall-duration'?: string
     '--pit-respawn-duration'?: string
+    '--burst-x'?: string
+    '--burst-y'?: string
+    '--burst-spin'?: string
+    '--burst-delay'?: string
+    '--burst-colour'?: string
   }>
 
 function holeColour(blend: number): string {
@@ -157,11 +170,13 @@ const ROBOT_COMPONENTS = [
 
 function RobotPiece({
   board,
+  celebrating,
   componentName,
   layer,
   robot,
 }: Readonly<{
   board: BoardRenderModel
+  celebrating: boolean
   componentName: (typeof ROBOT_COMPONENTS)[number]
   layer: number
   robot: DisplayRobot
@@ -197,6 +212,7 @@ function RobotPiece({
       data-board-tile={`${robot.position.coordinate.x},${robot.position.coordinate.y}`}
       data-robot-id={robot.robotId}
       data-playback-phase={robot.phase}
+      data-celebrating={celebrating || undefined}
       data-robot-sprite-id={robot.robotSpriteId}
       preserveAspectRatio="xMidYMid meet"
       style={style}
@@ -207,7 +223,61 @@ function RobotPiece({
   )
 }
 
-function BoardViewport({ board, robots }: BoardViewportProps) {
+const BURST_COLOURS = ['#f94144', '#f8961e', '#f9c74f', '#90be6d', '#43aa8b', '#577590']
+
+// Fixed spread, so every render and every test shows the same burst.
+const burst: readonly PieceStyle[] = Array.from({ length: 28 }, (_, index) => {
+  const angle = (index / 28) * Math.PI * 2
+  const distance = 70 + (index % 4) * 28
+  return {
+    '--burst-x': `${Math.cos(angle) * distance}px`,
+    '--burst-y': `${Math.sin(angle) * distance}px`,
+    '--burst-spin': `${(index * 47) % 360}deg`,
+    '--burst-delay': `${(index % 7) * 0.05}s`,
+    '--burst-colour': BURST_COLOURS[index % BURST_COLOURS.length],
+  }
+})
+
+// The win is shown on the board itself: a glow under the winning robot and confetti from its tile.
+function VictoryGlow({ board, robot, colour }: Readonly<{
+  board: BoardRenderModel
+  robot: DisplayRobot
+  colour: string
+}>) {
+  const centre = tileCentre(robot.position.coordinate, board, BOARD_CONFIG)
+  const surfaceHeight = 3 / BOARD_CONFIG.parallaxReferenceLayer
+  return (
+    <div
+      className="board-piece board-victory-glow"
+      aria-hidden="true"
+      data-board-tile={`${robot.position.coordinate.x},${robot.position.coordinate.y}`}
+      data-board-height={surfaceHeight}
+      data-board-lift-height={surfaceHeight}
+      style={{
+        left: centre.worldX,
+        top: centre.worldY,
+        width: BOARD_CONFIG.tile * 1.6,
+        zIndex: 1,
+        '--robot-colour': colour,
+      } as PieceStyle}
+    />
+  )
+}
+
+function VictoryBurst({ board, robot }: Readonly<{ board: BoardRenderModel; robot: DisplayRobot }>) {
+  const centre = tileCentre(robot.position.coordinate, board, BOARD_CONFIG)
+  return (
+    <div
+      className="board-victory-burst"
+      aria-hidden="true"
+      style={{ left: centre.worldX, top: centre.worldY }}
+    >
+      {burst.map((style, index) => <span key={index} className="board-victory-burst__piece" style={style} />)}
+    </div>
+  )
+}
+
+function BoardViewport({ board, robots, focus = null, celebration = null }: BoardViewportProps) {
   const viewportRef = useRef<HTMLElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const scene = useMemo(
@@ -220,13 +290,15 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
       ),
     [board],
   )
-  useBoardInteraction({ canvasRef, robots, scene, viewportRef })
+  useBoardInteraction({ canvasRef, focus, robots, scene, viewportRef })
   const checkpointTiles = scene.tiles.filter((tile) => tile.cell.checkpointNumber !== undefined)
   const fallingInto = new Set(robots.flatMap((robot) => robot.phase === 'pit-fall'
     ? [`${robot.position.coordinate.x},${robot.position.coordinate.y}`] : []))
   // Only the robot that is rebooting has this phase, so only its reboot tile spins.
   const rebootingAt = new Set(robots.flatMap((robot) => robot.phase === 'pit-respawn'
     ? [`${robot.position.coordinate.x},${robot.position.coordinate.y}`] : []))
+  const winningRobot = celebration && robots.find((robot) => robot.robotId === celebration.robotId)
+  const topLayer = scene.planes.length - 1
 
   return (
     <main
@@ -267,11 +339,21 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
                 />
               ))}
               {checkpointTiles.map((tile) => (
-                <CheckpointPiece key={`${tile.cell.x},${tile.cell.y}`} tile={tile} layer={layer} />
+                <CheckpointPiece
+                  key={`${tile.cell.x},${tile.cell.y}`}
+                  tile={tile}
+                  layer={layer}
+                  claimedColour={celebration && tile.cell.checkpointNumber === celebration.checkpointNumber
+                    ? celebration.colour : undefined}
+                />
               ))}
+              {layer === 3 && winningRobot && celebration && (
+                <VictoryGlow board={board} robot={winningRobot} colour={celebration.colour} />
+              )}
               {robotComponent && robots.map((robot) => (
                 <RobotPiece
                   board={board}
+                  celebrating={robot.robotId === celebration?.robotId}
                   componentName={robotComponent}
                   key={`${robot.robotId}:${robotComponent}`}
                   layer={layer}
@@ -306,6 +388,7 @@ function BoardViewport({ board, robots }: BoardViewportProps) {
                     ))}
                   </div>
                 ))}
+              {layer === topLayer && winningRobot && <VictoryBurst board={board} robot={winningRobot} />}
             </div>
           )
         })}

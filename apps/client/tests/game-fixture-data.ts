@@ -96,6 +96,7 @@ export type FixtureControl =
   | { type: 'start'; deferred: boolean; outcome?: 'STARTED' | 'LOBBY_MEMBER_DISCONNECTED' }
   | { type: 'respond-start' }
   | { type: 'joined-state'; state: PublicGameState; hand: readonly Card[]; programSubmitted: boolean }
+  | { type: 'won'; playerId: string; username: string }
 
 export type FixtureSnapshot = {
   id: string
