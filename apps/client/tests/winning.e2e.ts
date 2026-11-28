@@ -12,7 +12,7 @@ async function program(page: Page, cards: readonly string[]) {
   await page.getByRole('button', { name: 'Done', exact: true }).click()
 }
 
-test('announces the winner to every player and lets them leave', async ({ browser, page, baseURL }) => {
+test('announces the winner on the board to every player and lets them leave', async ({ browser, page, baseURL }) => {
   const context = await browser.newContext({ baseURL, ignoreHTTPSErrors: true, reducedMotion: 'reduce' })
   const other = await context.newPage()
   try {
@@ -38,22 +38,25 @@ test('announces the winner to every player and lets them leave', async ({ browse
     await program(page, rounds[1])
     await program(other, otherPrograms[1])
     for (const [client, heading] of [[page, 'You win!'], [other, 'bence wins!']] as const) {
-      const dialog = client.getByRole('dialog', { name: 'Game over' })
-      await expect(dialog.getByRole('heading')).toHaveText(heading, { timeout: 15000 })
+      const banner = client.getByRole('region', { name: 'Game over' })
+      await expect(banner.getByRole('heading')).toHaveText(heading, { timeout: 15000 })
       await expect(gameStatus(client)).toHaveText('Game over')
-      await expect(client.locator('.winner-confetti')).toBeHidden()
-      for (const card of await client.getByRole('region', { name: 'Programming hand' }).getByRole('button').all()) {
-        await expect(card).toBeDisabled()
-      }
+      // The board stays uncovered: no popup, and the hand makes room for the banner.
+      await expect(client.getByRole('dialog')).toHaveCount(0)
+      await expect(client.getByRole('region', { name: 'Programming hand' })).toHaveCount(0)
+      await expect(client.locator('[data-robot-id][data-celebrating]')).toHaveCount(8)
+      await expect(client.locator('.board-victory-burst')).toBeHidden()
+      await expect(client.getByRole('complementary', { name: 'Final standings' }).getByRole('listitem').first())
+        .toContainText('bence')
     }
     await expect(page.getByRole('heading', { name: 'Checkpoints', exact: true }).locator('..')).toContainText('2/2')
 
     // The winner leaves first; the other player must still see who won.
-    await page.getByRole('dialog', { name: 'Game over' }).getByRole('button', { name: 'Leave game', exact: true }).click()
+    await page.getByRole('region', { name: 'Game over' }).getByRole('button', { name: 'Leave game', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Create lobby', exact: true })).toBeVisible()
     await expect.poll(() => robotIds(other)).toHaveLength(1)
-    await expect(other.getByRole('dialog', { name: 'Game over' }).getByRole('heading')).toHaveText('bence wins!')
-    await other.getByRole('dialog', { name: 'Game over' }).getByRole('button', { name: 'Leave game', exact: true }).click()
+    await expect(other.getByRole('region', { name: 'Game over' }).getByRole('heading')).toHaveText('bence wins!')
+    await other.getByRole('region', { name: 'Game over' }).getByRole('button', { name: 'Leave game', exact: true }).click()
     await expect(other.getByRole('button', { name: 'Create lobby', exact: true })).toBeVisible()
   } finally {
     await context.close()

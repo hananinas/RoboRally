@@ -201,6 +201,12 @@ function controlFixture(fixture: Fixture, control: FixtureControl) {
       fixture.programSubmitted = control.programSubmitted
       fixture.program = [null, null, null, null, null]
       break
+    case 'won':
+      fixture.state = { ...fixture.state, winner: { playerId: control.playerId, username: control.username } }
+      for (const socket of fixture.sockets) {
+        socket.emit('game.won', { gameId: fixture.state.gameId, playerId: control.playerId, username: control.username })
+      }
+      break
     case 'submission':
       fixture.outcome = control.outcome
       fixture.deferred = control.deferred
