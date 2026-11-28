@@ -1,180 +1,170 @@
-<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
-  <symbol viewBox="0 0 72 72" id="conveyor-1-from-left">
-    <g id="conveyor-1-from-left-background">
-      <rect width="72" height="72" fill="#606A76" />
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <defs>
+    <clipPath id="conveyor-plate-clip">
+      <rect width="72" height="72" rx="10" />
+    </clipPath>
+    <g id="conveyor-plate">
+      <rect width="72" height="72" rx="10" fill="#606a76" />
+      <g fill="#b0b4b8">
+        <circle cx="9" cy="9" r="1.8" />
+        <circle cx="63" cy="9" r="1.8" />
+        <circle cx="9" cy="63" r="1.8" />
+        <circle cx="63" cy="63" r="1.8" />
+      </g>
     </g>
-    <g id="conveyor-1-from-left-belt" fill="none" stroke="#252A31" stroke-width="56" stroke-linejoin="round">
-      <path d="M0 36H22Q36 36 36 22V0" />
+    <path id="conveyor-route-from-left" d="M0 36H12A24 24 0 0 0 36 12V0" />
+    <g id="conveyor-track-from-left" clip-path="url(#conveyor-plate-clip)">
+      <use href="#conveyor-plate" />
+      <g fill="none" stroke-linejoin="round">
+        <use href="#conveyor-route-from-left" stroke="#798694" stroke-width="48" />
+        <use href="#conveyor-route-from-left" stroke="#1b2128" stroke-width="44" />
+        <use href="#conveyor-route-from-left" stroke="#303942" stroke-width="38" />
+        <path id="conveyor-tread-from-left" d="M2.850 20.000L2.850 52.000 M9.850 20.000L9.850 52.000 M13.606 19.837L20.028 51.186 M15.791 19.045L30.957 47.223 M17.657 17.657L40.284 40.284 M19.045 15.791L47.223 30.957 M19.837 13.606L51.186 20.028 M20.000 9.850L52.000 9.850 M20.000 2.850L52.000 2.850" stroke="#414c56" stroke-width="1.5" />
+      </g>
     </g>
-    <g id="conveyor-1-from-left-arrows" fill="none" stroke="#70CE88" stroke-width="6" stroke-linecap="square" stroke-linejoin="miter">
-      <path d="M-11 5L0 -5L11 5" transform="translate(36 15) rotate(0)" />
-      <path d="M-11 5L0 -5L11 5" transform="translate(15 36) rotate(90)" />
+    <path id="conveyor-route-from-right" d="M72 36H60A24 24 0 0 1 36 12V0" />
+    <g id="conveyor-track-from-right" clip-path="url(#conveyor-plate-clip)">
+      <use href="#conveyor-plate" />
+      <g fill="none" stroke-linejoin="round">
+        <use href="#conveyor-route-from-right" stroke="#798694" stroke-width="48" />
+        <use href="#conveyor-route-from-right" stroke="#1b2128" stroke-width="44" />
+        <use href="#conveyor-route-from-right" stroke="#303942" stroke-width="38" />
+        <use href="#conveyor-tread-from-left" transform="translate(72 0) scale(-1 1)" />
+      </g>
     </g>
+    <path id="conveyor-route-left-right" d="M0 36H22Q36 36 36 22V0 M72 36H50Q36 36 36 22V0" />
+    <g id="conveyor-track-left-right" clip-path="url(#conveyor-plate-clip)">
+      <use href="#conveyor-plate" />
+      <g fill="none" stroke-linejoin="round">
+        <use href="#conveyor-route-left-right" stroke="#798694" stroke-width="48" />
+        <use href="#conveyor-route-left-right" stroke="#1b2128" stroke-width="44" />
+        <use href="#conveyor-route-left-right" stroke="#303942" stroke-width="38" />
+        <path id="conveyor-tread-left-right" d="M20 4H52 M20 11H52 M20 18H52 M4 20V52 M11 20V52 M18 20V52 M68 20V52 M61 20V52 M54 20V52" stroke="#414c56" stroke-width="1.5" />
+      </g>
+    </g>
+    <path id="conveyor-route-straight-left" d="M36 72V0 M0 36H22Q36 36 36 22V0" />
+    <g id="conveyor-track-straight-left" clip-path="url(#conveyor-plate-clip)">
+      <use href="#conveyor-plate" />
+      <g fill="none" stroke-linejoin="round">
+        <use href="#conveyor-route-straight-left" stroke="#798694" stroke-width="48" />
+        <use href="#conveyor-route-straight-left" stroke="#1b2128" stroke-width="44" />
+        <use href="#conveyor-route-straight-left" stroke="#303942" stroke-width="38" />
+        <path id="conveyor-tread-straight-left" d="M20 4H52 M20 11H52 M20 18H52 M20 68H52 M20 61H52 M20 54H52 M4 20V52 M11 20V52 M18 20V52" stroke="#414c56" stroke-width="1.5" />
+      </g>
+    </g>
+    <path id="conveyor-route-straight-right" d="M36 72V0 M72 36H50Q36 36 36 22V0" />
+    <g id="conveyor-track-straight-right" clip-path="url(#conveyor-plate-clip)">
+      <use href="#conveyor-plate" />
+      <g fill="none" stroke-linejoin="round">
+        <use href="#conveyor-route-straight-right" stroke="#798694" stroke-width="48" />
+        <use href="#conveyor-route-straight-right" stroke="#1b2128" stroke-width="44" />
+        <use href="#conveyor-route-straight-right" stroke="#303942" stroke-width="38" />
+        <path id="conveyor-tread-straight-right" d="M20 4H52 M20 11H52 M20 18H52 M20 68H52 M20 61H52 M20 54H52 M68 20V52 M61 20V52 M54 20V52" stroke="#414c56" stroke-width="1.5" />
+      </g>
+    </g>
+    <path id="conveyor-route-straight" d="M36 72V0" />
+    <g id="conveyor-track-straight" clip-path="url(#conveyor-plate-clip)">
+      <use href="#conveyor-plate" />
+      <g fill="none" stroke-linejoin="round">
+        <use href="#conveyor-route-straight" stroke="#798694" stroke-width="48" />
+        <use href="#conveyor-route-straight" stroke="#1b2128" stroke-width="44" />
+        <use href="#conveyor-route-straight" stroke="#303942" stroke-width="38" />
+        <path id="conveyor-tread-straight" d="M20 4H52 M20 12H52 M20 20H52 M20 28H52 M20 36H52 M20 44H52 M20 52H52 M20 60H52 M20 68H52" stroke="#414c56" stroke-width="1.5" />
+      </g>
+    </g>
+    <path id="conveyor-route-three-way" d="M36 72V0 M0 36H22Q36 36 36 22V0 M72 36H50Q36 36 36 22V0" />
+    <g id="conveyor-track-three-way" clip-path="url(#conveyor-plate-clip)">
+      <use href="#conveyor-plate" />
+      <g fill="none" stroke-linejoin="round">
+        <use href="#conveyor-route-three-way" stroke="#798694" stroke-width="48" />
+        <use href="#conveyor-route-three-way" stroke="#1b2128" stroke-width="44" />
+        <use href="#conveyor-route-three-way" stroke="#303942" stroke-width="38" />
+        <path id="conveyor-tread-three-way" d="M20 4H52 M20 11H52 M20 18H52 M20 68H52 M20 61H52 M20 54H52 M4 20V52 M11 20V52 M18 20V52 M68 20V52 M61 20V52 M54 20V52" stroke="#414c56" stroke-width="1.5" />
+      </g>
+    </g>
+    <path id="conveyor-1-exit-mark" d="M-11 4L0 -4L11 4" fill="none" stroke="#70ce88" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" />
+    <path id="conveyor-1-entry-mark" d="M-8 4L0 -4L8 4" fill="none" stroke="#70ce88" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.82" />
+    <path id="conveyor-2-exit-mark" d="M-11 0L0 -8L11 0 M-11 9L0 1L11 9" fill="none" stroke="#77b5ff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" />
+    <path id="conveyor-2-entry-mark" d="M-8 0L0 -8L8 0 M-8 9L0 1L8 9" fill="none" stroke="#77b5ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.82" />
+  </defs>
+  <symbol id="conveyor-1-from-left" viewBox="0 0 72 72">
+    <use href="#conveyor-track-from-left" />
+    <use href="#conveyor-1-exit-mark" transform="translate(36 15)" />
+    <use href="#conveyor-1-entry-mark" transform="translate(15 36) rotate(90)" />
   </symbol>
-  <symbol viewBox="0 0 72 72" id="conveyor-1-from-right">
-    <g id="conveyor-1-from-right-background">
-      <rect width="72" height="72" fill="#606A76" />
-    </g>
-    <g id="conveyor-1-from-right-belt" fill="none" stroke="#252A31" stroke-width="56" stroke-linejoin="round">
-      <path d="M72 36H50Q36 36 36 22V0" />
-    </g>
-    <g id="conveyor-1-from-right-arrows" fill="none" stroke="#70CE88" stroke-width="6" stroke-linecap="square" stroke-linejoin="miter">
-      <path d="M-11 5L0 -5L11 5" transform="translate(36 15) rotate(0)" />
-      <path d="M-11 5L0 -5L11 5" transform="translate(57 36) rotate(-90)" />
-    </g>
+  <symbol id="conveyor-1-from-right" viewBox="0 0 72 72">
+    <use href="#conveyor-track-from-right" />
+    <use href="#conveyor-1-exit-mark" transform="translate(36 15)" />
+    <use href="#conveyor-1-entry-mark" transform="translate(57 36) rotate(-90)" />
   </symbol>
-  <symbol viewBox="0 0 72 72" id="conveyor-1-left-right">
-    <g id="conveyor-1-left-right-background">
-      <rect width="72" height="72" fill="#606A76" />
-    </g>
-    <g id="conveyor-1-left-right-belt" fill="none" stroke="#252A31" stroke-width="56" stroke-linejoin="round">
-      <path d="M0 36H22Q36 36 36 22V0 M72 36H50Q36 36 36 22V0" />
-    </g>
-    <g id="conveyor-1-left-right-arrows" fill="none" stroke="#70CE88" stroke-width="6" stroke-linecap="square" stroke-linejoin="miter">
-      <path d="M-11 5L0 -5L11 5" transform="translate(36 15) rotate(0)" />
-      <path d="M-11 5L0 -5L11 5" transform="translate(15 36) rotate(90)" />
-      <path d="M-11 5L0 -5L11 5" transform="translate(57 36) rotate(-90)" />
-    </g>
+  <symbol id="conveyor-1-left-right" viewBox="0 0 72 72">
+    <use href="#conveyor-track-left-right" />
+    <use href="#conveyor-1-exit-mark" transform="translate(36 15)" />
+    <use href="#conveyor-1-entry-mark" transform="translate(15 36) rotate(90)" />
+    <use href="#conveyor-1-entry-mark" transform="translate(57 36) rotate(-90)" />
   </symbol>
-  <symbol viewBox="0 0 72 72" id="conveyor-1-straight-left">
-    <g id="conveyor-1-straight-left-background">
-      <rect width="72" height="72" fill="#606A76" />
-    </g>
-    <g id="conveyor-1-straight-left-belt" fill="none" stroke="#252A31" stroke-width="56" stroke-linejoin="round">
-      <path d="M36 72V0 M0 36H22Q36 36 36 22V0" />
-    </g>
-    <g id="conveyor-1-straight-left-arrows" fill="none" stroke="#70CE88" stroke-width="6" stroke-linecap="square" stroke-linejoin="miter">
-      <path d="M-11 5L0 -5L11 5" transform="translate(36 15) rotate(0)" />
-      <path d="M-11 5L0 -5L11 5" transform="translate(36 57) rotate(0)" />
-      <path d="M-11 5L0 -5L11 5" transform="translate(15 36) rotate(90)" />
-    </g>
+  <symbol id="conveyor-1-straight-left" viewBox="0 0 72 72">
+    <use href="#conveyor-track-straight-left" />
+    <use href="#conveyor-1-exit-mark" transform="translate(36 15)" />
+    <use href="#conveyor-1-entry-mark" transform="translate(36 57)" />
+    <use href="#conveyor-1-entry-mark" transform="translate(15 36) rotate(90)" />
   </symbol>
-  <symbol viewBox="0 0 72 72" id="conveyor-1-straight-right">
-    <g id="conveyor-1-straight-right-background">
-      <rect width="72" height="72" fill="#606A76" />
-    </g>
-    <g id="conveyor-1-straight-right-belt" fill="none" stroke="#252A31" stroke-width="56" stroke-linejoin="round">
-      <path d="M36 72V0 M72 36H50Q36 36 36 22V0" />
-    </g>
-    <g id="conveyor-1-straight-right-arrows" fill="none" stroke="#70CE88" stroke-width="6" stroke-linecap="square" stroke-linejoin="miter">
-      <path d="M-11 5L0 -5L11 5" transform="translate(36 15) rotate(0)" />
-      <path d="M-11 5L0 -5L11 5" transform="translate(36 57) rotate(0)" />
-      <path d="M-11 5L0 -5L11 5" transform="translate(57 36) rotate(-90)" />
-    </g>
+  <symbol id="conveyor-1-straight-right" viewBox="0 0 72 72">
+    <use href="#conveyor-track-straight-right" />
+    <use href="#conveyor-1-exit-mark" transform="translate(36 15)" />
+    <use href="#conveyor-1-entry-mark" transform="translate(36 57)" />
+    <use href="#conveyor-1-entry-mark" transform="translate(57 36) rotate(-90)" />
   </symbol>
-  <symbol viewBox="0 0 72 72" id="conveyor-1-straight">
-    <g id="conveyor-1-straight-background">
-      <rect width="72" height="72" fill="#606A76" />
-    </g>
-    <g id="conveyor-1-straight-belt" fill="none" stroke="#252A31" stroke-width="56" stroke-linejoin="round">
-      <path d="M36 72V0" />
-    </g>
-    <g id="conveyor-1-straight-arrows" fill="none" stroke="#70CE88" stroke-width="6" stroke-linecap="square" stroke-linejoin="miter">
-      <path d="M-11 5L0 -5L11 5" transform="translate(36 15) rotate(0)" />
-      <path d="M-11 5L0 -5L11 5" transform="translate(36 57) rotate(0)" />
-    </g>
+  <symbol id="conveyor-1-straight" viewBox="0 0 72 72">
+    <use href="#conveyor-track-straight" />
+    <use href="#conveyor-1-exit-mark" transform="translate(36 15)" />
+    <use href="#conveyor-1-entry-mark" transform="translate(36 57)" />
   </symbol>
-  <symbol viewBox="0 0 72 72" id="conveyor-1-three-way">
-    <g id="conveyor-1-three-way-background">
-      <rect width="72" height="72" fill="#606A76" />
-    </g>
-    <g id="conveyor-1-three-way-belt" fill="none" stroke="#252A31" stroke-width="56" stroke-linejoin="round">
-      <path d="M36 72V0 M0 36H22Q36 36 36 22V0 M72 36H50Q36 36 36 22V0" />
-    </g>
-    <g id="conveyor-1-three-way-arrows" fill="none" stroke="#70CE88" stroke-width="6" stroke-linecap="square" stroke-linejoin="miter">
-      <path d="M-11 5L0 -5L11 5" transform="translate(36 15) rotate(0)" />
-      <path d="M-11 5L0 -5L11 5" transform="translate(36 57) rotate(0)" />
-      <path d="M-11 5L0 -5L11 5" transform="translate(15 36) rotate(90)" />
-      <path d="M-11 5L0 -5L11 5" transform="translate(57 36) rotate(-90)" />
-    </g>
+  <symbol id="conveyor-1-three-way" viewBox="0 0 72 72">
+    <use href="#conveyor-track-three-way" />
+    <use href="#conveyor-1-exit-mark" transform="translate(36 15)" />
+    <use href="#conveyor-1-entry-mark" transform="translate(36 57)" />
+    <use href="#conveyor-1-entry-mark" transform="translate(15 36) rotate(90)" />
+    <use href="#conveyor-1-entry-mark" transform="translate(57 36) rotate(-90)" />
   </symbol>
-  <symbol viewBox="0 0 72 72" id="conveyor-2-from-left">
-    <g id="conveyor-2-from-left-background">
-      <rect width="72" height="72" fill="#606A76" />
-    </g>
-    <g id="conveyor-2-from-left-belt" fill="none" stroke="#252A31" stroke-width="56" stroke-linejoin="round">
-      <path d="M0 36H22Q36 36 36 22V0" />
-    </g>
-    <g id="conveyor-2-from-left-arrows" fill="none" stroke="#77B5FF" stroke-width="6" stroke-linecap="square" stroke-linejoin="miter">
-      <path d="M-11 -1L0 -11L11 -1 M-11 12L0 2L11 12" transform="translate(36 15) rotate(0)" />
-      <path d="M-11 -1L0 -11L11 -1 M-11 12L0 2L11 12" transform="translate(15 36) rotate(90)" />
-    </g>
+  <symbol id="conveyor-2-from-left" viewBox="0 0 72 72">
+    <use href="#conveyor-track-from-left" />
+    <use href="#conveyor-2-exit-mark" transform="translate(36 15)" />
+    <use href="#conveyor-2-entry-mark" transform="translate(15 36) rotate(90)" />
   </symbol>
-  <symbol viewBox="0 0 72 72" id="conveyor-2-from-right">
-    <g id="conveyor-2-from-right-background">
-      <rect width="72" height="72" fill="#606A76" />
-    </g>
-    <g id="conveyor-2-from-right-belt" fill="none" stroke="#252A31" stroke-width="56" stroke-linejoin="round">
-      <path d="M72 36H50Q36 36 36 22V0" />
-    </g>
-    <g id="conveyor-2-from-right-arrows" fill="none" stroke="#77B5FF" stroke-width="6" stroke-linecap="square" stroke-linejoin="miter">
-      <path d="M-11 -1L0 -11L11 -1 M-11 12L0 2L11 12" transform="translate(36 15) rotate(0)" />
-      <path d="M-11 -1L0 -11L11 -1 M-11 12L0 2L11 12" transform="translate(57 36) rotate(-90)" />
-    </g>
+  <symbol id="conveyor-2-from-right" viewBox="0 0 72 72">
+    <use href="#conveyor-track-from-right" />
+    <use href="#conveyor-2-exit-mark" transform="translate(36 15)" />
+    <use href="#conveyor-2-entry-mark" transform="translate(57 36) rotate(-90)" />
   </symbol>
-  <symbol viewBox="0 0 72 72" id="conveyor-2-left-right">
-    <g id="conveyor-2-left-right-background">
-      <rect width="72" height="72" fill="#606A76" />
-    </g>
-    <g id="conveyor-2-left-right-belt" fill="none" stroke="#252A31" stroke-width="56" stroke-linejoin="round">
-      <path d="M0 36H22Q36 36 36 22V0 M72 36H50Q36 36 36 22V0" />
-    </g>
-    <g id="conveyor-2-left-right-arrows" fill="none" stroke="#77B5FF" stroke-width="6" stroke-linecap="square" stroke-linejoin="miter">
-      <path d="M-11 -1L0 -11L11 -1 M-11 12L0 2L11 12" transform="translate(36 15) rotate(0)" />
-      <path d="M-11 -1L0 -11L11 -1 M-11 12L0 2L11 12" transform="translate(15 36) rotate(90)" />
-      <path d="M-11 -1L0 -11L11 -1 M-11 12L0 2L11 12" transform="translate(57 36) rotate(-90)" />
-    </g>
+  <symbol id="conveyor-2-left-right" viewBox="0 0 72 72">
+    <use href="#conveyor-track-left-right" />
+    <use href="#conveyor-2-exit-mark" transform="translate(36 15)" />
+    <use href="#conveyor-2-entry-mark" transform="translate(15 36) rotate(90)" />
+    <use href="#conveyor-2-entry-mark" transform="translate(57 36) rotate(-90)" />
   </symbol>
-  <symbol viewBox="0 0 72 72" id="conveyor-2-straight-left">
-    <g id="conveyor-2-straight-left-background">
-      <rect width="72" height="72" fill="#606A76" />
-    </g>
-    <g id="conveyor-2-straight-left-belt" fill="none" stroke="#252A31" stroke-width="56" stroke-linejoin="round">
-      <path d="M36 72V0 M0 36H22Q36 36 36 22V0" />
-    </g>
-    <g id="conveyor-2-straight-left-arrows" fill="none" stroke="#77B5FF" stroke-width="6" stroke-linecap="square" stroke-linejoin="miter">
-      <path d="M-11 -1L0 -11L11 -1 M-11 12L0 2L11 12" transform="translate(36 15) rotate(0)" />
-      <path d="M-11 -1L0 -11L11 -1 M-11 12L0 2L11 12" transform="translate(36 57) rotate(0)" />
-      <path d="M-11 -1L0 -11L11 -1 M-11 12L0 2L11 12" transform="translate(15 36) rotate(90)" />
-    </g>
+  <symbol id="conveyor-2-straight-left" viewBox="0 0 72 72">
+    <use href="#conveyor-track-straight-left" />
+    <use href="#conveyor-2-exit-mark" transform="translate(36 15)" />
+    <use href="#conveyor-2-entry-mark" transform="translate(36 57)" />
+    <use href="#conveyor-2-entry-mark" transform="translate(15 36) rotate(90)" />
   </symbol>
-  <symbol viewBox="0 0 72 72" id="conveyor-2-straight-right">
-    <g id="conveyor-2-straight-right-background">
-      <rect width="72" height="72" fill="#606A76" />
-    </g>
-    <g id="conveyor-2-straight-right-belt" fill="none" stroke="#252A31" stroke-width="56" stroke-linejoin="round">
-      <path d="M36 72V0 M72 36H50Q36 36 36 22V0" />
-    </g>
-    <g id="conveyor-2-straight-right-arrows" fill="none" stroke="#77B5FF" stroke-width="6" stroke-linecap="square" stroke-linejoin="miter">
-      <path d="M-11 -1L0 -11L11 -1 M-11 12L0 2L11 12" transform="translate(36 15) rotate(0)" />
-      <path d="M-11 -1L0 -11L11 -1 M-11 12L0 2L11 12" transform="translate(36 57) rotate(0)" />
-      <path d="M-11 -1L0 -11L11 -1 M-11 12L0 2L11 12" transform="translate(57 36) rotate(-90)" />
-    </g>
+  <symbol id="conveyor-2-straight-right" viewBox="0 0 72 72">
+    <use href="#conveyor-track-straight-right" />
+    <use href="#conveyor-2-exit-mark" transform="translate(36 15)" />
+    <use href="#conveyor-2-entry-mark" transform="translate(36 57)" />
+    <use href="#conveyor-2-entry-mark" transform="translate(57 36) rotate(-90)" />
   </symbol>
-  <symbol viewBox="0 0 72 72" id="conveyor-2-straight">
-    <g id="conveyor-2-straight-background">
-      <rect width="72" height="72" fill="#606A76" />
-    </g>
-    <g id="conveyor-2-straight-belt" fill="none" stroke="#252A31" stroke-width="56" stroke-linejoin="round">
-      <path d="M36 72V0" />
-    </g>
-    <g id="conveyor-2-straight-arrows" fill="none" stroke="#77B5FF" stroke-width="6" stroke-linecap="square" stroke-linejoin="miter">
-      <path d="M-11 -1L0 -11L11 -1 M-11 12L0 2L11 12" transform="translate(36 15) rotate(0)" />
-      <path d="M-11 -1L0 -11L11 -1 M-11 12L0 2L11 12" transform="translate(36 57) rotate(0)" />
-    </g>
+  <symbol id="conveyor-2-straight" viewBox="0 0 72 72">
+    <use href="#conveyor-track-straight" />
+    <use href="#conveyor-2-exit-mark" transform="translate(36 15)" />
+    <use href="#conveyor-2-entry-mark" transform="translate(36 57)" />
   </symbol>
-  <symbol viewBox="0 0 72 72" id="conveyor-2-three-way">
-    <g id="conveyor-2-three-way-background">
-      <rect width="72" height="72" fill="#606A76" />
-    </g>
-    <g id="conveyor-2-three-way-belt" fill="none" stroke="#252A31" stroke-width="56" stroke-linejoin="round">
-      <path d="M36 72V0 M0 36H22Q36 36 36 22V0 M72 36H50Q36 36 36 22V0" />
-    </g>
-    <g id="conveyor-2-three-way-arrows" fill="none" stroke="#77B5FF" stroke-width="6" stroke-linecap="square" stroke-linejoin="miter">
-      <path d="M-11 -1L0 -11L11 -1 M-11 12L0 2L11 12" transform="translate(36 15) rotate(0)" />
-      <path d="M-11 -1L0 -11L11 -1 M-11 12L0 2L11 12" transform="translate(36 57) rotate(0)" />
-      <path d="M-11 -1L0 -11L11 -1 M-11 12L0 2L11 12" transform="translate(15 36) rotate(90)" />
-      <path d="M-11 -1L0 -11L11 -1 M-11 12L0 2L11 12" transform="translate(57 36) rotate(-90)" />
-    </g>
+  <symbol id="conveyor-2-three-way" viewBox="0 0 72 72">
+    <use href="#conveyor-track-three-way" />
+    <use href="#conveyor-2-exit-mark" transform="translate(36 15)" />
+    <use href="#conveyor-2-entry-mark" transform="translate(36 57)" />
+    <use href="#conveyor-2-entry-mark" transform="translate(15 36) rotate(90)" />
+    <use href="#conveyor-2-entry-mark" transform="translate(57 36) rotate(-90)" />
   </symbol>
 </svg>
